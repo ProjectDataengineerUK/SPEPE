@@ -3,9 +3,28 @@
 **Sistema de Perfilamento do Eleitorado e Previsão Eleitoral**
 Análise eleitoral brasileira via multi-agentes LLM com arquitetura Medallion no GCP.
 
+**Estado atual:** v4.2 — Design completo, Fase 1 em implementação
+**Próximo:** v1.0.0 — Produção com 5 domínios de dados (2026-Q2)
+
 ---
 
-## Arquitetura do sistema
+## Visão Estratégica (Brainstorm)
+
+SPEPE não é um sistema único — é uma **plataforma de inteligência eleitoral** com **5 motores de dados independentes** convergindo para um único núcleo de decisão:
+
+| Domínio | Missão | Fontes |
+|---------|--------|--------|
+| **Social** | Radar narrativo + sentimento | Twitter/X, Facebook, YouTube, TikTok |
+| **Pesquisas** | Intenção de voto + evolução | TSE, Atlas, institutos de pesquisa |
+| **Dados Públicos** | Contexto estrutural | IBGE (SIDRA), DATASUS |
+| **Eleições** | Comportamento histórico | TSE histórico (2018, 2022, 2026) |
+| **MLOps** | Predição + cenários | Vertex AI, PyMC, SHAP |
+
+**Princípio-mãe:** Ingestão separada, dados padronizados, análise unificada.
+
+---
+
+## Arquitetura do sistema (Fase 1 — Atual)
 
 ```
 Usuário (Chainlit / Dashboard)
@@ -301,28 +320,73 @@ Prompts em `agents/registry/*.md` (frontmatter YAML + system prompt Markdown).
 
 ---
 
-## Fluxo de dados completo
+## Escopo de Dados por Fase
+
+### Fase 1 — v1.0.0 (MVP Produção)
+**Dados:** TSE 2022 + IBGE + Histórico 2018/2022 fixo
+**Cobertura:** Todas as 27 UFs
+**Atualização:** TSE ingerido uma vez (snapshot), IBGE anual
+**Modelos:** Bayesiano (PyMC) — baseline de previsão
+**Consumo:** Dashboard tático + 7 agentes Claude/Gemini
+
+### Fase 2 — v1.5 (Social + Contexto)
+**Dados adicionais:** Twitter/X, Facebook, DATASUS
+**Atualização:** Social em tempo real (streaming), DATASUS mensal
+**Modelos:** NLP (sentimento, polarização), score territorial
+**Consumo:** Alertas de crise, semantic layer views
+
+### Fase 3+ — v2.0+ (Completo)
+**Dados adicionais:** YouTube, TikTok, pesquisas de institutos, dados históricos granulares
+**Modelos:** Feature store maduro, ensemble de modelos
+**Consumo:** API REST interna, Looker Studio, auto-retrain
+
+---
+
+## Fluxo de dados — Fase 1
 
 ```
-TSE (zip) ──────────────────────┐
-IBGE SIDRA API ──────────────── ├─► Bronze (GCS parquet)
-IBGE Localidades API ───────── ─┤     raw/{source}/{year}/{UF}/
-Google Trends (pytrends) ───────┤
-Meta Ad Library API ────────────┘
-         │
-         ▼ silver_transformer.py
-Silver (BigQuery spepe_silver)
-  tse_{uf}_{year}  — normalizado + joined IBGE + DQ score
-         │
-         ▼ gold_builder.py
-Gold (BigQuery spepe_gold)
-  fact_municipio_eleicao  — particionado por ano_eleicao, clusterizado por sg_uf
-  fact_ibge_municipio     — indicadores socioeconômicos
-  fact_candidato_eleicao  — agregado por candidato
-         │
-         ▼
-MLOps (BigQuery spepe_mlops)
-  model_evaluations | bias_metrics | fact_predictions
+FONTES (Fase 1)
+  TSE (zip) ────────────────────────┐
+  IBGE SIDRA API ───────────────── ├─► Bronze (GCS parquet)
+  IBGE Localidades API ──────────── ┤    raw/{source}/{year}/{UF}/
+  Google Trends (pytrends) ──────────┤ ← Opcional: para teste
+  Meta Ad Library API ────────────────┘ ← Opcional: para teste
+           │
+           ▼ silver_transformer.py
+  Silver (BigQuery spepe_silver)
+    tse_{uf}_{year}  — normalizado + joined IBGE + DQ score
+           │
+           ▼ gold_builder.py
+  Gold (BigQuery spepe_gold)
+    fact_municipio_eleicao  — particionado por ano_eleicao, clusterizado por sg_uf
+    fact_ibge_municipio     — indicadores socioeconômicos
+    fact_candidato_eleicao  — agregado por candidato
+           │
+           ▼
+  MLOps (BigQuery spepe_mlops)
+    model_evaluations | bias_metrics | fact_predictions
+           │
+           ▼ [7 Agentes Claude/Gemini]
+  UI (Chainlit + Dashboard)
+```
+
+### Adições Fase 2+
+
+```
+FONTES (Fase 2+)
+  Twitter/X API ─────────────┐
+  Facebook Graph API ────────┤
+  YouTube Data API ──────────├─► Bronze (Cloud Storage streaming)
+  TikTok API ─────────────────┤
+  DATASUS API ────────────────┘
+           │
+           ▼ [NLP, Clustering]
+  Silver (streaming tables)
+    stg_social_event
+    stg_datasus_monthly
+           │
+           ▼ [Feature engineering]
+  Gold + Feature Store
 ```
 
 ---
@@ -338,11 +402,112 @@ MLOps (BigQuery spepe_mlops)
 
 ---
 
-## Pendências conhecidas
+## Roadmap — 4 Fases
 
-- [ ] **URGENTE**: Revogar chave Anthropic exposta em `.env` — ir em `console.anthropic.com`
-- [ ] `eval_runner.py` precisa de bloco `__main__` para executar na CI
-- [ ] IAP não provisionado via Terraform (apenas YAML de documentação)
-- [ ] `fact_municipio_eleicao` no Gold não tem coluna `cd_cargo` — quebra filtro multi-cargo na API
-- [ ] Ingerir dados reais SP 2022 end-to-end para validar pipeline completo
-- [ ] `drift_config.yaml` referenciado por `drift_monitor.py` ainda não existe
+### Fase 1 (v1.0.0 — Atual, ~2026-Q2)
+**MVP: Pesquisas + Dados Públicos + Histórico Fixo**
+- ✅ Arquitetura Medallion single-project (spepe-dev)
+- ✅ TSE (pesquisas) + IBGE (contexto) + Histórico 2018/2022 ingeridos
+- ✅ 7 agentes Claude/Gemini (análise, predição, narrativa)
+- ⏳ Todas as 27 UFs + dados reais
+- ⏳ Dashboard tático (multi-cargo, comparação UFs)
+- ⏳ CI/CD completo (test → staging → prod)
+
+### Fase 2 (v1.5 — ~2026-Q4)
+**Adição: Social + DATASUS + Camada Semântica**
+- Módulo social (Twitter/X, Facebook): sentimento + polarização
+- DATASUS: contexto de saúde + vulnerabilidade territorial
+- Semantic layer: views de consumo (vw_sentimento_municipio, etc.)
+- Alertas de crise por narrativa/tema
+- NLP melhorado (Vertex AI)
+
+### Fase 3 (v2.0 — ~2027-Q2)
+**MLOps Formal + Vertex AI Pipelines**
+- Modelo de cenários (PyMC + Bayesiano)
+- Feature store (características sociais, pesquisas, estruturais)
+- Score territorial (risco político, força narrativa)
+- Auto-retrain com drift detection
+- Canary deployment (10% challenger)
+
+### Fase 4 (v2.5+ — 2027+)
+**Otimização de Custos + Feature Store Maduro**
+- Segregação em projetos GCP (core-analytics, social, pesquisas, dados-públicos, eleições)
+- Folders por ambiente (dev/stg/prod)
+- API interna de inteligência (REST)
+- Dashboard executivo (Looker Studio)
+- Automação pesada
+
+---
+
+## Arquitetura Futura — Multi-Projeto (Fases 2+)
+
+Após validar Fase 1, SPEPE migrará para **3+ projetos GCP por ambiente**:
+
+```
+org-eleicoes/
+  ├── folder-dev/
+  │   ├── prj-dev-core-analytics      (BigQuery central, semantic layer)
+  │   ├── prj-dev-data-platform       (Bronze/Silver — será quebrado em: social/pesquisas/publicos/eleicoes)
+  │   └── prj-dev-ml-platform         (Vertex AI, feature store, modelos)
+  │
+  ├── folder-stg/
+  │   ├── prj-stg-core-analytics
+  │   ├── prj-stg-data-platform
+  │   └── prj-stg-ml-platform
+  │
+  └── folder-prod/
+      ├── prj-prod-core-analytics
+      ├── prj-prod-data-platform (→ social/pesquisas/publicos/eleicoes)
+      └── prj-prod-ml-platform
+```
+
+**Modelo Lógico Comum** (todos os projetos):
+
+Dimensões-mãe:
+- `dim_tempo` — data, semana, mês, ano eleitoral
+- `dim_territorio` — UF, município (IBGE), região
+- `dim_candidato` — id, nome, partido, cargo
+- `dim_tema` — tema político (saúde, economia, etc.)
+- `dim_fonte` — social, pesquisa, IBGE, DATASUS
+
+Fatos:
+- `fato_social` — agregado por hora/dia × tema × candidato × UF
+- `fato_pesquisa` — intenção × instituto × data × candidato × UF
+- `fato_eleicao` — votos históricos 2018/2022/2026 × cargo × UF
+- `fato_ibge` — indicadores estruturais × UF × período
+- `fato_datasus` — saúde pública × UF × período
+
+Chaves-mestras: `cod_municipio_ibge`, `uf`, `ano_eleitoral`, `data_referencia`
+
+---
+
+## Pendências v1.0.0 — Crítico
+
+### 🔴 **Bloqueia Deploy**
+- [ ] **URGENTE**: Revogar ANTHROPIC_API_KEY exposta em `.env` — ir em console.anthropic.com
+- [ ] Committar 4 arquivos .py pendentes + gitignore audit logs
+- [ ] Adicionar `__main__` em mlops/eval/eval_runner.py para CI
+
+### 🟠 **Valida Funcionalidade (Fase 1)**
+- [ ] Pipeline end-to-end: ingerir **todas 27 UFs** 2022 (TSE + IBGE)
+- [ ] Validar coluna `cd_cargo` em Gold (quebra filtro multi-cargo)
+- [ ] Testes passando: pytest + eval_runner + security scan
+- [ ] Compilar e testar Vertex AI pipeline KFP 2.x
+
+### 🟡 **Produção Segura**
+- [ ] Secrets em Secret Manager (ANTHROPIC_API_KEY, META_APP_TOKEN, YOUTUBE_API_KEY)
+- [ ] Provisionar IAP via Terraform (security/iap_config.yaml → google_iap_*)
+- [ ] Validar imports: nenhuma referência a `mcp_servers.*`
+
+### 🟢 **Infraestrutura**
+- [ ] Documentar .env local (README: Quick Start)
+- [ ] Release v1.0.0: branch release/ → tag v1.0.0 → push
+- [ ] Deploy: Terraform apply staging → deploy.yml workflow → prod
+
+---
+
+## Pendências Conhecidas — Documento
+
+Para referência histórica (pode ser feito pós-v1.0.0):
+- [ ] `drift_config.yaml` — existe em mlops/monitoring/, já resolvido
+- [ ] IAP não provisionado (vide Pendências Críticas acima)
