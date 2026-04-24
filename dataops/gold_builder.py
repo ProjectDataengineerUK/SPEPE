@@ -78,7 +78,7 @@ def _build_fact_municipio_eleicao(df: pd.DataFrame) -> pd.DataFrame:
         candidates = df["nm_candidato"].value_counts().head(10).index.tolist()
         for cand in candidates:
             col_name = f"qt_votos_{cand[:20].replace(' ', '_').lower()}"
-            df[col_name] = df.apply(lambda r: r["qt_votos"] if r["nm_candidato"] == cand else 0, axis=1)
+            df[col_name] = df["qt_votos"].where(df["nm_candidato"] == cand, 0)
             agg_cols[col_name] = "sum"
 
         agg_cols["qt_votos"] = "sum"

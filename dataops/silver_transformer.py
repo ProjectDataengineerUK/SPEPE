@@ -166,8 +166,11 @@ def _write_bigquery(df: pd.DataFrame, table_name: str) -> str:
         return table_id
     except ImportError:
         logger.warning("google-cloud-bigquery não disponível. Usando local.")
-        parts = table_name.split("_")
-        return _write_local_silver(df, parts[1], int(parts[2]))
+        # table_name format: tse_{uf}_{year} — uf pode ter underscore, year é sempre 4 dígitos no fim
+        parts = table_name.rsplit("_", 2)
+        if len(parts) == 3:
+            return _write_local_silver(df, parts[1], int(parts[2]))
+        return _write_local_silver(df, "BR", 2022)
 
 
 def _dataframe_to_bq_schema(df: pd.DataFrame) -> list:

@@ -74,8 +74,10 @@ def finalize_promotion(rollback: bool = False) -> None:
         logger.error("No challenger found to finalize promotion")
         return
 
-    with open(CHALLENGER_PATH, "rb") as f:
-        challenger_model = pickle.load(f)
+    raw = CHALLENGER_PATH.read_bytes()
+    if len(raw) < 4:
+        raise RuntimeError("Arquivo challenger.pkl corrompido")
+    challenger_model = pickle.loads(raw)
     with open(CHALLENGER_META_PATH, encoding="utf-8") as f:
         challenger_meta = json.load(f)
 
@@ -118,8 +120,10 @@ def _save_champion(model, metrics: dict, prev_score: float, metric_key: str) -> 
 def load_champion():
     if not CHAMPION_PATH.exists():
         raise FileNotFoundError("Nenhum modelo champion disponível. Execute o pipeline de treino primeiro.")
-    with open(CHAMPION_PATH, "rb") as f:
-        return pickle.load(f)
+    raw = CHAMPION_PATH.read_bytes()
+    if len(raw) < 4:
+        raise RuntimeError("Arquivo champion.pkl corrompido")
+    return pickle.loads(raw)
 
 
 def _register_vertex(model, metrics: dict) -> None:

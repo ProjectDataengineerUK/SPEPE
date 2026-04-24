@@ -11,7 +11,7 @@ from agents.loader import load_agents
 from agents.tools import RunJobArgs, RUN_JOB_TOOL_SCHEMA, run_dataops_job
 from config.session_state import SessionState, BUDGET_USD
 from config.settings import settings
-from security.output_validators import AGENT_VALIDATORS
+from security.output_validators import AGENT_VALIDATORS, validate_input_injection
 
 logger = logging.getLogger("spepe.agents.supervisor")
 
@@ -136,6 +136,11 @@ class Supervisor:
                 refined_prompt: str = tool_use.input["refined_prompt"]
                 is_done: bool = tool_use.input.get("done", False)
 
+                inj_check = validate_input_injection(refined_prompt)
+                if not inj_check.ok:
+                    yield f"⚠️ Prompt bloqueado (injection detectada): {inj_check.reason}"
+                    return
+
                 agent = self._agents.get(agent_id)
                 if not agent:
                     yield f"Agente '{agent_id}' não encontrado."
@@ -149,7 +154,7 @@ class Supervisor:
                     artifacts=state.artifacts,
                 )
 
-                validated_text = self._validate_output(agent_id, resp.text, agent, refined_prompt)
+                validated_text = await self._validate_output(agent_id, resp.text, agent, refined_prompt)
 
                 try:
                     state.add_cost(resp.cost_usd)
@@ -194,7 +199,7 @@ class Supervisor:
         except Exception as e:
             return {"ok": False, "job": raw.get("job", "?"), "error": str(e)}
 
-    def _validate_output(
+    async def _validate_output(
         self, agent_id: str, text: str, agent, prompt: str
     ) -> str:
         validators = AGENT_VALIDATORS.get(agent_id, [])
@@ -205,12 +210,9 @@ class Supervisor:
                     logger.info("Output de %s remediado: %s", agent_id, result.reason)
                     return result.remediated
                 logger.warning("Output de %s falhou validação: %s — re-prompting", agent_id, result.reason)
-                import asyncio
-                retry = asyncio.get_event_loop().run_until_complete(
-                    agent.run_async(
-                        f"Sua resposta anterior violou: {result.reason}. "
-                        f"Reescreva seguindo rigorosamente o Formato de Resposta OBRIGATÓRIO.",
-                    )
+                retry = await agent.run_async(
+                    f"Sua resposta anterior violou: {result.reason}. "
+                    f"Reescreva seguindo rigorosamente o Formato de Resposta OBRIGATÓRIO.",
                 )
                 return retry.text
         return text

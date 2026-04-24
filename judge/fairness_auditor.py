@@ -1,12 +1,34 @@
 from __future__ import annotations
 
 import logging
+import re
 from dataclasses import dataclass, field
 from typing import Any
 
 import numpy as np
 
 logger = logging.getLogger(__name__)
+
+_ALLOWED_DIMENSIONS = {
+    "quintil_renda", "sg_uf", "pct_zona_rural", "cd_municipio_ibge",
+    "regiao", "nm_municipio", "populacao_faixa", "idhm_faixa",
+}
+_ALLOWED_DATASETS = {"spepe_mlops", "spepe_gold", "spepe_silver"}
+_PROJECT_RE = re.compile(r"^[a-z][a-z0-9-]{4,29}$")
+
+
+def _validate_fairness_args(
+    project_id: str, dimensions: list[str], mlops_dataset: str, gold_dataset: str
+) -> None:
+    if not _PROJECT_RE.match(project_id):
+        raise ValueError(f"project_id inválido: {project_id}")
+    invalid_dims = set(dimensions) - _ALLOWED_DIMENSIONS
+    if invalid_dims:
+        raise ValueError(f"Dimensões não permitidas: {invalid_dims}. Permitidas: {_ALLOWED_DIMENSIONS}")
+    if mlops_dataset not in _ALLOWED_DATASETS:
+        raise ValueError(f"mlops_dataset não permitido: {mlops_dataset}")
+    if gold_dataset not in _ALLOWED_DATASETS:
+        raise ValueError(f"gold_dataset não permitido: {gold_dataset}")
 
 
 @dataclass
@@ -44,24 +66,30 @@ def _fetch_audit_rows(
     mlops_dataset: str = "spepe_mlops",
     gold_dataset: str = "spepe_gold",
 ) -> list[dict[str, Any]]:
+    _validate_fairness_args(project_id, dimensions, mlops_dataset, gold_dataset)
     client = _bq_client(project_id)
     if client is None:
         return []
-    select_dims = ", ".join(f"m.{d}" for d in dimensions)
-    query = f"""
+    select_dims = ", ".join(f"m.`{d}`" for d in dimensions)
+    query = """
         SELECT
           p.p_mean,
           e.resultado_real AS y_true,
-          {select_dims}
-        FROM `{project_id}.{mlops_dataset}.fact_predictions` p
-        JOIN `{project_id}.{mlops_dataset}.ground_truth` e
+          {}
+        FROM `{}.{}.fact_predictions` p
+        JOIN `{}.{}.ground_truth` e
           ON p.cod_municipio_ibge = e.cod_municipio_ibge
          AND p.nm_candidato = e.nm_candidato
          AND p.ano_eleicao = e.ano_eleicao
-        JOIN `{project_id}.{gold_dataset}.fact_ibge_municipio` m
+        JOIN `{}.{}.fact_ibge_municipio` m
           ON p.cod_municipio_ibge = m.cod_municipio_ibge
         WHERE p.model_version = @model_version AND p.shadow = true
-    """
+    """.format(
+        select_dims,
+        project_id, mlops_dataset,
+        project_id, mlops_dataset,
+        project_id, gold_dataset,
+    )
     from google.cloud import bigquery
 
     job_config = bigquery.QueryJobConfig(

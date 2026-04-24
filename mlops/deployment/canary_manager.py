@@ -3,12 +3,33 @@ from __future__ import annotations
 
 import logging
 import os
+import re
 import subprocess
 import time
 from dataclasses import dataclass
 from typing import Any
 
 logger = logging.getLogger(__name__)
+
+_REVISION_RE = re.compile(r"^[a-z0-9][a-z0-9-]{0,62}$")
+_SERVICE_RE  = re.compile(r"^[a-z][a-z0-9-]{0,48}$")
+_REGION_RE   = re.compile(r"^[a-z]+-[a-z]+-[a-z0-9]+$")
+_PROJECT_RE  = re.compile(r"^[a-z][a-z0-9-]{4,29}$")
+
+
+def _validate_gcloud_args(service: str, project_id: str, region: str) -> None:
+    if not _SERVICE_RE.match(service):
+        raise ValueError(f"Nome de serviço inválido: {service}")
+    if not _PROJECT_RE.match(project_id):
+        raise ValueError(f"project_id inválido: {project_id}")
+    if not _REGION_RE.match(region):
+        raise ValueError(f"Região inválida: {region}")
+
+
+def _validate_revision(rev: str) -> str:
+    if not _REVISION_RE.match(rev):
+        raise ValueError(f"Nome de revisão inválido: {rev}")
+    return rev
 
 CANARY_TRAFFIC_PCT = 10
 EVAL_WINDOW_HOURS = 48
@@ -33,6 +54,9 @@ def start_canary(
 ) -> CanaryState:
     project_id = project_id or os.environ.get("GCP_PROJECT_ID", "spepe-dev")
     region = region or os.environ.get("GCP_REGION", "southamerica-east1")
+
+    _validate_gcloud_args(service, project_id, region)
+    _validate_revision(challenger_revision)
 
     champion_revision = _get_latest_serving_revision(service, project_id, region)
 

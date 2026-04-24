@@ -190,6 +190,44 @@ Para GCP produção — todas as secrets via Secret Manager, não .env.
 
 ---
 
+## Seleção de Modelo por Complexidade
+
+Use o modelo adequado à complexidade da tarefa para otimizar custo e qualidade.
+
+| Complexidade | Modelo | ID | Quando usar |
+|---|---|---|---|
+| **Alta** | Claude Opus 4.7 | `claude-opus-4-7` | Arquitetura, design de sistemas, debugging difícil, análise estratégica, código crítico |
+| **Média** | Claude Sonnet 4.6 | `claude-sonnet-4-6` | Desenvolvimento geral, refatoração, explicações, revisão de código |
+| **Leve** | Claude Haiku 4.5 | `claude-haiku-4-5-20251001` | Formatação, renomeações, buscas simples, perguntas diretas, edições pontuais |
+
+### Exemplos de classificação
+
+**Opus 4.7 (complexo):**
+- Desenhar nova arquitetura de agentes ou pipeline
+- Debug de falha silenciosa em Silver transformer
+- Avaliar trade-offs de multi-projeto GCP
+- Revisar lógica PyMC ou SHAP
+
+**Sonnet 4.6 (médio):**
+- Escrever novo Cloud Run Job
+- Refatorar silver_transformer.py
+- Explicar fluxo Medallion
+- Adicionar testes pytest
+
+**Haiku 4.5 (leve):**
+- Renomear variável ou arquivo
+- Formatar tabela Markdown
+- Buscar onde uma função é usada
+- Corrigir typo em prompt de agente
+
+### Histórico de uso
+
+| Data | Tarefa | Modelo usado | Resultado |
+|---|---|---|---|
+| 2026-04-24 | Criar seção de seleção de modelo | Sonnet 4.6 | ✅ OK |
+
+---
+
 ## Regras de código
 
 ### Imports — clientes corretos

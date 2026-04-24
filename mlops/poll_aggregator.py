@@ -49,6 +49,9 @@ def aggregate_polls(
     df["intencao_pct_num"] = pd.to_numeric(df[intencao_col], errors="coerce")
     df = df.dropna(subset=["intencao_pct_num"])
 
+    if df.empty:
+        return {"status": "no_data", "message": f"Nenhum valor numérico válido para '{candidate}'."}
+
     if instituto_col in df.columns:
         df["house_effect"] = df[instituto_col].str.lower().map(
             lambda x: HOUSE_EFFECTS.get(x.strip(), 0.0) if pd.notna(x) else 0.0

@@ -11,12 +11,20 @@ import pandas as pd
 
 logger = logging.getLogger("spepe.archetype.cache")
 
-CACHE_DIR = Path("output/archetype_cache")
+CACHE_DIR = Path(__file__).parent.parent / "output" / "archetype_cache"
 
 
 def _cache_key(escopo: str, feature_set: str, n_rows: int) -> str:
     raw = f"{escopo}:{feature_set}:{n_rows}"
-    return hashlib.md5(raw.encode()).hexdigest()[:12]
+    return hashlib.sha256(raw.encode()).hexdigest()[:16]
+
+
+def _verify_pickle(path: Path) -> bytes:
+    """Lê e verifica que o arquivo pickle existe e não está vazio antes de carregar."""
+    data = path.read_bytes()
+    if len(data) < 4:
+        raise ValueError(f"Arquivo de cache corrompido: {path}")
+    return data
 
 
 def save_pipeline_result(
@@ -61,5 +69,5 @@ def load_pipeline_result(escopo: str, feature_set: str, n_rows: int) -> dict | N
     cache_path = CACHE_DIR / f"archetype_{key}.pkl"
     if not cache_path.exists():
         return None
-    with open(cache_path, "rb") as f:
-        return pickle.load(f)
+    data = _verify_pickle(cache_path)
+    return pickle.loads(data)

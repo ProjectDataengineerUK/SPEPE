@@ -83,7 +83,10 @@ def detect_drift(
             is_categorical = False
             threshold = js_threshold
         else:
-            feat_name = feature_cfg.get("name", feature_cfg)
+            feat_name = feature_cfg.get("name", "")
+            if not feat_name:
+                logger.warning("Feature config sem 'name': %s — ignorado", feature_cfg)
+                continue
             is_categorical = feature_cfg.get("type") == "categorical"
             threshold = cat_threshold if is_categorical else js_threshold
 

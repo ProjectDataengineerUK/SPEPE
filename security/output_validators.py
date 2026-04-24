@@ -75,12 +75,24 @@ def validate_input_injection(text: str) -> ValidationResult:
     """Block common prompt injection patterns."""
     _injection_patterns = [
         r"(?i)ignore\s+(previous|all|your)\s+instructions",
-        r"(?i)você\s+agora\s+é",
+        r"(?i)você\s+agora\s+[eé]",
         r"(?i)esqueça\s+(seu|o)\s+sistema",
         r"(?i)new\s+instructions?:",
         r"(?i)system\s+prompt\s+override",
         r"(?i)jailbreak",
         r"(?i)DAN\s+mode",
+        r"(?i)act\s+as\s+(a\s+)?(?!analyst|agent)",
+        r"(?i)pretend\s+(you\s+are|to\s+be)",
+        r"(?i)your\s+new\s+(persona|role|instructions?)",
+        r"(?i)ignore\s+all\s+previous",
+        r"(?i)disregard\s+(your|all|previous)",
+        r"(?i)override\s+(your\s+)?instructions",
+        r"(?i)forget\s+(your\s+)?(training|instructions|system)",
+        r"(?i)(novo|nova)\s+(sistema|instrução|prompt)",
+        r"(?i)fingi[ar]\s+que\s+(você\s+é|é)",
+        r"(?i)aja\s+como\s+(se\s+você\s+fosse|um)",
+        r"(?i)<\s*/?system\s*>",
+        r"(?i)\[INST\]|\[\/INST\]",
     ]
     for pattern in _injection_patterns:
         if re.search(pattern, text):

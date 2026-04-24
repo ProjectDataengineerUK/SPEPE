@@ -33,9 +33,22 @@ def build_pipeline():
         gold_table: str,
         output_dataset: Output[Dataset],
     ) -> None:
+        import re
         from google.cloud import bigquery
+
+        _ALLOWED_DATASETS = {"spepe_gold", "spepe_silver", "spepe_mlops"}
+        _NAME_RE = re.compile(r"^[a-zA-Z][a-zA-Z0-9_]{0,127}$")
+        _PROJECT_RE = re.compile(r"^[a-z][a-z0-9-]{4,29}$")
+
+        if not _PROJECT_RE.match(project_id):
+            raise ValueError(f"project_id inválido: {project_id}")
+        if gold_dataset not in _ALLOWED_DATASETS:
+            raise ValueError(f"dataset não permitido: {gold_dataset}")
+        if not _NAME_RE.match(gold_table):
+            raise ValueError(f"nome de tabela inválido: {gold_table}")
+
         client = bigquery.Client(project=project_id)
-        query = f"SELECT * FROM `{project_id}.{gold_dataset}.{gold_table}`"
+        query = "SELECT * FROM `{}.{}.{}`".format(project_id, gold_dataset, gold_table)
         df = client.query(query).to_dataframe()
         df.to_parquet(output_dataset.path, index=False)
 
@@ -87,9 +100,12 @@ def build_pipeline():
         import pickle
         from sklearn.metrics import accuracy_score, brier_score_loss
 
+        from pathlib import Path
         df = pd.read_parquet(input_dataset.path)
-        with open(input_model.path, "rb") as f:
-            model_dict = pickle.load(f)
+        raw = Path(input_model.path).read_bytes()
+        if len(raw) < 4:
+            raise RuntimeError("Arquivo de modelo corrompido")
+        model_dict = pickle.loads(raw)
 
         model = model_dict["model"]
         feature_cols = model_dict["feature_cols"]

@@ -32,6 +32,11 @@ _SQL_INJECTION_PATTERNS = [
     r"--\s*$",
     r"'\s*OR\s*'1'\s*=\s*'1",
     r"1\s*=\s*1\s*--",
+    r";\s*CREATE\s+OR\s+REPLACE",
+    r"\bEXPORT\s+DATA\b",
+    r";\s*CALL\s+",
+    r"\bINTO\s+OUTFILE\b",
+    r"INFORMATION_SCHEMA\s*\.\s*TABLES",
 ]
 
 _COMPILED_DESTRUCTIVE = [re.compile(p, re.IGNORECASE) for p in _DESTRUCTIVE_PATTERNS]

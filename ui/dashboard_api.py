@@ -19,7 +19,9 @@ import os
 import uuid
 from typing import Any
 
-from fastapi import Query, WebSocket, WebSocketDisconnect
+from enum import Enum
+
+from fastapi import Header, HTTPException, Query, WebSocket, WebSocketDisconnect
 from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 
@@ -59,14 +61,28 @@ async def serve_dashboard() -> FileResponse:
 
 
 @_fastapi_app.get("/api/auth/me")
-async def auth_me() -> JSONResponse:
-    """Retorna perfil do usuário autenticado. Em prod valida Firebase ID token."""
-    return JSONResponse({
-        "uid": "demo-user",
-        "email": "jonalic@gmail.com",
-        "name": "J. Lima",
-        "plan": "pro",
-    })
+async def auth_me(authorization: str = Header(default=None)) -> JSONResponse:
+    """Retorna perfil do usuário autenticado. Valida Firebase ID token em produção."""
+    import os
+    if os.environ.get("FIREBASE_PROJECT_ID"):
+        if not authorization or not authorization.startswith("Bearer "):
+            raise HTTPException(status_code=401, detail="Token não fornecido")
+        token = authorization[7:]
+        try:
+            from google.auth.transport import requests as grequests
+            from google.oauth2 import id_token
+            decoded = id_token.verify_firebase_token(token, grequests.Request())
+            return JSONResponse({
+                "uid": decoded["uid"],
+                "email": decoded.get("email", ""),
+                "name": decoded.get("name", ""),
+                "plan": "pro",
+            })
+        except Exception:
+            raise HTTPException(status_code=401, detail="Token inválido")
+
+    # Dev/local: stub sem auth
+    return JSONResponse({"uid": "demo-user", "email": "", "name": "Demo", "plan": "pro"})
 
 
 # ── Candidatos por cargo / UF / ano ───────────────────────────────────────
@@ -207,7 +223,7 @@ async def get_municipios(
     cargo: str = Query("Presidente"),
     uf: str = Query("SP"),
     ano: int = Query(2022),
-    limit: int = Query(20),
+    limit: int = Query(20, ge=1, le=200),
 ) -> JSONResponse:
     return JSONResponse({"municipios": _MOCK_MUNICIPIOS[:limit]})
 
@@ -287,6 +303,15 @@ async def get_meta(
 # ── Mapa eleitoral — dados por nível geográfico ───────────────────────────
 
 
+class NivelGeo(str, Enum):
+    nacional  = "nacional"
+    regiao    = "regiao"
+    uf        = "uf"
+    municipio = "municipio"
+    zona      = "zona"
+    secao     = "secao"
+
+
 _CARGO_CD = {"Presidente": 1, "Governador": 3, "Senador": 5, "Dep. Federal": 6, "Dep. Estadual": 7}
 
 _UF_IBGE = {
@@ -354,7 +379,7 @@ _MOCK_MAPA_REGIAO = {
 
 @_fastapi_app.get("/api/mapa/{nivel}")
 async def get_mapa(
-    nivel: str,
+    nivel: NivelGeo,
     cargo: str = Query("Presidente"),
     ano: int = Query(2022),
     uf: str = Query(None),
@@ -367,7 +392,7 @@ async def get_mapa(
     nivel: nacional | regiao | uf | municipio | zona | secao
     Retorna lista de features com: id, label, lider, partido, pct, segundo, pct2, ibge_code
     """
-    nivel = nivel.lower()
+    nivel = nivel.value
 
     if nivel == "nacional":
         lula_votos = sum(1 for v in _MOCK_MAPA_UF.values() if v["lider"] == "Lula")
@@ -463,10 +488,7 @@ async def get_mapa(
             "nivel": "secao", "uf": uf_upper, "cd_municipio": mun, "nr_zona": zona, "features": features,
         })
 
-    return JSONResponse(
-        {"error": f"Nível inválido: {nivel}. Use: nacional|regiao|uf|municipio|zona|secao"},
-        status_code=400,
-    )
+    return JSONResponse({"error": "Nível não implementado"}, status_code=400)
 
 
 # ── WebSocket Chat → Supervisor ────────────────────────────────────────────
@@ -533,8 +555,8 @@ async def ws_chat(websocket: WebSocket) -> None:
 
             await websocket.send_json({
                 "type": "done",
-                "cost": round(state.total_cost, 5),
-                "budget_remaining": round(2.0 - state.total_cost, 4),
+                "cost": round(state.total_cost_usd, 5),
+                "budget_remaining": round(2.0 - state.total_cost_usd, 4),
                 "dashboard_update": dashboard_update,
             })
 

@@ -14,10 +14,26 @@ from __future__ import annotations
 import hashlib
 import logging
 import os
+import re
 from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
 
 logger = logging.getLogger("spepe.dataops.versioning")
+
+_ALLOWED_DATASETS = {"spepe_gold", "spepe_silver", "spepe_mlops", "spepe_snapshots"}
+_TABLE_RE = re.compile(r"^[a-zA-Z][a-zA-Z0-9_]{0,127}$")
+_SNAPSHOT_DATASET_RE = re.compile(r"^[a-zA-Z][a-zA-Z0-9_]{0,127}$")
+
+
+def _validate_table_ref(table_ref: str) -> None:
+    parts = table_ref.split(".")
+    if len(parts) != 2:
+        raise ValueError(f"source_table deve ser 'dataset.tabela': {table_ref}")
+    dataset, table = parts
+    if dataset not in _ALLOWED_DATASETS:
+        raise ValueError(f"Dataset não permitido: {dataset}. Permitidos: {_ALLOWED_DATASETS}")
+    if not _TABLE_RE.match(table):
+        raise ValueError(f"Nome de tabela inválido: {table}")
 
 
 @dataclass
@@ -58,6 +74,8 @@ class SnapshotManager:
         if not self.project_id:
             raise RuntimeError("GCP_PROJECT_ID not configured")
 
+        _validate_table_ref(source_table)
+
         try:
             from google.cloud import bigquery  # type: ignore
         except ImportError as exc:
@@ -71,14 +89,15 @@ class SnapshotManager:
 
         now = datetime.now(timezone.utc)
         expires = now + timedelta(days=self.retention_days)
+        expires_iso = expires.strftime("%Y-%m-%dT%H:%M:%SZ")
 
-        query = f"""
-        CREATE SNAPSHOT TABLE `{snapshot_fq}`
-        CLONE `{source_fq}`
+        query = """
+        CREATE SNAPSHOT TABLE `{}`
+        CLONE `{}`
         OPTIONS (
-          expiration_timestamp = TIMESTAMP '{expires.isoformat()}'
+          expiration_timestamp = TIMESTAMP '{}'
         )
-        """
+        """.format(snapshot_fq, source_fq, expires_iso)
         logger.info("Creating snapshot: %s", snapshot_fq)
         job = client.query(query)
         job.result()
@@ -102,7 +121,7 @@ class SnapshotManager:
 
     def _count_rows(self, client, fq_table: str) -> int | None:
         try:
-            q = f"SELECT COUNT(*) AS n FROM `{fq_table}`"
+            q = "SELECT COUNT(*) AS n FROM `{}`".format(fq_table)
             for row in client.query(q).result():
                 return int(row.n)
         except Exception as exc:
