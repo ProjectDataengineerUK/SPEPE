@@ -1,3 +1,69 @@
 {
-  "model": "claude-haiku-4-5-20251001"
+  "model": "claude-sonnet-4-6",
+  "permissions": {
+    "allow": [
+      "Read",
+      "Write",
+      "Edit",
+      "Glob",
+      "Grep",
+      "Bash"
+    ]
+  },
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Read|Grep|Glob",
+        "hooks": [
+          {
+            "type": "agent",
+            "prompt": "Classifica se esta é uma busca/leitura COMPLEXA que requer raciocínio profundo (análise de padrões, debugging, correlação de dados). Responde: 'complex' ou 'simple'.",
+            "model": "claude-haiku-4-5-20251001",
+            "statusMessage": "Triando tarefa leve...",
+            "timeout": 5
+          }
+        ]
+      },
+      {
+        "matcher": "Agent",
+        "hooks": [
+          {
+            "type": "agent",
+            "prompt": "Esta tarefa é DESIGN, PLANEJAMENTO, ou ANÁLISE PROFUNDA que requer raciocínio intenso? Responde 'complex' ou 'standard'.",
+            "model": "claude-sonnet-4-6",
+            "statusMessage": "Avaliando complexidade da tarefa...",
+            "timeout": 5
+          }
+        ]
+      }
+    ],
+    "PostToolUse": [
+      {
+        "matcher": "Write|Edit",
+        "hooks": [
+          {
+            "type": "agent",
+            "prompt": "Valide brevemente: o código/conteúdo escrito está correto, seguro e segue as convenções do projeto? Responde 'OK' ou descreve problemas.",
+            "model": "claude-haiku-4-5-20251001",
+            "statusMessage": "Verificando qualidade do código...",
+            "timeout": 10
+          }
+        ]
+      },
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "agent",
+            "prompt": "O comando executado teve sucesso? Houve erros ou avisos importantes? Responde 'SUCCESS' ou descreve problemas.",
+            "model": "claude-haiku-4-5-20251001",
+            "statusMessage": "Validando saída do comando...",
+            "timeout": 5
+          }
+        ]
+      }
+    ]
+  },
+  "effortLevel": "high",
+  "alwaysThinkingEnabled": true
 }

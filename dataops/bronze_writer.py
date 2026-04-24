@@ -26,18 +26,29 @@ def write_bronze(
     uf: str,
     filename: str,
     use_gcs: bool = False,
+    base_path: str = None,
 ) -> str:
     """Write DataFrame to Bronze layer (immutable, partitioned by source/year/uf).
+
+    Args:
+        df: Data to write
+        source: Data source (tse, ibge, digital, etc.)
+        year: Year of data
+        uf: State code (UF)
+        filename: Output filename
+        use_gcs: Write to GCS instead of local
+        base_path: Override base directory for local writes (for testing)
 
     Returns the path where data was written.
     """
     if use_gcs and GCS_BUCKET:
         return _write_gcs(df, source, year, uf, filename)
-    return _write_local(df, source, year, uf, filename)
+    return _write_local(df, source, year, uf, filename, base_path=base_path)
 
 
-def _write_local(df: pd.DataFrame, source: str, year: int, uf: str, filename: str) -> str:
-    out_dir = LOCAL_BRONZE_DIR / source / str(year) / uf.upper()
+def _write_local(df: pd.DataFrame, source: str, year: int, uf: str, filename: str, base_path: str = None) -> str:
+    base = Path(base_path) if base_path else LOCAL_BRONZE_DIR
+    out_dir = base / source / str(year) / uf.upper()
     out_dir.mkdir(parents=True, exist_ok=True)
     out_path = out_dir / filename
 

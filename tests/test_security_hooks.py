@@ -41,15 +41,15 @@ class TestDLPHook:
     def test_dlp_hook_returns_block_message(self):
         from hooks.dlp_hook import dlp_hook
 
-        result_with_pii = {"output": "Eleitor CPF 111.222.333-44 compareceu"}
-        response = dlp_hook("bash", result_with_pii, session_id="test")
+        result_with_pii = "Eleitor CPF 111.222.333-44 compareceu"
+        response = dlp_hook("bash", {}, tool_output=result_with_pii)
         assert response is not None
 
     def test_dlp_hook_returns_none_for_clean(self):
         from hooks.dlp_hook import dlp_hook
 
-        clean_result = {"output": "Taxa de abstenção: 20.3% em 2022"}
-        response = dlp_hook("read_file", clean_result, session_id="test")
+        clean_result = "Taxa de abstenção: 20.3% em 2022"
+        response = dlp_hook("read_file", {}, tool_output=clean_result)
         assert response is None
 
 
@@ -62,7 +62,7 @@ class TestRateLimitHook:
         _session_request_counts[session_id] = 0
 
         for _ in range(10):
-            response = rate_limit_hook("any_tool", {}, session_id=session_id)
+            response = rate_limit_hook(session_id)
             assert response is None
 
     def test_blocks_on_session_limit(self):
@@ -73,7 +73,7 @@ class TestRateLimitHook:
         session_id = "rl-test-session-limit"
         _session_request_counts[session_id] = MAX_REQUESTS_PER_SESSION
 
-        response = rate_limit_hook("any_tool", {}, session_id=session_id)
+        response = rate_limit_hook(session_id)
         assert response is not None
         assert "limit" in response.lower() or "excedido" in response.lower()
 
@@ -84,32 +84,33 @@ class TestRateLimitHook:
         _session_request_counts[session_id] = 0
 
         for _ in range(3):
-            rate_limit_hook("tool", {}, session_id=session_id)
+            rate_limit_hook(session_id)
 
         stats = get_session_stats(session_id)
-        assert "session_count" in stats
-        assert stats["session_count"] >= 3
+        assert "total_requests" in stats
+        assert stats["total_requests"] >= 3
 
 
 class TestSecurityHook:
     def test_blocks_sql_injection_drop(self):
         from hooks.security_hook import check_sql_injection
 
-        result = check_sql_injection("SELECT * FROM table; DROP TABLE users;")
+        result = check_sql_injection("run_query", {"sql": "SELECT * FROM table; DROP TABLE users;"})
         assert result is not None
 
     def test_blocks_sql_injection_union(self):
         from hooks.security_hook import check_sql_injection
 
-        result = check_sql_injection("' UNION ALL SELECT password FROM admin --")
+        result = check_sql_injection("run_query", {"sql": "' UNION ALL SELECT password FROM admin --"})
         assert result is not None
 
     def test_allows_clean_sql(self):
         from hooks.security_hook import check_sql_injection
 
         result = check_sql_injection(
-            "SELECT cd_municipio, SUM(qt_votos) FROM spepe_silver.tse_2022 "
-            "WHERE ano_eleicao = 2022 GROUP BY cd_municipio LIMIT 100"
+            "run_query",
+            {"sql": "SELECT cd_municipio, SUM(qt_votos) FROM spepe_silver.tse_2022 "
+                    "WHERE ano_eleicao = 2022 GROUP BY cd_municipio LIMIT 100"}
         )
         assert result is None
 
@@ -117,7 +118,7 @@ class TestSecurityHook:
         from hooks.security_hook import check_bigquery_cost
 
         expensive_query = "SELECT * FROM spepe_gold.fact_municipio_eleicao"
-        result = check_bigquery_cost(expensive_query)
+        result = check_bigquery_cost("bigquery", {"sql": expensive_query})
         assert result is not None
 
     def test_allows_bigquery_with_where(self):
@@ -127,7 +128,7 @@ class TestSecurityHook:
             "SELECT * FROM spepe_gold.fact_municipio_eleicao "
             "WHERE ano_eleicao = 2022"
         )
-        result = check_bigquery_cost(safe_query)
+        result = check_bigquery_cost("bigquery", {"sql": safe_query})
         assert result is None
 
     def test_allows_bigquery_with_limit(self):
@@ -136,7 +137,7 @@ class TestSecurityHook:
         safe_query = (
             "SELECT * FROM spepe_silver.tse_2022 LIMIT 1000"
         )
-        result = check_bigquery_cost(safe_query)
+        result = check_bigquery_cost("bigquery", {"sql": safe_query})
         assert result is None
 
 

@@ -40,6 +40,7 @@ data/
 
 # Logs
 logs/
+output/              # Runtime outputs: audit, reports, temp
 *.log
 
 # Cache
