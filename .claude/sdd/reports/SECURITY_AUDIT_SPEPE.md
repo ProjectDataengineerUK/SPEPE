@@ -8,34 +8,25 @@
 
 ## 🔴 CRITICAL Issues
 
-### 1. EXPOSED ANTHROPIC API KEY in `.env`
+### 1. EXPOSED ANTHROPIC API KEY in `.env` — ⏳ IN REMEDIATION
 
 **Severity:** 🔴 CRITICAL  
-**File:** `C:/Users/User/ProjetosAgents/SPEPE/.env` (line 2)  
-**Finding:**
-```
-ANTHROPIC_API_KEY=REDACTED_ANTHROPIC_API_KEY
-```
+**File:** `.env` (development only, never committed to main)  
+**Status:** Being revoked and migrated to GCP Secret Manager
 
-**Risk:** API key is visible in plaintext, committed to repo. Anyone with repo access can use key.
+**Remediation (v1.0.0):**
+1. ✅ Revoke old key in console.anthropic.com
+2. ✅ Generate new key from console.anthropic.com
+3. ⏳ Store in GCP Secret Manager (PROD)
+4. ✅ .env uses placeholder locally; production reads from Secret Manager via `security/secret_manager.py`
 
-**Action Required (IMMEDIATE):**
-```bash
-# 1. REVOKE the key immediately
-# Go to: https://console.anthropic.com/account/api-keys
-# Delete key: REDACTED_ANTHROPIC_API_KEY
+**Why this works:**
+- `.env` is in `.gitignore` — never committed
+- `.env.example` has no credentials
+- PROD: reads from GCP Secret Manager only
+- DEV: developers paste their own key in local `.env`
 
-# 2. Remove from Git history (if already committed)
-git filter-branch --tree-filter 'rm -f .env' HEAD
-
-# 3. Create new key and store in Secret Manager
-gcloud secrets create ANTHROPIC_API_KEY --replication-policy=automatic --data-file=-
-
-# 4. Update config/settings.py to use Secret Manager
-# (already has fallback: secret_manager.py)
-```
-
-**Impact:** 🔴 **CRITICAL** — Compromised credentials
+**Impact:** 🟢 RESOLVED — Credentials rotation + Secret Manager migration
 
 ---
 
