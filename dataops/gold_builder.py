@@ -54,6 +54,12 @@ def _build_fact_municipio_eleicao(df: pd.DataFrame) -> pd.DataFrame:
     if df.empty:
         return pd.DataFrame()
 
+    # Convert Arrow strings to regular strings to avoid pandas dtype issues
+    df = df.copy()
+    for col in df.columns:
+        if hasattr(df[col].dtype, 'name') and 'string' in str(df[col].dtype):
+            df[col] = df[col].astype(str)
+
     preferred_keys = ["cod_municipio_ibge", "cd_municipio"]
     municipality_key = next((k for k in preferred_keys if k in df.columns), None)
     if municipality_key is None:
@@ -91,7 +97,8 @@ def _build_fact_municipio_eleicao(df: pd.DataFrame) -> pd.DataFrame:
     if not avail_group or not avail_agg:
         return df
 
-    fact = df.groupby(avail_group).agg(avail_agg).reset_index()
+    # Use as_index=False to keep groupby columns as regular columns (avoid index conflicts)
+    fact = df.groupby(avail_group, as_index=False).agg(avail_agg)
     logger.info(f"fact_municipio_eleicao: {len(fact)} rows, {len(fact.columns)} colunas")
     return fact
 
