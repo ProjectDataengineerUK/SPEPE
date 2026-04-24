@@ -33,6 +33,18 @@ data/
 *.csv
 *.xlsx
 
+# Modelos treinados (pickle — podem conter dados de treino)
+*.pkl
+output/models/
+
+# Artefatos ML
+output/shap/
+output/mlops/
+output/ml_pipeline.yaml
+
+# Arquivos de cache de arquétipos
+output/archetype_cache/
+
 # Terraform
 .terraform/
 *.tfstate*
