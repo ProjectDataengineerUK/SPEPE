@@ -1,0 +1,87 @@
+defaults:
+  region: southamerica-east1
+  vertex_region: us-central1  # Vertex AI not available in southamerica-east1
+
+environments:
+  dev:
+    project_id: spepe-dev
+    gcs_bucket: spepe-dev-data
+    cloud_run_service: spepe-dev
+    cloud_run_min_instances: 0
+    cloud_run_max_instances: 2
+    cloud_run_cpu: "1"
+    cloud_run_memory: 2Gi
+    bigquery:
+      silver_dataset: spepe_silver
+      gold_dataset: spepe_gold
+      location: southamerica-east1
+    firestore:
+      database: "(default)"
+      collection_memory: spepe_memory
+    logging:
+      level: DEBUG
+      export_to_cloud: false
+
+  staging:
+    project_id: spepe-staging
+    gcs_bucket: spepe-staging-data
+    cloud_run_service: spepe-staging
+    cloud_run_min_instances: 0
+    cloud_run_max_instances: 3
+    cloud_run_cpu: "1"
+    cloud_run_memory: 2Gi
+    bigquery:
+      silver_dataset: spepe_silver
+      gold_dataset: spepe_gold
+      location: southamerica-east1
+    firestore:
+      database: "(default)"
+      collection_memory: spepe_memory
+    logging:
+      level: INFO
+      export_to_cloud: true
+
+  prod:
+    project_id: spepe-prod
+    gcs_bucket: spepe-prod-data
+    cloud_run_service: spepe-prod
+    cloud_run_min_instances: 1
+    cloud_run_max_instances: 5
+    cloud_run_cpu: "2"
+    cloud_run_memory: 4Gi
+    bigquery:
+      silver_dataset: spepe_silver
+      gold_dataset: spepe_gold
+      location: southamerica-east1
+    firestore:
+      database: "(default)"
+      collection_memory: spepe_memory
+    logging:
+      level: WARNING
+      export_to_cloud: true
+
+gcs_paths:
+  bronze_tse: bronze/tse
+  bronze_ibge: bronze/ibge
+  bronze_digital: bronze/digital
+  bronze_pesquisas: bronze/pesquisas
+  models: models
+  shap: shap
+  audit_logs: audit-logs
+
+scheduler_jobs:
+  tse_ingest:
+    schedule: "0 2 1 * *"
+    uri_path: /jobs/tse-ingest
+  ibge_sync:
+    schedule: "0 3 1 * *"
+    uri_path: /jobs/ibge-sync
+  silver_transform:
+    schedule: "0 4 * * 0"
+    uri_path: /jobs/silver-transform
+  gold_build:
+    schedule: "0 6 * * 0"
+    uri_path: /jobs/gold-build
+  digital_ingest:
+    schedule: "0 1 * * *"
+    uri_path: /jobs/digital-ingest

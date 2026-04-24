@@ -1,0 +1,38 @@
+{
+  "suite_name": "tse_silver",
+  "description": "Data quality expectations for TSE Silver layer",
+  "expectations": [
+    {
+      "type": "expect_column_values_to_not_be_null",
+      "kwargs": {"column": "cd_municipio"}
+    },
+    {
+      "type": "expect_column_values_to_not_be_null",
+      "kwargs": {"column": "qt_votos"}
+    },
+    {
+      "type": "expect_column_values_to_not_be_null",
+      "kwargs": {"column": "nr_zona"}
+    },
+    {
+      "type": "expect_column_values_to_not_be_null",
+      "kwargs": {"column": "sg_uf"}
+    },
+    {
+      "type": "expect_column_values_to_be_between",
+      "kwargs": {"column": "qt_votos", "min_value": 0}
+    },
+    {
+      "type": "expect_table_row_count_to_be_between",
+      "kwargs": {"min_value": 1000}
+    },
+    {
+      "type": "expect_column_to_exist",
+      "kwargs": {"column": "nm_candidato"}
+    },
+    {
+      "type": "expect_column_to_exist",
+      "kwargs": {"column": "ds_cargo"}
+    }
+  ]
+}

@@ -1,0 +1,63 @@
+project: ${GCP_PROJECT_ID}
+location: southamerica-east1
+
+jobs:
+  - name: spepe-tse-ingest-2022-sp
+    description: "Download TSE SP 2022 → Bronze (one-time historical)"
+    schedule: "0 2 1 * *"
+    timezone: "America/Sao_Paulo"
+    http_target:
+      uri: "${CLOUD_RUN_JOBS_URL}/tse-ingest"
+      http_method: POST
+      body: '{"uf": "SP", "year": 2022}'
+      headers:
+        Content-Type: application/json
+    retry_config:
+      retry_count: 2
+      max_retry_duration: 3600s
+
+  - name: spepe-ibge-sync-monthly
+    description: "IBGE SIDRA sync SP — mensal"
+    schedule: "0 3 1 * *"
+    timezone: "America/Sao_Paulo"
+    http_target:
+      uri: "${CLOUD_RUN_JOBS_URL}/ibge-sync"
+      http_method: POST
+      body: '{"uf": "SP"}'
+      headers:
+        Content-Type: application/json
+    retry_config:
+      retry_count: 2
+
+  - name: spepe-silver-transform-weekly
+    description: "Bronze → Silver transform — semanal"
+    schedule: "0 4 * * 0"
+    timezone: "America/Sao_Paulo"
+    http_target:
+      uri: "${CLOUD_RUN_JOBS_URL}/silver-transform"
+      http_method: POST
+      body: '{"uf": "SP", "years": [2014, 2018, 2022]}'
+    retry_config:
+      retry_count: 1
+
+  - name: spepe-gold-build-weekly
+    description: "Silver → Gold build — semanal (após Silver)"
+    schedule: "0 6 * * 0"
+    timezone: "America/Sao_Paulo"
+    http_target:
+      uri: "${CLOUD_RUN_JOBS_URL}/gold-build"
+      http_method: POST
+      body: '{}'
+    retry_config:
+      retry_count: 1
+
+  - name: spepe-digital-ingest-daily
+    description: "Digital signal (Trends, Meta Ads) — diário durante eleição"
+    schedule: "0 1 * * *"
+    timezone: "America/Sao_Paulo"
+    http_target:
+      uri: "${CLOUD_RUN_JOBS_URL}/digital-ingest"
+      http_method: POST
+      body: '{}'
+    retry_config:
+      retry_count: 2

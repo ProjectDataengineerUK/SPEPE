@@ -1,0 +1,36 @@
+# CDC strategies per source.
+# Referência: DESIGN_SPEPE.md — Decisão 17 (DataOps Nível 5).
+
+version: "1.0"
+
+sources:
+  tse:
+    strategy: event_triggered       # GCS notification → Pub/Sub `bronze-new-file`
+    watermark_column: updated_at
+    fallback: full_refresh           # TSE historical has no timestamps
+    frequency: on_event
+
+  ibge:
+    strategy: scheduled              # IBGE SIDRA updates quarterly
+    watermark_column: data_atualizacao
+    frequency: monthly
+    cron: "0 3 1 * *"
+    fallback: full_refresh
+
+  digital:
+    strategy: streaming              # Pub/Sub → Dataflow (fato_social)
+    watermark_column: collected_at
+    frequency: continuous
+    window_seconds: 300              # micro-batch every 5 minutes
+
+  pesquisas:
+    strategy: event_triggered
+    watermark_column: data_pesquisa
+    fallback: full_refresh
+    frequency: on_event
+
+defaults:
+  lookback_window_hours: 72          # to handle late-arriving data
+  max_delta_rows_per_batch: 500000
+  checkpoint_store: bigquery          # stores last watermark per source/partition
+  checkpoint_table: spepe_mlops.cdc_checkpoints

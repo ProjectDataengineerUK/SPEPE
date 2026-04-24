@@ -1,0 +1,79 @@
+# Data Contract: Bronze → Silver
+# Referência: DESIGN_SPEPE.md — Decisão 15 (Data Contracts ODCS-inspired).
+# Validação: dataops/contracts/contract_validator.py (runtime + CI).
+
+contract_version: "1.0"
+producer: "tse_ingest_job | ibge_sync_job | digital_ingest_job"
+consumer: "silver_transform_job"
+
+sla:
+  freshness_max_hours:
+    tse: 24
+    ibge: 72
+    digital: 6
+    pesquisas: 24
+
+schema_requirements:
+  tse:
+    required_columns:
+      - cod_municipio_ibge      # global key (7-digit IBGE)
+      - cd_municipio            # TSE code (transient — is mapped to IBGE in Silver)
+      - sg_uf
+      - ano_eleicao
+      - nm_candidato
+      - qt_votos
+      - cd_cargo
+      - nr_turno
+    types:
+      cod_municipio_ibge: int64
+      cd_municipio: int64
+      ano_eleicao: int64
+      qt_votos: int64
+    no_nulls:
+      - cd_municipio
+      - ano_eleicao
+      - sg_uf
+    ranges:
+      qt_votos: {min: 0}
+
+  ibge:
+    required_columns:
+      - cod_municipio_ibge
+      - sg_uf
+      - nm_municipio
+    types:
+      cod_municipio_ibge: int64
+    no_nulls:
+      - cod_municipio_ibge
+      - sg_uf
+
+  digital:
+    required_columns:
+      - cod_municipio_ibge
+      - semana_ref
+      - volume_mencoes
+      - fonte
+    lgpd_level: municipio        # aggregate-only; no individual data
+    no_nulls:
+      - cod_municipio_ibge
+      - semana_ref
+    ranges:
+      volume_mencoes: {min: 0}
+
+  pesquisas:
+    required_columns:
+      - instituto
+      - data_pesquisa
+      - candidato
+      - intencao_pct
+    ranges:
+      intencao_pct: {min: 0, max: 100}
+
+quality_gates:
+  municipio_coverage_pct: 95     # % municipalities expected per UF
+  null_pk_max: 0
+  duplicate_pk_max_pct: 0.1
+
+on_violation: block              # block Silver transform
+alert_channel: slack + cloud_logging
+severity: P1

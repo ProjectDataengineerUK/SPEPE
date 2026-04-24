@@ -1,0 +1,71 @@
+# RBAC — Três papéis funcionais mapeados a grupos Google Workspace
+# Referência: DESIGN_SPEPE.md — Decisão 14 e Access Control Model
+# Aplicado por: infra/terraform/bigquery_rbac.tf + security/row_access_policies.sql
+
+version: "1.0"
+
+roles:
+  spepe_viewer:
+    google_group: spepe-viewers@dominio.com
+    description: "Lê dashboards e outputs de agentes; sem acesso a dados brutos Gold."
+    capabilities:
+      read_dashboards: true
+      read_agent_outputs: true
+      run_slash_commands: false
+      read_gold_tables: false
+      read_mlops: false
+    iam_roles:
+      - roles/run.invoker
+      - roles/iap.httpsResourceAccessor
+
+  spepe_analyst:
+    google_group: spepe-analysts@dominio.com
+    description: "Executa slash commands; lê Gold filtrado por UF atribuída; sem colunas restritas."
+    capabilities:
+      read_dashboards: true
+      read_agent_outputs: true
+      run_slash_commands: true
+      read_gold_tables: true
+      read_mlops: false
+      run_dataops_jobs: false
+      run_mlops_pipeline: false
+    row_level_security:
+      field: sg_uf
+      attribute: uf_filter       # session_user_attributes via IAP
+    column_denies:
+      - fact_pesquisa.house_effect_adj
+      - fact_pesquisa.record_confidence_score
+      - fact_predictions.p_mean
+      - fact_predictions.p_lower
+      - fact_predictions.p_upper
+      - bias_metrics.bias_score_by_group
+    iam_roles:
+      - roles/run.invoker
+      - roles/iap.httpsResourceAccessor
+      - roles/bigquery.dataViewer   # com column-level ACLs + RLS
+
+  spepe_admin:
+    google_group: spepe-admins@dominio.com
+    description: "Acesso completo; pode executar jobs DataOps e MLOps; lê colunas restritas."
+    capabilities:
+      read_dashboards: true
+      read_agent_outputs: true
+      run_slash_commands: true
+      read_gold_tables: true
+      read_mlops: true
+      run_dataops_jobs: true
+      run_mlops_pipeline: true
+      modify_prompts: true
+      read_restricted_columns: true
+    iam_roles:
+      - roles/run.invoker
+      - roles/iap.httpsResourceAccessor
+      - roles/bigquery.dataOwner
+      - roles/aiplatform.user
+      - roles/storage.objectAdmin
+
+audit:
+  log_access_to_restricted_columns: true
+  alert_on_restricted_access_by_non_admin: true
+  severity: P1
+  channel: pagerduty+cloud_logging

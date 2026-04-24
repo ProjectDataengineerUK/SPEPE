@@ -1,0 +1,58 @@
+feature_store:
+  name: spepe_feature_store
+  project: ${GCP_PROJECT_ID}
+  location: us-central1
+  online_store_fixed_node_count: 1
+
+entity_types:
+  - entity_type_id: municipio
+    description: "Brazilian municipality electoral and socioeconomic features"
+    monitoring_config:
+      snapshot_analysis:
+        disabled: false
+        monitoring_interval_days: 7
+    features:
+      # Socioeconomic
+      - feature_id: idhm_2010
+        value_type: DOUBLE
+      - feature_id: idhm_educacao
+        value_type: DOUBLE
+      - feature_id: renda_media_domiciliar
+        value_type: DOUBLE
+      - feature_id: pct_analfabetos
+        value_type: DOUBLE
+      - feature_id: anos_estudo_medio
+        value_type: DOUBLE
+      - feature_id: pct_rural
+        value_type: DOUBLE
+      - feature_id: pib_per_capita
+        value_type: DOUBLE
+      - feature_id: taxa_desemprego
+        value_type: DOUBLE
+      - feature_id: gini
+        value_type: DOUBLE
+      # Electoral 2022
+      - feature_id: pct_votos_pt_2022
+        value_type: DOUBLE
+      - feature_id: pct_votos_pl_2022
+        value_type: DOUBLE
+      - feature_id: comparecimento_2022
+        value_type: DOUBLE
+      # Electoral 2018
+      - feature_id: pct_votos_pt_2018
+        value_type: DOUBLE
+      - feature_id: pct_votos_psl_2018
+        value_type: DOUBLE
+      # Electoral 2014
+      - feature_id: pct_votos_pt_2014
+        value_type: DOUBLE
+      # Cluster
+      - feature_id: archetype_id
+        value_type: INT64
+      - feature_id: archetype_label
+        value_type: STRING
+      # Geographic
+      - feature_id: sg_uf
+        value_type: STRING
+      - feature_id: populacao_2022
+        value_type: INT64

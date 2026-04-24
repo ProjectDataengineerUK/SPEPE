@@ -1,0 +1,57 @@
+{
+  "name": "SPEPE LLMOps Dashboard",
+  "description": "Executive dashboard: cost, cache hit rate, eval score, hallucination rate, output drift",
+  "data_sources": [
+    {
+      "name": "llm_cost_logs",
+      "type": "cloud_logging_bigquery_sink",
+      "project": "${GCP_PROJECT_ID}",
+      "dataset": "spepe_logs",
+      "table": "llm_cost_events",
+      "filter": "jsonPayload.llm_cost IS NOT NULL"
+    },
+    {
+      "name": "semantic_cache_metrics",
+      "type": "cloud_monitoring",
+      "metric": "custom.googleapis.com/spepe/cache_hit_rate"
+    },
+    {
+      "name": "continuous_eval_scores",
+      "type": "bigquery",
+      "project": "${GCP_PROJECT_ID}",
+      "dataset": "spepe_mlops",
+      "table": "continuous_eval_scores"
+    }
+  ],
+  "pages": [
+    {
+      "title": "Cost & Utilization",
+      "charts": [
+        {"type": "time_series", "metric": "usd_per_hour_by_agent"},
+        {"type": "pie", "metric": "cost_share_by_model"},
+        {"type": "table", "metric": "top_users_by_cost_24h"}
+      ]
+    },
+    {
+      "title": "Quality Gates",
+      "charts": [
+        {"type": "scorecard", "metric": "disclaimer_rate_last_24h", "target": 1.0},
+        {"type": "time_series", "metric": "continuous_eval_score_24h"},
+        {"type": "time_series", "metric": "hallucination_rate_24h"}
+      ]
+    },
+    {
+      "title": "Performance",
+      "charts": [
+        {"type": "time_series", "metric": "cache_hit_rate_by_agent"},
+        {"type": "histogram", "metric": "p95_latency_ms_by_agent"},
+        {"type": "time_series", "metric": "output_drift_z_score"}
+      ]
+    }
+  ],
+  "alerts": [
+    {"name": "disclaimer_rate_below_target", "threshold": 1.0, "severity": "P1"},
+    {"name": "eval_score_below_threshold", "threshold": 0.85, "severity": "P1"},
+    {"name": "cost_burst_detected", "threshold_multiplier": 3.0, "severity": "P2"}
+  ]
+}

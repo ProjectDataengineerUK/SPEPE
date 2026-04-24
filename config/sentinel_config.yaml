@@ -1,0 +1,47 @@
+sentinel:
+  run_mode: event_driven
+  genai_interpreter_model: claude-sonnet-4-6
+  kb_collection: sentinel_kb
+  project_id: ${GCP_PROJECT_ID}
+
+  watchers:
+    dataops:
+      freshness_slo_hours: 6
+      dq_pass_threshold: 0.95
+    mlops:
+      js_threshold: 0.10
+      brier_threshold: 0.25
+      canary_relative_degradation: 0.10
+    infra:
+      api_p99_ms_threshold: 1500
+      budget_warn_pct: 0.75
+    social:
+      z_threshold: 3.0
+      window: 1h
+
+  cooldowns:
+    retrain: 72h
+    rollback: 24h
+    pipeline_retry: 30min
+    scale_job: 1h
+    block_pipeline: 1h
+
+  auto_actions_enabled:
+    drift_detected: true
+    pipeline_failure: true
+    freshness_slo_breach: true
+    bias_alert: false
+    contract_breach: true
+    canary_degradation: true
+    budget_warning: false
+    social_burst: true
+    dq_violation: true
+
+  alerts_topic: sentinel-alerts
+  events_subscription: sentinel-events-sub
+  slack_webhook: ${SLACK_WEBHOOK}
+  alert_channel: "#spepe-sentinel"
+
+  thresholds:
+    auto_action_min_confidence: 0.70
+    escalate_to_human_below: 0.55

@@ -1,0 +1,54 @@
+# Environment & Secrets
+.env
+.env.*
+*.key
+*.pem
+secrets/
+config/secrets.yaml
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+venv/
+ENV/
+env/
+.venv
+pip-log.txt
+pip-delete-this-directory.txt
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+
+# Data
+data/
+*.parquet
+*.csv
+*.xlsx
+
+# Terraform
+.terraform/
+*.tfstate*
+.terraform.lock.hcl
+
+# Logs
+logs/
+*.log
+
+# Cache
+.cache/
+.pytest_cache/
+.mypy_cache/
+.coverage
+
+# Build
+build/
+dist/
+*.egg-info/

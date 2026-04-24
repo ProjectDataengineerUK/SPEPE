@@ -1,0 +1,50 @@
+{"id": "eval-001", "agent": "modelista", "input": "/prever Lula São Paulo 2026", "expected_patterns": ["IC 95%", "DISCLAIMER", "Premissas"], "required_fields": ["pct", "ci_lower", "ci_upper"]}
+{"id": "eval-002", "agent": "narrador", "input": "/relatorio", "expected_patterns": ["chance", "estimativa", "limitaç"], "forbidden_words": ["bootstrap", "SHAP", "cluster", "logístico"]}
+{"id": "eval-003", "agent": "explicador", "input": "/explicar", "expected_patterns": ["SHAP", "correlações", "causalidade"], "required_fields": ["top-10"]}
+{"id": "eval-004", "agent": "perfilador", "input": "/arquétipos SP", "expected_patterns": ["arquétipos", "silhouette", "mapa"], "required_fields": ["label", "municípios"]}
+{"id": "eval-005", "agent": "analista", "input": "/perfil São Paulo zona 001 2022 presidente", "expected_patterns": ["TSE", "IBGE", "socioeconômico"], "required_fields": ["candidato", "votos"]}
+{"id": "eval-006", "agent": "supervisor", "input": "/health", "expected_patterns": ["Coletor", "Perfilador", "Modelista", "Narrador", "Explicador"], "required_fields": ["status"]}
+{"id": "eval-007", "agent": "modelista", "input": "/prever Bolsonaro Rio de Janeiro 2026", "expected_patterns": ["IC 95%", "DISCLAIMER", "bootstrap"], "required_fields": ["pct", "ci_lower", "ci_upper"]}
+{"id": "eval-008", "agent": "narrador", "input": "/relatorio (após arquétipos BR)", "expected_patterns": ["grupos", "municípios", "padrão"], "forbidden_words": ["HDBSCAN", "UMAP", "K-means"]}
+{"id": "eval-009", "agent": "coletor", "input": "/coletar SP 2022", "expected_patterns": ["Bronze", "Silver", "DQ score", "Gold"], "required_fields": ["rows"]}
+{"id": "eval-010", "agent": "supervisor", "input": "Qual é a probabilidade do Lula ganhar em MG?", "expected_patterns": ["/prever", "Modelista"], "check_routing": true}
+{"id": "eval-011", "agent": "modelista", "input": "/prever Ciro Gomes Minas Gerais 2026", "expected_patterns": ["IC 95%", "DISCLAIMER", "Premissas"], "edge_case": "low_data_candidate"}
+{"id": "eval-012", "agent": "supervisor", "input": "Mostre o mapa do eleitorado brasileiro", "expected_patterns": ["/arquétipos", "Perfilador"], "check_routing": true}
+{"id": "eval-013", "agent": "analista", "input": "/perfil Campinas 2018 governador", "expected_patterns": ["TSE 2018", "IBGE"], "required_fields": ["candidato"]}
+{"id": "eval-014", "agent": "explicador", "input": "/explicar (após prever Lula SP)", "expected_patterns": ["correlações", "variáveis", "não implicam causalidade"], "required_fields": ["feature"]}
+{"id": "eval-015", "agent": "supervisor", "input": "/plan Fazer análise completa do eleitorado de SP", "expected_patterns": ["coletar", "arquétipos", "prever"], "check_decomposition": true}
+{"id": "eval-016", "agent": "modelista", "input": "Região sem dados: /prever Candidato X Acre 2026", "expected_patterns": ["dados insuficientes", "IC mais largo", "DISCLAIMER"], "edge_case": "missing_data"}
+{"id": "eval-017", "agent": "coletor", "input": "/coletar RJ 2018", "expected_patterns": ["Bronze", "Silver", "DQ"], "year": 2018}
+{"id": "eval-018", "agent": "narrador", "input": "/relatorio (IC 95% técnico presente)", "check": "no_technical_jargon", "forbidden_words": ["IC 95%", "bootstrap", "SHAP", "logístico"]}
+{"id": "eval-019", "agent": "supervisor", "input": "Quanto custa esta sessão?", "expected_patterns": ["USD", "budget", "sessão"], "check_budget_reporting": true}
+{"id": "eval-020", "agent": "perfilador", "input": "/arquétipos RJ", "expected_patterns": ["silhouette", "arquétipos", "mapa"], "required_fields": ["label"]}
+{"id": "eval-021", "agent": "analista", "input": "/perfil Belém 2022 presidente", "expected_patterns": ["TSE", "IBGE", "votos"], "region": "norte"}
+{"id": "eval-022", "agent": "modelista", "input": "/prever Lula RS 2026", "expected_patterns": ["IC 95%", "DISCLAIMER"], "region": "sul"}
+{"id": "eval-023", "agent": "explicador", "input": "/explicar (após análise de Lula)", "check_top_n": 10, "expected_patterns": ["IDH", "renda", "rural"]}
+{"id": "eval-024", "agent": "supervisor", "input": "Simone Tebet tem chance no interior de SP?", "expected_patterns": ["/prever", "/perfil"], "check_routing": true}
+{"id": "eval-025", "agent": "coletor", "input": "/coletar MG 2014", "expected_patterns": ["Bronze", "2014", "DQ"], "year": 2014}
+{"id": "eval-026", "agent": "analista", "input": "/perfil interior São Paulo 2022", "expected_patterns": ["municípios", "correlação", "TSE"], "required_fields": ["candidato"]}
+{"id": "eval-027", "agent": "supervisor", "input": "Quero exportar os dados para Jupyter", "expected_patterns": ["data/gold", "parquet", "pandas"], "check_data_export": true}
+{"id": "eval-028", "agent": "narrador", "input": "/relatorio (saída de arquétipos nordeste)", "check": "accessible_language", "expected_patterns": ["grupos", "municípios"]}
+{"id": "eval-029", "agent": "modelista", "input": "/prever Lula BR 2026", "expected_patterns": ["IC 95%", "DISCLAIMER", "nacional"], "scope": "BR"}
+{"id": "eval-030", "agent": "supervisor", "input": "/health (após deploy completo)", "expected_patterns": ["Coletor", "Perfilador", "Analista", "Modelista", "Narrador", "Explicador", "OK"], "check_all_agents": true}
+{"id": "eval-031", "agent": "modelista", "input": "/prever candidato X com dados insuficientes", "expected_patterns": ["dados insuficientes", "DISCLAIMER", "IC mais largo"], "edge_case": "insufficient_data"}
+{"id": "eval-032", "agent": "perfilador", "input": "/arquétipos BR", "expected_patterns": ["5570", "municípios", "mapa"], "scope": "BR"}
+{"id": "eval-033", "agent": "supervisor", "input": "Qual o arquétipo de Campinas?", "expected_patterns": ["/arquétipos", "/perfil"], "check_routing": true}
+{"id": "eval-034", "agent": "analista", "input": "/perfil Fortaleza 2022 presidente", "expected_patterns": ["TSE", "IBGE", "Nordeste"], "region": "nordeste"}
+{"id": "eval-035", "agent": "explicador", "input": "/explicar (modelo treinado em SP)", "expected_patterns": ["correlações", "causalidade", "SHAP"], "required_fields": ["feature"]}
+{"id": "eval-036", "agent": "coletor", "input": "/coletar SP 2022 (segundo run — deve usar cache)", "expected_patterns": ["cache", "existente"], "check_idempotency": true}
+{"id": "eval-037", "agent": "modelista", "input": "/prever múltiplos candidatos SP", "expected_patterns": ["IC 95%", "DISCLAIMER"], "check_multiple": true}
+{"id": "eval-038", "agent": "supervisor", "input": "Preciso de um relatório para o jornal", "expected_patterns": ["/relatorio", "Narrador"], "check_routing": true}
+{"id": "eval-039", "agent": "narrador", "input": "/relatorio (previsão com IC)", "check": "removes_ic_notation", "expected_patterns": ["chance", "entre", "e"]}
+{"id": "eval-040", "agent": "supervisor", "input": "Budget está acabando — o que fazer?", "expected_patterns": ["USD", "sessão", "economizar"], "check_budget_guidance": true}
+{"id": "eval-041", "agent": "analista", "input": "/perfil nordeste 2022", "expected_patterns": ["municípios", "IBGE", "TSE"], "region": "nordeste"}
+{"id": "eval-042", "agent": "perfilador", "input": "/arquétipos (silhouette < 0.45, fallback K-means)", "expected_patterns": ["K-means", "fallback", "aviso"], "edge_case": "low_silhouette"}
+{"id": "eval-043", "agent": "modelista", "input": "/prever com pesquisas disponíveis", "expected_patterns": ["pesquisas", "house effect", "IC 95%"], "check_poll_aggregation": true}
+{"id": "eval-044", "agent": "supervisor", "input": "LGPD — os dados são individuais?", "expected_patterns": ["município", "agregado", "LGPD", "individual nunca"], "check_lgpd": true}
+{"id": "eval-045", "agent": "explicador", "input": "/explicar (alta importância de renda)", "expected_patterns": ["renda", "famílias", "correlação"], "check_feature_translation": true}
+{"id": "eval-046", "agent": "coletor", "input": "/coletar SP 2022 (DQ score < 95%)", "expected_patterns": ["DQ", "aviso", "bloqueado"], "edge_case": "dq_failure"}
+{"id": "eval-047", "agent": "supervisor", "input": "Compare o eleitorado de SP e MG", "expected_patterns": ["/arquétipos", "/perfil", "comparação"], "check_multi_uf": true}
+{"id": "eval-048", "agent": "narrador", "input": "/relatorio (SHAP na entrada)", "check": "no_shap_jargon", "forbidden_words": ["SHAP", "shapley", "valores de importância técnica"]}
+{"id": "eval-049", "agent": "modelista", "input": "/prever Lula SP 2026 (com dados 2022)", "expected_patterns": ["IC 95%", "2022", "DISCLAIMER"], "check_year_scope": true}
+{"id": "eval-050", "agent": "supervisor", "input": "O que o SPEPE pode me entregar?", "expected_patterns": ["/arquétipos", "/prever", "/explicar", "/relatorio"], "check_capabilities": true}

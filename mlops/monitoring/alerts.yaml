@@ -1,0 +1,35 @@
+alerting_policies:
+  - display_name: spepe-model-drift-alert
+    conditions:
+      - display_name: Model drift threshold exceeded
+        condition_threshold:
+          filter: 'resource.type = "aiplatform.googleapis.com/Endpoint" AND metric.type = "aiplatform.googleapis.com/prediction/online/prediction_count"'
+          comparison: COMPARISON_GT
+          threshold_value: 0.1
+          duration: 3600s
+    notification_channels:
+      - projects/${GCP_PROJECT_ID}/notificationChannels/${ALERT_CHANNEL_ID}
+    alert_strategy:
+      auto_close: 86400s
+
+  - display_name: spepe-dq-score-alert
+    conditions:
+      - display_name: DQ score below threshold
+        condition_threshold:
+          filter: 'metric.type = "logging.googleapis.com/user/spepe_dq_score"'
+          comparison: COMPARISON_LT
+          threshold_value: 95.0
+          duration: 60s
+    notification_channels:
+      - projects/${GCP_PROJECT_ID}/notificationChannels/${ALERT_CHANNEL_ID}
+
+  - display_name: spepe-session-cost-alert
+    conditions:
+      - display_name: Session cost approaching limit
+        condition_threshold:
+          filter: 'metric.type = "logging.googleapis.com/user/spepe_session_cost_usd"'
+          comparison: COMPARISON_GT
+          threshold_value: 1.5
+          duration: 0s
+    notification_channels:
+      - projects/${GCP_PROJECT_ID}/notificationChannels/${ALERT_CHANNEL_ID}

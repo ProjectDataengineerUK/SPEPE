@@ -1,0 +1,22 @@
+{
+  "suite_name": "ibge_silver",
+  "description": "Data quality expectations for IBGE Silver layer",
+  "expectations": [
+    {
+      "type": "expect_column_to_exist",
+      "kwargs": {"column": "cd_municipio_ibge"}
+    },
+    {
+      "type": "expect_column_to_exist",
+      "kwargs": {"column": "nm_municipio"}
+    },
+    {
+      "type": "expect_column_values_to_not_be_null",
+      "kwargs": {"column": "cd_municipio_ibge"}
+    },
+    {
+      "type": "expect_table_row_count_to_be_between",
+      "kwargs": {"min_value": 100}
+    }
+  ]
+}

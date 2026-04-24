@@ -1,0 +1,175 @@
+name: Deploy
+
+on:
+  # Auto-deploy to staging only when CI passes on main
+  workflow_run:
+    workflows: [CI]
+    branches: [main]
+    types: [completed]
+  # Manual promotion to staging or prod
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: Target environment
+        required: true
+        default: staging
+        type: choice
+        options: [staging, prod]
+
+env:
+  PYTHON_VERSION: "3.12"
+  GCP_REGION: southamerica-east1
+  # Artifact Registry is the modern replacement for GCR (gcr.io is deprecated)
+  IMAGE_REGISTRY: southamerica-east1-docker.pkg.dev
+
+jobs:
+  # Gate: only proceed when CI succeeded (for workflow_run trigger)
+  check-ci:
+    runs-on: ubuntu-latest
+    if: >
+      github.event_name == 'workflow_dispatch' ||
+      (github.event_name == 'workflow_run' && github.event.workflow_run.conclusion == 'success')
+    steps:
+      - name: CI passed — proceeding with deployment
+        run: echo "CI conclusion=${{ github.event.workflow_run.conclusion || 'manual-dispatch' }}"
+
+  build-push:
+    runs-on: ubuntu-latest
+    needs: check-ci
+    environment: ${{ github.event.inputs.environment || 'staging' }}
+    outputs:
+      image_tag: ${{ steps.meta.outputs.image_tag }}
+    permissions:
+      contents: read
+      # Required for Workload Identity Federation
+      id-token: write
+    steps:
+      - uses: actions/checkout@v4
+
+      # OIDC-based auth — eliminates long-lived SA key stored as a secret
+      - id: auth
+        uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: ${{ vars.WIF_PROVIDER }}
+          service_account: ${{ vars.WIF_SERVICE_ACCOUNT }}
+
+      - uses: google-github-actions/setup-gcloud@v2
+
+      - name: Configure Docker for Artifact Registry
+        run: gcloud auth configure-docker ${{ env.IMAGE_REGISTRY }}
+
+      - id: meta
+        name: Set image tag
+        run: |
+          SHA="${{ github.sha }}"
+          SHORT="${SHA::8}"
+          PROJECT="${{ vars.GCP_PROJECT_ID }}"
+          REGISTRY="${{ env.IMAGE_REGISTRY }}"
+          TAG="${REGISTRY}/${PROJECT}/spepe/app:${SHORT}"
+          echo "image_tag=${TAG}" >> $GITHUB_OUTPUT
+          echo "short_sha=${SHORT}" >> $GITHUB_OUTPUT
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build and push (with layer cache)
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          push: true
+          tags: ${{ steps.meta.outputs.image_tag }}
+          # Cache layers in the registry — avoids rebuilding unchanged layers
+          cache-from: type=registry,ref=${{ env.IMAGE_REGISTRY }}/${{ vars.GCP_PROJECT_ID }}/spepe/app:cache
+          cache-to: type=registry,ref=${{ env.IMAGE_REGISTRY }}/${{ vars.GCP_PROJECT_ID }}/spepe/app:cache,mode=max
+
+  deploy-staging:
+    runs-on: ubuntu-latest
+    needs: build-push
+    # Always deploy to staging first, regardless of trigger
+    environment: staging
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - id: auth
+        uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: ${{ vars.WIF_PROVIDER }}
+          service_account: ${{ vars.WIF_SERVICE_ACCOUNT }}
+
+      - id: deploy
+        uses: google-github-actions/deploy-cloudrun@v2
+        with:
+          service: spepe-staging
+          image: ${{ needs.build-push.outputs.image_tag }}
+          region: ${{ env.GCP_REGION }}
+          project_id: ${{ vars.GCP_PROJECT_ID }}
+
+      - name: Smoke test — staging health check
+        run: |
+          URL="${{ steps.deploy.outputs.url }}"
+          echo "Service deployed to: ${URL}"
+          # Wait for the revision to become healthy before marking stage as done
+          for i in $(seq 1 10); do
+            STATUS=$(curl -s -o /dev/null -w "%{http_code}" \
+              -H "Authorization: Bearer $(gcloud auth print-identity-token)" \
+              "${URL}/healthz" || echo "000")
+            echo "Attempt ${i}: HTTP ${STATUS}"
+            if [ "${STATUS}" = "200" ]; then
+              echo "Health check passed."
+              exit 0
+            fi
+            sleep 15
+          done
+          echo "Health check failed after 10 attempts — rolling back staging."
+          gcloud run services update-traffic spepe-staging \
+            --to-revisions=LATEST=0 \
+            --region=${{ env.GCP_REGION }} \
+            --project=${{ vars.GCP_PROJECT_ID }} || true
+          exit 1
+
+  deploy-prod:
+    runs-on: ubuntu-latest
+    needs: [build-push, deploy-staging]
+    # Only run when explicitly targeting prod via workflow_dispatch
+    if: github.event.inputs.environment == 'prod'
+    environment: prod
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - id: auth
+        uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: ${{ vars.WIF_PROVIDER }}
+          service_account: ${{ vars.WIF_SERVICE_ACCOUNT }}
+
+      - id: deploy
+        uses: google-github-actions/deploy-cloudrun@v2
+        with:
+          service: spepe-prod
+          image: ${{ needs.build-push.outputs.image_tag }}
+          region: ${{ env.GCP_REGION }}
+          project_id: ${{ vars.GCP_PROJECT_ID }}
+
+      - name: Smoke test — prod health check
+        run: |
+          URL="${{ steps.deploy.outputs.url }}"
+          echo "Service deployed to: ${URL}"
+          for i in $(seq 1 10); do
+            STATUS=$(curl -s -o /dev/null -w "%{http_code}" \
+              -H "Authorization: Bearer $(gcloud auth print-identity-token)" \
+              "${URL}/healthz" || echo "000")
+            echo "Attempt ${i}: HTTP ${STATUS}"
+            if [ "${STATUS}" = "200" ]; then
+              echo "Health check passed."
+              exit 0
+            fi
+            sleep 15
+          done
+          echo "Health check failed — rolling back prod to previous revision."
+          gcloud run services update-traffic spepe-prod \
+            --to-revisions=LATEST=0 \
+            --region=${{ env.GCP_REGION }} \
+            --project=${{ vars.GCP_PROJECT_ID }} || true
+          exit 1

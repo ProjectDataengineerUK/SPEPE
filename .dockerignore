@@ -1,0 +1,53 @@
+# Secrets
+.env
+*.key
+*.pem
+google-credentials.json
+service-account*.json
+
+# Local runtime artifacts — replaced by GCS/BigQuery/Cloud Logging in GCP
+output/
+data/
+
+# Infrastructure as code — not needed in container
+infra/
+
+# CI/CD and development tooling
+.github/
+.claude/
+.chainlit/
+docs/
+
+# Tests — run in CI, not in container
+tests/
+
+# Dev dependencies file — only requirements.txt is needed in the image
+requirements-dev.txt
+
+# Python cache
+__pycache__/
+*.py[cod]
+*.so
+.Python
+.mypy_cache/
+.ruff_cache/
+.pytest_cache/
+htmlcov/
+.coverage
+
+# Virtual envs
+.venv/
+venv/
+env/
+
+# IDE
+.idea/
+.vscode/
+*.swp
+
+# OS
+.DS_Store
+Thumbs.db
+
+# KFP compiled pipelines — regenerated at deploy time
+output/ml_pipeline.yaml

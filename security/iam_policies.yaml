@@ -1,0 +1,49 @@
+project: ${GCP_PROJECT_ID}
+region: southamerica-east1
+
+service_accounts:
+  - name: spepe-cloud-run
+    display_name: "SPEPE Cloud Run Service Account"
+    roles:
+      - roles/bigquery.dataViewer
+      - roles/storage.objectViewer
+      - roles/datastore.user
+      - roles/cloudtrace.agent
+      - roles/logging.logWriter
+      - roles/secretmanager.secretAccessor
+
+  - name: spepe-dataops-jobs
+    display_name: "SPEPE DataOps Jobs Service Account"
+    roles:
+      - roles/bigquery.dataEditor
+      - roles/bigquery.jobUser
+      - roles/storage.objectAdmin
+      - roles/logging.logWriter
+
+  - name: spepe-vertex-pipeline
+    display_name: "SPEPE Vertex AI Pipeline SA"
+    roles:
+      - roles/aiplatform.user
+      - roles/bigquery.dataViewer
+      - roles/storage.objectViewer
+      - roles/storage.objectCreator
+      - roles/logging.logWriter
+
+  - name: spepe-github-actions
+    display_name: "SPEPE GitHub Actions SA (CI/CD)"
+    roles:
+      - roles/run.admin
+      - roles/storage.objectAdmin
+      - roles/artifactregistry.writer
+      - roles/iam.serviceAccountUser
+
+bindings:
+  - resource: bigquery://projects/${GCP_PROJECT_ID}/datasets/spepe_gold
+    role: roles/bigquery.dataViewer
+    members:
+      - serviceAccount:spepe-cloud-run@${GCP_PROJECT_ID}.iam.gserviceaccount.com
+
+  - resource: bigquery://projects/${GCP_PROJECT_ID}/datasets/spepe_silver
+    role: roles/bigquery.dataEditor
+    members:
+      - serviceAccount:spepe-dataops-jobs@${GCP_PROJECT_ID}.iam.gserviceaccount.com

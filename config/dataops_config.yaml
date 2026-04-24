@@ -1,0 +1,83 @@
+sources:
+  tse:
+    years: [2014, 2018, 2022]
+    ufs:
+      - AC, AL, AM, AP, BA, CE, DF, ES, GO, MA, MG, MS, MT
+      - PA, PB, PE, PI, PR, RJ, RN, RO, RR, RS, SC, SE, SP, TO
+    base_url: https://cdn.tse.jus.br/estatistica/sead/odsele/votacao_secao
+    timeout_seconds: 60
+    retry_attempts: 3
+    retry_backoff_seconds: 5
+
+  ibge:
+    sidra_indicators:
+      - idhm_2010
+      - renda_media_domiciliar
+      - anos_estudo_medio
+      - populacao_2022
+      - taxa_desemprego
+      - pct_analfabetos
+      - gini
+      - pib_per_capita
+      - pct_zona_rural
+    municipios_api: https://servicodados.ibge.gov.br/api/v1/localidades/municipios
+    censo_2022_url: https://ftp.ibge.gov.br/Censos/Censo_Demografico_2022/resultados
+    timeout_seconds: 30
+    retry_attempts: 3
+
+  digital:
+    google_trends:
+      timeframe_2022: "2022-06-01 2022-10-30"
+      geo: BR
+    meta_ads:
+      ad_library_url: https://www.facebook.com/ads/library/api/
+      aggregate_by: uf
+    youtube:
+      aggregate_period_days: 120    # 4 months before election day
+
+dq:
+  tse_suite: dataops/dq/expectations_tse.json
+  gold_suite: dataops/dq/expectations_gold.json
+  silver_dq_threshold: 95.0         # Silver job exits code 1 if below
+  gold_dq_threshold: 90.0
+  depara_match_threshold: 80.0      # Warn if TSE↔IBGE match < 80%
+  depara_ibge_threshold: 95.0       # DQ expectation: ≥95% matched
+
+bronze:
+  compression: zstd
+  immutable: true                   # Never overwrite existing bronze files
+  metadata_columns:
+    - _ingested_at
+    - _source
+    - _year
+    - _uf
+
+silver:
+  partition_by: [ano_eleicao, sg_uf]
+  clustering: [cd_municipio]
+  write_disposition: WRITE_TRUNCATE
+
+gold:
+  fact_municipio_eleicao:
+    partition_field: ano_eleicao
+    partition_type: YEAR
+    clustering: [sg_uf, cd_municipio]
+    deletion_protection_prod: true
+  fact_candidato_dia:
+    partition_field: data
+    partition_type: DAY
+    deletion_protection_prod: true
+  fact_pesquisa:
+    partition_field: data_pesquisa
+    partition_type: DAY
+    deletion_protection_prod: true
+
+lineage:
+  backend: dataplex
+  fallback_path: output/logs/lineage.jsonl
+  config: dataops/lineage/lineage_config.yaml
+
+depara:
+  cache_path: data/bronze/ibge/depara_municipios.parquet
+  ibge_api: https://servicodados.ibge.gov.br/api/v1/localidades/municipios
+  formula: "ibge_code // 10 == tse_code"   # Approximation — built from IBGE API

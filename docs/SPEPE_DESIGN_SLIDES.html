@@ -1,0 +1,1693 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SPEPE — Arquitetura Técnica</title>
+<style>
+  * {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+  }
+
+  :root {
+    --bg: #0d1117;
+    --bg-elev: #161b22;
+    --bg-card: #1c2129;
+    --accent: #00b4d8;
+    --accent-dim: #0096b8;
+    --accent-glow: rgba(0, 180, 216, 0.15);
+    --text: #ffffff;
+    --text-dim: #b8c1cc;
+    --text-mute: #7a8694;
+    --border: #21262d;
+    --border-bright: #30363d;
+    --grid: rgba(255, 255, 255, 0.025);
+    --success: #3fb950;
+    --warn: #d29922;
+    --danger: #f85149;
+  }
+
+  html, body {
+    width: 100%;
+    height: 100%;
+    background: var(--bg);
+    color: var(--text);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Inter", Helvetica, Arial, sans-serif;
+    font-feature-settings: "ss01", "cv11";
+    overflow: hidden;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  body {
+    background-image:
+      linear-gradient(var(--grid) 1px, transparent 1px),
+      linear-gradient(90deg, var(--grid) 1px, transparent 1px);
+    background-size: 48px 48px;
+  }
+
+  .slides-container {
+    position: relative;
+    width: 100vw;
+    height: 100vh;
+    overflow: hidden;
+  }
+
+  .slide {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    padding: 56px 80px 80px 80px;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.5s ease, transform 0.5s ease;
+    transform: translateX(20px);
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+  }
+
+  .slide.active {
+    opacity: 1;
+    pointer-events: auto;
+    transform: translateX(0);
+  }
+
+  .slide-tag {
+    font-size: 11px;
+    letter-spacing: 0.25em;
+    text-transform: uppercase;
+    color: var(--accent);
+    font-weight: 600;
+    margin-bottom: 14px;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+
+  .slide-tag::before {
+    content: "";
+    width: 24px;
+    height: 1px;
+    background: var(--accent);
+  }
+
+  h1 {
+    font-size: 72px;
+    font-weight: 800;
+    letter-spacing: -0.03em;
+    line-height: 1.0;
+    margin-bottom: 18px;
+  }
+
+  h2 {
+    font-size: 44px;
+    font-weight: 700;
+    letter-spacing: -0.02em;
+    line-height: 1.1;
+    margin-bottom: 12px;
+  }
+
+  h3 {
+    font-size: 22px;
+    font-weight: 600;
+    letter-spacing: -0.01em;
+    margin-bottom: 8px;
+    color: var(--text);
+  }
+
+  p {
+    color: var(--text-dim);
+    font-size: 17px;
+    line-height: 1.55;
+  }
+
+  .lede {
+    font-size: 19px;
+    color: var(--text-dim);
+    max-width: 720px;
+    line-height: 1.5;
+  }
+
+  /* ========== SLIDE 1: TITLE ========== */
+  .slide-title {
+    align-items: flex-start;
+    justify-content: center;
+    padding: 0 80px;
+    position: relative;
+  }
+
+  .slide-title::before {
+    content: "";
+    position: absolute;
+    top: 0; left: 0;
+    width: 100%;
+    height: 100%;
+    background: radial-gradient(ellipse at 30% 50%, var(--accent-glow) 0%, transparent 55%);
+    pointer-events: none;
+  }
+
+  .title-mark {
+    font-size: 11px;
+    letter-spacing: 0.4em;
+    color: var(--accent);
+    margin-bottom: 32px;
+    font-weight: 600;
+    position: relative;
+    z-index: 2;
+  }
+
+  .title-main {
+    font-size: 168px;
+    font-weight: 900;
+    letter-spacing: -0.06em;
+    line-height: 0.95;
+    background: linear-gradient(135deg, #ffffff 0%, var(--accent) 100%);
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+    margin-bottom: 18px;
+    position: relative;
+    z-index: 2;
+  }
+
+  .title-sub {
+    font-size: 28px;
+    font-weight: 400;
+    color: var(--text);
+    margin-bottom: 14px;
+    letter-spacing: -0.01em;
+    max-width: 880px;
+    position: relative;
+    z-index: 2;
+  }
+
+  .title-subsub {
+    font-size: 15px;
+    color: var(--text-mute);
+    letter-spacing: 0.05em;
+    margin-bottom: 56px;
+    position: relative;
+    z-index: 2;
+  }
+
+  .title-subsub span {
+    color: var(--accent);
+    margin: 0 6px;
+  }
+
+  .badges {
+    display: flex;
+    gap: 14px;
+    flex-wrap: wrap;
+    position: relative;
+    z-index: 2;
+  }
+
+  .badge {
+    background: var(--bg-elev);
+    border: 1px solid var(--border-bright);
+    padding: 14px 22px;
+    border-radius: 6px;
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--text);
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+
+  .badge::before {
+    content: "";
+    width: 6px;
+    height: 6px;
+    background: var(--accent);
+    border-radius: 50%;
+    box-shadow: 0 0 10px var(--accent);
+  }
+
+  /* ========== SLIDE 2: PROBLEM ========== */
+  .layout-left-heavy {
+    display: grid;
+    grid-template-columns: 1.4fr 1fr;
+    gap: 64px;
+    flex: 1;
+    align-items: center;
+  }
+
+  .pain-list {
+    list-style: none;
+    margin-top: 36px;
+  }
+
+  .pain-list li {
+    padding: 18px 0 18px 36px;
+    border-bottom: 1px solid var(--border);
+    color: var(--text-dim);
+    font-size: 17px;
+    line-height: 1.5;
+    position: relative;
+  }
+
+  .pain-list li::before {
+    content: "✕";
+    position: absolute;
+    left: 0;
+    top: 18px;
+    color: var(--danger);
+    font-weight: 700;
+    font-size: 16px;
+  }
+
+  .metric-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 16px;
+  }
+
+  .metric-card {
+    background: var(--bg-elev);
+    border: 1px solid var(--border-bright);
+    border-radius: 8px;
+    padding: 28px 22px;
+    text-align: left;
+    position: relative;
+    overflow: hidden;
+  }
+
+  .metric-card::before {
+    content: "";
+    position: absolute;
+    top: 0; left: 0;
+    width: 3px;
+    height: 100%;
+    background: var(--accent);
+  }
+
+  .metric-card .num {
+    font-size: 36px;
+    font-weight: 800;
+    letter-spacing: -0.02em;
+    color: var(--accent);
+    line-height: 1;
+    margin-bottom: 6px;
+  }
+
+  .metric-card .label {
+    font-size: 13px;
+    color: var(--text-mute);
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    font-weight: 500;
+  }
+
+  /* ========== SLIDE 3: MULTI-AGENT ========== */
+  .layout-center {
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+  }
+
+  .layout-center h2 { text-align: center; }
+  .layout-center .lede { text-align: center; margin: 0 auto 40px; }
+
+  .agent-tree {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    width: 100%;
+    margin-top: 24px;
+  }
+
+  .supervisor-node {
+    background: linear-gradient(135deg, var(--bg-elev), var(--bg-card));
+    border: 2px solid var(--accent);
+    padding: 18px 32px;
+    border-radius: 10px;
+    box-shadow: 0 0 30px var(--accent-glow);
+    text-align: center;
+    min-width: 360px;
+  }
+
+  .supervisor-node .name {
+    font-size: 18px;
+    font-weight: 700;
+    color: var(--text);
+    margin-bottom: 4px;
+  }
+
+  .supervisor-node .meta {
+    font-size: 12px;
+    color: var(--accent);
+    letter-spacing: 0.04em;
+  }
+
+  .tree-line {
+    width: 2px;
+    height: 32px;
+    background: linear-gradient(180deg, var(--accent), var(--border-bright));
+  }
+
+  .tree-bus {
+    width: 80%;
+    height: 2px;
+    background: var(--border-bright);
+    position: relative;
+  }
+
+  .agent-row {
+    display: grid;
+    grid-template-columns: repeat(7, 1fr);
+    gap: 10px;
+    width: 100%;
+    margin-top: 0;
+    position: relative;
+  }
+
+  .agent-row::before {
+    content: "";
+    position: absolute;
+    top: -16px;
+    left: 7%;
+    right: 7%;
+    height: 2px;
+    background: var(--border-bright);
+  }
+
+  .agent-node {
+    background: var(--bg-elev);
+    border: 1px solid var(--border-bright);
+    border-radius: 8px;
+    padding: 16px 8px 14px;
+    text-align: center;
+    position: relative;
+  }
+
+  .agent-node::before {
+    content: "";
+    position: absolute;
+    top: -16px;
+    left: 50%;
+    width: 1px;
+    height: 16px;
+    background: var(--border-bright);
+  }
+
+  .agent-node .a-name {
+    font-size: 13px;
+    font-weight: 700;
+    color: var(--text);
+    margin-bottom: 6px;
+  }
+
+  .agent-node .a-tier {
+    font-size: 10px;
+    padding: 2px 8px;
+    border-radius: 3px;
+    display: inline-block;
+    font-weight: 600;
+    letter-spacing: 0.04em;
+  }
+
+  .tier-t1 { background: rgba(0, 180, 216, 0.15); color: var(--accent); }
+  .tier-t3 { background: rgba(63, 185, 80, 0.15); color: var(--success); }
+
+  .budget-strip {
+    margin-top: 36px;
+    padding: 14px 26px;
+    background: var(--bg-elev);
+    border: 1px solid var(--border-bright);
+    border-left: 3px solid var(--warn);
+    border-radius: 6px;
+    display: inline-flex;
+    align-items: center;
+    gap: 14px;
+    font-size: 14px;
+    color: var(--text-dim);
+  }
+
+  .budget-strip strong { color: var(--warn); font-weight: 700; }
+
+  /* ========== SLIDE 4: MEDALLION ========== */
+  .layout-split {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 56px;
+    flex: 1;
+    align-items: center;
+  }
+
+  .medallion {
+    display: flex;
+    flex-direction: column;
+    gap: 18px;
+  }
+
+  .medal-step {
+    background: var(--bg-elev);
+    border: 1px solid var(--border-bright);
+    border-radius: 10px;
+    padding: 22px 24px;
+    position: relative;
+    overflow: hidden;
+  }
+
+  .medal-step .level {
+    font-size: 11px;
+    letter-spacing: 0.2em;
+    font-weight: 700;
+    margin-bottom: 6px;
+    text-transform: uppercase;
+  }
+
+  .medal-step .title {
+    font-size: 22px;
+    font-weight: 700;
+    margin-bottom: 6px;
+  }
+
+  .medal-step .desc {
+    font-size: 14px;
+    color: var(--text-dim);
+    line-height: 1.5;
+  }
+
+  .medal-bronze { border-left: 4px solid #cd7f32; }
+  .medal-bronze .level { color: #cd7f32; }
+
+  .medal-silver { border-left: 4px solid #c0c0c0; }
+  .medal-silver .level { color: #c0c0c0; }
+
+  .medal-gold { border-left: 4px solid #ffd700; }
+  .medal-gold .level { color: #ffd700; }
+
+  .medal-arrow {
+    text-align: center;
+    color: var(--text-mute);
+    font-size: 18px;
+    margin: -8px 0;
+  }
+
+  .gold-tables {
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+  }
+
+  .gold-table {
+    background: var(--bg-elev);
+    border: 1px solid var(--border-bright);
+    border-radius: 8px;
+    padding: 18px 20px;
+    position: relative;
+  }
+
+  .gold-table::before {
+    content: "▸";
+    color: var(--accent);
+    margin-right: 10px;
+  }
+
+  .gold-table .name {
+    font-family: "JetBrains Mono", "SF Mono", Menlo, monospace;
+    font-size: 14px;
+    color: var(--accent);
+    display: inline-block;
+    margin-bottom: 6px;
+    font-weight: 600;
+  }
+
+  .gold-table .desc {
+    font-size: 13px;
+    color: var(--text-dim);
+    line-height: 1.5;
+    margin-left: 20px;
+  }
+
+  /* ========== SLIDE 5: ML PIPELINE ========== */
+  .layout-horizontal {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+  }
+
+  .stages {
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr;
+    gap: 18px;
+    margin-top: 32px;
+  }
+
+  .stage {
+    background: var(--bg-elev);
+    border: 1px solid var(--border-bright);
+    border-radius: 10px;
+    padding: 26px 22px;
+    position: relative;
+    min-height: 320px;
+  }
+
+  .stage-num {
+    position: absolute;
+    top: -14px;
+    left: 22px;
+    background: var(--accent);
+    color: var(--bg);
+    width: 28px;
+    height: 28px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: 800;
+    font-size: 13px;
+  }
+
+  .stage h3 {
+    margin-top: 8px;
+    color: var(--accent);
+    font-size: 18px;
+  }
+
+  .stage .stage-name {
+    font-size: 22px;
+    font-weight: 700;
+    color: var(--text);
+    margin-bottom: 18px;
+  }
+
+  .pipeline-flow {
+    list-style: none;
+  }
+
+  .pipeline-flow li {
+    padding: 10px 0;
+    border-bottom: 1px dashed var(--border);
+    font-size: 13px;
+    color: var(--text-dim);
+    position: relative;
+    padding-left: 18px;
+  }
+
+  .pipeline-flow li::before {
+    content: "→";
+    position: absolute;
+    left: 0;
+    color: var(--accent);
+    font-weight: 700;
+  }
+
+  .pipeline-flow li:last-child { border-bottom: none; }
+
+  .pipeline-flow li code {
+    font-family: "JetBrains Mono", "SF Mono", Menlo, monospace;
+    color: var(--accent);
+    font-size: 12px;
+  }
+
+  /* ========== SLIDE 6: GCP STACK ========== */
+  .stack-grid {
+    display: grid;
+    grid-template-columns: repeat(5, 1fr);
+    gap: 14px;
+    margin-top: 32px;
+  }
+
+  .svc-card {
+    background: var(--bg-elev);
+    border: 1px solid var(--border-bright);
+    border-radius: 8px;
+    padding: 22px 18px;
+    text-align: center;
+    transition: transform 0.2s, border-color 0.2s;
+    position: relative;
+  }
+
+  .svc-card:hover {
+    transform: translateY(-2px);
+    border-color: var(--accent);
+  }
+
+  .svc-card .ico {
+    font-size: 24px;
+    color: var(--accent);
+    margin-bottom: 8px;
+    font-weight: 700;
+  }
+
+  .svc-card .svc-name {
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--text);
+    margin-bottom: 4px;
+  }
+
+  .svc-card .svc-cat {
+    font-size: 11px;
+    color: var(--text-mute);
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+  }
+
+  .region-note {
+    margin-top: 28px;
+    padding: 16px 22px;
+    background: var(--bg-elev);
+    border: 1px solid var(--border-bright);
+    border-left: 3px solid var(--accent);
+    border-radius: 6px;
+    font-size: 14px;
+    color: var(--text-dim);
+  }
+
+  .region-note strong { color: var(--accent); }
+
+  /* ========== SLIDE 7: MLOps LOOP ========== */
+  .loop-flow {
+    margin-top: 28px;
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 12px;
+  }
+
+  .loop-step {
+    background: var(--bg-elev);
+    border: 1px solid var(--border-bright);
+    border-radius: 8px;
+    padding: 16px 14px;
+    text-align: center;
+    position: relative;
+    min-height: 100px;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+  }
+
+  .loop-step .step-tag {
+    font-size: 10px;
+    color: var(--accent);
+    letter-spacing: 0.1em;
+    margin-bottom: 6px;
+    font-weight: 700;
+    text-transform: uppercase;
+  }
+
+  .loop-step .step-name {
+    font-size: 14px;
+    font-weight: 700;
+    color: var(--text);
+    margin-bottom: 4px;
+  }
+
+  .loop-step .step-meta {
+    font-size: 11px;
+    color: var(--text-mute);
+    font-family: "JetBrains Mono", monospace;
+  }
+
+  .loop-step.trigger { border-left: 3px solid var(--danger); }
+  .loop-step.action { border-left: 3px solid var(--accent); }
+  .loop-step.guard { border-left: 3px solid var(--warn); }
+  .loop-step.success { border-left: 3px solid var(--success); }
+
+  .loop-arrow-row {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 12px;
+    margin-top: 4px;
+    margin-bottom: 4px;
+  }
+
+  .loop-arrow-row .arr {
+    text-align: center;
+    color: var(--accent);
+    font-weight: 700;
+  }
+
+  .cooldown {
+    margin-top: 18px;
+    padding: 12px 22px;
+    background: rgba(210, 153, 34, 0.08);
+    border: 1px solid rgba(210, 153, 34, 0.4);
+    border-radius: 6px;
+    text-align: center;
+    font-size: 13px;
+    color: var(--warn);
+  }
+
+  /* ========== SLIDE 8: SECURITY ========== */
+  .layout-right-heavy {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 48px;
+    flex: 1;
+    align-items: center;
+  }
+
+  .sec-list {
+    list-style: none;
+    margin-top: 24px;
+  }
+
+  .sec-list li {
+    padding: 14px 0 14px 32px;
+    border-bottom: 1px solid var(--border);
+    color: var(--text-dim);
+    font-size: 15px;
+    line-height: 1.5;
+    position: relative;
+  }
+
+  .sec-list li::before {
+    content: "🔒";
+    position: absolute;
+    left: 0;
+    top: 14px;
+    font-size: 14px;
+    filter: grayscale(100%) brightness(1.3);
+  }
+
+  .sec-list li strong {
+    color: var(--text);
+    font-weight: 600;
+  }
+
+  .lgpd-panel {
+    background: var(--bg-elev);
+    border: 1px solid var(--border-bright);
+    border-left: 4px solid var(--success);
+    border-radius: 8px;
+    padding: 28px 28px;
+  }
+
+  .lgpd-panel .panel-title {
+    font-size: 16px;
+    color: var(--success);
+    font-weight: 700;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+    margin-bottom: 18px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+
+  .lgpd-panel .panel-title::before {
+    content: "✓";
+    background: var(--success);
+    color: var(--bg);
+    width: 20px; height: 20px;
+    border-radius: 50%;
+    display: inline-flex;
+    align-items: center; justify-content: center;
+    font-size: 12px;
+    font-weight: 800;
+  }
+
+  .lgpd-list {
+    list-style: none;
+  }
+
+  .lgpd-list li {
+    padding: 10px 0;
+    color: var(--text-dim);
+    font-size: 14px;
+    border-bottom: 1px dashed var(--border);
+  }
+
+  .lgpd-list li:last-child { border: none; }
+
+  /* ========== SLIDE 9: LLMOps ========== */
+  .llm-cols {
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr;
+    gap: 18px;
+    margin-top: 36px;
+  }
+
+  .llm-col {
+    background: var(--bg-elev);
+    border: 1px solid var(--border-bright);
+    border-radius: 10px;
+    padding: 28px 24px;
+    min-height: 320px;
+  }
+
+  .llm-col .col-num {
+    width: 32px; height: 32px;
+    border-radius: 8px;
+    background: var(--accent-glow);
+    color: var(--accent);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: 800;
+    margin-bottom: 14px;
+  }
+
+  .llm-col h3 {
+    font-size: 18px;
+    margin-bottom: 14px;
+    color: var(--text);
+  }
+
+  .llm-col ul {
+    list-style: none;
+  }
+
+  .llm-col li {
+    padding: 8px 0 8px 16px;
+    font-size: 13px;
+    color: var(--text-dim);
+    border-bottom: 1px dashed var(--border);
+    position: relative;
+    line-height: 1.4;
+  }
+
+  .llm-col li:last-child { border: none; }
+
+  .llm-col li::before {
+    content: "·";
+    position: absolute;
+    left: 0;
+    color: var(--accent);
+    font-weight: 700;
+    font-size: 18px;
+    line-height: 1;
+  }
+
+  .llm-col code {
+    font-family: "JetBrains Mono", monospace;
+    color: var(--accent);
+    font-size: 11.5px;
+  }
+
+  /* ========== SLIDE 10: CI/CD ========== */
+  .cicd-row {
+    display: flex;
+    align-items: stretch;
+    margin-top: 40px;
+    gap: 4px;
+    flex-wrap: nowrap;
+  }
+
+  .cicd-step {
+    flex: 1;
+    background: var(--bg-elev);
+    border: 1px solid var(--border-bright);
+    padding: 18px 14px;
+    text-align: center;
+    min-width: 0;
+    position: relative;
+    border-radius: 6px;
+  }
+
+  .cicd-step.start { border-left: 3px solid var(--success); }
+  .cicd-step.gate { border-left: 3px solid var(--warn); }
+  .cicd-step.deploy { border-left: 3px solid var(--accent); }
+  .cicd-step.scan { border-left: 3px solid var(--danger); }
+
+  .cicd-step .ico {
+    font-size: 18px;
+    color: var(--accent);
+    margin-bottom: 6px;
+    font-weight: 700;
+    font-family: "JetBrains Mono", monospace;
+  }
+
+  .cicd-step .step-name {
+    font-size: 12px;
+    font-weight: 700;
+    color: var(--text);
+    margin-bottom: 4px;
+    line-height: 1.2;
+  }
+
+  .cicd-step .step-detail {
+    font-size: 10px;
+    color: var(--text-mute);
+    line-height: 1.3;
+  }
+
+  .cicd-arrow {
+    align-self: center;
+    color: var(--accent);
+    font-size: 16px;
+    font-weight: 700;
+    padding: 0 2px;
+  }
+
+  .cicd-legend {
+    display: flex;
+    gap: 24px;
+    margin-top: 36px;
+    flex-wrap: wrap;
+  }
+
+  .legend-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 13px;
+    color: var(--text-dim);
+  }
+
+  .legend-dot {
+    width: 12px; height: 12px;
+    border-radius: 3px;
+  }
+
+  /* ========== SLIDE 11: QUALITY GATES ========== */
+  .gates-table {
+    width: 100%;
+    border-collapse: separate;
+    border-spacing: 0;
+    margin-top: 28px;
+    background: var(--bg-elev);
+    border-radius: 10px;
+    overflow: hidden;
+    border: 1px solid var(--border-bright);
+  }
+
+  .gates-table thead {
+    background: var(--bg-card);
+  }
+
+  .gates-table th {
+    padding: 16px 22px;
+    text-align: left;
+    font-size: 11px;
+    color: var(--accent);
+    letter-spacing: 0.15em;
+    text-transform: uppercase;
+    font-weight: 700;
+    border-bottom: 1px solid var(--border-bright);
+  }
+
+  .gates-table td {
+    padding: 14px 22px;
+    border-bottom: 1px solid var(--border);
+    font-size: 14px;
+    color: var(--text-dim);
+  }
+
+  .gates-table tr:last-child td { border-bottom: none; }
+
+  .gates-table tr:hover { background: rgba(0, 180, 216, 0.04); }
+
+  .gates-table .gate-name {
+    color: var(--text);
+    font-weight: 600;
+  }
+
+  .gates-table .gate-thresh {
+    font-family: "JetBrains Mono", monospace;
+    color: var(--accent);
+    font-size: 13px;
+    font-weight: 600;
+  }
+
+  .gates-table .gate-status {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 4px 10px;
+    background: rgba(63, 185, 80, 0.12);
+    color: var(--success);
+    border-radius: 4px;
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.05em;
+  }
+
+  .gates-table .gate-status::before {
+    content: "";
+    width: 6px; height: 6px;
+    background: var(--success);
+    border-radius: 50%;
+  }
+
+  /* ========== SLIDE 12: ROADMAP ========== */
+  .timeline {
+    margin-top: 48px;
+    position: relative;
+    padding: 40px 0 0 0;
+  }
+
+  .timeline::before {
+    content: "";
+    position: absolute;
+    top: 60px;
+    left: 0;
+    right: 0;
+    height: 2px;
+    background: linear-gradient(90deg, var(--success), var(--accent), var(--warn));
+  }
+
+  .phases {
+    display: grid;
+    grid-template-columns: repeat(5, 1fr);
+    gap: 14px;
+    position: relative;
+    z-index: 2;
+  }
+
+  .phase {
+    text-align: center;
+    padding-top: 50px;
+    position: relative;
+  }
+
+  .phase::before {
+    content: "";
+    position: absolute;
+    top: 11px;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 18px; height: 18px;
+    background: var(--bg);
+    border: 3px solid var(--accent);
+    border-radius: 50%;
+    z-index: 3;
+  }
+
+  .phase .phase-when {
+    font-size: 11px;
+    color: var(--accent);
+    font-weight: 700;
+    letter-spacing: 0.1em;
+    margin-bottom: 4px;
+    text-transform: uppercase;
+  }
+
+  .phase .phase-num {
+    font-size: 36px;
+    font-weight: 800;
+    color: var(--text);
+    line-height: 1;
+    margin-bottom: 8px;
+    letter-spacing: -0.02em;
+  }
+
+  .phase .phase-title {
+    font-size: 13px;
+    color: var(--text-dim);
+    line-height: 1.5;
+    padding: 12px 8px;
+    background: var(--bg-elev);
+    border: 1px solid var(--border-bright);
+    border-radius: 6px;
+  }
+
+  .final-stat {
+    margin-top: 56px;
+    padding: 22px 28px;
+    background: linear-gradient(135deg, var(--bg-elev), var(--bg-card));
+    border: 1px solid var(--accent);
+    border-radius: 10px;
+    text-align: center;
+    font-size: 18px;
+    font-weight: 700;
+    color: var(--text);
+    box-shadow: 0 0 40px var(--accent-glow);
+    letter-spacing: -0.01em;
+  }
+
+  .final-stat span {
+    color: var(--accent);
+    margin: 0 6px;
+  }
+
+  /* ========== UI CHROME ========== */
+  .progress-bar {
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    height: 3px;
+    background: var(--accent);
+    transition: width 0.4s ease;
+    z-index: 100;
+    box-shadow: 0 0 12px var(--accent);
+  }
+
+  .counter {
+    position: fixed;
+    bottom: 18px;
+    right: 28px;
+    font-family: "JetBrains Mono", "SF Mono", Menlo, monospace;
+    font-size: 12px;
+    color: var(--text-mute);
+    letter-spacing: 0.1em;
+    z-index: 100;
+    background: var(--bg-elev);
+    padding: 8px 14px;
+    border: 1px solid var(--border-bright);
+    border-radius: 4px;
+  }
+
+  .counter .current {
+    color: var(--accent);
+    font-weight: 700;
+  }
+
+  .nav-hint {
+    position: fixed;
+    bottom: 22px;
+    left: 28px;
+    font-size: 11px;
+    color: var(--text-mute);
+    letter-spacing: 0.1em;
+    z-index: 100;
+    text-transform: uppercase;
+  }
+
+  .nav-hint kbd {
+    background: var(--bg-elev);
+    border: 1px solid var(--border-bright);
+    border-radius: 3px;
+    padding: 2px 6px;
+    margin: 0 3px;
+    font-family: "JetBrains Mono", monospace;
+    color: var(--accent);
+    font-size: 10px;
+  }
+
+  .brand-mark {
+    position: fixed;
+    top: 24px;
+    right: 32px;
+    font-size: 11px;
+    color: var(--text-mute);
+    letter-spacing: 0.3em;
+    text-transform: uppercase;
+    z-index: 100;
+    font-weight: 700;
+  }
+
+  .brand-mark span { color: var(--accent); }
+
+  @media (max-width: 1280px) {
+    .slide { padding: 40px 50px 70px 50px; }
+    h1 { font-size: 56px; }
+    h2 { font-size: 36px; }
+    .title-main { font-size: 120px; }
+  }
+</style>
+</head>
+<body>
+
+<div class="brand-mark">SPEPE <span>·</span> 2026</div>
+
+<div class="slides-container" id="slidesContainer">
+
+  <!-- ========== SLIDE 1: TITLE ========== -->
+  <div class="slide slide-title active">
+    <div class="title-mark">DESIGN DECK · ARQUITETURA TÉCNICA · v1.0</div>
+    <div class="title-main">SPEPE</div>
+    <div class="title-sub">Sistema de Perfilamento do Eleitorado e Previsão Eleitoral</div>
+    <div class="title-subsub">Arquitetura Técnica <span>·</span> Multi-Agent AI <span>·</span> GCP <span>·</span> MLOps Nível 5</div>
+    <div class="badges">
+      <div class="badge">133 arquivos</div>
+      <div class="badge">7 agentes</div>
+      <div class="badge">14 fontes de dados</div>
+      <div class="badge">MLOps Nível 5</div>
+    </div>
+  </div>
+
+  <!-- ========== SLIDE 2: PROBLEM ========== -->
+  <div class="slide">
+    <div class="slide-tag">01 · Motivação</div>
+    <h2>Por que o SPEPE existe?</h2>
+    <p class="lede">O eleitorado brasileiro é fragmentado, multidimensional e mal compreendido por análises que tratam o país como um agregado homogêneo.</p>
+    <div class="layout-left-heavy">
+      <ul class="pain-list">
+        <li><strong>5.570 municípios</strong> com perfis socioeconômicos, culturais e demográficos radicalmente distintos.</li>
+        <li>Análises eleitorais convencionais <strong>ignoram dados socioeconômicos estruturais</strong> (saneamento, IDH, escolaridade).</li>
+        <li>Pesquisas com <strong>house effects não corrigidos</strong> distorcem previsões e amplificam vieses dos institutos.</li>
+        <li>Dados fragmentados: <strong>TSE + IBGE + redes sociais</strong> nunca foram integrados em um único modelo causal.</li>
+      </ul>
+      <div class="metric-grid">
+        <div class="metric-card"><div class="num">5.570</div><div class="label">Municípios</div></div>
+        <div class="metric-card"><div class="num">~200</div><div class="label">Variáveis</div></div>
+        <div class="metric-card"><div class="num">3</div><div class="label">Eleições</div></div>
+        <div class="metric-card"><div class="num">$2.00</div><div class="label">Budget / sessão</div></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ========== SLIDE 3: MULTI-AGENT ========== -->
+  <div class="slide layout-center">
+    <div class="slide-tag">02 · Orquestração</div>
+    <h2>Arquitetura Multi-Agente</h2>
+    <p class="lede">Um Supervisor delega tarefas a 7 especialistas via DOMA Protocol — cada um com seu próprio modelo, prompt e budget.</p>
+
+    <div class="agent-tree">
+      <div class="supervisor-node">
+        <div class="name">Supervisor</div>
+        <div class="meta">claude-opus-4-6 · DOMA Protocol</div>
+      </div>
+      <div class="tree-line"></div>
+      <div class="agent-row">
+        <div class="agent-node"><div class="a-name">Coletor</div><div class="a-tier tier-t3">haiku-4-5</div></div>
+        <div class="agent-node"><div class="a-name">Perfilador</div><div class="a-tier tier-t1">sonnet-4-6</div></div>
+        <div class="agent-node"><div class="a-name">Analista</div><div class="a-tier tier-t1">sonnet-4-6</div></div>
+        <div class="agent-node"><div class="a-name">Modelista</div><div class="a-tier tier-t1">sonnet-4-6</div></div>
+        <div class="agent-node"><div class="a-name">Explicador</div><div class="a-tier tier-t1">sonnet-4-6</div></div>
+        <div class="agent-node"><div class="a-name">Narrador</div><div class="a-tier tier-t1">sonnet-4-6</div></div>
+        <div class="agent-node"><div class="a-name">Vigilante</div><div class="a-tier tier-t3">haiku-4-5</div></div>
+      </div>
+      <div class="budget-strip">
+        <strong>Budget Guard:</strong> $2.00 / sessão · hard cap · degradação automática T1 → T3 quando &gt; 70%
+      </div>
+    </div>
+  </div>
+
+  <!-- ========== SLIDE 4: MEDALLION ========== -->
+  <div class="slide">
+    <div class="slide-tag">03 · Pipeline de Dados</div>
+    <h2>Arquitetura Medallion</h2>
+    <p class="lede">Bronze imutável → Silver tipado → Gold modelado. Schemas reforçados, DQ obrigatório em cada camada.</p>
+    <div class="layout-split">
+      <div class="medallion">
+        <div class="medal-step medal-bronze">
+          <div class="level">Camada Bronze</div>
+          <div class="title">Raw · Imutável</div>
+          <div class="desc">GCS · 14 fontes de dados · compressão ZSTD · particionamento por data de ingestão · audit-trail completo.</div>
+        </div>
+        <div class="medal-arrow">↓</div>
+        <div class="medal-step medal-silver">
+          <div class="level">Camada Silver</div>
+          <div class="title">Clean · Conformed</div>
+          <div class="desc">BigQuery <code>spepe_silver</code> · DQ ≥ 95% · schema enforced · types canônicos · join keys validadas.</div>
+        </div>
+        <div class="medal-arrow">↓</div>
+        <div class="medal-step medal-gold">
+          <div class="level">Camada Gold</div>
+          <div class="title">Modeled · Analytics</div>
+          <div class="desc">BigQuery <code>spepe_gold</code> · 3 fact tables · ~200 variáveis · pronto para ML e dashboards.</div>
+        </div>
+      </div>
+      <div>
+        <h3 style="margin-bottom:18px; color: var(--accent);">Tabelas Gold</h3>
+        <div class="gold-tables">
+          <div class="gold-table">
+            <div class="name">fact_municipio_eleicao</div>
+            <div class="desc">5.570 municípios × 3 eleições × ~200 features socioeconômicas, demográficas e históricas.</div>
+          </div>
+          <div class="gold-table">
+            <div class="name">fact_candidato_dia</div>
+            <div class="desc">Candidato × dia × ~40 features de exposição, sentimento e momentum digital.</div>
+          </div>
+          <div class="gold-table">
+            <div class="name">fact_pesquisa</div>
+            <div class="desc">Pesquisas eleitorais com house effect ajustado bayesianamente por instituto.</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ========== SLIDE 5: ML PIPELINE ========== -->
+  <div class="slide layout-horizontal">
+    <div class="slide-tag">04 · Machine Learning</div>
+    <h2>Pipeline de ML em 3 Estágios</h2>
+    <p class="lede">Da clusterização não-supervisionada à inferência causal bayesiana — com explicabilidade SHAP em cada etapa.</p>
+    <div class="stages">
+      <div class="stage">
+        <div class="stage-num">1</div>
+        <div class="stage-name">Arquétipos Municipais</div>
+        <ul class="pipeline-flow">
+          <li><code>StandardScaler</code> normalização</li>
+          <li><code>PCA</code> redução dimensional</li>
+          <li><code>HDBSCAN</code> silhouette ≥ 0.45</li>
+          <li><code>UMAP 2D</code> projeção visual</li>
+          <li>LLM <strong>label semântico</strong></li>
+          <li><code>Folium</code> mapa interativo</li>
+        </ul>
+      </div>
+      <div class="stage">
+        <div class="stage-num">2</div>
+        <div class="stage-name">Sinal Digital</div>
+        <ul class="pipeline-flow">
+          <li>Meta Ads Library (gasto / impressões)</li>
+          <li>Google Trends regional</li>
+          <li>YouTube comentários (sentimento)</li>
+          <li>Agregação <strong>município</strong> (LGPD)</li>
+          <li>Normalização per-capita</li>
+          <li>Time-series feature store</li>
+        </ul>
+      </div>
+      <div class="stage">
+        <div class="stage-num">3</div>
+        <div class="stage-name">Inferência Bayesiana</div>
+        <ul class="pipeline-flow">
+          <li>Bootstrap IC 95% (MVP)</li>
+          <li><code>PyMC HLM NUTS</code> (produção)</li>
+          <li>Pooling parcial por estado</li>
+          <li>House effect por instituto</li>
+          <li><strong>SHAP top-10</strong> explicabilidade</li>
+          <li>Brier score como métrica</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+
+  <!-- ========== SLIDE 6: GCP STACK ========== -->
+  <div class="slide">
+    <div class="slide-tag">05 · Infraestrutura</div>
+    <h2>Stack Google Cloud Platform</h2>
+    <p class="lede">Serverless-first, region-locked em <code>southamerica-east1</code> para conformidade com LGPD.</p>
+    <div class="stack-grid">
+      <div class="svc-card"><div class="ico">▶</div><div class="svc-name">Cloud Run</div><div class="svc-cat">Compute</div></div>
+      <div class="svc-card"><div class="ico">▤</div><div class="svc-name">BigQuery</div><div class="svc-cat">Data Warehouse</div></div>
+      <div class="svc-card"><div class="ico">◫</div><div class="svc-name">Cloud Storage</div><div class="svc-cat">Object Store</div></div>
+      <div class="svc-card"><div class="ico">◇</div><div class="svc-name">Vertex AI</div><div class="svc-cat">ML Platform</div></div>
+      <div class="svc-card"><div class="ico">⬢</div><div class="svc-name">Firestore</div><div class="svc-cat">NoSQL Cache</div></div>
+      <div class="svc-card"><div class="ico">⇄</div><div class="svc-name">Pub/Sub</div><div class="svc-cat">Messaging</div></div>
+      <div class="svc-card"><div class="ico">⚡</div><div class="svc-name">Eventarc</div><div class="svc-cat">Event Routing</div></div>
+      <div class="svc-card"><div class="ico">⛨</div><div class="svc-name">Cloud Armor</div><div class="svc-cat">WAF</div></div>
+      <div class="svc-card"><div class="ico">⚿</div><div class="svc-name">Secret Manager</div><div class="svc-cat">Secrets</div></div>
+      <div class="svc-card"><div class="ico">⊞</div><div class="svc-name">IAP</div><div class="svc-cat">Identity Proxy</div></div>
+    </div>
+    <div class="region-note">
+      <strong>Região:</strong> <code>southamerica-east1</code> (São Paulo) para LGPD · <strong>Vertex AI:</strong> <code>us-central1</code> (única região GA com Pipelines + HP Tuning para a stack escolhida)
+    </div>
+  </div>
+
+  <!-- ========== SLIDE 7: MLOps LOOP ========== -->
+  <div class="slide">
+    <div class="slide-tag">06 · MLOps Nível 5</div>
+    <h2>Loop de Auto-Healing Completo</h2>
+    <p class="lede">Detecção de drift dispara retraining, canary deploy, monitoramento e rollback — sem intervenção humana.</p>
+
+    <div class="loop-flow">
+      <div class="loop-step trigger">
+        <div class="step-tag">Detecta</div>
+        <div class="step-name">Drift Monitor</div>
+        <div class="step-meta">JS &gt; 0.10</div>
+      </div>
+      <div class="loop-step action">
+        <div class="step-tag">Publica</div>
+        <div class="step-name">Pub/Sub</div>
+        <div class="step-meta">spepe-drift-detected</div>
+      </div>
+      <div class="loop-step action">
+        <div class="step-tag">Roteia</div>
+        <div class="step-name">Eventarc</div>
+        <div class="step-meta">retrain_trigger_job</div>
+      </div>
+      <div class="loop-step action">
+        <div class="step-tag">Treina</div>
+        <div class="step-name">Vertex AI KFP</div>
+        <div class="step-meta">HP → Feat → Train → Eval</div>
+      </div>
+    </div>
+
+    <div class="loop-arrow-row">
+      <div class="arr">↓</div><div class="arr">↓</div><div class="arr">↓</div><div class="arr">↓</div>
+    </div>
+
+    <div class="loop-flow">
+      <div class="loop-step deploy" style="border-left: 3px solid var(--accent);">
+        <div class="step-tag">Deploy</div>
+        <div class="step-name">Canary 10%</div>
+        <div class="step-meta">tráfego split</div>
+      </div>
+      <div class="loop-step guard">
+        <div class="step-tag">Vigia</div>
+        <div class="step-name">Auto-Rollback Watch</div>
+        <div class="step-meta">48h · Brier &gt; champ × 1.05</div>
+      </div>
+      <div class="loop-step success">
+        <div class="step-tag">Promove</div>
+        <div class="step-name">Production 100%</div>
+        <div class="step-meta">novo champion</div>
+      </div>
+      <div class="loop-step guard">
+        <div class="step-tag">Audita</div>
+        <div class="step-name">Bias Monitor</div>
+        <div class="step-meta">81 grupos demográficos</div>
+      </div>
+    </div>
+
+    <div class="cooldown">
+      ⏱ Cooldown: <strong>72h</strong> entre retrainings consecutivos · evita oscilação por flaps de drift
+    </div>
+  </div>
+
+  <!-- ========== SLIDE 8: SECURITY ========== -->
+  <div class="slide">
+    <div class="slide-tag">07 · Segurança & Conformidade</div>
+    <h2>Defesa em Profundidade · LGPD by Design</h2>
+    <div class="layout-right-heavy">
+      <div>
+        <h3 style="margin-bottom:8px; color: var(--accent);">Camadas de Segurança</h3>
+        <ul class="sec-list">
+          <li><strong>Cloud Armor WAF</strong> — 100 req/min, geo-block, SQL injection rules.</li>
+          <li><strong>IAP</strong> — autenticação obrigatória em endpoints internos.</li>
+          <li><strong>DLP Hook</strong> — bloqueia CPF, CNPJ, email, CEP, RG, telefone.</li>
+          <li><strong>Security Hook</strong> — BigQuery sem partition filter → bloqueado.</li>
+          <li><strong>VPC Service Controls</strong> — perimeter de dados isolado.</li>
+        </ul>
+      </div>
+      <div class="lgpd-panel">
+        <div class="panel-title">LGPD Compliance</div>
+        <ul class="lgpd-list">
+          <li>Dados armazenados em <code>southamerica-east1</code></li>
+          <li>Granularidade mínima: <strong>município</strong> (nunca individual)</li>
+          <li><strong>Aggregate-only</strong> para sinal digital (Meta/Trends)</li>
+          <li>Audit log <strong>90 dias</strong> → Cloud Logging + BQ sink</li>
+          <li>DPO designado · DPIA documentado</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+
+  <!-- ========== SLIDE 9: LLMOps ========== -->
+  <div class="slide">
+    <div class="slide-tag">08 · LLMOps</div>
+    <h2>Operações de LLM em Produção</h2>
+    <p class="lede">Prompts versionados, eval gates no CI, observabilidade ponta-a-ponta com tracking de custo por token.</p>
+    <div class="llm-cols">
+      <div class="llm-col">
+        <div class="col-num">1</div>
+        <h3>Prompt Registry</h3>
+        <ul>
+          <li>Versionamento <strong>semver</strong> em YAML</li>
+          <li>Prompts: <code>supervisor</code></li>
+          <li>Prompts: <code>modelista</code></li>
+          <li>Prompts: <code>narrador</code></li>
+          <li>Prompts: <code>explicador</code></li>
+          <li><strong>Forbidden jargon list</strong> (acadêmico/político)</li>
+          <li>Diff review obrigatório no PR</li>
+        </ul>
+      </div>
+      <div class="llm-col">
+        <div class="col-num">2</div>
+        <h3>Eval CI Gate</h3>
+        <ul>
+          <li><strong>50 queries</strong> golden dataset</li>
+          <li>Score mínimo: <code>≥ 0.85</code></li>
+          <li>Routing accuracy check</li>
+          <li>Disclaimer presence check</li>
+          <li>LGPD redaction check</li>
+          <li>Bloqueia merge se falhar</li>
+          <li>Snapshot regression test</li>
+        </ul>
+      </div>
+      <div class="llm-col">
+        <div class="col-num">3</div>
+        <h3>Observabilidade</h3>
+        <ul>
+          <li><strong>Cloud Trace</strong> spans por agente</li>
+          <li>Looker Studio · <strong>3 dashboards</strong></li>
+          <li>Cost tracking por sessão</li>
+          <li>Token tracking input/output</li>
+          <li>Latency p50/p95/p99</li>
+          <li>Error rate por agente</li>
+          <li>Alerta budget &gt; 70% sessão</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+
+  <!-- ========== SLIDE 10: CI/CD ========== -->
+  <div class="slide">
+    <div class="slide-tag">09 · Entrega Contínua</div>
+    <h2>Pipeline CI/CD</h2>
+    <p class="lede">Cada commit dispara lint, testes, eval LLM, build, scan e deploy — com canary e watch automatizado.</p>
+
+    <div class="cicd-row">
+      <div class="cicd-step start">
+        <div class="ico">git</div>
+        <div class="step-name">git push</div>
+        <div class="step-detail">main / PR</div>
+      </div>
+      <div class="cicd-arrow">→</div>
+      <div class="cicd-step gate">
+        <div class="ico">CI</div>
+        <div class="step-name">Tests + Eval</div>
+        <div class="step-detail">ruff · pytest · LLM ≥0.85</div>
+      </div>
+      <div class="cicd-arrow">→</div>
+      <div class="cicd-step deploy">
+        <div class="ico">📦</div>
+        <div class="step-name">Docker Build</div>
+        <div class="step-detail">multi-stage</div>
+      </div>
+      <div class="cicd-arrow">→</div>
+      <div class="cicd-step deploy">
+        <div class="ico">↑</div>
+        <div class="step-name">GCR Push</div>
+        <div class="step-detail">tag SHA</div>
+      </div>
+      <div class="cicd-arrow">→</div>
+      <div class="cicd-step deploy">
+        <div class="ico">▶</div>
+        <div class="step-name">Cloud Run</div>
+        <div class="step-detail">deploy serverless</div>
+      </div>
+      <div class="cicd-arrow">→</div>
+      <div class="cicd-step gate">
+        <div class="ico">⌖</div>
+        <div class="step-name">Canary Deploy</div>
+        <div class="step-detail">48h watch</div>
+      </div>
+      <div class="cicd-arrow">→</div>
+      <div class="cicd-step deploy">
+        <div class="ico">◇</div>
+        <div class="step-name">ML Pipeline</div>
+        <div class="step-detail">Vertex KFP · Sundays</div>
+      </div>
+      <div class="cicd-arrow">→</div>
+      <div class="cicd-step scan">
+        <div class="ico">⛨</div>
+        <div class="step-name">Security Scan</div>
+        <div class="step-detail">Trivy + DLP</div>
+      </div>
+    </div>
+
+    <div class="cicd-legend">
+      <div class="legend-item"><div class="legend-dot" style="background:var(--success);"></div>Origem</div>
+      <div class="legend-item"><div class="legend-dot" style="background:var(--warn);"></div>Quality Gate</div>
+      <div class="legend-item"><div class="legend-dot" style="background:var(--accent);"></div>Build / Deploy</div>
+      <div class="legend-item"><div class="legend-dot" style="background:var(--danger);"></div>Security Scan</div>
+    </div>
+  </div>
+
+  <!-- ========== SLIDE 11: QUALITY GATES ========== -->
+  <div class="slide">
+    <div class="slide-tag">10 · Quality Scorecard</div>
+    <h2>10 Quality Gates · Hard Limits</h2>
+    <p class="lede">Limites mensuráveis e automatizados — falha em qualquer gate bloqueia promoção em produção.</p>
+    <table class="gates-table">
+      <thead>
+        <tr>
+          <th style="width:40%">Gate</th>
+          <th style="width:35%">Threshold</th>
+          <th style="width:25%">Status</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr><td class="gate-name">Data Quality · Silver</td><td class="gate-thresh">≥ 95%</td><td><span class="gate-status">enforced</span></td></tr>
+        <tr><td class="gate-name">Data Quality · Gold</td><td class="gate-thresh">≥ 90%</td><td><span class="gate-status">enforced</span></td></tr>
+        <tr><td class="gate-name">Cluster Silhouette</td><td class="gate-thresh">≥ 0.45</td><td><span class="gate-status">enforced</span></td></tr>
+        <tr><td class="gate-name">LLM Eval Score</td><td class="gate-thresh">≥ 0.85</td><td><span class="gate-status">CI gate</span></td></tr>
+        <tr><td class="gate-name">Drift JS Divergence</td><td class="gate-thresh">&lt; 0.10</td><td><span class="gate-status">monitored</span></td></tr>
+        <tr><td class="gate-name">Canary Rollback</td><td class="gate-thresh">Brier &gt; champion × 1.05</td><td><span class="gate-status">auto-trigger</span></td></tr>
+        <tr><td class="gate-name">Bias Alert</td><td class="gate-thresh">grupo &gt; global × 1.15</td><td><span class="gate-status">monitored</span></td></tr>
+        <tr><td class="gate-name">Budget per Session</td><td class="gate-thresh">≤ $2.00</td><td><span class="gate-status">hard cap</span></td></tr>
+        <tr><td class="gate-name">Rate Limit</td><td class="gate-thresh">60 req / min</td><td><span class="gate-status">enforced</span></td></tr>
+        <tr><td class="gate-name">Retrain Cooldown</td><td class="gate-thresh">72 h</td><td><span class="gate-status">enforced</span></td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <!-- ========== SLIDE 12: ROADMAP ========== -->
+  <div class="slide">
+    <div class="slide-tag">11 · Execução</div>
+    <h2>Roadmap até Eleição 2026</h2>
+    <p class="lede">5 fases evolutivas — do containerizar inicial à inferência causal validada contra ground truth eleitoral.</p>
+
+    <div class="timeline">
+      <div class="phases">
+        <div class="phase">
+          <div class="phase-when">Semanas 1-2</div>
+          <div class="phase-num">01</div>
+          <div class="phase-title"><strong>Fase 1</strong><br>Containerizar + CI/CD inicial</div>
+        </div>
+        <div class="phase">
+          <div class="phase-when">Semanas 3-4</div>
+          <div class="phase-num">02</div>
+          <div class="phase-title"><strong>Fase 2</strong><br>Deploy staging + BigQuery + Firestore</div>
+        </div>
+        <div class="phase">
+          <div class="phase-when">Mês 2</div>
+          <div class="phase-num">03</div>
+          <div class="phase-title"><strong>Fase 3</strong><br>MLOps Nv. 2 — Vertex Pipeline + Champion / Challenger</div>
+        </div>
+        <div class="phase">
+          <div class="phase-when">Mês 3</div>
+          <div class="phase-num">04</div>
+          <div class="phase-title"><strong>Fase 4</strong><br>MLOps Nv. 5 — Drift → Auto-retrain + Canary + Bias</div>
+        </div>
+        <div class="phase">
+          <div class="phase-when">Eleição 2026</div>
+          <div class="phase-num">05</div>
+          <div class="phase-title"><strong>Fase 5</strong><br>Prediction Store → Ground Truth Loop</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="final-stat">
+      133 arquivos <span>·</span> ~19.500 linhas <span>·</span> 7 agentes <span>·</span> 14 fontes <span>·</span> MLOps Nível 5
+    </div>
+  </div>
+
+</div>
+
+<div class="progress-bar" id="progressBar" style="width: 8.33%;"></div>
+<div class="counter"><span class="current" id="counterCurrent">01</span> / 12</div>
+<div class="nav-hint">Use <kbd>←</kbd> <kbd>→</kbd> ou clique para navegar</div>
+
+<script>
+(function() {
+  const slides = document.querySelectorAll('.slide');
+  const total = slides.length;
+  const progressBar = document.getElementById('progressBar');
+  const counterCurrent = document.getElementById('counterCurrent');
+  let current = 0;
+
+  function updateUI() {
+    slides.forEach((s, i) => s.classList.toggle('active', i === current));
+    progressBar.style.width = ((current + 1) / total * 100) + '%';
+    counterCurrent.textContent = String(current + 1).padStart(2, '0');
+  }
+
+  function next() { if (current < total - 1) { current++; updateUI(); } }
+  function prev() { if (current > 0) { current--; updateUI(); } }
+
+  document.addEventListener('keydown', function(e) {
+    if (e.key === 'ArrowRight' || e.key === 'PageDown' || e.key === ' ') { e.preventDefault(); next(); }
+    else if (e.key === 'ArrowLeft' || e.key === 'PageUp') { e.preventDefault(); prev(); }
+    else if (e.key === 'Home') { current = 0; updateUI(); }
+    else if (e.key === 'End') { current = total - 1; updateUI(); }
+  });
+
+  document.getElementById('slidesContainer').addEventListener('click', function(e) {
+    // Click right half = next, left half = prev
+    const x = e.clientX;
+    const w = window.innerWidth;
+    if (x > w / 2) next(); else prev();
+  });
+
+  updateUI();
+})();
+</script>
+
+</body>
+</html>

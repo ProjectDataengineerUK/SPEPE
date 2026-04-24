@@ -1,0 +1,35 @@
+memory_store:
+  embedding:
+    model: textembedding-gecko@003
+    dimensions: 768
+    region: us-central1
+
+  vector_search:
+    index_type: ANN
+    algorithm: ScaNN
+    distance_measure: COSINE_DISTANCE
+    approximate_neighbors_count: 50
+    leaf_node_embedding_count: 500
+    leaf_nodes_to_search_percent: 7
+
+  namespaces:
+    coletor: spepe-memory-coletor
+    analista: spepe-memory-analista
+    perfilador: spepe-memory-perfilador
+    modelista_bayesiano: spepe-memory-modelista
+    explicador: spepe-memory-explicador
+    narrador: spepe-memory-narrador
+    vigilante: spepe-memory-vigilante
+
+  retrieval:
+    top_k: 5
+    min_similarity: 0.75
+
+  lifecycle:
+    ttl_days: 365
+    dedup_similarity: 0.98
+    compaction_schedule: "0 4 * * 0"
+
+  firestore_mirror:
+    enabled: true
+    collection: spepe_memories

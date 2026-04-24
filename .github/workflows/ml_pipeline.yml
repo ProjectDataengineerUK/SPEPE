@@ -1,0 +1,59 @@
+name: ML Pipeline
+
+on:
+  workflow_dispatch:
+    inputs:
+      trigger_reason:
+        description: Reason for triggering
+        required: false
+        default: manual
+      environment:
+        description: Target environment for pipeline run
+        required: true
+        default: prod
+        type: choice
+        options: [staging, prod]
+  schedule:
+    # Sundays at 08:00 UTC (after gold_build_job at 06:00)
+    - cron: "0 8 * * 0"
+
+jobs:
+  trigger-vertex-pipeline:
+    runs-on: ubuntu-latest
+    # Scheduled runs always target prod; manual runs use the input selection
+    environment: ${{ github.event.inputs.environment || 'prod' }}
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - run: pip install kfp google-cloud-aiplatform
+
+      # OIDC-based auth — eliminates long-lived SA key stored as a secret
+      - id: auth
+        uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: ${{ vars.WIF_PROVIDER }}
+          service_account: ${{ vars.WIF_SERVICE_ACCOUNT }}
+
+      - name: Compile and submit Vertex AI Pipeline
+        env:
+          GCP_PROJECT_ID: ${{ vars.GCP_PROJECT_ID }}
+          VERTEX_LOCATION: ${{ vars.VERTEX_LOCATION || 'southamerica-east1' }}
+          BIGQUERY_DATASET_GOLD: spepe_gold
+          GCS_BUCKET: ${{ vars.GCS_BUCKET }}
+          SPEPE_ENVIRONMENT: ${{ github.event.inputs.environment || 'prod' }}
+        run: python mlops/vertex_pipeline.py
+
+      - name: Notify on failure
+        if: failure()
+        run: |
+          echo "ML Pipeline failed — check Vertex AI console"
+          echo "Project: ${{ vars.GCP_PROJECT_ID }}"
+          echo "Environment: ${{ github.event.inputs.environment || 'prod' }}"

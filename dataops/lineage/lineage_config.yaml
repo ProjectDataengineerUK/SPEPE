@@ -1,0 +1,52 @@
+pipeline: spepe-medallion
+version: "2.0"
+location: southamerica-east1
+
+layers:
+  bronze:
+    storage: gcs
+    path_pattern: "gs://{bucket}/raw/{source}/{year}/{uf}/"
+    immutable: true
+    sources:
+      - name: tse_resultados
+        type: csv_zip
+        url_pattern: "https://cdn.tse.jus.br/estatistica/sead/odsele/votacao_secao/votacao_secao_{year}_{uf}.zip"
+      - name: ibge_sidra
+        type: api_rest
+        url: "https://servicodados.ibge.gov.br/api/v3/agregados"
+      - name: ibge_censo_2022
+        type: csv
+      - name: digital_meta_ads
+        type: api_rest
+      - name: digital_google_trends
+        type: scraper
+      - name: pesquisas_tse_pesqele
+        type: csv
+
+  silver:
+    storage: bigquery
+    dataset: spepe_silver
+    dq_threshold: 95.0
+    tables:
+      - municipios_clean
+      - candidatos_clean
+      - ibge_indicadores
+      - digital_signal
+      - pesquisas_clean
+
+  gold:
+    storage: bigquery
+    dataset: spepe_gold
+    tables:
+      - name: fact_municipio_eleicao
+        description: "5570 municípios × 3 eleições × ~200 features"
+        partition_by: ano_eleicao
+      - name: fact_candidato_dia
+        description: "Candidatos × dia × features digitais (~40 features)"
+        partition_by: data
+      - name: fact_pesquisa
+        description: "Pesquisas × house effect ajustado × erro observado"
+        partition_by: data_pesquisa
+
+lineage_backend: dataplex
+lineage_fallback: local_jsonl

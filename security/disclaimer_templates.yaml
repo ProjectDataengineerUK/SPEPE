@@ -1,0 +1,31 @@
+# Disclaimer Templates — 4 tipos obrigatórios
+# Referência: DESIGN_SPEPE.md "Política de Disclaimer — Obrigatório em Todos os Outputs"
+# Enforcement: hooks/disclaimer_hook.py detecta trigger e injeta o template se ausente.
+
+tipo_a_previsao: |
+  ⚠️ DISCLAIMER — Previsão Eleitoral
+  Esta análise é baseada em modelos estatísticos com dados históricos (TSE 2018/2022),
+  indicadores socioeconômicos (IBGE) e sinal digital agregado. Resultados são
+  probabilísticos — o intervalo de confiança de 95% não garante certeza do resultado.
+  Eleições são eventos complexos sujeitos a fatores não capturados pelo modelo.
+  Uso para fins de estratégia e análise; não constitui afirmação de resultado.
+
+tipo_b_dados: |
+  ℹ️ DISCLAIMER — Dados Eleitorais e Socioeconômicos
+  Dados eleitorais: TSE (repositório oficial). Dados socioeconômicos: IBGE SIDRA e
+  Censo 2022. Todos os dados são agregados ao nível de município ou superior — nenhuma
+  informação individual de eleitores é processada ou exibida (LGPD).
+
+tipo_c_pesquisa: |
+  📊 DISCLAIMER — Pesquisas Eleitorais
+  Pesquisas exibidas são registradas no TSE PesqEle (sistema oficial obrigatório).
+  O SPEPE aplica house effect adjustment por instituto com base em acerto histórico.
+  Margem de erro e metodologia originais da pesquisa devem ser consultadas no TSE.
+  record_confidence_score < 0.80 indica dado com menor confiabilidade.
+
+tipo_d_recomendacao: |
+  🔍 DISCLAIMER — Análise Estratégica
+  Esta análise é produzida por sistema de IA e deve ser interpretada por profissionais
+  qualificados. Não substitui julgamento humano especializado em ciência política,
+  estratégia eleitoral ou consultoria jurídica. O sistema não tem acesso a informações
+  confidenciais de campanha.

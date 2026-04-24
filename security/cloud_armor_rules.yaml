@@ -1,0 +1,60 @@
+security_policy:
+  name: spepe-waf-policy
+  project: ${GCP_PROJECT_ID}
+  description: "SPEPE WAF — rate limiting, geo-restriction, SQL injection protection"
+
+rules:
+  - priority: 1000
+    action: deny(429)
+    description: "Rate limit: 100 req/min por IP"
+    match:
+      expr:
+        expression: "origin.region_code == 'BR' && request.method == 'POST' && rate(100, '60s')"
+
+  - priority: 2000
+    action: allow
+    description: "Allow Brazil traffic"
+    match:
+      config:
+        src_region_codes:
+          - BR
+
+  - priority: 2100
+    action: allow
+    description: "Allow known VPN/proxy ranges (research institutions)"
+    match:
+      config:
+        src_ip_ranges:
+          - 200.130.0.0/16
+
+  - priority: 3000
+    action: deny(403)
+    description: "Block SQL injection attempts"
+    match:
+      expr:
+        expression: "evaluatePreconfiguredExpr('sqli-v33-stable')"
+
+  - priority: 3100
+    action: deny(403)
+    description: "Block XSS attempts"
+    match:
+      expr:
+        expression: "evaluatePreconfiguredExpr('xss-v33-stable')"
+
+  - priority: 9000
+    action: deny(403)
+    description: "Block all non-Brazil traffic by default"
+    match:
+      versioned_expr: SRC_IPS_V1
+      config:
+        src_ip_ranges:
+          - "*"
+
+  - priority: 2147483647
+    action: allow
+    description: "Default allow (fallback — should not be reached)"
+    match:
+      versioned_expr: SRC_IPS_V1
+      config:
+        src_ip_ranges:
+          - "0.0.0.0/0"

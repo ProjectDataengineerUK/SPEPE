@@ -1,0 +1,24 @@
+iap:
+  project: ${GCP_PROJECT_ID}
+  service: spepe-cloud-run
+  region: southamerica-east1
+
+oauth_client:
+  client_id: ${IAP_CLIENT_ID}
+  client_secret_name: IAP_CLIENT_SECRET
+
+access_policy:
+  allowed_members:
+    - user:${ADMIN_EMAIL}
+    - group:${RESEARCH_GROUP_EMAIL}
+  denied_members: []
+
+backend_service:
+  name: spepe-cloud-run-backend
+  iap_enabled: true
+  signed_headers_jwt_expiration: 3600s
+
+notes:
+  - "IAP garante que apenas usuários Google autorizados acessam o Cloud Run"
+  - "Sem autenticação IAP, o Cloud Run não é acessível publicamente"
+  - "Para desenvolvimento local, use gcloud auth print-identity-token"

@@ -1,0 +1,50 @@
+# Data Contract: Silver → Gold
+# Referência: DESIGN_SPEPE.md — Decisão 15.
+# Validação: dataops/contracts/contract_validator.py
+
+contract_version: "1.0"
+producer: "silver_transform_job"
+consumer: "gold_build_job"
+
+gates:
+  dq_score_min: 0.95                 # Great Expectations suite
+  cod_municipio_ibge: required       # global key — mandatory
+  eleicoes_required: [2018, 2022]    # 2014 is auxiliary
+  ibge_indicadores_min: 3            # min indicators per municipality
+
+schema_requirements:
+  fact_municipio_eleicao_input:
+    required_columns:
+      - cod_municipio_ibge
+      - sg_uf
+      - ano_eleicao
+      - cd_cargo
+      - nr_turno
+    types:
+      cod_municipio_ibge: int64
+      ano_eleicao: int64
+
+  fato_social_input:
+    required_columns:
+      - cod_municipio_ibge
+      - semana_ref
+      - volume_mencoes
+    lgpd_level: municipio
+
+  fact_pesquisa_input:
+    required_columns:
+      - instituto
+      - data_pesquisa
+      - candidato
+      - intencao_pct
+      - record_confidence_score
+
+quality_gates:
+  null_pk_max: 0
+  ranges:
+    qt_votos: {min: 0}
+    intencao_pct: {min: 0, max: 100}
+
+on_violation: block                  # blocks Gold build
+alert_channel: slack + cloud_logging
+severity: P1

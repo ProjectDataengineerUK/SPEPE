@@ -1,0 +1,69 @@
+monitoring_job:
+  display_name: spepe-model-monitoring
+  project: ${GCP_PROJECT_ID}
+  location: ${VERTEX_LOCATION}
+
+endpoint: ${VERTEX_ENDPOINT_NAME}
+
+model_monitoring_alert_config:
+  email_alert_config:
+    user_emails:
+      - admin@spepe.example.com
+
+skew_detection_config:
+  data_source:
+    bigquery_source:
+      input_uri: bigquery://${GCP_PROJECT_ID}.spepe_gold.fact_municipio_eleicao
+  feature_thresholds:
+    idhm_2010:
+      jensen_shannon_divergence: 0.1
+    renda_media_domiciliar:
+      jensen_shannon_divergence: 0.1
+    pct_analfabetos:
+      jensen_shannon_divergence: 0.1
+    pct_rural:
+      jensen_shannon_divergence: 0.1
+
+drift_detection_config:
+  feature_thresholds:
+    idhm_2010:
+      jensen_shannon_divergence: 0.1
+    renda_media_domiciliar:
+      jensen_shannon_divergence: 0.1
+  categorical_threshold_config:
+    sg_uf:
+      jensen_shannon_divergence: 0.05
+
+sampling_strategy:
+  random_sample_config:
+    sample_rate: 0.1
+
+monitor_interval:
+  seconds: 86400
+
+bias_monitoring:
+  enabled: true
+  protected_attributes:
+    - sg_uf
+    - quintil_renda
+  fairness_metrics:
+    - equalized_odds_diff
+    - demographic_parity_diff
+  threshold: 0.15
+  alert_severity: high
+
+auto_actions:
+  trigger_retrain: true
+  retrain_threshold: 0.15
+  cooldown_hours: 6
+  notify_channels:
+    - pubsub
+    - cloud_logging
+  pubsub_topic: projects/spepe-dev/topics/drift-detected
+
+reporting:
+  enabled: true
+  daily_summary: true
+  weekly_report: true
+  slack_webhook: ${SLACK_WEBHOOK_URL}
+  looker_board: spepe-mlops-monitoring

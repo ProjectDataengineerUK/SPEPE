@@ -1,0 +1,33 @@
+vpc_service_controls:
+  project: ${GCP_PROJECT_ID}
+  access_policy: ${VPC_SC_POLICY_NAME}
+
+perimeter:
+  name: spepe-data-perimeter
+  description: "VPC SC perimeter around BigQuery and GCS for SPEPE"
+  resources:
+    - projects/${GCP_PROJECT_ID}
+  restricted_services:
+    - bigquery.googleapis.com
+    - storage.googleapis.com
+    - aiplatform.googleapis.com
+  access_levels:
+    - name: spepe-allowed-ips
+      conditions:
+        - ip_subnetworks:
+            - 34.0.0.0/8
+            - 35.0.0.0/8
+
+vpc_network:
+  name: spepe-vpc
+  region: southamerica-east1
+  subnets:
+    - name: spepe-services
+      ip_cidr_range: "10.0.0.0/24"
+      region: southamerica-east1
+      private_google_access: true
+
+cloud_run:
+  ingress: internal-and-cloud-load-balancing
+  vpc_connector: spepe-vpc-connector
+  egress: all-traffic

@@ -1,0 +1,89 @@
+name: Security
+
+on:
+  push:
+    branches: [main, develop]
+  schedule:
+    - cron: "0 6 * * 1"  # Mondays at 06:00 UTC
+
+jobs:
+  trivy-scan:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      # Required to upload SARIF results to GitHub Security tab
+      security-events: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build image for scanning
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          # Load into local Docker daemon for Trivy to scan — do not push
+          load: true
+          tags: spepe:scan
+          # Reuse cache from deploy workflow to avoid a full rebuild
+          cache-from: type=gha
+
+      - name: Trivy image scan
+        # Pinned to a specific version tag — avoids supply-chain risk from @master
+        uses: aquasecurity/trivy-action@0.28.0
+        with:
+          image-ref: spepe:scan
+          format: sarif
+          output: trivy-results.sarif
+          severity: CRITICAL,HIGH
+          exit-code: "1"
+
+      - name: Upload SARIF to GitHub Security
+        uses: github/codeql-action/upload-sarif@v3
+        # Upload even when Trivy found vulnerabilities (exit-code 1 above)
+        if: always()
+        with:
+          sarif_file: trivy-results.sarif
+
+  dlp-check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+      - run: pip install -r requirements.txt
+      - name: Scan codebase for PII patterns
+        run: python -c "
+import re, sys, pathlib
+from security.output_validators import _PII_PATTERNS
+
+skip_dirs = {'.git', '.github', '__pycache__', 'tests'}
+violations = []
+for f in pathlib.Path('.').rglob('*.py'):
+    if any(p in f.parts for p in skip_dirs):
+        continue
+    text = f.read_text(errors='ignore')
+    for pat, _ in _PII_PATTERNS:
+        if re.search(pat, text):
+            violations.append(str(f))
+            break
+
+if violations:
+    print('PII patterns found in:', violations)
+    sys.exit(1)
+print('DLP scan passed')
+"
+
+  dependency-audit:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+      - run: pip install pip-audit
+      - run: pip-audit -r requirements.txt --ignore-vuln GHSA-w7pp-m8wf-vj6r

@@ -1,0 +1,86 @@
+supervisor:
+  name: Supervisor SPEPE
+  model: claude-sonnet-4-6
+  protocol: DOMA
+  budget_guard_usd: 2.00
+  budget_warn_usd: 1.50
+  max_turns: 50
+
+agents:
+  - name: Coletor
+    id: coletor
+    tier: T1
+    model: gemini-2.5-flash
+    slash_commands: [/coletar, /ingerir]
+    mcp_servers: [tse, ibge, digital, pesquisas]
+    lgpd_restrictions:
+      - aggregate_only_digital
+
+  - name: Analista
+    id: analista
+    tier: T1
+    model: gemini-2.5-pro
+    slash_commands: [/analisar, /perfil, /comparar]
+    mcp_servers: [tse, ibge]
+
+  - name: Perfilador
+    id: perfilador
+    tier: T1
+    model: gemini-2.5-flash
+    slash_commands: [/arquétipos, /perfis]
+    mcp_servers: [tse, ibge]
+    lgpd_restrictions:
+      - aggregate_only
+      - minimum_level: municipio
+    pipeline_module: archetype.pipeline
+    pipeline_fn: run_archetype_pipeline
+    silhouette_threshold: 0.45
+
+  - name: Modelista Bayesiano
+    id: modelista_bayesiano
+    tier: T1
+    model: gemini-2.5-pro
+    slash_commands: [/prever, /simular]
+    mcp_servers: [pesquisas, vertex]
+    output_format: "P({candidato}) = {X}% [IC 95%: {lo}%–{hi}%]"
+    mandatory_disclaimer: true
+
+  - name: Explicador
+    id: explicador
+    tier: T1
+    model: gemini-2.5-pro
+    slash_commands: [/explicar, /shap]
+    shap_path: output/shap/shap_values_latest.json
+    max_features_shown: 10
+    mandatory_disclaimer: true
+    forbidden_jargon: [bootstrap, logístico]
+
+  - name: Narrador
+    id: narrador
+    tier: T2
+    model: gemini-2.0-flash
+    slash_commands: [/narrar, /relatorio]
+    max_words: 300
+    mandatory_disclaimer: true
+
+  - name: Vigilante
+    id: vigilante
+    tier: T3
+    model: gemini-2.0-flash
+    slash_commands: [/monitorar, /drift]
+    drift_threshold: 0.10
+    check_interval_hours: 24
+
+hooks:
+  pre_tool_use:
+    - hooks.dlp_hook.dlp_hook
+    - hooks.rate_limit_hook.rate_limit_hook
+    - hooks.security_hook.security_hook
+  post_tool_use:
+    - hooks.audit_hook.audit_tool_usage
+
+output_constraints:
+  disclaimer_required_agents: [modelista_bayesiano, explicador, narrador]
+  disclaimer_text: "Esta análise é baseada em dados históricos e modelos estatísticos. Não constitui previsão definitiva de resultado eleitoral."
+  aggregate_only_agents: [perfilador, coletor]
+  minimum_aggregate_level: municipio

@@ -1,0 +1,37 @@
+judge:
+  name: ml_judge
+  model: gemini-2.5-pro
+  region: us-central1
+  isolation: strict
+
+  thresholds:
+    brier_max: 0.25
+    calibration_error_max: 0.05
+    ic_coverage_min: 0.92
+    ic_coverage_max: 0.98
+    fairness_gap_max_pp: 15.0
+    min_samples_for_audit: 200
+
+  backtest:
+    shadow_flag: true
+    horizon_days: 7
+    bootstrap_samples: 1000
+
+  fairness:
+    protected_attributes:
+      - quintil_renda
+      - sg_uf
+      - pct_zona_rural
+    metric: equalized_odds
+    bucket_min_size: 50
+
+  reporting:
+    output_table: spepe_mlops.audit_reports
+    bucket_path: gs://spepe-audit/reports
+
+  promotion_gate:
+    block_on:
+      - Reprovado
+    warn_on:
+      - "Aprovado com ressalvas"
+    require_resolution: true

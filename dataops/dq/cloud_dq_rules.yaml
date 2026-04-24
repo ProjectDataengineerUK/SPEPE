@@ -1,0 +1,25 @@
+rules:
+  - rule_binding_id: tse_silver_not_null_votos
+    entity_uri: bigquery://spepe_silver/tse_sp_2022
+    column_id: qt_votos
+    rule_id: not_null_simple
+
+  - rule_binding_id: tse_silver_not_null_municipio
+    entity_uri: bigquery://spepe_silver/tse_sp_2022
+    column_id: cd_municipio
+    rule_id: not_null_simple
+
+  - rule_binding_id: gold_municipio_row_count
+    entity_uri: bigquery://spepe_gold/fact_municipio_eleicao
+    rule_id: row_count_between
+    rule_params:
+      min_count: 5570
+      max_count: 60000
+
+rule_definitions:
+  not_null_simple:
+    sql_expression: "$column IS NOT NULL"
+
+  row_count_between:
+    sql_expression: |
+      (SELECT COUNT(*) FROM $entity) BETWEEN $min_count AND $max_count

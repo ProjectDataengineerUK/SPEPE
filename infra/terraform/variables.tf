@@ -1,0 +1,54 @@
+variable "project_id" {
+  description = "GCP project ID"
+  type        = string
+}
+
+variable "region" {
+  description = "GCP region for data services (LGPD: southamerica-east1)"
+  type        = string
+  default     = "southamerica-east1"
+}
+
+variable "vertex_region" {
+  description = "Vertex AI region (us-central1 — Vertex not in southamerica-east1)"
+  type        = string
+  default     = "us-central1"
+}
+
+variable "environment" {
+  description = "Environment: dev, staging, prod"
+  type        = string
+  default     = "dev"
+  validation {
+    condition     = contains(["dev", "staging", "prod"], var.environment)
+    error_message = "Environment must be dev, staging, or prod."
+  }
+}
+
+variable "admin_email" {
+  description = "Admin email for IAP and alerts"
+  type        = string
+}
+
+variable "budget_alert_usd" {
+  description = "Monthly budget alert threshold in USD"
+  type        = number
+  default     = 50
+}
+
+variable "app_image" {
+  description = "Full Artifact Registry image URI including tag (e.g. southamerica-east1-docker.pkg.dev/PROJECT/spepe/app:SHA)"
+  type        = string
+  # No default — must be supplied explicitly to prevent accidental :latest deploys.
+  # Pass via: -var="app_image=..."  or  TF_VAR_app_image env var in CI.
+}
+
+variable "wif_pool_id" {
+  description = "Workload Identity Pool ID used by GitHub Actions OIDC auth"
+  type        = string
+}
+
+variable "github_repo" {
+  description = "GitHub repository in 'owner/repo' format for WIF subject binding"
+  type        = string
+}

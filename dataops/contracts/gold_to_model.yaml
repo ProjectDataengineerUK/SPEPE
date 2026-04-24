@@ -1,0 +1,36 @@
+# Data Contract: Gold → Modelo ML
+# Referência: DESIGN_SPEPE.md — Decisão 15.
+# Validação: dataops/contracts/contract_validator.py antes do KFP pipeline.
+
+contract_version: "1.0"
+producer: "gold_build_job"
+consumer: "mlops/vertex_pipeline"
+
+required_features:
+  - {name: cod_municipio_ibge, type: int64}
+  - {name: sg_uf, type: string}
+  - {name: ano_eleicao, type: int64}
+  - {name: cd_cargo, type: int64}
+  - {name: renda_media_domiciliar, type: float64, range: [0, 50000]}
+  - {name: pct_zona_rural, type: float64, range: [0, 1]}
+  - {name: taxa_desemprego, type: float64, range: [0, 1]}
+  - {name: pct_analfabetos, type: float64, range: [0, 1]}
+  - {name: idhm, type: float64, range: [0, 1]}
+  - {name: pib_per_capita, type: float64, range: [0, 1000000]}
+  - {name: resultado_2018, type: float64, range: [0, 1]}
+  - {name: resultado_2022, type: float64, range: [0, 1]}
+
+optional_features:
+  - {name: volume_mencoes, type: float64}          # from fato_social
+  - {name: sentiment_score, type: float64, range: [-1, 1]}
+  - {name: trends_index, type: float64}
+
+pesquisas_filter:
+  record_confidence_score_min: 0.80   # only high-confidence rows feed the model
+
+no_nulls_in_required: true
+row_count_min: 5000                    # Brazil has 5570 municipalities; allow partial
+
+on_violation: block
+alert_channel: slack + cloud_logging
+severity: P1

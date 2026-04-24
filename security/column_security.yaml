@@ -1,0 +1,65 @@
+# Column-level security (BigQuery) — mapeamento de colunas restritas para papel mínimo.
+# Aplicado por: infra/terraform/bigquery_rbac.tf via policy tags (BigQuery).
+# Nenhum dado sensível pode ser lido por papéis abaixo do minimum_role.
+
+version: "1.0"
+
+policy_taxonomy:
+  name: spepe_data_classification
+  location: southamerica-east1
+
+policy_tags:
+  - name: confidential
+    minimum_role: spepe_admin
+    description: "Colunas com dados estatisticamente sensíveis — somente admin."
+  - name: internal
+    minimum_role: spepe_analyst
+    description: "Colunas de uso analítico interno."
+  - name: public
+    minimum_role: spepe_viewer
+    description: "Colunas públicas em dashboards."
+
+columns:
+  # spepe_gold.fact_pesquisa
+  - dataset: spepe_gold
+    table: fact_pesquisa
+    column: house_effect_adj
+    policy_tag: confidential
+  - dataset: spepe_gold
+    table: fact_pesquisa
+    column: record_confidence_score
+    policy_tag: confidential
+
+  # spepe_mlops.fact_predictions
+  - dataset: spepe_mlops
+    table: fact_predictions
+    column: p_mean
+    policy_tag: confidential
+  - dataset: spepe_mlops
+    table: fact_predictions
+    column: p_lower
+    policy_tag: confidential
+  - dataset: spepe_mlops
+    table: fact_predictions
+    column: p_upper
+    policy_tag: confidential
+
+  # spepe_mlops.bias_metrics
+  - dataset: spepe_mlops
+    table: bias_metrics
+    column: bias_score_by_group
+    policy_tag: confidential
+
+  # Colunas públicas (explícitas para referência)
+  - dataset: spepe_gold
+    table: fact_municipio_eleicao
+    column: cod_municipio_ibge
+    policy_tag: public
+  - dataset: spepe_gold
+    table: fact_municipio_eleicao
+    column: sg_uf
+    policy_tag: public
+  - dataset: spepe_gold
+    table: fact_municipio_eleicao
+    column: ano_eleicao
+    policy_tag: public

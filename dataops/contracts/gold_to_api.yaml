@@ -1,0 +1,40 @@
+# Data Contract: Gold → Dashboard / API
+# Referência: DESIGN_SPEPE.md — Decisão 15 + Access Control Model.
+
+contract_version: "1.0"
+producer: "gold_build_job"
+consumer: "ui/dashboard_api | ui/chainlit_app"
+
+sla:
+  freshness_max_hours: 2               # Gold must be fresh within 2h
+  api_p99_ms: 3000
+
+public_columns:                        # readable by spepe.viewer
+  - cod_municipio_ibge
+  - sg_uf
+  - nm_municipio
+  - ano_eleicao
+  - cd_cargo
+  - nr_turno
+  - resultado_2018
+  - resultado_2022
+  - qt_votos
+  - nm_candidato
+  - sg_partido
+
+restricted_columns:                    # spepe.admin only
+  - house_effect_adj
+  - record_confidence_score
+
+row_level_security:
+  enabled: true
+  field: sg_uf
+  role: spepe_analyst
+  attribute: uf_filter
+
+schema_version: semver                 # breaking changes require major bump
+breaking_change_cooldown_sprints: 1
+
+on_violation: block
+alert_channel: slack + cloud_logging
+severity: P2

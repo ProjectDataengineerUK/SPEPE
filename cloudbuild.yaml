@@ -1,0 +1,42 @@
+# cloudbuild.yaml — manual trigger only (CI/CD via GitHub Actions deploy.yml is preferred)
+# Use only for ad-hoc builds triggered from Cloud Console or gcloud builds submit.
+
+steps:
+  - name: gcr.io/cloud-builders/docker
+    id: build
+    args:
+      - build
+      - -t
+      - southamerica-east1-docker.pkg.dev/$PROJECT_ID/spepe/app:$COMMIT_SHA
+      - .
+
+  - name: gcr.io/cloud-builders/docker
+    id: push
+    waitFor: [build]
+    args: [push, southamerica-east1-docker.pkg.dev/$PROJECT_ID/spepe/app:$COMMIT_SHA]
+
+  - name: gcr.io/google.com/cloudsdktool/cloud-sdk
+    id: deploy
+    waitFor: [push]
+    entrypoint: gcloud
+    args:
+      - run
+      - deploy
+      - spepe-$_ENVIRONMENT
+      - --image=southamerica-east1-docker.pkg.dev/$PROJECT_ID/spepe/app:$COMMIT_SHA
+      - --region=$_REGION
+      - --platform=managed
+      - --set-env-vars=GCP_PROJECT_ID=$PROJECT_ID
+      - --set-secrets=ANTHROPIC_API_KEY=ANTHROPIC_API_KEY:latest
+      - --quiet
+
+substitutions:
+  _ENVIRONMENT: staging
+  _REGION: southamerica-east1
+
+options:
+  logging: CLOUD_LOGGING_ONLY
+  machineType: E2_HIGHCPU_8
+
+images:
+  - southamerica-east1-docker.pkg.dev/$PROJECT_ID/spepe/app:$COMMIT_SHA
