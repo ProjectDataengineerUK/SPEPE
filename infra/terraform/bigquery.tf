@@ -202,12 +202,11 @@ resource "google_bigquery_table" "dim_territorio" {
 
 # Visão pré-agregada por zona — evita scan de fact_secao_eleicao (~100-500M linhas) para o dashboard
 resource "google_bigquery_table" "mv_zona_eleicao" {
-  dataset_id               = google_bigquery_dataset.spepe_gold.dataset_id
-  table_id                 = "mv_zona_eleicao"
-  description              = "Materialized View: votos por zona × cargo × candidato × eleição"
-  labels                   = local.labels
-  deletion_protection      = var.environment == "prod"
-  require_partition_filter = true
+  dataset_id          = google_bigquery_dataset.spepe_gold.dataset_id
+  table_id            = "mv_zona_eleicao"
+  description         = "Materialized View: votos por zona × cargo × candidato × eleição"
+  labels              = local.labels
+  deletion_protection = var.environment == "prod"
 
   range_partitioning {
     field = "ano_eleicao"
