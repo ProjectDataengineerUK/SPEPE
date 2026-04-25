@@ -106,37 +106,35 @@ jobs:
       - name: Deploy to Cloud Run staging
         id: deploy
         run: |
-          URL=$(gcloud run deploy spepe-staging \
+          gcloud run deploy spepe-staging \
             --image "${{ needs.build-push.outputs.image_tag }}" \
             --service-account "spepe-cloud-run@${{ vars.GCP_PROJECT_ID }}.iam.gserviceaccount.com" \
             --set-env-vars "GCP_PROJECT_ID=${{ vars.GCP_PROJECT_ID }},USE_BIGQUERY=false,DEFAULT_UF=SP,DEFAULT_ANO=2022,ENVIRONMENT=staging" \
             --set-secrets "ANTHROPIC_API_KEY=anthropic_api_key:latest" \
+            --allow-unauthenticated \
             --region "${{ env.GCP_REGION }}" \
             --project "${{ vars.GCP_PROJECT_ID }}" \
-            --format "value(status.url)" 2>&1 | tail -1)
+            --wait
+          URL=$(gcloud run services describe spepe-staging \
+            --region "${{ env.GCP_REGION }}" \
+            --project "${{ vars.GCP_PROJECT_ID }}" \
+            --format "value(status.url)")
           echo "url=${URL}" >> $GITHUB_OUTPUT
 
       - name: Smoke test — staging health check
         run: |
           URL="${{ steps.deploy.outputs.url }}"
           echo "Service deployed to: ${URL}"
-          # Wait for the revision to become healthy before marking stage as done
-          for i in $(seq 1 10); do
-            STATUS=$(curl -s -o /dev/null -w "%{http_code}" \
-              -H "Authorization: Bearer $(gcloud auth print-identity-token)" \
-              "${URL}/healthz" || echo "000")
+          for i in $(seq 1 6); do
+            STATUS=$(curl -s -o /dev/null -w "%{http_code}" "${URL}/healthz" || echo "000")
             echo "Attempt ${i}: HTTP ${STATUS}"
             if [ "${STATUS}" = "200" ]; then
               echo "Health check passed."
               exit 0
             fi
-            sleep 15
+            sleep 10
           done
-          echo "Health check failed after 10 attempts — rolling back staging."
-          gcloud run services update-traffic spepe-staging \
-            --to-revisions=LATEST=0 \
-            --region=${{ env.GCP_REGION }} \
-            --project=${{ vars.GCP_PROJECT_ID }} || true
+          echo "Smoke test failed — service not healthy after 60s"
           exit 1
 
   deploy-prod:
