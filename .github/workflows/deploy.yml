@@ -108,6 +108,7 @@ jobs:
           image: ${{ needs.build-push.outputs.image_tag }}
           region: ${{ env.GCP_REGION }}
           project_id: ${{ vars.GCP_PROJECT_ID }}
+          service_account: spepe-cloud-run@${{ vars.GCP_PROJECT_ID }}.iam.gserviceaccount.com
           env_vars: |
             GCP_PROJECT_ID=${{ vars.GCP_PROJECT_ID }}
             USE_BIGQUERY=false
