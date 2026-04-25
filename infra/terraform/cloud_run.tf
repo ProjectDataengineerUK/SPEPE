@@ -3,7 +3,9 @@ resource "google_cloud_run_v2_service" "spepe" {
   location = var.region
   labels   = local.labels
 
-  ingress = "INGRESS_TRAFFIC_INTERNAL_LOAD_BALANCER"
+  # dev: allow direct public access for fast iteration (no LB required)
+  # staging/prod: restrict to HTTPS Load Balancer (IAP sits in front)
+  ingress = var.environment == "dev" ? "INGRESS_TRAFFIC_ALL" : "INGRESS_TRAFFIC_INTERNAL_LOAD_BALANCER"
 
   template {
     service_account = google_service_account.cloud_run.email

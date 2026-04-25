@@ -18,6 +18,7 @@ locals {
     "billingbudgets.googleapis.com",
     "workloadidentity.googleapis.com",
     "sts.googleapis.com",
+    "compute.googleapis.com",
   ])
 }
 

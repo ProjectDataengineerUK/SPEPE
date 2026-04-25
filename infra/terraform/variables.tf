@@ -52,3 +52,15 @@ variable "billing_account_id" {
   description = "GCP Billing Account ID (format: XXXXXX-XXXXXX-XXXXXX) for budget alerts"
   type        = string
 }
+
+variable "domain" {
+  description = "Public domain for the HTTPS Load Balancer (e.g. spepe.example.com). Required for staging/prod IAP."
+  type        = string
+  default     = ""
+}
+
+variable "research_group_email" {
+  description = "Google Group email for IAP access (optional, staging/prod only)"
+  type        = string
+  default     = ""
+}
