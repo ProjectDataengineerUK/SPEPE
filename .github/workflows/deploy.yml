@@ -108,6 +108,14 @@ jobs:
           image: ${{ needs.build-push.outputs.image_tag }}
           region: ${{ env.GCP_REGION }}
           project_id: ${{ vars.GCP_PROJECT_ID }}
+          env_vars: |
+            GCP_PROJECT_ID=${{ vars.GCP_PROJECT_ID }}
+            USE_BIGQUERY=false
+            DEFAULT_UF=SP
+            DEFAULT_ANO=2022
+            ENVIRONMENT=staging
+          secrets: |
+            ANTHROPIC_API_KEY=anthropic_api_key:latest
 
       - name: Smoke test — staging health check
         run: |
