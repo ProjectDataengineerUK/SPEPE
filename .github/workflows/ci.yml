@@ -39,7 +39,7 @@ jobs:
         with:
           python-version: ${{ env.PYTHON_VERSION }}
           cache: pip
-      - run: pip install -r requirements-dev.txt
+      - run: pip install -r requirements-test.txt
       - run: pytest tests/ -v --cov=. --cov-report=xml --ignore=tests/fixtures -m "not integration"
       - uses: codecov/codecov-action@v4
         with:
