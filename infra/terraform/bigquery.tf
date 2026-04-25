@@ -241,3 +241,48 @@ resource "google_bigquery_table" "mv_zona_eleicao" {
     refresh_interval_ms = 3600000
   }
 }
+
+# Segurança Pública — IVS (IPEA) + Atlas da Violência (IPEA/FBSP) + SINESP
+resource "google_bigquery_table" "fact_seguranca_municipio" {
+  dataset_id               = google_bigquery_dataset.spepe_gold.dataset_id
+  table_id                 = "fact_seguranca_municipio"
+  description              = "Indicadores de segurança pública por município × ano — IVS + Atlas da Violência + SINESP"
+  labels                   = local.labels
+  deletion_protection      = var.environment == "prod"
+  require_partition_filter = true
+
+  range_partitioning {
+    field = "ano"
+    range {
+      start    = 2010
+      end      = 2034
+      interval = 1
+    }
+  }
+
+  clustering = ["sg_uf", "cd_municipio_ibge"]
+
+  schema = jsonencode([
+    { name = "cd_municipio_ibge", type = "INT64", mode = "REQUIRED" },
+    { name = "sg_uf", type = "STRING", mode = "REQUIRED" },
+    { name = "sg_regiao", type = "STRING", mode = "NULLABLE" },
+    { name = "nm_regiao", type = "STRING", mode = "NULLABLE" },
+    { name = "ano", type = "INT64", mode = "REQUIRED" },
+    # Atlas da Violência — IPEA/FBSP
+    { name = "taxa_homicidio_100k", type = "FLOAT64", mode = "NULLABLE" },
+    { name = "qt_homicidios", type = "INT64", mode = "NULLABLE" },
+    # IVS — Índice de Vulnerabilidade Social (IPEA)
+    { name = "ivs_total", type = "FLOAT64", mode = "NULLABLE" },
+    { name = "ivs_infraestrutura", type = "FLOAT64", mode = "NULLABLE" },
+    { name = "ivs_capital_humano", type = "FLOAT64", mode = "NULLABLE" },
+    { name = "ivs_renda_trabalho", type = "FLOAT64", mode = "NULLABLE" },
+    # SINESP — ocorrências criminais (quando disponível)
+    { name = "taxa_roubo_100k", type = "FLOAT64", mode = "NULLABLE" },
+    { name = "taxa_furto_100k", type = "FLOAT64", mode = "NULLABLE" },
+    { name = "qt_feminicidio", type = "INT64", mode = "NULLABLE" },
+    { name = "taxa_mortalidade_transito_100k", type = "FLOAT64", mode = "NULLABLE" },
+    # Metadados
+    { name = "fontes", type = "STRING", mode = "NULLABLE" },
+    { name = "ingested_at", type = "TIMESTAMP", mode = "REQUIRED" },
+  ])
+}

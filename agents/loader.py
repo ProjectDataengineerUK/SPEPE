@@ -15,6 +15,7 @@ _MODEL_ASSIGNMENT = {
     "coletor": "gemini-2.5-flash",
     "perfilador": "gemini-2.5-flash",
     "analista": "gemini-2.5-pro",
+    "analista_seguranca": "gemini-2.5-pro",
     "modelista_bayesiano": "gemini-2.5-pro",
     "explicador": "gemini-2.5-pro",
     "narrador": "gemini-2.0-flash",
@@ -24,6 +25,7 @@ _MODEL_ASSIGNMENT = {
 _ID_ALIASES = {
     "analista-eleitoral": "analista",
     "analista_eleitoral": "analista",
+    "analista-seguranca": "analista_seguranca",
     "modelista-bayesiano": "modelista_bayesiano",
 }
 
