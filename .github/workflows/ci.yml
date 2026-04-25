@@ -65,7 +65,7 @@ jobs:
           cache: pip
       - run: pip install -r requirements-llm-eval.txt
       - name: Run LLM eval gate
-        run: python mlops/eval/eval_runner.py
+        run: python -m mlops.eval.eval_runner
         # Calls Claude Haiku for 10 items; exits 1 if overall_score < 0.85
 
   security-scan:
