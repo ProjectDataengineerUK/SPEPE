@@ -18,10 +18,7 @@ EVAL_SCORE_THRESHOLD = 0.85
 EVAL_REPORT_PATH = Path("output/mlops/eval_report.json")
 _REGISTRY_DIR = Path(__file__).parent.parent.parent / "agents" / "registry"
 _SUPERVISOR_YAML = (
-    Path(__file__).parent.parent.parent
-    / "config"
-    / "prompt_registry"
-    / "supervisor_v1.0.0.yaml"
+    Path(__file__).parent.parent.parent / "config" / "prompt_registry" / "supervisor_v1.0.0.yaml"
 )
 _AGENT_FILE_MAP = {
     "modelista": "modelista-bayesiano",
@@ -139,9 +136,7 @@ def run_eval_on_dataset(dataset: list[dict], responses: dict[str, str]) -> dict:
         json.dump(report, f, ensure_ascii=False, indent=2)
 
     if not ci_pass:
-        logger.warning(
-            "LLM eval FALHOU: score=%.3f < %.2f", overall_score, EVAL_SCORE_THRESHOLD
-        )
+        logger.warning("LLM eval FALHOU: score=%.3f < %.2f", overall_score, EVAL_SCORE_THRESHOLD)
     else:
         logger.info("LLM eval OK: score=%.3f passed=%d/%d", overall_score, passed, n)
 
