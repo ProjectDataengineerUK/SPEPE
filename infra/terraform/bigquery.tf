@@ -44,12 +44,16 @@ resource "google_bigquery_table" "fact_municipio_eleicao" {
   table_id            = "fact_municipio_eleicao"
   description         = "5570 municípios × 3 eleições × ~200 features"
   labels              = local.labels
-  deletion_protection = var.environment == "prod"
+  deletion_protection      = var.environment == "prod"
+  require_partition_filter = true
 
-  time_partitioning {
-    type                     = "YEAR"
-    field                    = "ano_eleicao"
-    require_partition_filter = true
+  range_partitioning {
+    field = "ano_eleicao"
+    range {
+      start    = 2010
+      end      = 2034
+      interval = 4
+    }
   }
 
   clustering = ["sg_uf", "cd_municipio", "ano_eleicao"]
@@ -78,12 +82,12 @@ resource "google_bigquery_table" "fact_candidato_dia" {
   table_id            = "fact_candidato_dia"
   description         = "Candidatos × dia × features digitais (~40 features)"
   labels              = local.labels
-  deletion_protection = var.environment == "prod"
+  deletion_protection      = var.environment == "prod"
+  require_partition_filter = true
 
   time_partitioning {
-    type                     = "DAY"
-    field                    = "data"
-    require_partition_filter = true
+    type  = "DAY"
+    field = "data"
   }
 
   clustering = ["nm_candidato", "sg_uf", "ano_eleicao"]
@@ -108,12 +112,12 @@ resource "google_bigquery_table" "fact_pesquisa" {
   table_id            = "fact_pesquisa"
   description         = "Pesquisas eleitorais × house effect ajustado"
   labels              = local.labels
-  deletion_protection = var.environment == "prod"
+  deletion_protection      = var.environment == "prod"
+  require_partition_filter = true
 
   time_partitioning {
-    type                     = "DAY"
-    field                    = "data_pesquisa"
-    require_partition_filter = true
+    type  = "DAY"
+    field = "data_pesquisa"
   }
 
   clustering = ["instituto", "candidato", "sg_uf"]
@@ -139,12 +143,16 @@ resource "google_bigquery_table" "fact_secao_eleicao" {
   table_id            = "fact_secao_eleicao"
   description         = "Granular: seção × candidato × cargo — base para todas as visões geográficas"
   labels              = local.labels
-  deletion_protection = var.environment == "prod"
+  deletion_protection      = var.environment == "prod"
+  require_partition_filter = true
 
-  time_partitioning {
-    type                     = "YEAR"
-    field                    = "ano_eleicao"
-    require_partition_filter = true
+  range_partitioning {
+    field = "ano_eleicao"
+    range {
+      start    = 2010
+      end      = 2034
+      interval = 4
+    }
   }
 
   clustering = ["sg_uf", "cd_municipio", "nr_zona"]

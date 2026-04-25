@@ -16,7 +16,6 @@ locals {
     "monitoring.googleapis.com",
     "logging.googleapis.com",
     "billingbudgets.googleapis.com",
-    "workloadidentity.googleapis.com",
     "sts.googleapis.com",
     "compute.googleapis.com",
   ])

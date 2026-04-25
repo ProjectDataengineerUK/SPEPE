@@ -11,12 +11,12 @@ resource "google_billing_budget" "spepe_monthly" {
   display_name    = "SPEPE Monthly Budget"
 
   budget_filter {
-    projects = ["projects/${var.project_id}"]
+    projects = ["projects/${data.google_project.spepe.number}"]
   }
 
   amount {
     specified_amount {
-      currency_code = "USD"
+      currency_code = "BRL"
       units         = tostring(var.budget_alert_usd)
     }
   }

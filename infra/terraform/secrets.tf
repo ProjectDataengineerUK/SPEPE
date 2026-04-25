@@ -41,6 +41,29 @@ resource "google_secret_manager_secret_iam_member" "cloud_run_youtube" {
   member    = "serviceAccount:${google_service_account.cloud_run.email}"
 }
 
+# Bootstrap placeholder versions — overwrite with real values via Secret Manager console or CLI:
+#   gcloud secrets versions add ANTHROPIC_API_KEY --data-file=- <<< "sk-ant-real-key"
+resource "google_secret_manager_secret_version" "anthropic_api_key_placeholder" {
+  secret      = google_secret_manager_secret.anthropic_api_key.id
+  secret_data = "placeholder"
+  lifecycle { ignore_changes = [secret_data] }
+}
+
+#
+#   gcloud secrets versions add META_APP_TOKEN --data-file=-  <<< "real-token"
+#   gcloud secrets versions add YOUTUBE_API_KEY --data-file=- <<< "real-key"
+resource "google_secret_manager_secret_version" "meta_app_token_placeholder" {
+  secret      = google_secret_manager_secret.meta_app_token.id
+  secret_data = "placeholder"
+  lifecycle { ignore_changes = [secret_data] }
+}
+
+resource "google_secret_manager_secret_version" "youtube_api_key_placeholder" {
+  secret      = google_secret_manager_secret.youtube_api_key.id
+  secret_data = "placeholder"
+  lifecycle { ignore_changes = [secret_data] }
+}
+
 # Grant DataOps Jobs SA access to secrets needed by digital_ingest job
 resource "google_secret_manager_secret_iam_member" "dataops_meta" {
   secret_id = google_secret_manager_secret.meta_app_token.id

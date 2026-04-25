@@ -23,12 +23,12 @@ resource "google_bigquery_table" "fact_predictions" {
   table_id            = "fact_predictions"
   description         = "All model predictions with IC 95% — joined with ground truth post-election"
   labels              = local.labels
-  deletion_protection = var.environment == "prod"
+  deletion_protection      = var.environment == "prod"
+  require_partition_filter = true
 
   time_partitioning {
-    type                     = "DAY"
-    field                    = "prediction_date"
-    require_partition_filter = true
+    type  = "DAY"
+    field = "prediction_date"
   }
 
   clustering = ["candidato", "sg_uf", "model_version"]
@@ -56,7 +56,7 @@ resource "google_bigquery_table" "model_evaluations" {
   description         = "Backtest and canary evaluation results per model version"
   labels              = local.labels
   deletion_protection = false
-  expiration_time     = timeadd(timestamp(), "17520h") # 2 years
+  expiration_time     = 1893456000000 # ~2030-01-01 — retain evaluations for 4+ years
 
   time_partitioning {
     type  = "DAY"
@@ -84,7 +84,7 @@ resource "google_bigquery_table" "bias_metrics" {
   description         = "Fairness metrics per sg_uf, income quintile, and rural pct"
   labels              = local.labels
   deletion_protection = false
-  expiration_time     = timeadd(timestamp(), "17520h") # 2 years
+  expiration_time     = 1893456000000 # ~2030-01-01 — retain evaluations for 4+ years
 
   time_partitioning {
     type  = "DAY"

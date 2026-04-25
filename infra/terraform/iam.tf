@@ -78,13 +78,6 @@ resource "google_service_account_iam_member" "wif_github_impersonate" {
   member             = "principalSet://iam.googleapis.com/${google_iam_workload_identity_pool.github.name}/attribute.repository/${var.github_repo}"
 }
 
-# Allow GitHub Actions to trigger Cloud Run Jobs (e.g. smoke test in CI)
-resource "google_project_iam_member" "github_run_jobs_runner" {
-  project = var.project_id
-  role    = "roles/run.jobs.runner"
-  member  = "serviceAccount:${google_service_account.github_actions.email}"
-}
-
 # Allow Pub/Sub service agent to create OIDC tokens for cloud_run SA
 # Required for push subscriptions that deliver to authenticated Cloud Run endpoints
 resource "google_service_account_iam_member" "pubsub_token_creator" {

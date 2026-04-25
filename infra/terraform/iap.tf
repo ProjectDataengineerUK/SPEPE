@@ -24,7 +24,9 @@ resource "google_iap_client" "spepe" {
 resource "google_secret_manager_secret" "iap_client_secret" {
   count     = local.iap_enabled ? 1 : 0
   secret_id = "IAP_CLIENT_SECRET"
-  replication { auto {} }
+  replication {
+    auto {}
+  }
   labels = local.labels
 }
 
