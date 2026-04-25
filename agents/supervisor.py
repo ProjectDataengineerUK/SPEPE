@@ -92,7 +92,7 @@ class Supervisor:
             return
 
         state.add_turn("user", user_input)
-        current_input = user_input
+        current_input: str | None = user_input
 
         for hop in range(_MAX_HOPS):
             warn = state.warn_budget()

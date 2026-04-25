@@ -762,9 +762,9 @@ async def get_mapa(
     nivel: nacional | regiao | uf | municipio | zona | secao
     Retorna lista de features com: id, label, lider, partido, pct, segundo, pct2, ibge_code
     """
-    nivel = nivel.value
+    nivel_str = nivel.value
 
-    if nivel == "nacional":
+    if nivel_str == "nacional":
         lula_votos = sum(1 for v in _MOCK_MAPA_UF.values() if v["lider"] == "Lula")
         total = len(_MOCK_MAPA_UF)
         return JSONResponse(
@@ -786,7 +786,7 @@ async def get_mapa(
             }
         )
 
-    if nivel == "regiao":
+    if nivel_str == "regiao":
         features = [
             {
                 "id": reg,
@@ -804,7 +804,7 @@ async def get_mapa(
         ]
         return JSONResponse({"nivel": "regiao", "features": features})
 
-    if nivel == "uf":
+    if nivel_str == "uf":
         features = [
             {
                 "id": uf_key,
@@ -817,7 +817,7 @@ async def get_mapa(
         ]
         return JSONResponse({"nivel": "uf", "features": features})
 
-    if nivel == "municipio":
+    if nivel_str == "municipio":
         uf_upper = (uf or "SP").upper()
         mock_muns = [
             {
@@ -867,7 +867,7 @@ async def get_mapa(
         ]
         return JSONResponse({"nivel": "municipio", "uf": uf_upper, "features": mock_muns})
 
-    if nivel == "zona":
+    if nivel_str == "zona":
         uf_upper = (uf or "SP").upper()
         mun = cd_municipio or "71072"
         features = [
@@ -887,7 +887,7 @@ async def get_mapa(
             {"nivel": "zona", "uf": uf_upper, "cd_municipio": mun, "features": features}
         )
 
-    if nivel == "secao":
+    if nivel_str == "secao":
         uf_upper = (uf or "SP").upper()
         mun = cd_municipio or "71072"
         zona = nr_zona or "1"

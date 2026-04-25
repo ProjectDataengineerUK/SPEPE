@@ -60,8 +60,8 @@ def validate_forecast(text: str) -> ValidationResult:
         if not re.search(pattern, text):
             return ValidationResult(False, f"Elemento obrigatório ausente: {label}")
     for pattern in _CERTAINTY_FORBIDDEN:
-        if re.search(pattern, text):
-            match = re.search(pattern, text)
+        match = re.search(pattern, text)
+        if match:
             return ValidationResult(False, f"Linguagem de certeza proibida: '{match.group()}'")
     return ValidationResult(True)
 

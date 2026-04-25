@@ -16,6 +16,7 @@ mypy>=1.9.0
 # Type stubs
 pandas-stubs>=2.2.0
 types-pyyaml>=6.0.0
+types-requests>=2.31.0
 
 # Dev utilities
 ipython>=8.22.0

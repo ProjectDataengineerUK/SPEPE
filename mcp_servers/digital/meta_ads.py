@@ -36,7 +36,7 @@ def fetch_ad_spend_by_candidate(
         "limit": 100,
     }
     try:
-        r = requests.get(AD_LIBRARY_URL, params=params, timeout=30)
+        r = requests.get(AD_LIBRARY_URL, params=params, timeout=30)  # type: ignore[arg-type]
         r.raise_for_status()
         data = r.json().get("data", [])
     except requests.RequestException as e:

@@ -19,7 +19,7 @@ class Prediction:
     n_bootstrap: int
     alpha: float
     method: str = "bootstrap_logistic"
-    warnings: list[str] = None
+    warnings: list[str] | None = None
 
     def to_str(self) -> str:
         pct = self.point_estimate * 100

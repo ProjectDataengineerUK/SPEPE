@@ -434,14 +434,18 @@ async def on_start() -> None:
     cl.user_session.set("session_id", session_id)
 
     actions = [
-        cl.Action(name="cmd", value="/coletar SP 2022", label="📥 /coletar SP 2022"),
-        cl.Action(name="cmd", value="/social BR 2026", label="📱 /social BR 2026"),
-        cl.Action(name="cmd", value="/pesquisas presidente 2026", label="📊 /pesquisas 2026"),
-        cl.Action(name="cmd", value="/perfil São Paulo 2022", label="🔍 /perfil SP 2022"),
-        cl.Action(name="cmd", value="/prever Lula 2026", label="🎯 /prever Lula 2026"),
-        cl.Action(name="cmd", value="/arquétipos BR", label="🗂️ /arquétipos BR"),
-        cl.Action(name="cmd", value="/monitorar", label="👁️ /monitorar"),
-        cl.Action(name="cmd", value="/relatorio", label="📄 /relatorio"),
+        cl.Action(name="cmd", payload={"value": "/coletar SP 2022"}, label="📥 /coletar SP 2022"),
+        cl.Action(name="cmd", payload={"value": "/social BR 2026"}, label="📱 /social BR 2026"),
+        cl.Action(
+            name="cmd", payload={"value": "/pesquisas presidente 2026"}, label="📊 /pesquisas 2026"
+        ),
+        cl.Action(
+            name="cmd", payload={"value": "/perfil São Paulo 2022"}, label="🔍 /perfil SP 2022"
+        ),
+        cl.Action(name="cmd", payload={"value": "/prever Lula 2026"}, label="🎯 /prever Lula 2026"),
+        cl.Action(name="cmd", payload={"value": "/arquétipos BR"}, label="🗂️ /arquétipos BR"),
+        cl.Action(name="cmd", payload={"value": "/monitorar"}, label="👁️ /monitorar"),
+        cl.Action(name="cmd", payload={"value": "/relatorio"}, label="📄 /relatorio"),
     ]
 
     await cl.Message(
@@ -452,8 +456,9 @@ async def on_start() -> None:
 
 @cl.action_callback("cmd")
 async def on_action(action: cl.Action) -> None:
-    await cl.Message(content=action.value, author="Usuário").send()
-    await _handle(action.value)
+    cmd = action.payload.get("value", "") if action.payload else ""
+    await cl.Message(content=cmd, author="Usuário").send()
+    await _handle(cmd)
 
 
 @cl.on_message

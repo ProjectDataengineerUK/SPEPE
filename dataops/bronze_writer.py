@@ -26,7 +26,7 @@ def write_bronze(
     uf: str,
     filename: str,
     use_gcs: bool = False,
-    base_path: str = None,
+    base_path: str | None = None,
 ) -> str:
     """Write DataFrame to Bronze layer (immutable, partitioned by source/year/uf).
 
@@ -52,7 +52,7 @@ def _write_local(
     year: int,
     uf: str,
     filename: str,
-    base_path: str = None,
+    base_path: str | None = None,
 ) -> str:
     base = Path(base_path) if base_path else LOCAL_BRONZE_DIR
     out_dir = base / source / str(year) / uf.upper()

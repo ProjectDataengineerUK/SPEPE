@@ -5,7 +5,7 @@ from __future__ import annotations
 import logging
 import os
 import subprocess
-from typing import Literal
+from typing import Literal, cast
 
 from pydantic import BaseModel, field_validator
 
@@ -72,7 +72,9 @@ def _run_cloud_run_job(args: RunJobArgs, project: str, region: str) -> dict:
         from google.cloud import run_v2
 
         client = run_v2.JobsClient()
-        job_name = f"projects/{project}/locations/{region}/jobs/{CLOUD_RUN_JOBS[args.job]}"
+        job_name = (
+            f"projects/{project}/locations/{region}/jobs/{CLOUD_RUN_JOBS[cast(JobName, args.job)]}"
+        )
 
         request = run_v2.RunJobRequest(
             name=job_name,
@@ -103,7 +105,7 @@ def _run_cloud_run_job(args: RunJobArgs, project: str, region: str) -> dict:
 def _run_local_subprocess(args: RunJobArgs) -> dict:
     import sys
 
-    script = ALLOWED_JOBS[args.job]
+    script = ALLOWED_JOBS[cast(JobName, args.job)]
     cmd = [sys.executable, script, "--uf", args.uf, "--year", str(args.year)]
     logger.info("Executando local: %s", " ".join(cmd))
 

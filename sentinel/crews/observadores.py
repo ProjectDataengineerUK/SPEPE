@@ -38,6 +38,7 @@ class ObservadoresCrew:
 
     def observe(self, event: SentinelEvent) -> dict[str, Any]:
         observations: dict[str, Any] = {}
+        obs: Any
         if event.type in self.DATAOPS_EVENTS:
             obs = self.dataops.observe(event)
             observations["dataops"] = self._pack(obs)

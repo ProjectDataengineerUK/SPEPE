@@ -52,7 +52,7 @@ class IncrementalLoader:
     def _read_watermark_from_bq(self) -> datetime | None:
         """Read last watermark from checkpoint table. Returns None on failure."""
         try:
-            from google.cloud import bigquery  # type: ignore
+            from google.cloud import bigquery
         except ImportError:
             logger.debug("BigQuery SDK not available; skipping checkpoint read")
             return None
@@ -89,7 +89,7 @@ class IncrementalLoader:
     def _write_watermark_to_bq(self, watermark: datetime) -> None:
         """Persist new watermark."""
         try:
-            from google.cloud import bigquery  # type: ignore
+            from google.cloud import bigquery
         except ImportError:
             logger.debug("BigQuery SDK not available; skipping checkpoint write")
             return

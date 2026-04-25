@@ -86,7 +86,7 @@ def fetch_meta_ads(
     }
 
     try:
-        resp = requests.get(url, params=params, timeout=30)
+        resp = requests.get(url, params=params, timeout=30)  # type: ignore[arg-type]
         resp.raise_for_status()
         data = resp.json().get("data", [])
     except Exception as exc:

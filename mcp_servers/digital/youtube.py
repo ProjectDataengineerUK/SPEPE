@@ -61,7 +61,7 @@ def fetch_video_views_aggregate(
     }
     total_views = 0
     try:
-        r = requests.get(f"{YT_API_BASE}/search", params=params, timeout=15)
+        r = requests.get(f"{YT_API_BASE}/search", params=params, timeout=15)  # type: ignore[arg-type]
         r.raise_for_status()
         video_ids = [item["id"]["videoId"] for item in r.json().get("items", [])]
 

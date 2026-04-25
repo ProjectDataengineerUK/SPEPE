@@ -78,7 +78,7 @@ class SnapshotManager:
         _validate_table_ref(source_table)
 
         try:
-            from google.cloud import bigquery  # type: ignore
+            from google.cloud import bigquery
         except ImportError as exc:
             raise RuntimeError("google-cloud-bigquery not installed") from exc
 
@@ -132,7 +132,7 @@ class SnapshotManager:
     def _register(self, info: SnapshotInfo) -> None:
         """Register snapshot metadata in sentinel_kb / spepe_mlops.snapshots."""
         try:
-            from google.cloud import bigquery  # type: ignore
+            from google.cloud import bigquery
 
             client = bigquery.Client(project=self.project_id)
             table = f"{self.project_id}.spepe_mlops.snapshots"
