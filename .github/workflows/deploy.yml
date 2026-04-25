@@ -110,7 +110,7 @@ jobs:
             --image "${{ needs.build-push.outputs.image_tag }}" \
             --service-account "spepe-cloud-run@${{ vars.GCP_PROJECT_ID }}.iam.gserviceaccount.com" \
             --set-env-vars "GCP_PROJECT_ID=${{ vars.GCP_PROJECT_ID }},USE_BIGQUERY=false,DEFAULT_UF=SP,DEFAULT_ANO=2022,ENVIRONMENT=staging" \
-            --set-secrets "ANTHROPIC_API_KEY=anthropic_api_key:latest" \
+            --set-secrets "ANTHROPIC_API_KEY=ANTHROPIC_API_KEY:latest" \
             --allow-unauthenticated \
             --region "${{ env.GCP_REGION }}" \
             --project "${{ vars.GCP_PROJECT_ID }}"
