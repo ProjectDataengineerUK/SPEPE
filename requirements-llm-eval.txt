@@ -1,0 +1,3 @@
+# Minimal deps for llm-eval CI job — eval runner only needs anthropic + yaml
+anthropic>=0.49.0
+pyyaml>=6.0

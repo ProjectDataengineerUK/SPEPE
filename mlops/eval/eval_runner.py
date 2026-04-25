@@ -5,6 +5,7 @@ from __future__ import annotations
 import argparse
 import json
 import logging
+import os
 from pathlib import Path
 import sys
 
@@ -15,6 +16,17 @@ logger = logging.getLogger("spepe.mlops.eval")
 GOLDEN_DATASET_PATH = Path(__file__).parent / "golden_dataset.jsonl"
 EVAL_SCORE_THRESHOLD = 0.85
 EVAL_REPORT_PATH = Path("output/mlops/eval_report.json")
+_REGISTRY_DIR = Path(__file__).parent.parent.parent / "agents" / "registry"
+_SUPERVISOR_YAML = (
+    Path(__file__).parent.parent.parent
+    / "config"
+    / "prompt_registry"
+    / "supervisor_v1.0.0.yaml"
+)
+_AGENT_FILE_MAP = {
+    "modelista": "modelista-bayesiano",
+    "analista": "analista-eleitoral",
+}
 
 
 def load_golden_dataset(limit: int | None = None) -> list[dict]:
@@ -27,9 +39,55 @@ def load_golden_dataset(limit: int | None = None) -> list[dict]:
     return items[:limit] if limit else items
 
 
-def run_eval_offline(responses: dict[str, str]) -> dict:
-    """Run eval against pre-generated responses (for CI)."""
-    dataset = load_golden_dataset()
+def _load_agent_system_prompt(agent_name: str) -> str:
+    import re as _re
+    import yaml as _yaml
+
+    file_stem = _AGENT_FILE_MAP.get(agent_name, agent_name)
+    md_path = _REGISTRY_DIR / f"{file_stem}.md"
+    if md_path.exists():
+        content = md_path.read_text(encoding="utf-8")
+        m = _re.match(r"^---\n(.*?)\n---\n(.*)", content, _re.DOTALL)
+        return m.group(2).strip() if m else content
+
+    if _SUPERVISOR_YAML.exists():
+        data = _yaml.safe_load(_SUPERVISOR_YAML.read_text(encoding="utf-8"))
+        return str(data.get("system_prompt", ""))
+
+    return "Você é um especialista em análise eleitoral brasileira."
+
+
+def generate_responses_live(dataset: list[dict]) -> dict[str, str]:
+    """Generate responses via Claude Haiku for each eval item."""
+    import anthropic
+
+    client = anthropic.Anthropic()
+    responses: dict[str, str] = {}
+
+    for item in dataset:
+        eval_id = item["id"]
+        agent = item.get("agent", "supervisor")
+        user_input = item.get("input", "")
+        system_prompt = _load_agent_system_prompt(agent)
+
+        try:
+            msg = client.messages.create(
+                model="claude-haiku-4-5-20251001",
+                max_tokens=500,
+                system=system_prompt,
+                messages=[{"role": "user", "content": user_input}],
+            )
+            responses[eval_id] = msg.content[0].text
+            logger.info("Generated response for %s (%s)", eval_id, agent)
+        except Exception as exc:
+            logger.warning("Failed to generate response for %s: %s", eval_id, exc)
+            responses[eval_id] = ""
+
+    return responses
+
+
+def run_eval_on_dataset(dataset: list[dict], responses: dict[str, str]) -> dict:
+    """Evaluate responses against the given dataset items."""
     results = []
     total_score = 0.0
     passed = 0
@@ -62,16 +120,17 @@ def run_eval_offline(responses: dict[str, str]) -> dict:
         if result.passed:
             passed += 1
 
-    overall_score = total_score / len(dataset) if dataset else 0.0
+    n = len(dataset)
+    overall_score = total_score / n if n > 0 else 0.0
     ci_pass = overall_score >= EVAL_SCORE_THRESHOLD
 
     report = {
         "overall_score": overall_score,
         "ci_pass": ci_pass,
         "threshold": EVAL_SCORE_THRESHOLD,
-        "total": len(dataset),
+        "total": n,
         "passed": passed,
-        "failed": len(dataset) - passed,
+        "failed": n - passed,
         "results": results,
     }
 
@@ -80,11 +139,18 @@ def run_eval_offline(responses: dict[str, str]) -> dict:
         json.dump(report, f, ensure_ascii=False, indent=2)
 
     if not ci_pass:
-        logger.warning(f"LLM eval FALHOU: score={overall_score:.3f} < {EVAL_SCORE_THRESHOLD}")
+        logger.warning(
+            "LLM eval FALHOU: score=%.3f < %.2f", overall_score, EVAL_SCORE_THRESHOLD
+        )
     else:
-        logger.info(f"LLM eval OK: score={overall_score:.3f} passed={passed}/{len(dataset)}")
+        logger.info("LLM eval OK: score=%.3f passed=%d/%d", overall_score, passed, n)
 
     return report
+
+
+# Keep old name for backwards compat
+def run_eval_offline(responses: dict[str, str]) -> dict:
+    return run_eval_on_dataset(load_golden_dataset(), responses)
 
 
 if __name__ == "__main__":
@@ -104,24 +170,27 @@ if __name__ == "__main__":
         "--limit",
         type=int,
         default=None,
-        help="Limit number of evaluations (for testing)",
+        help="Limit number of evaluations (default: 10 for live mode, all for offline)",
     )
     args = parser.parse_args()
 
     logger.info("Starting SPEPE LLM eval runner...")
 
-    responses = {}
     if args.responses_file:
-        with open(args.responses_file, "r", encoding="utf-8") as f:
+        with open(args.responses_file, encoding="utf-8") as f:
             responses = json.load(f)
-        logger.info(f"Loaded {len(responses)} pre-generated responses from {args.responses_file}")
+        logger.info("Loaded %d pre-generated responses", len(responses))
+        dataset = load_golden_dataset()
+    elif os.environ.get("ANTHROPIC_API_KEY"):
+        ci_limit = args.limit or int(os.environ.get("EVAL_CI_LIMIT", "10"))
+        logger.info("Generating live responses via Claude Haiku (limit=%d)...", ci_limit)
+        dataset = load_golden_dataset(limit=ci_limit)
+        responses = generate_responses_live(dataset)
     else:
-        logger.info("No responses file provided — using empty responses (all will fail)")
+        logger.error("Provide --responses-file or set ANTHROPIC_API_KEY")
+        sys.exit(1)
 
-    report = run_eval_offline(responses)
-
-    ci_pass = report["ci_pass"]
-    exit_code = 0 if ci_pass else 1
+    report = run_eval_on_dataset(dataset, responses)
 
     print(f"\n{'=' * 60}")
     print(f"EVAL REPORT: {report['overall_score']:.3f} (threshold: {report['threshold']})")
@@ -129,4 +198,4 @@ if __name__ == "__main__":
     print(f"Report saved to: {EVAL_REPORT_PATH}")
     print(f"{'=' * 60}\n")
 
-    sys.exit(exit_code)
+    sys.exit(0 if report["ci_pass"] else 1)
