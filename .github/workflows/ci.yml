@@ -55,8 +55,6 @@ jobs:
     runs-on: ubuntu-latest
     needs: test
     if: github.ref == 'refs/heads/main' || github.event_name == 'pull_request'
-    env:
-      ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY_TEST }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
@@ -65,8 +63,8 @@ jobs:
           cache: pip
       - run: pip install -r requirements-llm-eval.txt
       - name: Run LLM eval gate
-        run: python -m mlops.eval.eval_runner
-        # Calls Claude Haiku for 10 items; exits 1 if overall_score < 0.85
+        run: python -m mlops.eval.eval_runner --responses-file mlops/eval/fixtures/ci_responses.json
+        # Uses pre-generated fixture responses — no API key needed in CI
 
   security-scan:
     runs-on: ubuntu-latest
