@@ -1,0 +1,115 @@
+{
+  "_meta": {
+    "description": "Contexto de infraestrutura GCP deployada — carregado pelos agentes sentinelas em runtime",
+    "deployed_at": "2026-04-25",
+    "version": "v1.0.0",
+    "environment": "dev",
+    "terraform_state": "gs://spepe-dev-terraform-state/spepe"
+  },
+
+  "project": {
+    "id": "spepe-dev",
+    "number": "334344543887",
+    "region": "southamerica-east1",
+    "vertex_region": "us-central1"
+  },
+
+  "cloud_run": {
+    "service_url": "https://spepe-dev-jf253xcuga-rj.a.run.app",
+    "service_name": "spepe-dev",
+    "health_endpoint": "https://spepe-dev-jf253xcuga-rj.a.run.app/healthz",
+    "service_account": "spepe-cloud-run@spepe-dev.iam.gserviceaccount.com"
+  },
+
+  "cloud_run_jobs": {
+    "tse_ingest":       "spepe-tse-ingest",
+    "ibge_sync":        "spepe-ibge-sync",
+    "digital_ingest":   "spepe-digital-ingest",
+    "silver_transform": "spepe-silver-transform",
+    "gold_build":       "spepe-gold-build",
+    "dataops_service_account": "spepe-dataops-jobs@spepe-dev.iam.gserviceaccount.com"
+  },
+
+  "bigquery": {
+    "silver_dataset": "spepe_silver",
+    "gold_dataset":   "spepe_gold",
+    "mlops_dataset":  "spepe_mlops",
+    "tables": {
+      "fact_municipio_eleicao": "spepe_gold.fact_municipio_eleicao",
+      "fact_candidato_dia":     "spepe_gold.fact_candidato_dia",
+      "fact_pesquisa":          "spepe_gold.fact_pesquisa",
+      "fact_secao_eleicao":     "spepe_gold.fact_secao_eleicao",
+      "fact_predictions":       "spepe_mlops.fact_predictions",
+      "model_evaluations":      "spepe_mlops.model_evaluations",
+      "bias_metrics":           "spepe_mlops.bias_metrics"
+    },
+    "monitoring_queries": {
+      "latest_brier": "SELECT model_version, brier_score, evaluated_at FROM spepe_mlops.model_evaluations ORDER BY evaluated_at DESC LIMIT 10",
+      "drift_alerts":  "SELECT * FROM spepe_mlops.bias_metrics WHERE alert_triggered = TRUE ORDER BY measured_at DESC LIMIT 20",
+      "predictions_pending_eval": "SELECT COUNT(*) as n FROM spepe_mlops.fact_predictions WHERE actual_result IS NULL"
+    }
+  },
+
+  "gcs": {
+    "bucket": "spepe-dev-spepe-data",
+    "bronze_prefix": "raw/{source}/{year}/{uf}/",
+    "audit_logs_prefix": "audit-logs/"
+  },
+
+  "pubsub": {
+    "drift_topic": "spepe-drift-detected",
+    "drift_subscription": "spepe-drift-eventarc-sub",
+    "retrain_trigger_path": "/jobs/retrain-trigger"
+  },
+
+  "eventarc": {
+    "drift_retrain_trigger": "spepe-drift-retrain-trigger"
+  },
+
+  "firestore": {
+    "database": "(default)",
+    "sessions_collection": "spepe_sessions",
+    "memory_collection": "spepe_memory"
+  },
+
+  "secret_manager": {
+    "anthropic_api_key": "ANTHROPIC_API_KEY",
+    "meta_app_token":    "META_APP_TOKEN",
+    "youtube_api_key":   "YOUTUBE_API_KEY",
+    "iap_client_secret": "IAP_CLIENT_SECRET"
+  },
+
+  "artifact_registry": {
+    "base_url": "southamerica-east1-docker.pkg.dev/spepe-dev/spepe",
+    "image": "southamerica-east1-docker.pkg.dev/spepe-dev/spepe/app"
+  },
+
+  "ci_cd": {
+    "github_repo": "ProjectDataengineerUK/SPEPE",
+    "wif_provider": "projects/334344543887/locations/global/workloadIdentityPools/github-pool/providers/github-provider",
+    "github_actions_sa": "spepe-github-actions@spepe-dev.iam.gserviceaccount.com"
+  },
+
+  "monitoring": {
+    "budget_brl": 50,
+    "billing_account": "01EC7E-0F407D-06978B",
+    "audit_sink": "spepe-audit-sink",
+    "thresholds": {
+      "js_divergence_drift":   0.10,
+      "brier_score_rollback":  "degraded_vs_champion",
+      "bias_ratio_alert":      1.3,
+      "dq_score_silver_min":   0.95,
+      "llm_eval_min_score":    0.85,
+      "budget_warn_usd":       1.50,
+      "budget_max_usd":        2.00
+    }
+  },
+
+  "sentinel_instructions": {
+    "health_check": "GET /healthz — espera HTTP 200",
+    "drift_check":  "JS divergence > 0.10 → publicar em pubsub/drift-detected",
+    "bias_check":   "bias_ratio > 1.3 → alerta MLOps",
+    "retrain_loop": "Pub/Sub drift-detected → Eventarc → spepe-drift-retrain-trigger → /jobs/retrain-trigger",
+    "canary_path":  "Cloud Run traffic split via gcloud CLI — não via Terraform"
+  }
+}
