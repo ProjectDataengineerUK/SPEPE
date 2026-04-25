@@ -9,7 +9,7 @@ uvicorn==0.44.0
 
 # Data processing
 pandas==3.0.2
-numpy==2.4.4
+numpy>=1.26.4,<2
 pyarrow==23.0.1
 google-genai==1.10.0
 
