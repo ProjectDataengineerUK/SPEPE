@@ -4,6 +4,14 @@ WORKDIR /build
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
     build-essential \
+    gcc \
+    g++ \
+    gfortran \
+    libgeos-dev \
+    libproj-dev \
+    libgdal-dev \
+    libopenblas-dev \
+    pkg-config \
     && rm -rf /var/lib/apt/lists/*
 
 COPY requirements.txt .
