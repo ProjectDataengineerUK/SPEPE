@@ -81,9 +81,7 @@ def build_pipeline():
 
         df = pd.read_parquet(input_dataset.path)
         feature_cols = [
-            c
-            for c in df.columns
-            if any(ind in c for ind in ["idhm", "renda", "estudo", "pct"])
+            c for c in df.columns if any(ind in c for ind in ["idhm", "renda", "estudo", "pct"])
         ]
         target_col = f"pct_votos_{target_candidate.lower().replace(' ', '_')}_2022"
 
@@ -101,9 +99,7 @@ def build_pipeline():
 
         from sklearn.metrics import accuracy_score
 
-        output_metrics.log_metric(
-            "accuracy", float(accuracy_score(y, model.predict(X)))
-        )
+        output_metrics.log_metric("accuracy", float(accuracy_score(y, model.predict(X))))
         output_metrics.log_metric("n_train", len(X))
 
     @component(
@@ -140,9 +136,7 @@ def build_pipeline():
         output_metrics.log_metric(
             "eval_accuracy", float(accuracy_score(y_true, (y_proba > 0.5).astype(int)))
         )
-        output_metrics.log_metric(
-            "eval_brier_score", float(brier_score_loss(y_true, y_proba))
-        )
+        output_metrics.log_metric("eval_brier_score", float(brier_score_loss(y_true, y_proba)))
 
     @dsl.pipeline(
         name="spepe-ml-pipeline",

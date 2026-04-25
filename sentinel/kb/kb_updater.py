@@ -37,9 +37,7 @@ class KBUpdater:
         self._reinforce_pattern(event_type, cause, action, outcome)
         return incident_id
 
-    def _reinforce_pattern(
-        self, event_type: str, cause: str, action: str, outcome: str
-    ) -> None:
+    def _reinforce_pattern(self, event_type: str, cause: str, action: str, outcome: str) -> None:
         pattern_id = f"{event_type}:{hash(cause) & 0xFFFFFF:06x}"
         existing = self.kb.find_patterns({"event_type": event_type}, limit=50)
         match = next(

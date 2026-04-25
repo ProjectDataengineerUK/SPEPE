@@ -33,19 +33,13 @@ def build_gold(use_bigquery: bool = False) -> dict:
     result = {}
 
     fact_mun = _build_fact_municipio_eleicao(df_all)
-    result["fact_municipio_eleicao"] = _write_gold(
-        fact_mun, "fact_municipio_eleicao", use_bigquery
-    )
+    result["fact_municipio_eleicao"] = _write_gold(fact_mun, "fact_municipio_eleicao", use_bigquery)
 
     fact_sec = _build_fact_secao_eleicao(df_all)
-    result["fact_secao_eleicao"] = _write_gold(
-        fact_sec, "fact_secao_eleicao", use_bigquery
-    )
+    result["fact_secao_eleicao"] = _write_gold(fact_sec, "fact_secao_eleicao", use_bigquery)
 
     fact_cand = _build_fact_candidato_dia(df_all)
-    result["fact_candidato_dia"] = _write_gold(
-        fact_cand, "fact_candidato_dia", use_bigquery
-    )
+    result["fact_candidato_dia"] = _write_gold(fact_cand, "fact_candidato_dia", use_bigquery)
 
     ibge_data = _load_ibge_silver()
     fact_pesq = _build_fact_pesquisa(ibge_data)
@@ -72,9 +66,7 @@ def _build_fact_municipio_eleicao(df: pd.DataFrame) -> pd.DataFrame:
     preferred_keys = ["cod_municipio_ibge", "cd_municipio"]
     municipality_key = next((k for k in preferred_keys if k in df.columns), None)
     if municipality_key is None:
-        logger.warning(
-            "fact_municipio_eleicao: no municipality key found in Silver data"
-        )
+        logger.warning("fact_municipio_eleicao: no municipality key found in Silver data")
         return pd.DataFrame()
 
     group_cols = [municipality_key, "sg_uf", "ano_eleicao"]
@@ -114,9 +106,7 @@ def _build_fact_municipio_eleicao(df: pd.DataFrame) -> pd.DataFrame:
 
     # Use as_index=False to keep groupby columns as regular columns (avoid index conflicts)
     fact = df.groupby(avail_group, as_index=False).agg(avail_agg)
-    logger.info(
-        f"fact_municipio_eleicao: {len(fact)} rows, {len(fact.columns)} colunas"
-    )
+    logger.info(f"fact_municipio_eleicao: {len(fact)} rows, {len(fact.columns)} colunas")
     return fact
 
 
@@ -130,15 +120,11 @@ def _build_fact_candidato_dia(df: pd.DataFrame) -> pd.DataFrame:
 
     cand_agg = (
         df.groupby(
-            ["nm_candidato", "ano_eleicao"]
-            if "ano_eleicao" in df.columns
-            else ["nm_candidato"]
+            ["nm_candidato", "ano_eleicao"] if "ano_eleicao" in df.columns else ["nm_candidato"]
         )
         .agg(
             qt_votos_total=(
-                ("qt_votos", "sum")
-                if "qt_votos" in df.columns
-                else ("nm_candidato", "count")
+                ("qt_votos", "sum") if "qt_votos" in df.columns else ("nm_candidato", "count")
             ),
         )
         .reset_index()
@@ -219,14 +205,10 @@ def _write_bigquery_gold(df: pd.DataFrame, table_name: str) -> str:
             write_disposition="WRITE_APPEND",
             create_disposition="CREATE_IF_NEEDED",
             time_partitioning=(
-                bigquery.TimePartitioning(field=partition_field)
-                if partition_field
-                else None
+                bigquery.TimePartitioning(field=partition_field) if partition_field else None
             ),
             clustering_fields=(
-                [f for f in cluster_fields if f in df.columns]
-                if cluster_fields
-                else None
+                [f for f in cluster_fields if f in df.columns] if cluster_fields else None
             ),
             autodetect=False,
             schema=_dataframe_to_bq_schema(df),

@@ -45,9 +45,7 @@ class CostAttributor:
         output_tokens: int,
     ) -> CostEvent:
         prices = PRICE_USD_PER_1M_TOKENS.get(model, {"input": 0.0, "output": 0.0})
-        cost = (
-            input_tokens * prices["input"] + output_tokens * prices["output"]
-        ) / 1_000_000
+        cost = (input_tokens * prices["input"] + output_tokens * prices["output"]) / 1_000_000
         event = CostEvent(
             agent=agent,
             session_id=session_id,

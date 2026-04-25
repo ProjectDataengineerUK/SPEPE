@@ -88,18 +88,12 @@ def _export_to_cloud_trace(span: SpanContext, duration_ms: int) -> None:
                 attributes=trace_v2.Span.Attributes(
                     attribute_map={
                         "session_id": trace_v2.AttributeValue(
-                            string_value=trace_v2.TruncatableString(
-                                value=span.session_id
-                            )
+                            string_value=trace_v2.TruncatableString(value=span.session_id)
                         ),
                         "agent": trace_v2.AttributeValue(
-                            string_value=trace_v2.TruncatableString(
-                                value=span.agent_name
-                            )
+                            string_value=trace_v2.TruncatableString(value=span.agent_name)
                         ),
-                        "token_count": trace_v2.AttributeValue(
-                            int_value=span.token_count
-                        ),
+                        "token_count": trace_v2.AttributeValue(int_value=span.token_count),
                     }
                 ),
             )

@@ -86,9 +86,7 @@ class Supervisor:
         self._client = anthropic.Anthropic(api_key=settings.anthropic_api_key)
         self._agents = load_agents()
 
-    async def run(
-        self, user_input: str, state: SessionState
-    ) -> AsyncGenerator[str, None]:
+    async def run(self, user_input: str, state: SessionState) -> AsyncGenerator[str, None]:
         if state.total_cost_usd >= BUDGET_USD:
             yield f"⚠️ Budget esgotado: ${state.total_cost_usd:.4f} / ${BUDGET_USD:.2f}"
             return
@@ -113,8 +111,7 @@ class Supervisor:
 
             usage = response.usage
             claude_cost = (
-                usage.input_tokens * _CLAUDE_INPUT_RATE
-                + usage.output_tokens * _CLAUDE_OUTPUT_RATE
+                usage.input_tokens * _CLAUDE_INPUT_RATE + usage.output_tokens * _CLAUDE_OUTPUT_RATE
             )
             try:
                 state.add_cost(claude_cost)
@@ -130,14 +127,12 @@ class Supervisor:
             if tool_use.name == "run_dataops_job":
                 result = self._execute_job(tool_use.input)
                 status = "✅" if result["ok"] else "❌"
-                yield f"{status} Job `{result['job']}` ({result.get('mode','')}) — "
+                yield f"{status} Job `{result['job']}` ({result.get('mode', '')}) — "
                 if result["ok"]:
                     yield "concluído com sucesso.\n\n"
                 else:
-                    yield f"erro: {result.get('error') or result.get('stderr','')[:200]}\n\n"
-                state.add_turn(
-                    "supervisor", f"job_result: {result}", agent_id="supervisor"
-                )
+                    yield f"erro: {result.get('error') or result.get('stderr', '')[:200]}\n\n"
+                state.add_turn("supervisor", f"job_result: {result}", agent_id="supervisor")
                 current_input = None
                 continue
 
@@ -216,9 +211,7 @@ class Supervisor:
         except Exception as e:
             return {"ok": False, "job": raw.get("job", "?"), "error": str(e)}
 
-    async def _validate_output(
-        self, agent_id: str, text: str, agent, prompt: str
-    ) -> str:
+    async def _validate_output(self, agent_id: str, text: str, agent, prompt: str) -> str:
         validators = AGENT_VALIDATORS.get(agent_id, [])
         for validator in validators:
             result = validator(text)

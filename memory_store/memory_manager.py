@@ -47,15 +47,11 @@ class MemoryManager:
         if self._fs_client is None:
             logger.info("ttl_enforce_skipped_no_fs")
             return 0
-        collection = self.config.get("firestore_mirror", {}).get(
-            "collection", "spepe_memories"
-        )
+        collection = self.config.get("firestore_mirror", {}).get("collection", "spepe_memories")
         deleted = 0
         try:
             docs = (
-                self._fs_client.collection(collection)
-                .where("timestamp", "<", cutoff_iso)
-                .stream()
+                self._fs_client.collection(collection).where("timestamp", "<", cutoff_iso).stream()
             )
             for doc in docs:
                 doc.reference.delete()

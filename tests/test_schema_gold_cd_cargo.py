@@ -24,13 +24,9 @@ class TestSchemaGoldCdCargo:
         normalized = normalize_columns(mock_tse, year=2022)
 
         # Validar que cd_cargo existe após normalização
-        assert (
-            "cd_cargo" in normalized.columns
-        ), "cd_cargo não presente após normalize_columns"
+        assert "cd_cargo" in normalized.columns, "cd_cargo não presente após normalize_columns"
         assert normalized["cd_cargo"].notna().all(), "cd_cargo tem valores nulos"
-        assert list(normalized["cd_cargo"].unique()) == [
-            1
-        ], "cd_cargo não mantém valores corretos"
+        assert list(normalized["cd_cargo"].unique()) == [1], "cd_cargo não mantém valores corretos"
 
     def test_gold_schema_preserves_cd_cargo(self):
         """Gold fact_municipio_eleicao deve incluir cd_cargo no groupby."""
@@ -59,9 +55,9 @@ class TestSchemaGoldCdCargo:
         # cd_cargo deve estar no resultado se existia no input
         if "cd_cargo" in mock_silver.columns:
             # fact pode ter agrupado por cd_cargo, logo deve ter mais linhas ou coluna presente
-            assert (
-                "cd_cargo" in fact.columns or len(fact) > 2
-            ), "fact_municipio_eleicao não preservou informação de cd_cargo"
+            assert "cd_cargo" in fact.columns or len(fact) > 2, (
+                "fact_municipio_eleicao não preservou informação de cd_cargo"
+            )
 
             # Validar que temos registros para diferentes cargos
             if "cd_cargo" in fact.columns:

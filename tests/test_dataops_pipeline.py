@@ -68,18 +68,14 @@ class TestBronzeWriter:
                 # Bronze should not overwrite (immutable)
                 write_bronze(sample_tse_df, "tse", 2022, "SP", "test.parquet")
                 files_after = list(tmp_path.rglob("*.parquet"))
-                assert (
-                    len(files_after) == 1
-                ), "Bronze created duplicate (immutability violated)"
+                assert len(files_after) == 1, "Bronze created duplicate (immutability violated)"
 
 
 class TestDeParaMunicipios:
     def test_join_tse_ibge(self, sample_tse_df, sample_ibge_df):
         from dataops.depara_municipios import join_tse_ibge
 
-        sample_ibge_df["cd_municipio_tse"] = (
-            sample_ibge_df["cd_municipio_ibge"] // 10
-        ).astype(str)
+        sample_ibge_df["cd_municipio_tse"] = (sample_ibge_df["cd_municipio_ibge"] // 10).astype(str)
         sample_tse_df["CD_MUNICIPIO"] = sample_tse_df["CD_MUNICIPIO"].astype(str)
 
         result = join_tse_ibge(sample_tse_df, sample_ibge_df, tse_key="CD_MUNICIPIO")

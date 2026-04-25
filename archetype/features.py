@@ -45,14 +45,10 @@ GEOGRAPHIC_FEATURES = [
     "regiao",
 ]
 
-ALL_FEATURES = (
-    SOCIOECONOMIC_FEATURES + ELECTORAL_FEATURES + DIGITAL_FEATURES + GEOGRAPHIC_FEATURES
-)
+ALL_FEATURES = SOCIOECONOMIC_FEATURES + ELECTORAL_FEATURES + DIGITAL_FEATURES + GEOGRAPHIC_FEATURES
 
 
-def select_features(
-    df: pd.DataFrame, feature_set: str = "all"
-) -> tuple[pd.DataFrame, list[str]]:
+def select_features(df: pd.DataFrame, feature_set: str = "all") -> tuple[pd.DataFrame, list[str]]:
     mapping = {
         "all": ALL_FEATURES,
         "socioeconomic": SOCIOECONOMIC_FEATURES,

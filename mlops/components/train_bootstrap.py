@@ -46,9 +46,7 @@ def predict_with_ic(
     n = len(X_train)
 
     if n < 100:
-        warnings.append(
-            f"Amostra pequena ({n} observações) — IC mais amplo que o usual."
-        )
+        warnings.append(f"Amostra pequena ({n} observações) — IC mais amplo que o usual.")
         n_bootstrap = min(n_bootstrap * 2, 5000)
 
     X_train_c = sm.add_constant(X_train, has_constant="add")
@@ -109,10 +107,7 @@ def prepare_features_from_gold(
         feature_cols = [
             c
             for c in df.columns
-            if any(
-                ind in c
-                for ind in ["idhm", "renda", "estudo", "pct_rural", "populacao", "pib"]
-            )
+            if any(ind in c for ind in ["idhm", "renda", "estudo", "pct_rural", "populacao", "pib"])
             and c in df.columns
         ]
 

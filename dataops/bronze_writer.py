@@ -86,9 +86,7 @@ def _write_gcs(df: pd.DataFrame, source: str, year: int, uf: str, filename: str)
         blob = bucket.blob(gcs_path)
 
         if blob.exists():
-            logger.info(
-                f"Bronze GCS já existe (imutável): gs://{GCS_BUCKET}/{gcs_path}"
-            )
+            logger.info(f"Bronze GCS já existe (imutável): gs://{GCS_BUCKET}/{gcs_path}")
             return f"gs://{GCS_BUCKET}/{gcs_path}"
 
         df_with_meta = df.copy()

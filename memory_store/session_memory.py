@@ -92,8 +92,7 @@ class SessionMemory:
             from google.cloud import aiplatform
 
             namespace = (
-                self.config.get("namespaces", {}).get(agent_name)
-                or f"spepe-memory-{agent_name}"
+                self.config.get("namespaces", {}).get(agent_name) or f"spepe-memory-{agent_name}"
             )
             aiplatform.init(project=self.project_id)
             logger.info("memory_vector_upserted id=%s namespace=%s", memory_id, namespace)
@@ -103,9 +102,7 @@ class SessionMemory:
     def _write_firestore(self, memory_id: str, memory: Memory) -> None:
         if self._fs_client is None:
             return
-        collection = self.config.get("firestore_mirror", {}).get(
-            "collection", "spepe_memories"
-        )
+        collection = self.config.get("firestore_mirror", {}).get("collection", "spepe_memories")
         doc = {**memory.to_dict(), "memory_id": memory_id}
         try:
             self._fs_client.collection(collection).document(memory_id).set(doc)

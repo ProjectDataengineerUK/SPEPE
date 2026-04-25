@@ -51,9 +51,7 @@ class KnowledgeBase:
     def write_incident(self, incident: dict[str, Any]) -> str:
         incident_id = incident.get("incident_id") or str(uuid.uuid4())
         incident["incident_id"] = incident_id
-        incident["timestamp"] = incident.get(
-            "timestamp", datetime.now(timezone.utc).isoformat()
-        )
+        incident["timestamp"] = incident.get("timestamp", datetime.now(timezone.utc).isoformat())
         ref = self._doc_ref(self.INCIDENTS, incident_id)
         if ref is not None:
             ref.set(incident)
@@ -68,9 +66,7 @@ class KnowledgeBase:
             return snap.to_dict() if snap.exists else None
         return self._memory[self.INCIDENTS].get(incident_id)
 
-    def find_patterns(
-        self, signature: dict[str, Any], limit: int = 5
-    ) -> list[dict[str, Any]]:
+    def find_patterns(self, signature: dict[str, Any], limit: int = 5) -> list[dict[str, Any]]:
         event_type = signature.get("event_type")
         if self._client is None:
             return [

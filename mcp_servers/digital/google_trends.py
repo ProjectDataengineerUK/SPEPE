@@ -1,4 +1,5 @@
 """Google Trends scraper via pytrends — LGPD-safe aggregate by region."""
+
 from __future__ import annotations
 
 import logging

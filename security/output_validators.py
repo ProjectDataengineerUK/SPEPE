@@ -62,9 +62,7 @@ def validate_forecast(text: str) -> ValidationResult:
     for pattern in _CERTAINTY_FORBIDDEN:
         if re.search(pattern, text):
             match = re.search(pattern, text)
-            return ValidationResult(
-                False, f"Linguagem de certeza proibida: '{match.group()}'"
-            )
+            return ValidationResult(False, f"Linguagem de certeza proibida: '{match.group()}'")
     return ValidationResult(True)
 
 
@@ -76,9 +74,7 @@ def validate_no_pii(text: str) -> ValidationResult:
             remediated = re.sub(pattern, replacement, remediated)
             found = True
     if found:
-        return ValidationResult(
-            False, "PII detectado e removido", remediated=remediated
-        )
+        return ValidationResult(False, "PII detectado e removido", remediated=remediated)
     return ValidationResult(True)
 
 
@@ -107,9 +103,7 @@ def validate_input_injection(text: str) -> ValidationResult:
     ]
     for pattern in _injection_patterns:
         if re.search(pattern, text):
-            return ValidationResult(
-                False, f"Possível prompt injection detectado: {pattern}"
-            )
+            return ValidationResult(False, f"Possível prompt injection detectado: {pattern}")
     return ValidationResult(True)
 
 

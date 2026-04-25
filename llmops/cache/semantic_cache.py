@@ -32,9 +32,7 @@ class SemanticCache:
         self.embedder = embedder or self._default_embedder
         self._r = self._connect(redis_url)
         self._local: dict[str, tuple[np.ndarray, str]] = {}
-        self._stats: dict[str, dict[str, int]] = defaultdict(
-            lambda: {"hit": 0, "miss": 0}
-        )
+        self._stats: dict[str, dict[str, int]] = defaultdict(lambda: {"hit": 0, "miss": 0})
 
     def _connect(self, redis_url: str | None):
         if not redis_url:
@@ -75,9 +73,7 @@ class SemanticCache:
                         continue
                     cached = np.frombuffer(raw, dtype=np.float32).astype(np.float64)
                     if self._similarity(q_emb, cached) >= self.threshold:
-                        resp_key = key.replace(
-                            self.EMB_PREFIX.encode(), self.RESP_PREFIX.encode()
-                        )
+                        resp_key = key.replace(self.EMB_PREFIX.encode(), self.RESP_PREFIX.encode())
                         payload = self._r.get(resp_key)
                         if payload:
                             return payload.decode("utf-8")
@@ -99,9 +95,7 @@ class SemanticCache:
                     self.ttl,
                     q_emb.astype(np.float32).tobytes(),
                 )
-                self._r.setex(
-                    f"{self.RESP_PREFIX}{key_id}", self.ttl, response.encode("utf-8")
-                )
+                self._r.setex(f"{self.RESP_PREFIX}{key_id}", self.ttl, response.encode("utf-8"))
                 return
             except Exception as exc:
                 logger.warning("redis_store_failed: %s", exc)

@@ -21,9 +21,7 @@ class RegistryLoader:
                 return fallback.read_text(encoding="utf-8")
             return ""
         if version == "latest":
-            versions = sorted(
-                p for p in agent_dir.iterdir() if p.suffix in {".md", ".txt"}
-            )
+            versions = sorted(p for p in agent_dir.iterdir() if p.suffix in {".md", ".txt"})
             if not versions:
                 return ""
             return versions[-1].read_text(encoding="utf-8")
@@ -39,6 +37,4 @@ class RegistryLoader:
         agent_dir = self.root / agent_name
         if not agent_dir.exists():
             return []
-        return sorted(
-            p.stem for p in agent_dir.iterdir() if p.suffix in {".md", ".txt"}
-        )
+        return sorted(p.stem for p in agent_dir.iterdir() if p.suffix in {".md", ".txt"})

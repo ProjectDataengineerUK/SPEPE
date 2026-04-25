@@ -87,9 +87,7 @@ class EvalRunner:
         summary = {
             "total": len(results),
             "passed": sum(1 for r in results if r.passed),
-            "avg_score": (
-                sum(r.score for r in results) / len(results) if results else 0.0
-            ),
+            "avg_score": (sum(r.score for r in results) / len(results) if results else 0.0),
             "disclaimer_rate": disc_rate,
             "hard_gate_passed": disc_rate >= self.disclaimer_gate,
             "results": [r.__dict__ for r in results],

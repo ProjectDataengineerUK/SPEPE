@@ -28,17 +28,14 @@ def run_hptuning(
     project_id = project_id or os.environ.get("GCP_PROJECT_ID", "spepe-dev")
     location = location or os.environ.get("VERTEX_LOCATION", "us-central1")
     staging_bucket = (
-        staging_bucket
-        or f"gs://{os.environ.get('GCS_BUCKET', 'spepe-dev-data')}/hptuning"
+        staging_bucket or f"gs://{os.environ.get('GCS_BUCKET', 'spepe-dev-data')}/hptuning"
     )
 
     try:
         from google.cloud import aiplatform
         from google.cloud.aiplatform import hyperparameter_tuning as hpt
 
-        aiplatform.init(
-            project=project_id, location=location, staging_bucket=staging_bucket
-        )
+        aiplatform.init(project=project_id, location=location, staging_bucket=staging_bucket)
 
         worker_pool_specs = [
             {
@@ -64,13 +61,9 @@ def run_hptuning(
             display_name="spepe-hptuning",
             metric_spec={"brier_score": "minimize"},
             parameter_spec={
-                "min_cluster_size": hpt.IntegerParameterSpec(
-                    min=20, max=50, scale="linear"
-                ),
+                "min_cluster_size": hpt.IntegerParameterSpec(min=20, max=50, scale="linear"),
                 "n_bootstrap": hpt.IntegerParameterSpec(min=500, max=2000, scale="log"),
-                "silhouette_thr": hpt.DoubleParameterSpec(
-                    min=0.35, max=0.55, scale="linear"
-                ),
+                "silhouette_thr": hpt.DoubleParameterSpec(min=0.35, max=0.55, scale="linear"),
             },
             max_trial_count=max_trial_count,
             parallel_trial_count=parallel_trial_count,

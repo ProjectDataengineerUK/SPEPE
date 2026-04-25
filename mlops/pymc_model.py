@@ -43,9 +43,7 @@ def build_hierarchical_model(
 
         mu_beta = pm.Normal("mu_beta", mu=0, sigma=1, shape=n_features)
         sigma_beta = pm.HalfNormal("sigma_beta", sigma=1)
-        beta = pm.Normal(
-            "beta", mu=mu_beta, sigma=sigma_beta, shape=(n_groups, n_features)
-        )
+        beta = pm.Normal("beta", mu=mu_beta, sigma=sigma_beta, shape=(n_groups, n_features))
 
         X_tensor = pt.as_tensor_variable(X)
         logit_p = alpha[groups] + pm.math.dot(X_tensor, beta[groups].T).diagonal()
@@ -99,12 +97,12 @@ def predict_pymc(
     except ImportError:
         raise ImportError("PyMC necessário.")
 
-    alpha_samples = trace.posterior["alpha"].values.reshape(
-        -1, trace.posterior["alpha"].shape[-1]
-    )[:, group_idx]
-    beta_samples = trace.posterior["beta"].values.reshape(
-        -1, *trace.posterior["beta"].shape[-2:]
-    )[:, group_idx, :]
+    alpha_samples = trace.posterior["alpha"].values.reshape(-1, trace.posterior["alpha"].shape[-1])[
+        :, group_idx
+    ]
+    beta_samples = trace.posterior["beta"].values.reshape(-1, *trace.posterior["beta"].shape[-2:])[
+        :, group_idx, :
+    ]
 
     logits = alpha_samples + beta_samples @ X_new
     probs = 1 / (1 + np.exp(-logits))

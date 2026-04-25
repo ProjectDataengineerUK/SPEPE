@@ -9,9 +9,7 @@ import pandas as pd
 
 from dataops.bronze_writer import write_bronze
 
-logging.basicConfig(
-    level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s %(message)s"
-)
+logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s %(message)s")
 logger = logging.getLogger("spepe.jobs.digital_ingest")
 
 CANDIDATES_2022 = ["Lula", "Bolsonaro", "Ciro Gomes", "Simone Tebet"]

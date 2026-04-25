@@ -20,9 +20,7 @@ class MLOpsWatcher:
         self.config = config or {}
         self.js_threshold = self.config.get("js_threshold", 0.10)
         self.brier_threshold = self.config.get("brier_threshold", 0.25)
-        self.canary_relative_degradation = self.config.get(
-            "canary_relative_degradation", 0.10
-        )
+        self.canary_relative_degradation = self.config.get("canary_relative_degradation", 0.10)
 
     def observe(self, event: SentinelEvent) -> Observation:
         if event.type == EventType.DRIFT_DETECTED:

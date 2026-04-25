@@ -67,7 +67,5 @@ class EventBus:
             except Exception as exc:
                 logger.exception("event_processing_failed: %s", exc)
         if ack_ids:
-            subscriber.acknowledge(
-                request={"subscription": sub_path, "ack_ids": ack_ids}
-            )
+            subscriber.acknowledge(request={"subscription": sub_path, "ack_ids": ack_ids})
         return len(ack_ids)

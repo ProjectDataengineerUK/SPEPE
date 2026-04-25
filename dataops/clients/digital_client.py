@@ -27,9 +27,7 @@ def fetch_trends(
         return pd.DataFrame()
 
     try:
-        pt = TrendReq(
-            hl="pt-BR", tz=-180, timeout=(10, 30), retries=3, backoff_factor=0.5
-        )
+        pt = TrendReq(hl="pt-BR", tz=-180, timeout=(10, 30), retries=3, backoff_factor=0.5)
 
         # pytrends supports max 5 keywords per request
         frames: list[pd.DataFrame] = []
@@ -52,9 +50,7 @@ def fetch_trends(
         for df in frames[1:]:
             result = result.join(df, how="outer")
 
-        logger.info(
-            "Google Trends: %d linhas, %d candidatos", len(result), len(result.columns)
-        )
+        logger.info("Google Trends: %d linhas, %d candidatos", len(result), len(result.columns))
         return result
 
     except Exception as exc:

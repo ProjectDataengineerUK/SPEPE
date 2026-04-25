@@ -436,12 +436,8 @@ async def on_start() -> None:
     actions = [
         cl.Action(name="cmd", value="/coletar SP 2022", label="📥 /coletar SP 2022"),
         cl.Action(name="cmd", value="/social BR 2026", label="📱 /social BR 2026"),
-        cl.Action(
-            name="cmd", value="/pesquisas presidente 2026", label="📊 /pesquisas 2026"
-        ),
-        cl.Action(
-            name="cmd", value="/perfil São Paulo 2022", label="🔍 /perfil SP 2022"
-        ),
+        cl.Action(name="cmd", value="/pesquisas presidente 2026", label="📊 /pesquisas 2026"),
+        cl.Action(name="cmd", value="/perfil São Paulo 2022", label="🔍 /perfil SP 2022"),
         cl.Action(name="cmd", value="/prever Lula 2026", label="🎯 /prever Lula 2026"),
         cl.Action(name="cmd", value="/arquétipos BR", label="🗂️ /arquétipos BR"),
         cl.Action(name="cmd", value="/monitorar", label="👁️ /monitorar"),

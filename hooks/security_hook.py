@@ -40,12 +40,8 @@ _SQL_INJECTION_PATTERNS = [
 ]
 
 _COMPILED_DESTRUCTIVE = [re.compile(p, re.IGNORECASE) for p in _DESTRUCTIVE_PATTERNS]
-_COMPILED_SQL_COST = [
-    re.compile(p, re.IGNORECASE | re.DOTALL) for p in _SQL_COST_PATTERNS
-]
-_COMPILED_BQ_COST = [
-    re.compile(p, re.IGNORECASE | re.DOTALL) for p in _BIGQUERY_COST_PATTERNS
-]
+_COMPILED_SQL_COST = [re.compile(p, re.IGNORECASE | re.DOTALL) for p in _SQL_COST_PATTERNS]
+_COMPILED_BQ_COST = [re.compile(p, re.IGNORECASE | re.DOTALL) for p in _BIGQUERY_COST_PATTERNS]
 _COMPILED_SQL_INJECT = [re.compile(p, re.IGNORECASE) for p in _SQL_INJECTION_PATTERNS]
 
 
@@ -74,11 +70,7 @@ def check_sql_cost(tool_name: str, tool_input: dict) -> str | None:
 def check_bigquery_cost(tool_name: str, tool_input: dict) -> str | None:
     """Block BigQuery queries without partition filter (high cost risk)."""
     text = str(tool_input.get("sql", tool_input.get("query", "")))
-    if (
-        not text
-        or "bigquery" not in tool_name.lower()
-        and "bq" not in tool_name.lower()
-    ):
+    if not text or "bigquery" not in tool_name.lower() and "bq" not in tool_name.lower():
         return None
     if "spepe_gold" in text or "spepe_silver" in text:
         has_partition_filter = any(

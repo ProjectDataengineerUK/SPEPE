@@ -108,9 +108,7 @@ class TestAT003ModelistaAgent:
                 "date": [date(2022, 9, 1), date(2022, 9, 5), date(2022, 9, 10)],
             }
         )
-        result = aggregate_polls(
-            polls, candidate="Candidato A", reference_date=date(2022, 10, 1)
-        )
+        result = aggregate_polls(polls, candidate="Candidato A", reference_date=date(2022, 10, 1))
         assert "mean" in result
         assert "lower" in result
         assert "upper" in result

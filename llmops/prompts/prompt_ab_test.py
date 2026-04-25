@@ -51,11 +51,7 @@ class PromptABTest:
         self._candidate_scores: list[float] = []
 
     def choose_prompt(self) -> str:
-        return (
-            self.current.prompt_id
-            if random.random() < 0.5
-            else self.candidate.prompt_id
-        )
+        return self.current.prompt_id if random.random() < 0.5 else self.candidate.prompt_id
 
     def record_score(self, prompt_id: str, score: float) -> None:
         if prompt_id == self.current.prompt_id:

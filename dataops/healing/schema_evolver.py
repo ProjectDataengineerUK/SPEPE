@@ -52,9 +52,7 @@ class SchemaEvolver:
     def __init__(self, auto_apply_additive: bool = True):
         self.auto_apply_additive = auto_apply_additive
 
-    def diff(
-        self, old_schema: dict[str, str], new_schema: dict[str, str]
-    ) -> list[SchemaChange]:
+    def diff(self, old_schema: dict[str, str], new_schema: dict[str, str]) -> list[SchemaChange]:
         """Diff two schemas.
 
         Args:
@@ -112,9 +110,7 @@ class SchemaEvolver:
                     )
         return changes
 
-    def plan(
-        self, old_schema: dict[str, str], new_schema: dict[str, str]
-    ) -> EvolutionPlan:
+    def plan(self, old_schema: dict[str, str], new_schema: dict[str, str]) -> EvolutionPlan:
         """Build an evolution plan: which changes to auto-apply vs. block."""
         plan = EvolutionPlan()
         for change in self.diff(old_schema, new_schema):

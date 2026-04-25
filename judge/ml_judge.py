@@ -85,9 +85,7 @@ class MLJudge:
             metadata=report.metadata,
         )
 
-    def _decide(
-        self, backtest: BacktestResult, fairness: FairnessReport
-    ) -> tuple[str, str]:
+    def _decide(self, backtest: BacktestResult, fairness: FairnessReport) -> tuple[str, str]:
         reasons: list[str] = []
         hard_fail = False
         soft_fail = False
@@ -96,27 +94,20 @@ class MLJudge:
         if backtest.n_samples < min_samples:
             return (
                 self.REJECTED,
-                f"Amostra insuficiente para auditoria: {backtest.n_samples} "
-                f"< {min_samples}.",
+                f"Amostra insuficiente para auditoria: {backtest.n_samples} < {min_samples}.",
             )
 
         brier_max = self.thresholds.get("brier_max", 0.25)
         if backtest.brier_score > brier_max:
-            reasons.append(
-                f"Brier {backtest.brier_score:.4f} > limite {brier_max:.4f}"
-            )
+            reasons.append(f"Brier {backtest.brier_score:.4f} > limite {brier_max:.4f}")
             hard_fail = True
         elif backtest.brier_score > 0.80 * brier_max:
-            reasons.append(
-                f"Brier {backtest.brier_score:.4f} proximo ao limite {brier_max:.4f}"
-            )
+            reasons.append(f"Brier {backtest.brier_score:.4f} proximo ao limite {brier_max:.4f}")
             soft_fail = True
 
         ece_max = self.thresholds.get("calibration_error_max", 0.05)
         if backtest.calibration_error > ece_max:
-            reasons.append(
-                f"Calibration error {backtest.calibration_error:.4f} > {ece_max:.4f}"
-            )
+            reasons.append(f"Calibration error {backtest.calibration_error:.4f} > {ece_max:.4f}")
             hard_fail = True
 
         cov_min = self.thresholds.get("ic_coverage_min", 0.92)
@@ -130,9 +121,7 @@ class MLJudge:
 
         gap_max = self.thresholds.get("fairness_gap_max_pp", 15.0)
         if fairness.max_gap_pp > gap_max:
-            reasons.append(
-                f"Fairness gap {fairness.max_gap_pp:.2f}pp > {gap_max:.2f}pp"
-            )
+            reasons.append(f"Fairness gap {fairness.max_gap_pp:.2f}pp > {gap_max:.2f}pp")
             hard_fail = True
 
         if hard_fail:

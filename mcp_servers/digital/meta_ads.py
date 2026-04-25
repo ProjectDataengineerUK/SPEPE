@@ -2,6 +2,7 @@
 
 Reads ad spend data at the municipality level (never individual).
 """
+
 from __future__ import annotations
 
 import logging
@@ -46,19 +47,27 @@ def fetch_ad_spend_by_candidate(
     for ad in data:
         spend = ad.get("spend", {})
         for region in ad.get("region_distribution", []):
-            rows.append({
-                "candidato": candidate_name,
-                "uf": region.get("region", ""),
-                "spend_usd": float(spend.get("lower_bound", 0) or 0),
-                "impressions_lower": float(ad.get("impressions", {}).get("lower_bound", 0) or 0),
-            })
+            rows.append(
+                {
+                    "candidato": candidate_name,
+                    "uf": region.get("region", ""),
+                    "spend_usd": float(spend.get("lower_bound", 0) or 0),
+                    "impressions_lower": float(
+                        ad.get("impressions", {}).get("lower_bound", 0) or 0
+                    ),
+                }
+            )
 
     df = pd.DataFrame(rows)
     if not df.empty:
-        df = df.groupby(["candidato", "uf"]).agg(
-            spend_usd=("spend_usd", "sum"),
-            impressions_lower=("impressions_lower", "sum"),
-        ).reset_index()
+        df = (
+            df.groupby(["candidato", "uf"])
+            .agg(
+                spend_usd=("spend_usd", "sum"),
+                impressions_lower=("impressions_lower", "sum"),
+            )
+            .reset_index()
+        )
 
     CACHE_DIR.mkdir(parents=True, exist_ok=True)
     if not df.empty:

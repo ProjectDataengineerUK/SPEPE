@@ -59,31 +59,23 @@ def _load_contract(contract_path: str | Path) -> dict[str, Any]:
     return yaml.safe_load(path.read_text(encoding="utf-8")) or {}
 
 
-def _check_columns(
-    df: pd.DataFrame, required: list[str], report: ContractReport
-) -> None:
+def _check_columns(df: pd.DataFrame, required: list[str], report: ContractReport) -> None:
     missing = [c for c in required if c not in df.columns]
     if missing:
         report.violations.append(f"missing_required_columns={missing}")
 
 
-def _check_types(
-    df: pd.DataFrame, types: dict[str, str], report: ContractReport
-) -> None:
+def _check_types(df: pd.DataFrame, types: dict[str, str], report: ContractReport) -> None:
     for col, expected in types.items():
         if col not in df.columns:
             continue
         actual = str(df[col].dtype)
         # flexible match — accept int64/Int64, float64/Float64
         if expected.lower().replace("_", "") not in actual.lower().replace("_", ""):
-            report.warnings.append(
-                f"type_mismatch col={col} expected={expected} got={actual}"
-            )
+            report.warnings.append(f"type_mismatch col={col} expected={expected} got={actual}")
 
 
-def _check_no_nulls(
-    df: pd.DataFrame, columns: list[str], report: ContractReport
-) -> None:
+def _check_no_nulls(df: pd.DataFrame, columns: list[str], report: ContractReport) -> None:
     for col in columns:
         if col not in df.columns:
             continue
@@ -105,9 +97,7 @@ def _check_ranges(
             report.violations.append(f"range_violation col={col} > max={bounds['max']}")
 
 
-def _check_row_count_min(
-    df: pd.DataFrame, minimum: int, report: ContractReport
-) -> None:
+def _check_row_count_min(df: pd.DataFrame, minimum: int, report: ContractReport) -> None:
     if len(df) < minimum:
         report.violations.append(f"row_count_below_min rows={len(df)} min={minimum}")
 

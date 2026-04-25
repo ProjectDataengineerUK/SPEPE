@@ -102,9 +102,7 @@ def _enforce_silver_schema(df: pd.DataFrame, uf: str, year: int) -> pd.DataFrame
     if "ano_eleicao" not in df.columns:
         df["ano_eleicao"] = year
     if "qt_votos" in df.columns:
-        df["qt_votos"] = (
-            pd.to_numeric(df["qt_votos"], errors="coerce").fillna(0).astype(int)
-        )
+        df["qt_votos"] = pd.to_numeric(df["qt_votos"], errors="coerce").fillna(0).astype(int)
     return df
 
 

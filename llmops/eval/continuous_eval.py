@@ -64,14 +64,10 @@ class ContinuousEval:
 
         dp_rate = disclaimer_present_rate(outputs) if outputs else 0.0
         rel_score = (
-            sum(relevance(o, expected_keywords) for o in outputs) / len(outputs)
-            if outputs
-            else 0.0
+            sum(relevance(o, expected_keywords) for o in outputs) / len(outputs) if outputs else 0.0
         )
         fact_score = (
-            sum(factuality(o, ground_truths) for o in outputs) / len(outputs)
-            if outputs
-            else 0.0
+            sum(factuality(o, ground_truths) for o in outputs) / len(outputs) if outputs else 0.0
         )
         score = (dp_rate + rel_score + fact_score) / 3.0
         result = EvalScore(

@@ -105,9 +105,7 @@ def rollback_canary(state: CanaryState) -> None:
         splits={state.champion_revision: 100},
     )
     state.status = "rolled_back"
-    logger.warning(
-        "Canary ROLLED BACK: %s → 100%% traffic restored", state.champion_revision
-    )
+    logger.warning("Canary ROLLED BACK: %s → 100%% traffic restored", state.champion_revision)
 
 
 def _get_latest_serving_revision(service: str, project_id: str, region: str) -> str:

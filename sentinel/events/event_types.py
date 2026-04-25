@@ -30,9 +30,7 @@ class SentinelEvent:
     source: str
     payload: dict[str, Any] = field(default_factory=dict)
     severity: Severity = Severity.P2
-    timestamp: str = field(
-        default_factory=lambda: datetime.now(timezone.utc).isoformat()
-    )
+    timestamp: str = field(default_factory=lambda: datetime.now(timezone.utc).isoformat())
     correlation_id: str | None = None
 
     def to_dict(self) -> dict[str, Any]:

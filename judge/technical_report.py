@@ -61,8 +61,7 @@ def generate_technical_report(
         lines.append("|----------|--------|-----|-----|----------|")
         for f in fairness.findings:
             lines.append(
-                f"| {f.dimension} | {f.bucket} | {f.tpr:.3f} | {f.fpr:.3f} | "
-                f"{f.gap_pp:.2f} |"
+                f"| {f.dimension} | {f.bucket} | {f.tpr:.3f} | {f.fpr:.3f} | {f.gap_pp:.2f} |"
             )
 
     lines.extend(

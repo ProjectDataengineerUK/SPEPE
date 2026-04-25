@@ -39,9 +39,7 @@ class SentinelOrchestrator:
         interpretation_bundle = self.interpretadores.interpret(analysis)
         dispatch_result = self.despachantes.dispatch(interpretation_bundle, event_type)
         interpretation = interpretation_bundle["interpretation"]
-        outcome = "success" if dispatch_result.get("action", {}).get(
-            "executed"
-        ) else "notified"
+        outcome = "success" if dispatch_result.get("action", {}).get("executed") else "notified"
         self.interpretadores.record_outcome(
             event_type=event_type.value,
             correlations=interpretation_bundle.get("correlations", []),

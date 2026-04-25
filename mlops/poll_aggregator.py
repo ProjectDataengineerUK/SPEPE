@@ -37,9 +37,7 @@ def aggregate_polls(
         return {"status": "no_data", "message": "Nenhuma pesquisa disponível."}
 
     if candidate_col in df_polls.columns:
-        df = df_polls[
-            df_polls[candidate_col].str.contains(candidate, case=False, na=False)
-        ].copy()
+        df = df_polls[df_polls[candidate_col].str.contains(candidate, case=False, na=False)].copy()
     else:
         df = df_polls.copy()
 
@@ -98,8 +96,6 @@ def aggregate_polls(
         "ci_lower_pct": ci_lo,
         "ci_upper_pct": ci_hi,
         "alpha": alpha,
-        "institutes": (
-            df[instituto_col].unique().tolist() if instituto_col in df.columns else []
-        ),
+        "institutes": (df[instituto_col].unique().tolist() if instituto_col in df.columns else []),
         "summary": f"P({candidate}) = {weighted_mean:.1f}% [IC 95%: {ci_lo:.1f}%–{ci_hi:.1f}%] (n={n} pesquisas)",
     }

@@ -86,9 +86,9 @@ def join_tse_ibge(
 
     df_ibge_str = df_ibge.copy()
     if ibge_key in df_ibge_str.columns:
-        df_ibge_str[ibge_key] = pd.to_numeric(
-            df_ibge_str[ibge_key], errors="coerce"
-        ).astype("Int64")
+        df_ibge_str[ibge_key] = pd.to_numeric(df_ibge_str[ibge_key], errors="coerce").astype(
+            "Int64"
+        )
 
     df_tse_mapped["cd_municipio_ibge"] = pd.to_numeric(
         df_tse_mapped["cd_municipio_ibge"], errors="coerce"

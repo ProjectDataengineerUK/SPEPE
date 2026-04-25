@@ -112,18 +112,13 @@ class TestPipelineE2EMock:
 
         # Validate join
         assert len(joined) > 0, "Join resulted in empty dataframe"
-        assert (
-            "cod_municipio_ibge" in joined.columns
-            or "cd_municipio_ibge" in joined.columns
-        )
+        assert "cod_municipio_ibge" in joined.columns or "cd_municipio_ibge" in joined.columns
         if "cod_municipio_ibge" in joined.columns:
             match_pct = joined["cod_municipio_ibge"].notna().mean() * 100
             assert match_pct >= 50, f"IBGE match too low: {match_pct:.0f}%"
 
     @patch("dataops.depara_municipios.load_depara")
-    def test_gold_aggregation(
-        self, mock_load_depara, mock_tse_data, mock_ibge_data, mock_depara
-    ):
+    def test_gold_aggregation(self, mock_load_depara, mock_tse_data, mock_ibge_data, mock_depara):
         """Step 4: Gold layer — aggregate into facts."""
         from dataops.clients.tse_client import normalize_columns
         from dataops.depara_municipios import join_tse_ibge
@@ -141,9 +136,7 @@ class TestPipelineE2EMock:
         # Validate Gold
         assert len(fact) > 0, "Gold table is empty"
         assert "sg_uf" in fact.columns
-        assert "ano_eleicao" in fact.columns or "ano_eleição" in fact.columns.map(
-            str.lower()
-        )
+        assert "ano_eleicao" in fact.columns or "ano_eleição" in fact.columns.map(str.lower())
 
         # Multi-cargo support
         if "cd_cargo" in fact.columns:

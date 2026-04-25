@@ -60,24 +60,16 @@ def tag_lineage_event(
         return True
 
     except ImportError:
-        logger.debug(
-            "google-cloud-datacatalog-lineage não disponível — lineage local apenas"
-        )
-        _log_local_lineage(
-            source_table, target_table, pipeline_run_id, rows_written, dq_score
-        )
+        logger.debug("google-cloud-datacatalog-lineage não disponível — lineage local apenas")
+        _log_local_lineage(source_table, target_table, pipeline_run_id, rows_written, dq_score)
         return False
     except Exception as e:
         logger.warning(f"Dataplex lineage falhou: {e}")
-        _log_local_lineage(
-            source_table, target_table, pipeline_run_id, rows_written, dq_score
-        )
+        _log_local_lineage(source_table, target_table, pipeline_run_id, rows_written, dq_score)
         return False
 
 
-def _log_local_lineage(
-    source: str, target: str, run_id: str, rows: int, dq_score: float
-) -> None:
+def _log_local_lineage(source: str, target: str, run_id: str, rows: int, dq_score: float) -> None:
     import json
     from pathlib import Path
 

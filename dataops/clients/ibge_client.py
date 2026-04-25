@@ -12,9 +12,7 @@ from tenacity import retry, stop_after_attempt, wait_exponential
 
 logger = logging.getLogger("spepe.clients.ibge")
 
-_LOCALIDADES_URL = (
-    "https://servicodados.ibge.gov.br/api/v1/localidades/estados/{uf}/municipios"
-)
+_LOCALIDADES_URL = "https://servicodados.ibge.gov.br/api/v1/localidades/estados/{uf}/municipios"
 _SIDRA_URL = (
     "https://servicodados.ibge.gov.br/api/v3/agregados"
     "/{tabela}/periodos/{periodo}/variaveis/{variavel}"

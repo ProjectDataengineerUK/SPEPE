@@ -103,9 +103,7 @@ class TestSecurityHook:
     def test_blocks_sql_injection_drop(self):
         from hooks.security_hook import check_sql_injection
 
-        result = check_sql_injection(
-            "run_query", {"sql": "SELECT * FROM table; DROP TABLE users;"}
-        )
+        result = check_sql_injection("run_query", {"sql": "SELECT * FROM table; DROP TABLE users;"})
         assert result is not None
 
     def test_blocks_sql_injection_union(self):
@@ -138,10 +136,7 @@ class TestSecurityHook:
     def test_allows_bigquery_with_where(self):
         from hooks.security_hook import check_bigquery_cost
 
-        safe_query = (
-            "SELECT * FROM spepe_gold.fact_municipio_eleicao "
-            "WHERE ano_eleicao = 2022"
-        )
+        safe_query = "SELECT * FROM spepe_gold.fact_municipio_eleicao WHERE ano_eleicao = 2022"
         result = check_bigquery_cost("bigquery", {"sql": safe_query})
         assert result is None
 

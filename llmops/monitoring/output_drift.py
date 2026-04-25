@@ -40,12 +40,8 @@ class OutputDriftMonitor:
         z = (value - mean) / std
         series.append(value)
         if abs(z) > self.z_threshold:
-            logger.warning(
-                "output_drift metric=%s z=%.2f current=%.3f", metric, z, value
-            )
-            return DriftSignal(
-                metric=metric, z_score=z, mean=mean, std=std, current=value
-            )
+            logger.warning("output_drift metric=%s z=%.2f current=%.3f", metric, z, value)
+            return DriftSignal(metric=metric, z_score=z, mean=mean, std=std, current=value)
         return None
 
     def snapshot(self) -> dict[str, dict[str, float]]:

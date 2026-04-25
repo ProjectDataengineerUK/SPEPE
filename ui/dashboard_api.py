@@ -87,9 +87,7 @@ async def auth_me(authorization: str = Header(default=None)) -> JSONResponse:
             raise HTTPException(status_code=401, detail="Token inválido")
 
     # Dev/local: stub sem auth
-    return JSONResponse(
-        {"uid": "demo-user", "email": "", "name": "Demo", "plan": "pro"}
-    )
+    return JSONResponse({"uid": "demo-user", "email": "", "name": "Demo", "plan": "pro"})
 
 
 # ── Candidatos por cargo / UF / ano ───────────────────────────────────────
@@ -249,16 +247,12 @@ async def get_candidatos(
     if settings.gcp_project_id and os.environ.get("USE_BIGQUERY", "").lower() == "true":
         try:
             data = await _bq_candidatos(cargo, uf, ano)
-            return JSONResponse(
-                {"cargo": cargo, "uf": uf, "ano": ano, "candidatos": data}
-            )
+            return JSONResponse({"cargo": cargo, "uf": uf, "ano": ano, "candidatos": data})
         except Exception as exc:
             logger.warning("BigQuery candidatos falhou, usando mock: %s", exc)
 
     candidatos = _MOCK_CANDIDATOS.get(cargo, _MOCK_CANDIDATOS["Presidente"])
-    return JSONResponse(
-        {"cargo": cargo, "uf": uf, "ano": ano, "candidatos": candidatos}
-    )
+    return JSONResponse({"cargo": cargo, "uf": uf, "ano": ano, "candidatos": candidatos})
 
 
 async def _bq_candidatos(cargo: str, uf: str, ano: int) -> list[dict]:
@@ -375,12 +369,8 @@ async def get_trends(
     try:
         df = fetch_trends(keywords, timeframe=timeframe, geo="BR")
         if not df.empty:
-            result = {
-                kw: df[kw].tolist() if kw in df.columns else [] for kw in keywords
-            }
-            return JSONResponse(
-                {"labels": df.index.astype(str).tolist(), "series": result}
-            )
+            result = {kw: df[kw].tolist() if kw in df.columns else [] for kw in keywords}
+            return JSONResponse({"labels": df.index.astype(str).tolist(), "series": result})
     except Exception as exc:
         logger.warning("Google Trends real falhou: %s — usando mock", exc)
 
@@ -425,9 +415,7 @@ async def get_meta(
 
     # Mock fallback
     mock = [14200, 22800, 4100, 1900]
-    results = [
-        {"candidato": c["nm"], "gasto_r": mock[i]} for i, c in enumerate(cands[:4])
-    ]
+    results = [{"candidato": c["nm"], "gasto_r": mock[i]} for i, c in enumerate(cands[:4])]
     return JSONResponse({"candidatos": results})
 
 
@@ -877,9 +865,7 @@ async def get_mapa(
                 "ibge_code": "3548100",
             },
         ]
-        return JSONResponse(
-            {"nivel": "municipio", "uf": uf_upper, "features": mock_muns}
-        )
+        return JSONResponse({"nivel": "municipio", "uf": uf_upper, "features": mock_muns})
 
     if nivel == "zona":
         uf_upper = (uf or "SP").upper()

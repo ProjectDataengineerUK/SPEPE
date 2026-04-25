@@ -59,9 +59,7 @@ def get_shap_explanation(
     return result
 
 
-def _save_shap_summary(
-    result: list[dict], filename: str = "shap_values_latest.json"
-) -> None:
+def _save_shap_summary(result: list[dict], filename: str = "shap_values_latest.json") -> None:
     SHAP_OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
     path = SHAP_OUTPUT_DIR / filename
     with open(path, "w", encoding="utf-8") as f:

@@ -105,6 +105,4 @@ class GeminiAgent:
         artifacts: dict[str, str] | None = None,
     ) -> AgentResponse:
         loop = asyncio.get_event_loop()
-        return await loop.run_in_executor(
-            None, self.run, prompt, session_ctx, artifacts
-        )
+        return await loop.run_in_executor(None, self.run, prompt, session_ctx, artifacts)

@@ -45,9 +45,7 @@ def promote_if_better(
 
     new_score = new_metrics.get(metric_key, 0.0)
     should_promote = (
-        (new_score > champion_score)
-        if higher_is_better
-        else (new_score < champion_score)
+        (new_score > champion_score) if higher_is_better else (new_score < champion_score)
     )
 
     if should_promote and save_as_challenger:
@@ -152,9 +150,7 @@ def _register_vertex(model, metrics: dict) -> None:
     try:
         from google.cloud import aiplatform
 
-        aiplatform.init(
-            project=project, location=os.environ.get("VERTEX_LOCATION", "us-central1")
-        )
+        aiplatform.init(project=project, location=os.environ.get("VERTEX_LOCATION", "us-central1"))
 
         import tempfile
 
@@ -167,8 +163,6 @@ def _register_vertex(model, metrics: dict) -> None:
             serving_container_image_uri="us-docker.pkg.dev/vertex-ai/prediction/sklearn-cpu.1-3:latest",
             description=f"SPEPE electoral model | accuracy={metrics.get('accuracy', 0):.3f}",
         )
-        logger.info(
-            f"Modelo registrado no Vertex AI Model Registry: {model_obj.resource_name}"
-        )
+        logger.info(f"Modelo registrado no Vertex AI Model Registry: {model_obj.resource_name}")
     except Exception as e:
         logger.warning(f"Vertex Model Registry falhou: {e}")

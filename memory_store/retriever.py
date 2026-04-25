@@ -60,9 +60,7 @@ def retrieve_relevant_memories(
         from google.cloud import aiplatform
 
         aiplatform.init(project=project_id, location=region)
-        endpoint = aiplatform.MatchingEngineIndexEndpoint(
-            index_endpoint_name=index_endpoint_name
-        )
+        endpoint = aiplatform.MatchingEngineIndexEndpoint(index_endpoint_name=index_endpoint_name)
         response = endpoint.find_neighbors(
             deployed_index_id=agent_name,
             queries=[query_vec],
@@ -78,9 +76,7 @@ def retrieve_relevant_memories(
                 results.append(
                     Memory(
                         content=str(meta.get("content", "")),
-                        memory_type=MemoryType(
-                            meta.get("memory_type", MemoryType.ANALISE.value)
-                        ),
+                        memory_type=MemoryType(meta.get("memory_type", MemoryType.ANALISE.value)),
                         agent_name=agent_name,
                         timestamp=str(meta.get("timestamp", "")),
                         similarity=similarity,

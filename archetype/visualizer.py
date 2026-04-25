@@ -58,8 +58,7 @@ def build_brazil_choropleth(
 
     unique_clusters = sorted(df_archetypes[archetype_col].unique())
     color_map = {
-        cid: ARCHETYPE_PALETTE[i % len(ARCHETYPE_PALETTE)]
-        for i, cid in enumerate(unique_clusters)
+        cid: ARCHETYPE_PALETTE[i % len(ARCHETYPE_PALETTE)] for i, cid in enumerate(unique_clusters)
     }
 
     def style_fn(feature):
@@ -74,9 +73,7 @@ def build_brazil_choropleth(
     tooltip_fields = ["NM_MUN", label_col, archetype_col]
     tooltip_aliases = ["Município", "Arquétipo", "ID"]
     available_fields = [f for f in tooltip_fields if f in merged.columns]
-    available_aliases = [
-        a for f, a in zip(tooltip_fields, tooltip_aliases) if f in merged.columns
-    ]
+    available_aliases = [a for f, a in zip(tooltip_fields, tooltip_aliases) if f in merged.columns]
 
     folium.GeoJson(
         merged.__geo_interface__,

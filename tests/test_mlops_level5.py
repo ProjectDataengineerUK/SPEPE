@@ -15,9 +15,7 @@ class TestDriftMonitor:
         rng = np.random.default_rng(42)
         data = rng.normal(0, 1, 500)
         score = _js_divergence(data, data.copy())
-        assert (
-            score < 0.01
-        ), "Identical distributions should have near-zero JS divergence"
+        assert score < 0.01, "Identical distributions should have near-zero JS divergence"
 
     def test_js_divergence_different_distributions(self):
         from mlops.monitoring.drift_monitor import _js_divergence
@@ -26,9 +24,7 @@ class TestDriftMonitor:
         p = rng.normal(0, 1, 500)
         q = rng.normal(5, 1, 500)  # Very different mean
         score = _js_divergence(p, q)
-        assert (
-            score > 0.05
-        ), "Clearly different distributions should have high JS divergence"
+        assert score > 0.05, "Clearly different distributions should have high JS divergence"
 
     def test_js_divergence_bounded(self):
         from mlops.monitoring.drift_monitor import _js_divergence
@@ -103,12 +99,8 @@ class TestPubSubPublisher:
     def test_publish_returns_none_without_credentials(self):
         from mlops.monitoring.pubsub_publisher import publish_drift_event
 
-        with patch(
-            "mlops.monitoring.pubsub_publisher._get_publisher", return_value=None
-        ):
-            result = publish_drift_event(
-                "idhm_2010", 0.15, 0.10, project_id="spepe-test"
-            )
+        with patch("mlops.monitoring.pubsub_publisher._get_publisher", return_value=None):
+            result = publish_drift_event("idhm_2010", 0.15, 0.10, project_id="spepe-test")
         assert result is None
 
 
@@ -262,9 +254,7 @@ class TestAutoRollback:
             region="southamerica-east1",
         )
 
-        with patch(
-            "mlops.deployment.auto_rollback._fetch_brier_score", return_value=None
-        ):
+        with patch("mlops.deployment.auto_rollback._fetch_brier_score", return_value=None):
             decision = evaluate_canary(state)
 
         assert decision.action == "continue"
@@ -280,9 +270,7 @@ class TestPromoteV2:
                 with patch.object(
                     promote_mod, "CHAMPION_META_PATH", tmp_path / "champion_meta.json"
                 ):
-                    with patch.object(
-                        promote_mod, "CHALLENGER_PATH", tmp_path / "challenger.pkl"
-                    ):
+                    with patch.object(promote_mod, "CHALLENGER_PATH", tmp_path / "challenger.pkl"):
                         with patch.object(
                             promote_mod,
                             "CHALLENGER_META_PATH",

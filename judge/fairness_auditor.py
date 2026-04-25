@@ -10,8 +10,14 @@ import numpy as np
 logger = logging.getLogger(__name__)
 
 _ALLOWED_DIMENSIONS = {
-    "quintil_renda", "sg_uf", "pct_zona_rural", "cd_municipio_ibge",
-    "regiao", "nm_municipio", "populacao_faixa", "idhm_faixa",
+    "quintil_renda",
+    "sg_uf",
+    "pct_zona_rural",
+    "cd_municipio_ibge",
+    "regiao",
+    "nm_municipio",
+    "populacao_faixa",
+    "idhm_faixa",
 }
 _ALLOWED_DATASETS = {"spepe_mlops", "spepe_gold", "spepe_silver"}
 _PROJECT_RE = re.compile(r"^[a-z][a-z0-9-]{4,29}$")
@@ -24,7 +30,9 @@ def _validate_fairness_args(
         raise ValueError(f"project_id inválido: {project_id}")
     invalid_dims = set(dimensions) - _ALLOWED_DIMENSIONS
     if invalid_dims:
-        raise ValueError(f"Dimensões não permitidas: {invalid_dims}. Permitidas: {_ALLOWED_DIMENSIONS}")
+        raise ValueError(
+            f"Dimensões não permitidas: {invalid_dims}. Permitidas: {_ALLOWED_DIMENSIONS}"
+        )
     if mlops_dataset not in _ALLOWED_DATASETS:
         raise ValueError(f"mlops_dataset não permitido: {mlops_dataset}")
     if gold_dataset not in _ALLOWED_DATASETS:
@@ -86,16 +94,17 @@ def _fetch_audit_rows(
         WHERE p.model_version = @model_version AND p.shadow = true
     """.format(
         select_dims,
-        project_id, mlops_dataset,
-        project_id, mlops_dataset,
-        project_id, gold_dataset,
+        project_id,
+        mlops_dataset,
+        project_id,
+        mlops_dataset,
+        project_id,
+        gold_dataset,
     )
     from google.cloud import bigquery
 
     job_config = bigquery.QueryJobConfig(
-        query_parameters=[
-            bigquery.ScalarQueryParameter("model_version", "STRING", model_version)
-        ]
+        query_parameters=[bigquery.ScalarQueryParameter("model_version", "STRING", model_version)]
     )
     return [dict(row) for row in client.query(query, job_config=job_config).result()]
 
@@ -114,11 +123,7 @@ def audit_fairness(
     `gap_threshold_pp` percentage points from the overall average.
     """
     dimensions = dimensions or ["quintil_renda", "sg_uf", "pct_zona_rural"]
-    data = (
-        rows
-        if rows is not None
-        else _fetch_audit_rows(project_id, model_version, dimensions)
-    )
+    data = rows if rows is not None else _fetch_audit_rows(project_id, model_version, dimensions)
     report = FairnessReport(metric="equalized_odds", dimensions=dimensions)
     if not data:
         return report
@@ -141,9 +146,7 @@ def audit_fairness(
             tpr = _tpr(preds_b, true_b)
             fpr = _fpr(preds_b, true_b)
             gap = max(abs(tpr - overall_tpr), abs(fpr - overall_fpr)) * 100.0
-            finding = FairnessFinding(
-                dimension=dim, bucket=bucket, tpr=tpr, fpr=fpr, gap_pp=gap
-            )
+            finding = FairnessFinding(dimension=dim, bucket=bucket, tpr=tpr, fpr=fpr, gap_pp=gap)
             report.findings.append(finding)
             if gap > report.max_gap_pp:
                 report.max_gap_pp = gap

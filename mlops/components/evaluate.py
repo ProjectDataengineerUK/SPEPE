@@ -44,9 +44,7 @@ def backtest_2018_2022(
     return metrics
 
 
-def compute_calibration(
-    y_true: np.ndarray, y_pred_proba: np.ndarray, n_bins: int = 10
-) -> dict:
+def compute_calibration(y_true: np.ndarray, y_pred_proba: np.ndarray, n_bins: int = 10) -> dict:
     """Compute calibration metrics (reliability diagram data)."""
     bins = np.linspace(0, 1, n_bins + 1)
     bin_means = []

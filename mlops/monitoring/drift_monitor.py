@@ -44,9 +44,7 @@ def _js_divergence(p: np.ndarray, q: np.ndarray, n_bins: int = 20) -> float:
     q_hist /= q_hist.sum()
 
     m = 0.5 * (p_hist + q_hist)
-    js = 0.5 * np.sum(p_hist * np.log(p_hist / m)) + 0.5 * np.sum(
-        q_hist * np.log(q_hist / m)
-    )
+    js = 0.5 * np.sum(p_hist * np.log(p_hist / m)) + 0.5 * np.sum(q_hist * np.log(q_hist / m))
     return float(np.clip(js, 0.0, 1.0))
 
 
@@ -61,9 +59,7 @@ def _categorical_divergence(p: pd.Series, q: pd.Series) -> float:
     q_arr /= q_arr.sum()
 
     m = 0.5 * (p_arr + q_arr)
-    js = 0.5 * np.sum(p_arr * np.log(p_arr / m)) + 0.5 * np.sum(
-        q_arr * np.log(q_arr / m)
-    )
+    js = 0.5 * np.sum(p_arr * np.log(p_arr / m)) + 0.5 * np.sum(q_arr * np.log(q_arr / m))
     return float(np.clip(js, 0.0, 1.0))
 
 

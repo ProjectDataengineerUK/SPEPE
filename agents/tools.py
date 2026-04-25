@@ -11,9 +11,7 @@ from pydantic import BaseModel, field_validator
 
 logger = logging.getLogger("spepe.agents.tools")
 
-JobName = Literal[
-    "tse_ingest", "ibge_sync", "silver_transform", "gold_build", "digital_ingest"
-]
+JobName = Literal["tse_ingest", "ibge_sync", "silver_transform", "gold_build", "digital_ingest"]
 
 ALLOWED_JOBS: dict[JobName, str] = {
     "tse_ingest": "dataops/jobs/tse_ingest_job.py",
@@ -41,9 +39,7 @@ class RunJobArgs(BaseModel):
     @classmethod
     def validate_job(cls, v: str) -> str:
         if v not in ALLOWED_JOBS:
-            raise ValueError(
-                f"Job não permitido: {v}. Permitidos: {list(ALLOWED_JOBS)}"
-            )
+            raise ValueError(f"Job não permitido: {v}. Permitidos: {list(ALLOWED_JOBS)}")
         return v
 
     @field_validator("uf")
@@ -76,9 +72,7 @@ def _run_cloud_run_job(args: RunJobArgs, project: str, region: str) -> dict:
         from google.cloud import run_v2
 
         client = run_v2.JobsClient()
-        job_name = (
-            f"projects/{project}/locations/{region}/jobs/{CLOUD_RUN_JOBS[args.job]}"
-        )
+        job_name = f"projects/{project}/locations/{region}/jobs/{CLOUD_RUN_JOBS[args.job]}"
 
         request = run_v2.RunJobRequest(
             name=job_name,
@@ -94,16 +88,12 @@ def _run_cloud_run_job(args: RunJobArgs, project: str, region: str) -> dict:
             ),
         )
         operation = client.run_job(request=request)
-        logger.info(
-            "Cloud Run Job disparado: %s (uf=%s year=%s)", args.job, args.uf, args.year
-        )
+        logger.info("Cloud Run Job disparado: %s (uf=%s year=%s)", args.job, args.uf, args.year)
         return {
             "ok": True,
             "mode": "cloud_run",
             "job": args.job,
-            "operation": (
-                operation.metadata.name if operation.metadata else "dispatched"
-            ),
+            "operation": (operation.metadata.name if operation.metadata else "dispatched"),
         }
     except Exception as e:
         logger.error("Cloud Run Job falhou: %s — fallback local", e)

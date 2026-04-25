@@ -11,9 +11,7 @@ import pandas as pd
 from dataops.bronze_writer import write_bronze
 from dataops.clients.ibge_client import fetch_sidra_indicators, load_municipios
 
-logging.basicConfig(
-    level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s %(message)s"
-)
+logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s %(message)s")
 logger = logging.getLogger("spepe.jobs.ibge_sync")
 
 UF_CODES = {

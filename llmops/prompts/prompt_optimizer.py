@@ -35,9 +35,7 @@ class PromptOptimizer:
     def generate_variations(self, base: str) -> list[PromptCandidate]:
         candidates = [PromptCandidate(prompt_id="base", text=base)]
         for i, tpl in enumerate(self.VARIATION_TEMPLATES):
-            candidates.append(
-                PromptCandidate(prompt_id=f"var_{i:02d}", text=tpl.format(base=base))
-            )
+            candidates.append(PromptCandidate(prompt_id=f"var_{i:02d}", text=tpl.format(base=base)))
         return candidates
 
     def optimize(self, base: str) -> PromptCandidate:

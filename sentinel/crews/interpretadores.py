@@ -17,9 +17,7 @@ class InterpretadoresCrew:
         self.kb = kb or KnowledgeBase(project_id=self.config.get("project_id"))
         self.context_builder = ContextBuilder(self.kb)
         self.interpreter = GenAIInterpreter(
-            model=self.config.get(
-                "genai_interpreter_model", "claude-sonnet-4-6"
-            ),
+            model=self.config.get("genai_interpreter_model", "claude-sonnet-4-6"),
             api_key=self.config.get("anthropic_api_key"),
         )
         self.kb_updater = KBUpdater(self.kb)

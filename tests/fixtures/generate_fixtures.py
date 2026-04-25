@@ -31,9 +31,7 @@ def generate_sample_tse_2022(n: int = 1000) -> pd.DataFrame:
             "NR_ZONA": rng.integers(1, 300, n),
             "NR_SECAO": rng.integers(1, 500, n),
             "NR_CANDIDATO": rng.choice([13, 22, 40, 45], size=n),
-            "NM_CANDIDATO": rng.choice(
-                ["LULA", "BOLSONARO", "CIRO", "SIMONE TEBET"], size=n
-            ),
+            "NM_CANDIDATO": rng.choice(["LULA", "BOLSONARO", "CIRO", "SIMONE TEBET"], size=n),
             "DS_CARGO": ["PRESIDENTE"] * n,
             "QT_VOTOS_NOMINAIS": rng.integers(50, 800, n),
             "SG_PARTIDO": rng.choice(["PT", "PL", "PDT", "MDB"], size=n),

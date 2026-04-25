@@ -20,9 +20,7 @@ import yaml
 
 logger = logging.getLogger("spepe.hooks.disclaimer")
 
-_TEMPLATES_PATH = (
-    Path(__file__).parent.parent / "security" / "disclaimer_templates.yaml"
-)
+_TEMPLATES_PATH = Path(__file__).parent.parent / "security" / "disclaimer_templates.yaml"
 
 TRIGGERS: dict[str, re.Pattern[str]] = {
     "tipo_a_previsao": re.compile(
@@ -87,11 +85,7 @@ def disclaimer_hook(output: str, agent_name: str | None = None) -> tuple[str, bo
     if not required:
         return output, False
 
-    missing = [
-        t
-        for t in required
-        if not _disclaimer_already_present(output, templates.get(t, ""))
-    ]
+    missing = [t for t in required if not _disclaimer_already_present(output, templates.get(t, ""))]
 
     if not missing:
         logger.debug("disclaimer_ok agent=%s required=%s", agent_name, required)
@@ -108,9 +102,7 @@ def audit_disclaimer(output: str, agent_name: str | None = None) -> dict:
     """Return structured audit record (for Cloud Logging)."""
     required = detect_required_disclaimers(output)
     templates = _load_templates()
-    present = [
-        t for t in required if _disclaimer_already_present(output, templates.get(t, ""))
-    ]
+    present = [t for t in required if _disclaimer_already_present(output, templates.get(t, ""))]
     return {
         "agent": agent_name,
         "required": required,

@@ -6,9 +6,7 @@ import logging
 import os
 import sys
 
-logging.basicConfig(
-    level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s %(message)s"
-)
+logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s %(message)s")
 logger = logging.getLogger("spepe.jobs.silver_transform")
 
 YEARS = [2014, 2018, 2022]
@@ -38,9 +36,7 @@ def main(uf: str, years: list[int] | None = None) -> None:
             )
             all_ok = False
         else:
-            logger.info(
-                f"Silver OK {uf}/{year}: {result.get('rows')} rows, DQ={dq_score:.1f}%"
-            )
+            logger.info(f"Silver OK {uf}/{year}: {result.get('rows')} rows, DQ={dq_score:.1f}%")
 
     if not all_ok:
         sys.exit(1)

@@ -6,6 +6,7 @@ Tools:
   digital_youtube    — YouTube views do canal oficial (agregado)
   digital_status     — Cache local disponível
 """
+
 from __future__ import annotations
 
 import json
@@ -23,7 +24,11 @@ TOOLS = [
         "inputSchema": {
             "type": "object",
             "properties": {
-                "keywords": {"type": "array", "items": {"type": "string"}, "description": "Lista de candidatos/termos (max 5)"},
+                "keywords": {
+                    "type": "array",
+                    "items": {"type": "string"},
+                    "description": "Lista de candidatos/termos (max 5)",
+                },
                 "timeframe": {"type": "string", "default": "2022-06-01 2022-10-30"},
                 "geo": {"type": "string", "default": "BR"},
             },
@@ -49,8 +54,14 @@ TOOLS = [
             "type": "object",
             "properties": {
                 "channel_id": {"type": "string"},
-                "published_after": {"type": "string", "default": "2022-06-01T00:00:00Z"},
-                "published_before": {"type": "string", "default": "2022-10-31T23:59:59Z"},
+                "published_after": {
+                    "type": "string",
+                    "default": "2022-06-01T00:00:00Z",
+                },
+                "published_before": {
+                    "type": "string",
+                    "default": "2022-10-31T23:59:59Z",
+                },
             },
             "required": ["channel_id"],
         },
@@ -65,6 +76,7 @@ TOOLS = [
 
 def _trends(keywords, timeframe, geo):
     from mcp_servers.digital.google_trends import fetch_trends
+
     df = fetch_trends(keywords, timeframe=timeframe, geo=geo)
     if df.empty:
         return "Nenhum dado de Trends disponível (verifique conectividade ou limites da API)."
@@ -73,6 +85,7 @@ def _trends(keywords, timeframe, geo):
 
 def _meta_ads(candidate_name, country):
     from mcp_servers.digital.meta_ads import fetch_ad_spend_by_candidate
+
     token = os.environ.get("META_APP_TOKEN", "")
     df = fetch_ad_spend_by_candidate(candidate_name, country=country, access_token=token)
     if df.empty:
@@ -82,6 +95,7 @@ def _meta_ads(candidate_name, country):
 
 def _youtube(channel_id, published_after, published_before):
     from mcp_servers.digital.youtube import fetch_video_views_aggregate
+
     api_key = os.environ.get("YOUTUBE_API_KEY", "")
     result = fetch_video_views_aggregate(channel_id, api_key, published_after, published_before)
     return json.dumps(result, ensure_ascii=False, indent=2)
@@ -89,6 +103,7 @@ def _youtube(channel_id, published_after, published_before):
 
 def _status():
     from pathlib import Path
+
     cache_dirs = [
         Path("data/bronze/digital/google_trends"),
         Path("data/bronze/digital/meta_ads"),
@@ -105,7 +120,11 @@ def handle_request(request: dict) -> dict:
     method = request.get("method", "")
 
     if method == "initialize":
-        return {"protocolVersion": "2024-11-05", "capabilities": {"tools": {}}, "serverInfo": {"name": "spepe-digital", "version": "1.0.0"}}
+        return {
+            "protocolVersion": "2024-11-05",
+            "capabilities": {"tools": {}},
+            "serverInfo": {"name": "spepe-digital", "version": "1.0.0"},
+        }
 
     if method == "tools/list":
         return {"tools": TOOLS}
@@ -115,13 +134,21 @@ def handle_request(request: dict) -> dict:
         args = request.get("params", {}).get("arguments", {})
 
         if name == "digital_trends":
-            text = _trends(args.get("keywords", []), args.get("timeframe", "2022-06-01 2022-10-30"), args.get("geo", "BR"))
+            text = _trends(
+                args.get("keywords", []),
+                args.get("timeframe", "2022-06-01 2022-10-30"),
+                args.get("geo", "BR"),
+            )
             return {"content": [{"type": "text", "text": text}]}
         if name == "digital_meta_ads":
             text = _meta_ads(args.get("candidate_name", ""), args.get("country", "BR"))
             return {"content": [{"type": "text", "text": text}]}
         if name == "digital_youtube":
-            text = _youtube(args.get("channel_id", ""), args.get("published_after", "2022-06-01T00:00:00Z"), args.get("published_before", "2022-10-31T23:59:59Z"))
+            text = _youtube(
+                args.get("channel_id", ""),
+                args.get("published_after", "2022-06-01T00:00:00Z"),
+                args.get("published_before", "2022-10-31T23:59:59Z"),
+            )
             return {"content": [{"type": "text", "text": text}]}
         if name == "digital_status":
             return {"content": [{"type": "text", "text": _status()}]}
@@ -140,7 +167,11 @@ def main() -> None:
             result = handle_request(request)
             response = {"jsonrpc": "2.0", "id": request.get("id"), "result": result}
         except Exception as e:
-            response = {"jsonrpc": "2.0", "id": None, "error": {"code": -32603, "message": str(e)}}
+            response = {
+                "jsonrpc": "2.0",
+                "id": None,
+                "error": {"code": -32603, "message": str(e)},
+            }
         print(json.dumps(response, ensure_ascii=False), flush=True)
 
 

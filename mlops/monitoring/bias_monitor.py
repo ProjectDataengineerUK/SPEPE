@@ -92,9 +92,7 @@ def run_bias_monitor(
             )
         )
         if alert:
-            logger.warning(
-                "BIAS ALERT: sg_uf=%s  Brier=%.4f  ratio=%.2f×global", uf, bs, ratio
-            )
+            logger.warning("BIAS ALERT: sg_uf=%s  Brier=%.4f  ratio=%.2f×global", uf, bs, ratio)
 
     # Group 2: income quintile
     df = _assign_income_quintile(df)

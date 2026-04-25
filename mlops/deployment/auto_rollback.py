@@ -26,17 +26,13 @@ class RollbackDecision:
     ratio: float
 
 
-def _fetch_brier_score(
-    revision: str, window_hours: int, project_id: str
-) -> float | None:
+def _fetch_brier_score(revision: str, window_hours: int, project_id: str) -> float | None:
     """Fetch average Brier score for a Cloud Run revision from fact_predictions."""
     try:
         from google.cloud import bigquery
 
         client = bigquery.Client(project=project_id)
-        cutoff = (
-            datetime.now(timezone.utc) - timedelta(hours=window_hours)
-        ).isoformat()
+        cutoff = (datetime.now(timezone.utc) - timedelta(hours=window_hours)).isoformat()
         query = f"""
             SELECT AVG(brier_score) as avg_brier
             FROM `{project_id}.spepe_mlops.fact_predictions`
@@ -55,12 +51,8 @@ def _fetch_brier_score(
 def evaluate_canary(state: CanaryState, window_hours: int = 6) -> RollbackDecision:
     project_id = state.project_id
 
-    challenger_brier = _fetch_brier_score(
-        state.challenger_revision, window_hours, project_id
-    )
-    champion_brier = _fetch_brier_score(
-        state.champion_revision, window_hours, project_id
-    )
+    challenger_brier = _fetch_brier_score(state.challenger_revision, window_hours, project_id)
+    champion_brier = _fetch_brier_score(state.champion_revision, window_hours, project_id)
 
     if challenger_brier is None or champion_brier is None:
         logger.info("Insufficient data for canary evaluation — continuing")
@@ -114,9 +106,7 @@ def watch_canary(state: CanaryState, max_hours: int = EVAL_WINDOW_HOURS) -> str:
             promote_canary(state)
             return "promoted"
 
-    logger.warning(
-        "Canary window expired without clear decision — promoting challenger"
-    )
+    logger.warning("Canary window expired without clear decision — promoting challenger")
     promote_canary(state)
     return "promoted"
 
@@ -127,9 +117,7 @@ def check_cooldown(project_id: str) -> bool:
         from google.cloud import bigquery
 
         client = bigquery.Client(project=project_id)
-        cutoff = (
-            datetime.now(timezone.utc) - timedelta(hours=COOLDOWN_HOURS)
-        ).isoformat()
+        cutoff = (datetime.now(timezone.utc) - timedelta(hours=COOLDOWN_HOURS)).isoformat()
         query = f"""
             SELECT COUNT(*) as recent_retrains
             FROM `{project_id}.spepe_mlops.model_evaluations`

@@ -51,9 +51,7 @@ class PromotionGate:
             archived_id=archived_id,
         )
 
-    def _archive(
-        self, project_id: str, verdict: JudgeVerdict
-    ) -> str | None:
+    def _archive(self, project_id: str, verdict: JudgeVerdict) -> str | None:
         try:
             from google.cloud import bigquery
 

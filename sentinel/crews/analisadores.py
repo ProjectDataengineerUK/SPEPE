@@ -14,9 +14,7 @@ class AnalisadoresCrew:
         self.config = config or {}
         self.kb = kb or KnowledgeBase(project_id=self.config.get("project_id"))
         self.pattern_detector = PatternDetector(kb_client=self.kb)
-        self.anomaly_detector = AnomalyDetector(
-            z_threshold=self.config.get("z_threshold", 3.0)
-        )
+        self.anomaly_detector = AnomalyDetector(z_threshold=self.config.get("z_threshold", 3.0))
 
     def analyze(self, observations_bundle: dict[str, Any]) -> dict[str, Any]:
         event_dict = observations_bundle["event"]
@@ -25,9 +23,7 @@ class AnalisadoresCrew:
         patterns = self.pattern_detector.detect(event)
         pattern_dicts = [p.__dict__ for p in patterns]
         correlations = [
-            f"{domain}: {data['reason']}"
-            for domain, data in obs.items()
-            if data.get("detected")
+            f"{domain}: {data['reason']}" for domain, data in obs.items() if data.get("detected")
         ]
         primary_metric, primary_history = self._primary_metric(obs)
         anomaly = None
@@ -45,9 +41,7 @@ class AnalisadoresCrew:
             "anomaly": anomaly.__dict__ if anomaly else None,
         }
 
-    def _primary_metric(
-        self, obs: dict[str, Any]
-    ) -> tuple[float | None, list[float]]:
+    def _primary_metric(self, obs: dict[str, Any]) -> tuple[float | None, list[float]]:
         for _domain, data in obs.items():
             metrics = data.get("metrics", {})
             for key in (

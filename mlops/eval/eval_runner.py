@@ -80,13 +80,9 @@ def run_eval_offline(responses: dict[str, str]) -> dict:
         json.dump(report, f, ensure_ascii=False, indent=2)
 
     if not ci_pass:
-        logger.warning(
-            f"LLM eval FALHOU: score={overall_score:.3f} < {EVAL_SCORE_THRESHOLD}"
-        )
+        logger.warning(f"LLM eval FALHOU: score={overall_score:.3f} < {EVAL_SCORE_THRESHOLD}")
     else:
-        logger.info(
-            f"LLM eval OK: score={overall_score:.3f} passed={passed}/{len(dataset)}"
-        )
+        logger.info(f"LLM eval OK: score={overall_score:.3f} passed={passed}/{len(dataset)}")
 
     return report
 
@@ -118,25 +114,19 @@ if __name__ == "__main__":
     if args.responses_file:
         with open(args.responses_file, "r", encoding="utf-8") as f:
             responses = json.load(f)
-        logger.info(
-            f"Loaded {len(responses)} pre-generated responses from {args.responses_file}"
-        )
+        logger.info(f"Loaded {len(responses)} pre-generated responses from {args.responses_file}")
     else:
-        logger.info(
-            "No responses file provided — using empty responses (all will fail)"
-        )
+        logger.info("No responses file provided — using empty responses (all will fail)")
 
     report = run_eval_offline(responses)
 
     ci_pass = report["ci_pass"]
     exit_code = 0 if ci_pass else 1
 
-    print(f"\n{'='*60}")
-    print(
-        f"EVAL REPORT: {report['overall_score']:.3f} (threshold: {report['threshold']})"
-    )
+    print(f"\n{'=' * 60}")
+    print(f"EVAL REPORT: {report['overall_score']:.3f} (threshold: {report['threshold']})")
     print(f"Results: {report['passed']}/{report['total']} passed")
     print(f"Report saved to: {EVAL_REPORT_PATH}")
-    print(f"{'='*60}\n")
+    print(f"{'=' * 60}\n")
 
     sys.exit(exit_code)

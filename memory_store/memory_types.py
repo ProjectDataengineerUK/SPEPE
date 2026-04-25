@@ -18,9 +18,7 @@ class Memory:
     content: str
     memory_type: MemoryType
     agent_name: str
-    timestamp: str = field(
-        default_factory=lambda: datetime.now(timezone.utc).isoformat()
-    )
+    timestamp: str = field(default_factory=lambda: datetime.now(timezone.utc).isoformat())
     session_id: str | None = None
     similarity: float | None = None
     metadata: dict | None = None
@@ -28,9 +26,11 @@ class Memory:
     def to_dict(self) -> dict:
         return {
             "content": self.content,
-            "memory_type": self.memory_type.value
-            if isinstance(self.memory_type, MemoryType)
-            else self.memory_type,
+            "memory_type": (
+                self.memory_type.value
+                if isinstance(self.memory_type, MemoryType)
+                else self.memory_type
+            ),
             "agent_name": self.agent_name,
             "timestamp": self.timestamp,
             "session_id": self.session_id,

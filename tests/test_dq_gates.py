@@ -77,11 +77,7 @@ class TestDQRunnerSuites:
         bad_df = clean_gold_df.drop(columns=["cd_municipio"])
         result = run_suite(bad_df, "gold")
         col_check = next(
-            (
-                r
-                for r in result["results"]
-                if r["expectation"] == "expect_column_to_exist"
-            ),
+            (r for r in result["results"] if r["expectation"] == "expect_column_to_exist"),
             None,
         )
         assert col_check is not None

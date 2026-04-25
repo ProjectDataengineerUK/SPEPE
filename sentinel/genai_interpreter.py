@@ -81,9 +81,7 @@ class GenAIInterpreter:
             return {
                 "causa_raiz": best.get("probable_cause", "unknown"),
                 "confianca": float(best.get("confidence", 0.5)),
-                "acao_recomendada": best.get(
-                    "recommended_action", "requires_human_review"
-                ),
+                "acao_recomendada": best.get("recommended_action", "requires_human_review"),
                 "severidade": context.event.get("severity", "P2"),
                 "referencias_kb": [best.get("pattern_id")],
                 "requer_humano": float(best.get("confidence", 0.5)) < 0.70,

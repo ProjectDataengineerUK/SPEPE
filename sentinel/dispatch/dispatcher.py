@@ -20,9 +20,7 @@ class Dispatcher:
         self.project_id = project_id
         self.alerts_topic = alerts_topic
 
-    def dispatch(
-        self, markdown_report: str, payload: dict[str, Any]
-    ) -> dict[str, bool]:
+    def dispatch(self, markdown_report: str, payload: dict[str, Any]) -> dict[str, bool]:
         result = {
             "slack": self._send_slack(markdown_report, payload),
             "cloud_logging": self._log_cloud(markdown_report, payload),
@@ -64,9 +62,7 @@ class Dispatcher:
 
             publisher = pubsub_v1.PublisherClient()
             topic_path = publisher.topic_path(self.project_id, self.alerts_topic)
-            publisher.publish(topic_path, json.dumps(payload).encode("utf-8")).result(
-                timeout=15
-            )
+            publisher.publish(topic_path, json.dumps(payload).encode("utf-8")).result(timeout=15)
             return True
         except Exception as exc:
             logger.exception("pubsub_dispatch_failed: %s", exc)

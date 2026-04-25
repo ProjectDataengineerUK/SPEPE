@@ -12,10 +12,7 @@ from tenacity import retry, stop_after_attempt, wait_exponential
 
 logger = logging.getLogger("spepe.clients.tse")
 
-_CDN = (
-    "https://cdn.tse.jus.br/estatistica/sead/odsele/votacao_secao"
-    "/votacao_secao_{year}_{uf}.zip"
-)
+_CDN = "https://cdn.tse.jus.br/estatistica/sead/odsele/votacao_secao/votacao_secao_{year}_{uf}.zip"
 
 # Raw TSE column → canonical lowercase name
 _COL_MAP: dict[str, str] = {

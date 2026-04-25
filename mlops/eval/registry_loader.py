@@ -19,9 +19,7 @@ def load_prompt(agent_name: str, version: str | None = None) -> dict:
     else:
         files = sorted(REGISTRY_DIR.glob(f"{agent_name}_v*.yaml"), reverse=True)
         if not files:
-            raise FileNotFoundError(
-                f"Nenhum prompt encontrado para agente: {agent_name}"
-            )
+            raise FileNotFoundError(f"Nenhum prompt encontrado para agente: {agent_name}")
         path = files[0]
 
     with open(path, encoding="utf-8") as f:

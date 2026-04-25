@@ -125,6 +125,4 @@ def run_archetype_pipeline_cli(
         print(f"\nMapa salvo em: {map_path}")
     else:
         print(f"\nGeoJSON não encontrado em {GEOJSON_PATH} — mapa não gerado.")
-        print(
-            "Baixe o GeoJSON de municípios do IBGE e salve em data/geo/municipios_br.geojson"
-        )
+        print("Baixe o GeoJSON de municípios do IBGE e salve em data/geo/municipios_br.geojson")

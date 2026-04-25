@@ -9,9 +9,7 @@ import sys
 from dataops.bronze_writer import write_bronze
 from dataops.clients.tse_client import download_tse_resultados, normalize_columns
 
-logging.basicConfig(
-    level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s %(message)s"
-)
+logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s %(message)s")
 logger = logging.getLogger("spepe.jobs.tse_ingest")
 
 
@@ -47,8 +45,6 @@ if __name__ == "__main__":
 
     parser = argparse.ArgumentParser(description="TSE ingest job")
     parser.add_argument("--uf", default=os.environ.get("DEFAULT_UF", "SP"))
-    parser.add_argument(
-        "--year", type=int, default=int(os.environ.get("DEFAULT_ANO", "2022"))
-    )
+    parser.add_argument("--year", type=int, default=int(os.environ.get("DEFAULT_ANO", "2022")))
     args = parser.parse_args()
     main(args.uf, args.year)

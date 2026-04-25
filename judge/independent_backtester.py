@@ -56,9 +56,7 @@ def _fetch_predictions(
     from google.cloud import bigquery
 
     job_config = bigquery.QueryJobConfig(
-        query_parameters=[
-            bigquery.ScalarQueryParameter("model_version", "STRING", model_version)
-        ]
+        query_parameters=[bigquery.ScalarQueryParameter("model_version", "STRING", model_version)]
     )
     return [dict(row) for row in client.query(query, job_config=job_config).result()]
 
@@ -105,16 +103,14 @@ def run_independent_backtest(
     )
 
 
-def _expected_calibration_error(
-    p_mean: np.ndarray, y_true: np.ndarray, n_bins: int = 10
-) -> float:
+def _expected_calibration_error(p_mean: np.ndarray, y_true: np.ndarray, n_bins: int = 10) -> float:
     bins = np.linspace(0.0, 1.0, n_bins + 1)
     ece = 0.0
     n = len(p_mean)
     for i in range(n_bins):
         lo, hi = bins[i], bins[i + 1]
-        mask = (p_mean >= lo) & (p_mean < hi) if i < n_bins - 1 else (
-            (p_mean >= lo) & (p_mean <= hi)
+        mask = (
+            (p_mean >= lo) & (p_mean < hi) if i < n_bins - 1 else ((p_mean >= lo) & (p_mean <= hi))
         )
         if not mask.any():
             continue

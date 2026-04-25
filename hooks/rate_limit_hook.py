@@ -46,9 +46,7 @@ def rate_limit_hook(session_id: str) -> str | None:
         return msg
 
     if total > MAX_REQUESTS_PER_SESSION * 0.9:
-        logger.info(
-            f"Session {session_id}: {total}/{MAX_REQUESTS_PER_SESSION} requests"
-        )
+        logger.info(f"Session {session_id}: {total}/{MAX_REQUESTS_PER_SESSION} requests")
 
     return None
 

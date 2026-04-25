@@ -109,9 +109,7 @@ class IncrementalLoader:
         try:
             errors = client.insert_rows_json(f"{project}.{table}", [row])
             if errors:
-                logger.warning(
-                    "Checkpoint write errors for %s: %s", self.source, errors
-                )
+                logger.warning("Checkpoint write errors for %s: %s", self.source, errors)
         except Exception as exc:
             logger.warning("Checkpoint write failed for %s: %s", self.source, exc)
 
@@ -144,16 +142,12 @@ class IncrementalLoader:
                 self.source,
                 len(df_bronze),
             )
-            watermark_series = pd.to_datetime(
-                df_bronze[self.watermark_col], errors="coerce"
-            )
+            watermark_series = pd.to_datetime(df_bronze[self.watermark_col], errors="coerce")
             new_watermark = watermark_series.max()
             delta_df = df_bronze
             watermark_from = None
         else:
-            watermark_series = pd.to_datetime(
-                df_bronze[self.watermark_col], errors="coerce"
-            )
+            watermark_series = pd.to_datetime(df_bronze[self.watermark_col], errors="coerce")
             mask = watermark_series > pd.Timestamp(last_watermark)
             delta_df = df_bronze[mask].copy()
             new_watermark = watermark_series.max()
@@ -185,17 +179,13 @@ class IncrementalLoader:
                 rows_loaded=len(delta_df),
                 strategy=self.strategy,
                 watermark_from=watermark_from,
-                watermark_to=(
-                    new_watermark.isoformat() if pd.notna(new_watermark) else None
-                ),
+                watermark_to=(new_watermark.isoformat() if pd.notna(new_watermark) else None),
                 fell_back_to_full_refresh=False,
             ),
         )
 
 
-def load_incremental(
-    df_bronze: pd.DataFrame, source: str
-) -> tuple[pd.DataFrame, LoadResult]:
+def load_incremental(df_bronze: pd.DataFrame, source: str) -> tuple[pd.DataFrame, LoadResult]:
     """Convenience wrapper to instantiate + load."""
     loader = IncrementalLoader(source)
     return loader.load(df_bronze)
