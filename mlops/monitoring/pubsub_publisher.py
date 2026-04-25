@@ -46,7 +46,6 @@ def publish_drift_event(
         return None
 
     try:
-        from google.cloud import pubsub_v1
         topic_path = publisher.topic_path(project_id, TOPIC_ID)
         future = publisher.publish(topic_path, data=data)
         message_id = future.result(timeout=10)

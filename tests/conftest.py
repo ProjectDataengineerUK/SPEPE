@@ -1,7 +1,4 @@
 """Fixtures compartilhadas para testes do SPEPE."""
-import os
-import tempfile
-from pathlib import Path
 
 import pytest
 

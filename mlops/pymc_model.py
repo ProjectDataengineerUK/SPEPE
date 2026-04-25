@@ -92,7 +92,6 @@ def predict_pymc(
 ) -> dict:
     """Generate predictions from PyMC posterior samples."""
     try:
-        import pymc as pm
         import numpy as np
     except ImportError:
         raise ImportError("PyMC necessário.")

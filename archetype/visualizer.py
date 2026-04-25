@@ -90,17 +90,15 @@ def build_umap_scatter(
 ) -> str:
     try:
         import plotly.express as px
-        import numpy as np
     except ImportError:
         logger.warning("plotly não disponível — scatter UMAP não gerado")
         return ""
 
-    import numpy as np
     df_plot = pd.DataFrame({
         "UMAP-1": embedding_2d[:, 0],
         "UMAP-2": embedding_2d[:, 1],
-        "cluster": [str(l) for l in labels],
-        "arquetipo": [label_names.get(l, f"Cluster {l}") for l in labels],
+        "cluster": [str(lbl) for lbl in labels],
+        "arquetipo": [label_names.get(lbl, f"Cluster {lbl}") for lbl in labels],
     })
 
     fig = px.scatter(

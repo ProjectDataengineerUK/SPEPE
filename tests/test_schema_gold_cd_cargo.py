@@ -1,6 +1,5 @@
 """Test: validate cd_cargo column flows through Bronze → Silver → Gold."""
 import pandas as pd
-import pytest
 
 
 class TestSchemaGoldCdCargo:

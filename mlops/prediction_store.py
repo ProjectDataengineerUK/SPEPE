@@ -113,13 +113,12 @@ def evaluate_deferred(
 def load_predictions_for_eval(
     model_version: str,
     project_id: str | None = None,
-) -> "pd.DataFrame | None":
+) -> Any | None:
     project_id = project_id or os.environ.get("GCP_PROJECT_ID", "")
     if not project_id:
         return None
 
     try:
-        import pandas as pd
         from google.cloud import bigquery
         client = bigquery.Client(project=project_id)
         query = f"""

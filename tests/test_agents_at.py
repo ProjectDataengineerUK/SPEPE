@@ -1,8 +1,6 @@
 """Acceptance tests AT-001 to AT-006 for SPEPE agents."""
-import json
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import patch
 
-import pytest
 
 
 class TestAT001CollectorAgent:
@@ -28,7 +26,6 @@ class TestAT001CollectorAgent:
     def test_bronze_writer_adds_metadata(self, tmp_path):
         import pandas as pd
         from dataops.bronze_writer import write_bronze
-        import os
 
         df = pd.DataFrame({"col_a": [1, 2, 3], "col_b": ["x", "y", "z"]})
         with patch("dataops.bronze_writer.LOCAL_BRONZE_DIR", tmp_path):
@@ -63,12 +60,10 @@ class TestAT002ArchetypeAgent:
 
     def test_silhouette_threshold_triggers_fallback(self):
         import numpy as np
-        from archetype.clustering import compute_silhouette, select_best_algorithm
+        from archetype.clustering import select_best_algorithm
 
         rng = np.random.default_rng(42)
         X = rng.random((100, 5))
-        labels_noise = np.full(100, -1)  # All noise → should trigger fallback
-
         algo, labels, score = select_best_algorithm(X, silhouette_threshold=0.45)
         assert algo in ("hdbscan", "kmeans_fallback")
 
@@ -100,7 +95,7 @@ class TestAT003ModelistaAgent:
         assert "52.3%" in formatted
 
     def test_poll_aggregator_applies_house_effect(self):
-        from mlops.poll_aggregator import aggregate_polls, HOUSE_EFFECTS
+        from mlops.poll_aggregator import aggregate_polls
         import pandas as pd
         from datetime import date
 

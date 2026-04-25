@@ -23,7 +23,6 @@ from enum import Enum
 
 from fastapi import Header, HTTPException, Query, WebSocket, WebSocketDisconnect
 from fastapi.responses import FileResponse, JSONResponse
-from fastapi.staticfiles import StaticFiles
 
 # Monta sobre o app Chainlit existente
 from chainlit.server import app as _fastapi_app

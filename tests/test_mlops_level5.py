@@ -1,11 +1,6 @@
 """Tests for MLOps Level 5: drift→retrain, canary, rollback, HP tuning, prediction store, bias."""
-import json
 import os
-import tempfile
-from dataclasses import dataclass
-from datetime import datetime, timezone
-from pathlib import Path
-from unittest.mock import MagicMock, patch
+from unittest.mock import patch
 
 import numpy as np
 import pandas as pd

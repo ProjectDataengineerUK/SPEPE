@@ -137,7 +137,6 @@ def _register_vertex(model, metrics: dict) -> None:
         import tempfile
         with tempfile.NamedTemporaryFile(suffix=".pkl", delete=False) as tmp:
             pickle.dump(model, tmp)
-            tmp_path = tmp.name
 
         model_obj = aiplatform.Model.upload(
             display_name="spepe-electoral-model",

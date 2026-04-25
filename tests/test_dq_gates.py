@@ -1,6 +1,4 @@
 """Tests for Data Quality gate execution and thresholds."""
-import json
-from pathlib import Path
 
 import numpy as np
 import pandas as pd

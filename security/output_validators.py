@@ -111,7 +111,7 @@ def validate_disclaimer(text: str) -> ValidationResult:
 
     remediated, was_modified = disclaimer_hook(text, agent_name=None)
     if was_modified:
-        audit = audit_disclaimer(remediated)
+        audit_disclaimer(remediated)
         reason = (
             f"Disclaimer obrigatório ausente — tipos requeridos: {required}. "
             f"Injetado automaticamente."

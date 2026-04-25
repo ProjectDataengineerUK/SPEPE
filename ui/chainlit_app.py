@@ -10,12 +10,12 @@ from chainlit.server import app as _fastapi_app
 async def healthz() -> Response:
     return Response(content="ok", status_code=200)
 
-import ui.dashboard_api  # noqa: F401 — registers /api/* and /ws/chat routes
-from agents.supervisor import Supervisor
-from config.logging_config import setup_logging
-from config.session_state import SessionState
-from config.settings import settings
-from security.output_validators import validate_input_injection
+import ui.dashboard_api  # noqa: E402, F401
+from agents.supervisor import Supervisor  # noqa: E402
+from config.logging_config import setup_logging  # noqa: E402
+from config.session_state import SessionState  # noqa: E402
+from config.settings import settings  # noqa: E402
+from security.output_validators import validate_input_injection  # noqa: E402
 
 setup_logging(log_level=settings.log_level, console_log_level="ERROR")
 

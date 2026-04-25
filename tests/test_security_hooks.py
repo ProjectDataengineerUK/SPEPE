@@ -1,8 +1,6 @@
 """Tests for DLP, rate limit, security, and BigQuery cost hooks."""
-import time
 from unittest.mock import patch
 
-import pytest
 
 
 class TestDLPHook:

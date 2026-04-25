@@ -1,7 +1,6 @@
 """Bronze layer writer — immutable raw data to GCS (or local fallback)."""
 from __future__ import annotations
 
-import hashlib
 import logging
 import os
 from datetime import datetime, timezone
