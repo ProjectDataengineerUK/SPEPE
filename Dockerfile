@@ -40,6 +40,7 @@ RUN chown -R spepe:spepe /app
 
 USER spepe
 ENV PATH="/opt/venv/bin:$PATH" \
+    PYTHONPATH=/app \
     PYTHONUNBUFFERED=1 \
     PYTHONDONTWRITEBYTECODE=1 \
     PORT=8080
