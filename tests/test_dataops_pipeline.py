@@ -78,7 +78,11 @@ class TestDeParaMunicipios:
         sample_ibge_df["cd_municipio_tse"] = (sample_ibge_df["cd_municipio_ibge"] // 10).astype(str)
         sample_tse_df["CD_MUNICIPIO"] = sample_tse_df["CD_MUNICIPIO"].astype(str)
 
-        result = join_tse_ibge(sample_tse_df, sample_ibge_df, tse_key="CD_MUNICIPIO")
+        mock_depara = pd.DataFrame(
+            columns=["cd_municipio_tse", "cd_municipio_ibge", "nm_municipio", "sg_uf"]
+        )
+        with patch("dataops.depara_municipios.load_depara", return_value=mock_depara):
+            result = join_tse_ibge(sample_tse_df, sample_ibge_df, tse_key="CD_MUNICIPIO")
         assert isinstance(result, pd.DataFrame)
         assert len(result) == len(sample_tse_df)
 

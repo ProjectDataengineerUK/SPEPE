@@ -45,16 +45,23 @@ def _build_depara() -> pd.DataFrame:
 
     rows = []
     for m in municipios:
-        ibge_code = int(m["id"])
-        tse_code = ibge_code // 10
-        rows.append(
-            {
-                "cd_municipio_tse": tse_code,
-                "cd_municipio_ibge": ibge_code,
-                "nm_municipio": m["nome"],
-                "sg_uf": m["microrregiao"]["mesorregiao"]["UF"]["sigla"],
-            }
-        )
+        try:
+            ibge_code = int(m["id"])
+            tse_code = ibge_code // 10
+            microrregiao = m.get("microrregiao") or {}
+            mesorregiao = microrregiao.get("mesorregiao") or {}
+            uf = mesorregiao.get("UF") or {}
+            sg_uf = uf.get("sigla", "")
+            rows.append(
+                {
+                    "cd_municipio_tse": tse_code,
+                    "cd_municipio_ibge": ibge_code,
+                    "nm_municipio": m.get("nome", ""),
+                    "sg_uf": sg_uf,
+                }
+            )
+        except (KeyError, TypeError, ValueError):
+            logger.warning("Município IBGE inválido ignorado: %s", m)
 
     df = pd.DataFrame(rows)
     DEPARA_PATH.parent.mkdir(parents=True, exist_ok=True)
