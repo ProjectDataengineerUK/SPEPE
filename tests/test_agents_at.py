@@ -7,15 +7,16 @@ class TestAT001CollectorAgent:
     """AT-001: Coletor downloads TSE data and writes to Bronze."""
 
     def test_tse_schema_registry_loads_2022(self):
-        # DEPRECATED: mcp_servers.tse removed in v4.2
-        # Using TSE client directly instead
+        import pandas as pd
         from dataops.clients.tse_client import normalize_columns
 
-        # TSE expected columns for any year
-        sample_cols = ["sg_uf", "cd_municipio", "nm_candidato", "qt_votos", "ds_cargo"]
-        normalized = normalize_columns(sample_cols)
-        assert "sg_uf" in normalized
-        assert "qt_votos" in normalized
+        df = pd.DataFrame({
+            "SG_UF": ["SP"], "CD_MUNICIPIO": ["12345"],
+            "NM_CANDIDATO": ["FULANO"], "QT_VOTOS_NOMINAIS": ["100"], "DS_CARGO": ["PRESIDENTE"],
+        })
+        normalized = normalize_columns(df, 2022)
+        assert "sg_uf" in normalized.columns
+        assert "qt_votos" in normalized.columns
 
     def test_tse_schema_registry_all_years(self):
         # DEPRECATED: mcp_servers.tse removed in v4.2
@@ -89,7 +90,7 @@ class TestAT003ModelistaAgent:
     def test_prediction_format(self):
         from mlops.components.train_bootstrap import Prediction
 
-        pred = Prediction(mean=0.523, lower=0.48, upper=0.57)
+        pred = Prediction(point_estimate=0.523, ci_lower=0.48, ci_upper=0.57, n_bootstrap=100, alpha=0.05)
         formatted = pred.to_str("Candidato X")
         assert "P(Candidato X)" in formatted
         assert "IC 95%" in formatted
@@ -102,17 +103,17 @@ class TestAT003ModelistaAgent:
 
         polls = pd.DataFrame(
             {
-                "candidate": ["Candidato A"] * 3,
-                "institute": ["datafolha", "sensus", "ibope"],
-                "estimate": [0.45, 0.47, 0.44],
-                "date": [date(2022, 9, 1), date(2022, 9, 5), date(2022, 9, 10)],
+                "candidato": ["Candidato A"] * 3,
+                "instituto": ["datafolha", "sensus", "ibope"],
+                "intencao_pct": [45.0, 47.0, 44.0],
+                "data_pesquisa": [date(2022, 9, 1), date(2022, 9, 5), date(2022, 9, 10)],
             }
         )
-        result = aggregate_polls(polls, candidate="Candidato A", reference_date=date(2022, 10, 1))
-        assert "mean" in result
-        assert "lower" in result
-        assert "upper" in result
-        assert result["lower"] <= result["mean"] <= result["upper"]
+        result = aggregate_polls(polls, candidate="Candidato A")
+        assert "weighted_mean_pct" in result
+        assert "ci_lower_pct" in result
+        assert "ci_upper_pct" in result
+        assert result["ci_lower_pct"] <= result["weighted_mean_pct"] <= result["ci_upper_pct"]
 
 
 class TestAT004DQGate:
@@ -124,8 +125,8 @@ class TestAT004DQGate:
 
         bad_df = pd.DataFrame(
             {
-                "CD_MUNICIPIO": [None] * 100,
-                "QT_VOTOS_NOMINAIS": [-1] * 100,
+                "cd_municipio": [None] * 100,
+                "qt_votos": [-1] * 100,
             }
         )
         result = run_suite(bad_df, "tse")

@@ -11,12 +11,12 @@ def clean_tse_df():
     n = 2000
     return pd.DataFrame(
         {
-            "CD_MUNICIPIO": rng.integers(10000, 99999, n).astype(str),
-            "SG_UF": ["SP"] * n,
-            "QT_VOTOS_NOMINAIS": rng.integers(1, 50000, n),
-            "NR_ZONA": rng.integers(1, 300, n),
-            "DS_CARGO": ["PRESIDENTE"] * n,
-            "NM_CANDIDATO": [f"CANDIDATO_{i % 5}" for i in range(n)],
+            "cd_municipio": rng.integers(10000, 99999, n).astype(str),
+            "sg_uf": ["SP"] * n,
+            "qt_votos": rng.integers(1, 50000, n),
+            "nr_zona": rng.integers(1, 300, n),
+            "ds_cargo": ["PRESIDENTE"] * n,
+            "nm_candidato": [f"CANDIDATO_{i % 5}" for i in range(n)],
         }
     )
 
@@ -44,7 +44,7 @@ class TestDQRunnerSuites:
         from dataops.dq.runner import run_suite
 
         bad_df = clean_tse_df.copy()
-        bad_df.loc[:100, "CD_MUNICIPIO"] = None
+        bad_df.loc[:100, "cd_municipio"] = None
 
         result = run_suite(bad_df, "tse")
         assert result["score"] < 95.0

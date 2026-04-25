@@ -9,7 +9,7 @@ class TestDLPHook:
 
         violations = check_dlp("Eleitor CPF 123.456.789-09 registrado")
         assert len(violations) > 0
-        assert any("cpf" in v.lower() or "123" in v for v in violations)
+        assert any("cpf" in v[1].lower() or "123" in v[0] for v in violations)
 
     def test_blocks_phone_pattern(self):
         from hooks.dlp_hook import check_dlp

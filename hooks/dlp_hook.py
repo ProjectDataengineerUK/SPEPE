@@ -13,7 +13,7 @@ _PII_PATTERNS = [
     (re.compile(r"\b[a-zA-Z0-9_.+-]+@[a-zA-Z0-9-]+\.[a-zA-Z0-9-.]+\b"), "email"),
     (re.compile(r"\b\d{5}-\d{3}\b"), "CEP"),
     (re.compile(r"\bRG\s*:?\s*\d{1,2}\.\d{3}\.\d{3}-\d\b", re.IGNORECASE), "RG"),
-    (re.compile(r"\b\(\d{2}\)\s*\d{4,5}-\d{4}\b"), "telefone"),
+    (re.compile(r"(?<!\w)\(\d{2}\)\s*\d{4,5}-\d{4}\b"), "telefone"),
 ]
 
 

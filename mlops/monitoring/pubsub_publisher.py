@@ -6,6 +6,7 @@ import json
 import logging
 import os
 from datetime import datetime, timezone
+from pathlib import Path
 from typing import Any
 
 logger = logging.getLogger(__name__)
@@ -65,9 +66,7 @@ def publish_drift_event(
 
 
 def _fallback_log(payload: dict[str, Any]) -> None:
-    import pathlib
-
-    log_path = pathlib.Path("output/logs/drift_events.jsonl")
+    log_path = Path("output/logs/drift_events.jsonl")
     log_path.parent.mkdir(parents=True, exist_ok=True)
     with log_path.open("a") as f:
         f.write(json.dumps(payload) + "\n")

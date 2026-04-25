@@ -3,7 +3,6 @@ from __future__ import annotations
 import logging
 import os
 
-import anthropic
 import pandas as pd
 
 logger = logging.getLogger("spepe.archetype.labels")
@@ -16,6 +15,8 @@ def generate_archetype_label(
     n_municipios: int,
     model: str = "claude-haiku-4-5-20251001",
 ) -> str:
+    import anthropic  # lazy — optional dep, not needed at import time
+
     client = anthropic.Anthropic(api_key=os.environ.get("ANTHROPIC_API_KEY", ""))
 
     features_str = "\n".join(

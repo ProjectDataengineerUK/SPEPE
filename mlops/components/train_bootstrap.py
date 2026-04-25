@@ -21,11 +21,12 @@ class Prediction:
     method: str = "bootstrap_logistic"
     warnings: list[str] | None = None
 
-    def to_str(self) -> str:
+    def to_str(self, candidate: str = "") -> str:
         pct = self.point_estimate * 100
         lo = self.ci_lower * 100
         hi = self.ci_upper * 100
-        return f"P = {pct:.1f}% [IC 95%: {lo:.1f}%–{hi:.1f}%]"
+        prefix = f"P({candidate})" if candidate else "P"
+        return f"{prefix} = {pct:.1f}% [IC 95%: {lo:.1f}%–{hi:.1f}%]"
 
     def __post_init__(self):
         if self.warnings is None:

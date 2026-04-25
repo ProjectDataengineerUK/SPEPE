@@ -23,25 +23,30 @@ def run_suite(df: pd.DataFrame, suite_name: str) -> dict:
     with open(suite_path, encoding="utf-8") as f:
         suite = json.load(f)
 
-    failures = []
+    all_results = []
     passed = 0
     total = 0
 
     for exp in suite.get("expectations", []):
         total += 1
-        result = _evaluate_expectation(df, exp)
-        if result["success"]:
+        raw = _evaluate_expectation(df, exp)
+        all_results.append({
+            "expectation": raw.get("type", "unknown"),
+            "passed": raw.get("success", False),
+            **{k: v for k, v in raw.items() if k not in ("type", "success")},
+        })
+        if raw.get("success"):
             passed += 1
-        else:
-            failures.append(result)
 
     score = (passed / total * 100) if total > 0 else 100.0
+    failures = [r for r in all_results if not r["passed"]]
     run_result = {
         "suite": suite_name,
         "timestamp": datetime.now(timezone.utc).isoformat(),
         "score": score,
         "passed": passed,
         "total": total,
+        "results": all_results,
         "failures": failures,
         "status": "pass" if score >= 95.0 else "fail",
     }

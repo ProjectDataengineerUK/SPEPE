@@ -1,6 +1,9 @@
 # Minimal dependencies for CI test suite — avoids heavy ML packages
 # that have numpy 2.x compatibility issues (umap-learn, geopandas, pymc, shap)
 
+# Anthropic SDK (needed by archetype/labels.py via archetype/__init__.py)
+anthropic>=0.49.0
+
 # Core data
 numpy>=1.26
 pandas>=2.0
