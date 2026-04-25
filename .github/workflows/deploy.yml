@@ -101,22 +101,20 @@ jobs:
           workload_identity_provider: ${{ vars.WIF_PROVIDER }}
           service_account: ${{ vars.WIF_SERVICE_ACCOUNT }}
 
-      - id: deploy
-        uses: google-github-actions/deploy-cloudrun@v2
-        with:
-          service: spepe-staging
-          image: ${{ needs.build-push.outputs.image_tag }}
-          region: ${{ env.GCP_REGION }}
-          project_id: ${{ vars.GCP_PROJECT_ID }}
-          service_account: spepe-cloud-run@${{ vars.GCP_PROJECT_ID }}.iam.gserviceaccount.com
-          env_vars: |
-            GCP_PROJECT_ID=${{ vars.GCP_PROJECT_ID }}
-            USE_BIGQUERY=false
-            DEFAULT_UF=SP
-            DEFAULT_ANO=2022
-            ENVIRONMENT=staging
-          secrets: |
-            ANTHROPIC_API_KEY=anthropic_api_key:latest
+      - uses: google-github-actions/setup-gcloud@v2
+
+      - name: Deploy to Cloud Run staging
+        id: deploy
+        run: |
+          URL=$(gcloud run deploy spepe-staging \
+            --image "${{ needs.build-push.outputs.image_tag }}" \
+            --service-account "spepe-cloud-run@${{ vars.GCP_PROJECT_ID }}.iam.gserviceaccount.com" \
+            --set-env-vars "GCP_PROJECT_ID=${{ vars.GCP_PROJECT_ID }},USE_BIGQUERY=false,DEFAULT_UF=SP,DEFAULT_ANO=2022,ENVIRONMENT=staging" \
+            --set-secrets "ANTHROPIC_API_KEY=anthropic_api_key:latest" \
+            --region "${{ env.GCP_REGION }}" \
+            --project "${{ vars.GCP_PROJECT_ID }}" \
+            --format "value(status.url)" 2>&1 | tail -1)
+          echo "url=${URL}" >> $GITHUB_OUTPUT
 
       - name: Smoke test — staging health check
         run: |
