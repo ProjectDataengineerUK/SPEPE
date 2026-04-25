@@ -95,9 +95,11 @@ class TestSilverTransformer:
         assert any(not r["passed"] for r in result["results"])
 
     def test_dq_check_passes_clean_data(self, sample_tse_df):
+        from dataops.clients.tse_client import normalize_columns
         from dataops.dq.runner import run_suite
 
-        result = run_suite(sample_tse_df, "tse")
+        normalized = normalize_columns(sample_tse_df, 2022)
+        result = run_suite(normalized, "tse")
         assert result["score"] >= 50.0  # Most checks should pass
 
 

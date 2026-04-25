@@ -32,6 +32,10 @@ system_prompt: |
   - Dados sempre em nível agregado (município mínimo) — LGPD
   - Se output de agente não tiver IC 95% em previsão: solicite reprocessamento
 
+budget_guard:
+  max_usd: 2.00
+  warn_usd: 1.50
+
 variables:
   - name: session_cost_usd
     type: float

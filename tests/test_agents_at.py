@@ -71,7 +71,7 @@ class TestAT002ArchetypeAgent:
 
         rng = np.random.default_rng(42)
         X = rng.random((100, 5))
-        algo, labels, score = select_best_algorithm(X, silhouette_threshold=0.45)
+        labels, algo, score = select_best_algorithm(X, silhouette_threshold=0.45)
         assert algo in ("hdbscan", "kmeans_fallback")
 
     def test_cache_key_is_deterministic(self):
