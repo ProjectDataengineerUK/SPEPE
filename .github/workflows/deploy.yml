@@ -16,6 +16,10 @@ on:
         type: choice
         options: [staging, prod]
 
+concurrency:
+  group: deploy-${{ github.ref }}
+  cancel-in-progress: true
+
 env:
   PYTHON_VERSION: "3.12"
   GCP_REGION: southamerica-east1
