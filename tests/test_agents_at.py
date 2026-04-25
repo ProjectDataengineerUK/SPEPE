@@ -10,10 +10,15 @@ class TestAT001CollectorAgent:
         import pandas as pd
         from dataops.clients.tse_client import normalize_columns
 
-        df = pd.DataFrame({
-            "SG_UF": ["SP"], "CD_MUNICIPIO": ["12345"],
-            "NM_CANDIDATO": ["FULANO"], "QT_VOTOS_NOMINAIS": ["100"], "DS_CARGO": ["PRESIDENTE"],
-        })
+        df = pd.DataFrame(
+            {
+                "SG_UF": ["SP"],
+                "CD_MUNICIPIO": ["12345"],
+                "NM_CANDIDATO": ["FULANO"],
+                "QT_VOTOS_NOMINAIS": ["100"],
+                "DS_CARGO": ["PRESIDENTE"],
+            }
+        )
         normalized = normalize_columns(df, 2022)
         assert "sg_uf" in normalized.columns
         assert "qt_votos" in normalized.columns
@@ -90,7 +95,9 @@ class TestAT003ModelistaAgent:
     def test_prediction_format(self):
         from mlops.components.train_bootstrap import Prediction
 
-        pred = Prediction(point_estimate=0.523, ci_lower=0.48, ci_upper=0.57, n_bootstrap=100, alpha=0.05)
+        pred = Prediction(
+            point_estimate=0.523, ci_lower=0.48, ci_upper=0.57, n_bootstrap=100, alpha=0.05
+        )
         formatted = pred.to_str("Candidato X")
         assert "P(Candidato X)" in formatted
         assert "IC 95%" in formatted

@@ -30,11 +30,13 @@ def run_suite(df: pd.DataFrame, suite_name: str) -> dict:
     for exp in suite.get("expectations", []):
         total += 1
         raw = _evaluate_expectation(df, exp)
-        all_results.append({
-            "expectation": raw.get("type", "unknown"),
-            "passed": raw.get("success", False),
-            **{k: v for k, v in raw.items() if k not in ("type", "success")},
-        })
+        all_results.append(
+            {
+                "expectation": raw.get("type", "unknown"),
+                "passed": raw.get("success", False),
+                **{k: v for k, v in raw.items() if k not in ("type", "success")},
+            }
+        )
         if raw.get("success"):
             passed += 1
 
