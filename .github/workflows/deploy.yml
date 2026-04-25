@@ -113,8 +113,7 @@ jobs:
             --set-secrets "ANTHROPIC_API_KEY=anthropic_api_key:latest" \
             --allow-unauthenticated \
             --region "${{ env.GCP_REGION }}" \
-            --project "${{ vars.GCP_PROJECT_ID }}" \
-            --wait
+            --project "${{ vars.GCP_PROJECT_ID }}"
           URL=$(gcloud run services describe spepe-staging \
             --region "${{ env.GCP_REGION }}" \
             --project "${{ vars.GCP_PROJECT_ID }}" \
