@@ -9,7 +9,7 @@
 | **Feature** | SPEPE |
 | **Date** | 2026-04-17 |
 | **Author** | define-agent |
-| **Updated** | 2026-04-23 (iterate-agent — v4.0: Sentinel, ML Judge, Vector Memory, L5 DataOps/MLOps/LLMOps, Governance, RBAC, Data Contracts, Disclaimer enforcement) |
+| **Updated** | 2026-04-25 (iterate-agent — v4.1: +4 módulos Group B: DataSUS/DIEESE/CETIC/Segurança; +IBGE expandido 10 domínios; +3 tabelas Gold; +3 Cloud Run Jobs; Source Inventory atualizado; Open Question 2 resolvida) |
 | **Status** | Ready for Build |
 | **Clarity Score** | 15/15 |
 
@@ -38,8 +38,10 @@ As ferramentas existentes são dashboards estáticos (sem ML), modelos caixa-pre
 
 | Priority | Goal |
 |----------|------|
-| **MUST** | Pipeline Medallion Bronze→Silver→Gold para 9 fontes de dados, 5.570 municípios |
-| **MUST** | `fact_municipio_eleicao` com ≥ 150 features por município × eleição (2018/2022) |
+| **MUST** | Pipeline Medallion Bronze→Silver→Gold para 13 fontes de dados, 5.570 municípios |
+| **MUST** | `fact_municipio_eleicao` com ≥ 200 features por município × eleição (2018/2022) — inclui IBGE expandido + CETIC + DIEESE |
+| **MUST** | `fact_saude_municipio` (DataSUS SIM + ANS) e `fact_economico_municipio` (DIEESE + PIB) como tabelas Gold dedicadas |
+| **MUST** | `fact_seguranca_municipio` (IVS + Atlas da Violência + SINESP) com agente dedicado `analista_seguranca` |
 | **MUST** | `fato_social` como tabela Gold: sinal digital agregado (município × semana, LGPD-safe) |
 | **MUST** | `fact_pesquisa` como tabela central: pesquisas com `record_confidence_score` (1.00→0.30) e house effect |
 | **MUST** | `cod_municipio_ibge` (7 dígitos IBGE) como chave global em todo o pipeline Gold |
@@ -191,8 +193,15 @@ As ferramentas existentes são dashboards estáticos (sem ML), modelos caixa-pre
 |--------|------|--------|-----------|-------|
 | TSE Repositório de Dados Eleitorais | CSV/zip download | Bronze raw | Anual (por ciclo eleitoral) | TSE (público) |
 | TSE PesqEle | CSV bulk + portal | Bronze raw | Contínuo (por registro de pesquisa) | TSE (público/gratuito) |
-| IBGE SIDRA | API REST + CSV | Bronze raw | Anual (PNAD) / quinquenal (Censo) | IBGE (público) |
-| IBGE Censo 2022 | CSV | Bronze raw | Estático | IBGE (público) |
+| IBGE SIDRA | API REST | Bronze raw | Anual (PNAD) / quinquenal (Censo) | IBGE (público) |
+| IBGE Censo 2022 | API SIDRA (tabelas 9514, 9543, 9662, 9714, 2094) | Bronze raw | Estático | IBGE (público) |
+| IPEADATA | API OData4 | Bronze raw | Anual | IPEA (público) |
+| Atlas da Violência (IPEA/FBSP) | CSV download | Bronze raw | Anual | IPEA/FBSP (público) |
+| IVS — Índice de Vulnerabilidade Social | API IPEADATA | Bronze raw | Censo | IPEA (público) |
+| SINESP / dados.gov.br | CSV download | Bronze raw | Mensal | MJ (público) |
+| DataSUS SIM / ANS | IPEADATA API + ANS CSV | Bronze raw | Anual | DataSUS/ANS (público) |
+| DIEESE Cesta Básica | IPEADATA API | Bronze raw | Mensal | DIEESE/IPEA (público) |
+| CETIC TIC Domicílios | API REST | Bronze raw | Anual | CETIC.br (público) |
 | Google Trends (pytrends) | API não-oficial | Bronze raw | Semanal | Google (público) |
 | Meta Ad Library | API oficial | Bronze raw | Diário | Meta (público, token necessário) |
 | Twitter/X | API v2 (ou scraping) | Bronze raw | Diário | Twitter/X (token necessário) |
@@ -312,7 +321,7 @@ Nenhum dado chega ao Gold sem `cod_municipio_ibge` validado e não-nulo.
 ## Open Questions
 
 1. ~~**2014 como feature**~~ — **RESOLVIDO**: 2014 = contexto histórico auxiliar; não entra na feature matrix principal (2018+2022). Ver DESIGN ADR 2026-04-23.
-2. **DATASUS**: integrar indicadores de saúde pública como features? (mencionado no BRAINSTORM, ausente no DESIGN) — decisão pendente para pós-MVP.
+2. ~~**DATASUS**~~ — **RESOLVIDO**: DataSUS integrado em Fase 1 com SIM mortalidade (via IPEADATA) + ANS cobertura de planos. `fact_saude_municipio` adicionada ao Gold. DIEESE (cesta básica) e CETIC (internet domiciliar) também implementados. Ver DESIGN v4.3.
 3. **UF do MVP**: SP confirmado — confirmar cobertura mínima de municípios SP para primeira entrega.
 4. ~~**Nomenclatura**~~ — **RESOLVIDO**: `cod_municipio_ibge` (com prefixo `cod_`) é o padrão em todo o pipeline Gold. Ver DESIGN v4.0.
 
@@ -326,6 +335,7 @@ Nenhum dado chega ao Gold sem `cod_municipio_ibge` validado e não-nulo.
 | 2.0 | 2026-04-18 | iterate-agent | Expansão completa: 7 agentes, 14 fontes, GCP full stack |
 | 3.0 | 2026-04-23 | iterate-agent | Reframing plataforma real; sinal digital estrutural (MUST); fato_social tabela Gold; fact_pesquisa central com record_confidence_score; cod_municipio_ibge chave global; regra LLM=suporte; Out of Scope corrigido; Data Contract com 9 fontes; Constraints GCP; Risks atualizados |
 | 4.0 | 2026-04-23 | iterate-agent | Alinhamento com DESIGN v4.5: +9 MUST/SHOULD goals (Sentinel, ML Judge, Disclaimer enforcement, DataOps/MLOps/LLMOps L5, Vector Memory, Governance, Data Contracts, RBAC); +6 Success Criteria; +4 ATs (AT-009 a AT-012); +3 Constraints; 2 Open Questions resolvidas |
+| 4.1 | 2026-04-25 | iterate-agent | **Group B implementado**: +4 módulos (DataSUS/DIEESE/CETIC/Segurança) + IBGE expandido (10 domínios, ~30 indicadores novos) · Source Inventory: 9→16 fontes · Goals: 9 fontes→13, `fact_municipio_eleicao` ≥150→≥200 features, +3 novas tabelas Gold MUST · Open Question 2 DATASUS resolvida |
 
 ---
 

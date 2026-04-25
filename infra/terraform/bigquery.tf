@@ -74,6 +74,30 @@ resource "google_bigquery_table" "fact_municipio_eleicao" {
     { name = "taxa_desemprego", type = "FLOAT64", mode = "NULLABLE" },
     { name = "pib_per_capita", type = "FLOAT64", mode = "NULLABLE" },
     { name = "populacao_total", type = "INT64", mode = "NULLABLE" },
+    # Faixas etárias (Censo 2022)
+    { name = "pct_0_14", type = "FLOAT64", mode = "NULLABLE" },
+    { name = "pct_15_29", type = "FLOAT64", mode = "NULLABLE" },
+    { name = "pct_30_59", type = "FLOAT64", mode = "NULLABLE" },
+    { name = "pct_60_mais", type = "FLOAT64", mode = "NULLABLE" },
+    # Gênero
+    { name = "pct_mulheres", type = "FLOAT64", mode = "NULLABLE" },
+    # Escolaridade
+    { name = "pct_ensino_medio", type = "FLOAT64", mode = "NULLABLE" },
+    { name = "pct_superior_completo", type = "FLOAT64", mode = "NULLABLE" },
+    # Religião (Censo 2010)
+    { name = "pct_catolico", type = "FLOAT64", mode = "NULLABLE" },
+    { name = "pct_sem_religiao", type = "FLOAT64", mode = "NULLABLE" },
+    # Urbanização
+    { name = "pct_urbano", type = "FLOAT64", mode = "NULLABLE" },
+    { name = "densidade_demografica", type = "FLOAT64", mode = "NULLABLE" },
+    { name = "in_regiao_metropolitana", type = "BOOL", mode = "NULLABLE" },
+    # Desigualdade / Pobreza
+    { name = "gini_renda", type = "FLOAT64", mode = "NULLABLE" },
+    { name = "pct_extrema_pobreza", type = "FLOAT64", mode = "NULLABLE" },
+    # Digital (CETIC TIC Domicílios)
+    { name = "pct_internet_domiciliar", type = "FLOAT64", mode = "NULLABLE" },
+    # Econômico (DIEESE)
+    { name = "cesta_basica_uf_brl", type = "FLOAT64", mode = "NULLABLE" },
     { name = "features_json", type = "JSON", mode = "NULLABLE" },
     { name = "ingested_at", type = "TIMESTAMP", mode = "REQUIRED" },
   ])
@@ -281,6 +305,87 @@ resource "google_bigquery_table" "fact_seguranca_municipio" {
     { name = "taxa_furto_100k", type = "FLOAT64", mode = "NULLABLE" },
     { name = "qt_feminicidio", type = "INT64", mode = "NULLABLE" },
     { name = "taxa_mortalidade_transito_100k", type = "FLOAT64", mode = "NULLABLE" },
+    # Metadados
+    { name = "fontes", type = "STRING", mode = "NULLABLE" },
+    { name = "ingested_at", type = "TIMESTAMP", mode = "REQUIRED" },
+  ])
+}
+
+# Saúde pública — DataSUS SIM (mortalidade) + SINASC (nascimentos) + ANS (cobertura)
+resource "google_bigquery_table" "fact_saude_municipio" {
+  dataset_id               = google_bigquery_dataset.spepe_gold.dataset_id
+  table_id                 = "fact_saude_municipio"
+  description              = "Indicadores de saúde pública por município × ano — DataSUS SIM + SINASC + ANS"
+  labels                   = local.labels
+  deletion_protection      = var.environment == "prod"
+  require_partition_filter = true
+
+  range_partitioning {
+    field = "ano"
+    range {
+      start    = 2010
+      end      = 2034
+      interval = 1
+    }
+  }
+
+  clustering = ["sg_uf", "cd_municipio_ibge"]
+
+  schema = jsonencode([
+    { name = "cd_municipio_ibge", type = "INT64", mode = "REQUIRED" },
+    { name = "sg_uf", type = "STRING", mode = "REQUIRED" },
+    { name = "sg_regiao", type = "STRING", mode = "NULLABLE" },
+    { name = "ano", type = "INT64", mode = "REQUIRED" },
+    # SIM — Sistema de Informação sobre Mortalidade
+    { name = "taxa_mortalidade_geral_100k", type = "FLOAT64", mode = "NULLABLE" },
+    { name = "taxa_mortalidade_infantil_1000", type = "FLOAT64", mode = "NULLABLE" },
+    { name = "taxa_mortalidade_materna_100k", type = "FLOAT64", mode = "NULLABLE" },
+    { name = "qt_obitos_total", type = "INT64", mode = "NULLABLE" },
+    { name = "qt_obitos_evitaveis", type = "INT64", mode = "NULLABLE" },
+    # SINASC — Nascidos Vivos
+    { name = "taxa_natalidade_1000", type = "FLOAT64", mode = "NULLABLE" },
+    { name = "pct_nascimentos_low_weight", type = "FLOAT64", mode = "NULLABLE" },
+    # ANS — Cobertura planos de saúde
+    { name = "pct_cobertura_plano_saude", type = "FLOAT64", mode = "NULLABLE" },
+    # IDSUS / Índice de Desempenho do SUS
+    { name = "idsus_score", type = "FLOAT64", mode = "NULLABLE" },
+    # Metadados
+    { name = "fontes", type = "STRING", mode = "NULLABLE" },
+    { name = "ingested_at", type = "TIMESTAMP", mode = "REQUIRED" },
+  ])
+}
+
+# Indicadores econômicos municipais — DIEESE (cesta básica) + PIB per capita IBGE
+resource "google_bigquery_table" "fact_economico_municipio" {
+  dataset_id               = google_bigquery_dataset.spepe_gold.dataset_id
+  table_id                 = "fact_economico_municipio"
+  description              = "Indicadores econômicos por município × ano — DIEESE cesta básica + PIB IBGE + desigualdade"
+  labels                   = local.labels
+  deletion_protection      = var.environment == "prod"
+  require_partition_filter = false # volume pequeno — 5570 municípios × anos
+
+  time_partitioning {
+    type  = "YEAR"
+    field = "data_referencia"
+  }
+
+  clustering = ["sg_uf", "cd_municipio_ibge"]
+
+  schema = jsonencode([
+    { name = "cd_municipio_ibge", type = "INT64", mode = "REQUIRED" },
+    { name = "sg_uf", type = "STRING", mode = "REQUIRED" },
+    { name = "data_referencia", type = "DATE", mode = "REQUIRED" },
+    # DIEESE — Cesta Básica (nível UF — capital)
+    { name = "cesta_basica_capital_brl", type = "FLOAT64", mode = "NULLABLE" },
+    { name = "variacao_cesta_mensal_pct", type = "FLOAT64", mode = "NULLABLE" },
+    { name = "horas_trabalho_cesta", type = "FLOAT64", mode = "NULLABLE" },
+    # IBGE — PIB e renda
+    { name = "pib_per_capita_brl", type = "FLOAT64", mode = "NULLABLE" },
+    { name = "pib_total_mil_brl", type = "FLOAT64", mode = "NULLABLE" },
+    # Desigualdade
+    { name = "gini_renda", type = "FLOAT64", mode = "NULLABLE" },
+    { name = "pct_extrema_pobreza", type = "FLOAT64", mode = "NULLABLE" },
+    { name = "pct_pobreza", type = "FLOAT64", mode = "NULLABLE" },
     # Metadados
     { name = "fontes", type = "STRING", mode = "NULLABLE" },
     { name = "ingested_at", type = "TIMESTAMP", mode = "REQUIRED" },

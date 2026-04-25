@@ -1,8 +1,8 @@
 # BRAINSTORM — SPEPE
 **Sistema de Perfilamento do Eleitorado e Previsão Eleitoral**
 
-> Phase 0 — Atualizado em: 2026-04-23
-> Versão: 2.9 — Módulo Pesquisas: questionários, Atlas, record_confidence_score, stack, painéis
+> Phase 0 — Atualizado em: 2026-04-25
+> Versão: 3.0 — 10 módulos completos: +DataSUS, +DIEESE, +CETIC, +Segurança; Gold expandido para ~240 variáveis
 > Próximo passo: `/iterate .claude/sdd/features/DEFINE_SPEPE.md`
 
 ---
@@ -61,6 +61,23 @@ O SPEPE é um **sistema conversacional multi-agente com pipeline de ML/estatíst
 - **Plataforma GCP**: Cloud Run + BigQuery + Vertex AI + Dataplex, região southamerica-east1
 
 **Ambição declarada:** tese de mestrado + portfólio sênior + produto comercializável.
+
+---
+
+## Módulos de Dados — 10 Módulos Implementados / Planejados
+
+| # | Módulo | Status | Fontes | Tabela Gold | Agente |
+|---|--------|--------|--------|-------------|--------|
+| 1 | **Eleições** | ✅ Fase 1 | TSE resultados 2018/2022 | `fact_municipio_eleicao`, `fact_secao_eleicao`, `fact_candidato_dia` | coletor, analista |
+| 2 | **IBGE Estrutural** | ✅ Fase 1 expandido | SIDRA (Censo 2022, PNAD), IPEADATA (Gini) | `fact_municipio_eleicao` (~240 features) | analista |
+| 3 | **Pesquisas Eleitorais** | ✅ Fase 1 | TSE PesqEle, Atlas Político | `fact_pesquisa` | modelista_bayesiano |
+| 4 | **Segurança Pública** | ✅ Fase 1 | Atlas da Violência (IPEA), IVS (IPEA), SINESP | `fact_seguranca_municipio` | analista_seguranca |
+| 5 | **DataSUS — Saúde** | ✅ Fase 1 | DataSUS SIM (IPEADATA), ANS | `fact_saude_municipio` | analista |
+| 6 | **DIEESE — Custo de Vida** | ✅ Fase 1 | DIEESE Cesta Básica (IPEADATA) | `fact_economico_municipio` | analista |
+| 7 | **CETIC — Inclusão Digital** | ✅ Fase 1 | CETIC TIC Domicílios | `fact_municipio_eleicao` (pct_internet_domiciliar) | analista |
+| 8 | **Social — Sinal Digital** | 🔶 Fase 2 | Twitter/X, YouTube, Meta Ads, Google Trends | `fato_social`, `fact_candidato_dia` | coletor (digital) |
+| 9 | **MLOps** | 🔶 Fase 3 | Vertex AI, modelos PyMC | `fact_predictions` | modelista_bayesiano |
+| 10 | **Geoespacial** | 🔶 Fase 2 | IBGE malha municipal, IBGE RM | `dim_territorio` (atualizar) | analista |
 
 ---
 
@@ -789,13 +806,90 @@ record_confidence_source: str   # "tse_csv" | "tse_anexo" | "atlas_conciliado" |
 - Cobertura por UF
 - Evolução de intenção de voto por candidato × instituto
 
-### Módulo IBGE
+### Módulo IBGE — Contexto Estrutural Expandido
 
-**Missão:** dar contexto **estrutural** ao território. Não serve para tempo real — serve para explicar onde certas narrativas têm mais chance de tracionar.
+**Missão:** dar contexto **estrutural** ao território. Versão expandida cobre 10 domínios de indicadores.
 
-### Módulo DataSUS
+**Indicadores implementados (Fase 1):**
+
+| Domínio | Indicadores | Fonte | Granularidade |
+|---------|-------------|-------|---------------|
+| **Demográfico** | populacao, pct_0_14, pct_15_29, pct_30_59, pct_60_mais, pct_mulheres | Censo 2022 | Municipal |
+| **Educação** | pct_analfabetos, pct_ensino_medio, pct_superior_completo | Censo 2022 | Municipal |
+| **Religião** | pct_catolico, pct_sem_religiao | Censo 2010* | Municipal |
+| **Urbanização** | pct_urbano, densidade_demografica, in_regiao_metropolitana | Censo 2022 | Municipal |
+| **Renda/Emprego** | renda_media, taxa_desemprego, pct_extrema_pobreza | PNAD 2023 | Municipal/UF |
+| **Desigualdade** | gini_renda | IPEADATA | UF (proxy) |
+| **Digital** | pct_internet_domiciliar | CETIC TIC 2023 | UF (proxy) |
+
+> *Censo 2022 religião ainda em consolidação — Censo 2010 como referência.
+
+**Tabela Gold:** `fact_municipio_eleicao` (~240 features após expansão)
+
+### Módulo DataSUS — Saúde Pública
 
 **Missão:** dar contexto **temático de saúde**. Cruzar com discurso de saúde, temas de campanha, crises regionais e sensibilidade territorial.
+
+**Indicadores implementados (Fase 1):**
+
+| Indicador | Fonte | Significado Eleitoral |
+|-----------|-------|----------------------|
+| `taxa_mortalidade_infantil_1000` | DataSUS SIM / IPEADATA | Proxy de qualidade dos serviços públicos |
+| `taxa_mortalidade_materna_100k` | DataSUS SIM / IPEADATA | Sensibilidade territorial a pautas de saúde |
+| `pct_cobertura_plano_saude` | ANS beneficiários | Dependência do SUS vs. sistema privado |
+
+**Cadeia causal para o modelo:**
+```
+Alta mortalidade infantil → território dependente do SUS
+    → sensível a pautas de saúde pública
+    → candidatos com agenda social têm tração diferenciada
+```
+
+**Tabela Gold:** `fact_saude_municipio` (particionado por `ano`)
+
+### Módulo DIEESE — Custo de Vida
+
+**Missão:** capturar **poder de compra real** do eleitorado — complemento ao IBGE renda nominal.
+
+**Indicadores implementados:**
+
+| Indicador | Significado Eleitoral |
+|-----------|----------------------|
+| `cesta_basica_capital_brl` | Custo de vida da UF (capital como referência) |
+| `horas_trabalho_cesta` | Quantas horas de trabalho ao SM para comprar a cesta |
+
+> DIEESE publica ao nível de capital de UF — valor propagado para todos os municípios da UF como proxy.
+
+**Tabela Gold:** `fact_economico_municipio`
+
+### Módulo CETIC — Inclusão Digital
+
+**Missão:** capturar **acesso digital real** por território — essencial para interpretar capacidade de mobilização online.
+
+**Indicadores implementados:**
+
+| Indicador | Significado Eleitoral |
+|-----------|----------------------|
+| `pct_internet_domiciliar` | Penetração digital — define se sinal digital tem validade no território |
+| `pct_smartphone_domiciliar` | Acesso mobile — sinal digital vem de smartphones, não desktops |
+
+> CETIC publica ao nível de UF — valor propagado para municípios como proxy.
+
+**Cadeia causal para o modelo:**
+```
+pct_internet_domiciliar baixo → sinal digital tem peso reduzido na previsão
+    → modelo deve ponderar fact_candidato_dia proporcionalmente ao acesso
+```
+
+### Módulo Segurança Pública
+
+**Missão:** correlacionar violência e vulnerabilidade social com padrões eleitorais.
+
+**Indicadores implementados:** taxa_homicidio_100k, ivs_total, ivs_infraestrutura, ivs_capital_humano, ivs_renda_trabalho, taxa_roubo_100k, taxa_furto_100k, qt_feminicidio
+
+**Tabela Gold:** `fact_seguranca_municipio` (particionado por `ano`)
+
+**Agente dedicado:** `analista_seguranca` (Gemini 2.5 Pro) — `/seguranca {UF} {ano}`, `/correlacao_seguranca`
 
 ### Módulo Eleições
 
@@ -1003,6 +1097,7 @@ Narrador: [texto corrido sem jargão + disclaimer automático]
 | 2.1 | 2026-04-23 | user | **Síntese conceitual**: definição do SPEPE como sistema integrador de 5 camadas com regra Dados→Histórico→Pesquisa→Social→Modelo |
 | 2.2 | 2026-04-23 | iterate-agent | **Integração reuniao.md**: princípio "ingestão separada, análise unificada" · DataSUS como nova fonte · GCP multi-projeto · Terraform módulos/envs · modelo dimensional completo · camada semântica · 4 módulos detalhados · 4 blocos MLOps · roadmap 4 fases · naming convention · 8 novos riscos |
 | 2.9 | 2026-04-23 | iterate-agent | **Módulo Pesquisas expandido**: questionários + Atlas + detalhamento bairro/município · `record_confidence_score` (1.00→0.30) · fila async Redis/RabbitMQ · stack Python/FastAPI/PostgreSQL · painéis operacional+produto |
+| 3.0 | 2026-04-25 | iterate-agent | **10 módulos completos**: +Segurança Pública (Atlas/IVS/SINESP) +DataSUS (SIM mortalidade/ANS) +DIEESE (Cesta Básica) +CETIC (TIC Domicílios) · IBGE expandido: 10 domínios, ~30 indicadores novos · Gold: ~240 variáveis · 3 novas tabelas Gold (fact_saude, fact_economico, fact_seguranca) · 9 Cloud Run Jobs · tabela de 10 módulos com status |
 | 2.8 | 2026-04-23 | iterate-agent | **Módulo Social expandido**: 6 fontes × papel · insight "valor está na correlação" · exemplo crise real · MVP 3 semanas · nível avançado (bots, influenciadores, clustering, previsão) |
 | 2.7 | 2026-04-23 | iterate-agent | **Alinhamento com diagrama**: GCS = zona de pouso raw (fora do Medallion) · BigQuery = Bronze+Silver+Gold · orquestração = Cloud Scheduler+Workflows (não Airflow) |
 | 2.6 | 2026-04-23 | iterate-agent | **Módulo Social refinado**: papel="capturar narrativa, não só sentimento" · pipeline API→fila Pub/Sub→process→NLP→BigQuery · 8 features geradas com janela temporal · 3 papéis no modelo (variável explicativa, early signal, detecção de ruptura) |

@@ -24,7 +24,7 @@
 | **Author** | design-agent |
 | **DEFINE** | [DEFINE_SPEPE.md](./DEFINE_SPEPE.md) |
 | **Status** | Ready for Build |
-| **Version** | 4.2 — Sentinel: orquestrador multi-agent autônomo (4 crews), Governança, Data Contracts, RBAC, Lineage coluna, SLOs |
+| **Version** | 4.6 — 10 módulos completos: IBGE expandido (~240 features) + DataSUS + DIEESE + CETIC + Segurança; 8 agentes; 9 Cloud Run Jobs; 5 tabelas Gold de fatos |
 
 ---
 
@@ -127,6 +127,10 @@
 | **ML Stage 1** | Arquétipos do eleitorado | HDBSCAN, UMAP, Folium |
 | **ML Stage 2** | Sinal digital agregado | LGPD-safe aggregation |
 | **ML Stage 3** | Previsão bayesiana + SHAP | statsmodels / PyMC |
+| **DataSUS Client** | SIM mortalidade + ANS cobertura de planos | IPEADATA API + ANS CSV |
+| **DIEESE Client** | Cesta básica por UF | IPEADATA API (série DIEESE) |
+| **CETIC Client** | TIC Domicílios — acesso internet/smartphone | CETIC.br API REST |
+| **Analista Segurança** | Correlação violência × voto eleitoral | gemini-2.5-pro, /seguranca, /violencia |
 | **DataOps** | Orquestração, DQ, linhagem | Cloud Composer / Cloud Scheduler |
 | **MLOps** | Treino, avaliação, promoção de modelos | Vertex AI Pipelines (KFP v2) |
 | **LLMOps** | Registry de prompts, eval CI, tracing | Git semver + Cloud Trace |
@@ -2350,7 +2354,10 @@ sentinel:
 | `/prever [candidato] [cenário]` | Modelista | sonnet-4-6 | P(X)=N% [IC 95%: A%–B%] + premissas |
 | `/explicar` | Explicador | sonnet-4-6 | SHAP top-10 em linguagem natural |
 | `/relatorio` | Narrador | haiku-4-5-20251001 | Output técnico → texto para leigos |
-| `/health` | Supervisor | opus-4-6 | Status de todos os 7 agentes + GCP services |
+| `/seguranca [uf] [ano]` | Analista Segurança | gemini-2.5-pro | Violência × voto, IVS, correlações territoriais |
+| `/violencia [uf]` | Analista Segurança | gemini-2.5-pro | Panorama de homicídio + vulnerabilidade social |
+| `/correlacao_seguranca [candidato] [uf]` | Analista Segurança | gemini-2.5-pro | Spearman: % votos × indicadores de segurança |
+| `/health` | Supervisor | opus-4-6 | Status de todos os 8 agentes + GCP services |
 | `/plan [objetivo]` | Supervisor | opus-4-6 | DOMA protocol: decompõe e roteia |
 
 ---
@@ -2368,6 +2375,7 @@ sentinel:
 | 4.3 | 2026-04-23 | iterate-agent | DataOps L5 (CDC incremental, self-healing, data versioning, real-time DQ, auto-profiler, slot optimizer, data mesh), MLOps L5 (experiment tracking, feature store online, shadow mode, McNemar significance, continuous training, auto model card), LLMOps L5 (semantic cache Redis, continuous eval 5%, hallucination detector, prompt A/B, context manager, output drift, cost attributor); +3 ADRs (17, 18, 19); +3 code patterns (8, 9, 10); +33 arquivos (210 total) |
 | 4.4 | 2026-04-23 | iterate-agent | Memória vetorial de longo prazo (Vertex AI Vector Search 768d, ScaNN, K=5 por sessão, 5 tipos de memória, TTL 1 ano, namespaces por agente); ML Judge auditor independente (Gemini 2.5 Pro, isolamento total, backtest independente, Equalized Odds fairness, parecer técnico formal Aprovado/Reprovado, bloqueio de promoção); +2 ADRs (20, 21); +17 arquivos (227 total) |
 | 4.5 | 2026-04-23 | iterate-agent | Disclaimer obrigatório universal: 4 tipos (previsão/dados/pesquisa/recomendação), enforcement em 3 camadas (prompt→hook→eval), disclaimer_hook.py como gate binário bloqueante, disclaimer_templates.yaml, disclaimer_rate = 100% gate no ML Judge; +6 arquivos (233 total) |
+| 4.6 | 2026-04-25 | iterate-agent | **10 módulos implementados — Group A+B**: IBGE expandido (ibge_client.py: +20 tabelas SIDRA, fetch_ipeadata_gini, 10 domínios de indicadores) · Segurança (seguranca_client.py, analista_seguranca agent, fact_seguranca_municipio) · DataSUS (datasus_client.py + datasus_ingest_job) · DIEESE (dieese_client.py + dieese_ingest_job) · CETIC (cetic_client.py + cetic_ingest_job) · BigQuery: +16 colunas em fact_municipio_eleicao (~240 features), +fact_saude_municipio, +fact_economico_municipio · Terraform: +3 Cloud Run Jobs (9 total) · Slash commands: +3 (/seguranca, /violencia, /correlacao_seguranca) · agentes: 7→8 (analista_seguranca adicionado) |
 
 ---
 

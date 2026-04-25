@@ -3,6 +3,9 @@ locals {
     tse_ingest       = { timeout = "3600s", memory = "2Gi", cpu = "2", args = ["--uf", "SP"] }
     ibge_sync        = { timeout = "1800s", memory = "1Gi", cpu = "1", args = ["--uf", "SP"] }
     security_ingest  = { timeout = "1800s", memory = "1Gi", cpu = "1", args = ["--uf", "SP"] }
+    datasus_ingest   = { timeout = "1800s", memory = "1Gi", cpu = "1", args = ["--uf", "SP"] }
+    dieese_ingest    = { timeout = "900s",  memory = "512Mi", cpu = "1", args = ["--uf", "SP"] }
+    cetic_ingest     = { timeout = "900s",  memory = "512Mi", cpu = "1", args = ["--uf", "SP"] }
     silver_transform = { timeout = "1800s", memory = "2Gi", cpu = "2", args = ["--uf", "SP"] }
     gold_build       = { timeout = "1800s", memory = "2Gi", cpu = "2", args = [] }
     digital_ingest   = { timeout = "900s", memory = "1Gi", cpu = "1", args = [] }
@@ -12,6 +15,9 @@ locals {
     tse_ingest       = ["python", "-m", "dataops.jobs.tse_ingest_job"]
     ibge_sync        = ["python", "-m", "dataops.jobs.ibge_sync_job"]
     security_ingest  = ["python", "-m", "dataops.jobs.security_ingest_job"]
+    datasus_ingest   = ["python", "-m", "dataops.jobs.datasus_ingest_job"]
+    dieese_ingest    = ["python", "-m", "dataops.jobs.dieese_ingest_job"]
+    cetic_ingest     = ["python", "-m", "dataops.jobs.cetic_ingest_job"]
     silver_transform = ["python", "-m", "dataops.jobs.silver_transform_job"]
     gold_build       = ["python", "-m", "dataops.jobs.gold_build_job"]
     digital_ingest   = ["python", "-m", "dataops.jobs.digital_ingest_job"]
