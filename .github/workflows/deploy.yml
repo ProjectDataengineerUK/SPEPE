@@ -125,10 +125,10 @@ jobs:
           URL="${{ steps.deploy.outputs.url }}"
           echo "Service deployed to: ${URL}"
           for i in $(seq 1 6); do
-            STATUS=$(curl -s -o /dev/null -w "%{http_code}" "${URL}/healthz" || echo "000")
+            STATUS=$(curl -s -o /dev/null -w "%{http_code}" "${URL}/" || echo "000")
             echo "Attempt ${i}: HTTP ${STATUS}"
-            if [ "${STATUS}" = "200" ] || [ "${STATUS}" = "404" ]; then
-              echo "Service is up (HTTP ${STATUS})."
+            if [ "${STATUS}" = "200" ]; then
+              echo "Service is up."
               exit 0
             fi
             sleep 10
