@@ -36,6 +36,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 
 COPY --from=builder /opt/venv /opt/venv
 COPY --chown=spepe:spepe . .
+RUN chown -R spepe:spepe /app
 
 USER spepe
 ENV PATH="/opt/venv/bin:$PATH" \
