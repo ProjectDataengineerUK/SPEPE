@@ -3,7 +3,7 @@ resource "google_firestore_database" "spepe" {
   location_id = var.region
   type        = "FIRESTORE_NATIVE"
 
-  deletion_policy = var.environment == "prod" ? "DELETE" : "ABANDON"
+  deletion_policy = var.environment == "prod" ? "ABANDON" : "DELETE"
 }
 
 resource "google_firestore_index" "session_memory" {

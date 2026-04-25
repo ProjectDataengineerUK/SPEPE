@@ -49,7 +49,7 @@ resource "google_cloud_run_v2_service" "spepe" {
         name = "ANTHROPIC_API_KEY"
         value_source {
           secret_key_ref {
-            secret  = "ANTHROPIC_API_KEY"
+            secret  = google_secret_manager_secret.anthropic_api_key.secret_id
             version = "latest"
           }
         }

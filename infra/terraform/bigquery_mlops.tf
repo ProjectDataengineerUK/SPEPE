@@ -5,6 +5,10 @@ resource "google_bigquery_dataset" "spepe_mlops" {
   labels      = local.labels
 
   access {
+    role          = "OWNER"
+    user_by_email = var.admin_email
+  }
+  access {
     role          = "WRITER"
     user_by_email = google_service_account.dataops_jobs.email
   }

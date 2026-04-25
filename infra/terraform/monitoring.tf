@@ -38,7 +38,7 @@ resource "google_billing_budget" "spepe_monthly" {
 }
 
 data "google_billing_account" "acct" {
-  open = true
+  billing_account = var.billing_account_id
 }
 
 resource "google_logging_project_sink" "spepe_audit" {

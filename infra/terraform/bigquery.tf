@@ -6,6 +6,10 @@ resource "google_bigquery_dataset" "spepe_silver" {
   default_table_expiration_ms = 7776000000 # 90 days — Silver is rebuilt from Bronze on demand
 
   access {
+    role          = "OWNER"
+    user_by_email = var.admin_email
+  }
+  access {
     role          = "WRITER"
     user_by_email = google_service_account.dataops_jobs.email
   }
@@ -21,6 +25,10 @@ resource "google_bigquery_dataset" "spepe_gold" {
   description = "SPEPE Gold layer — 3 fact tables for ML and analytics"
   labels      = local.labels
 
+  access {
+    role          = "OWNER"
+    user_by_email = var.admin_email
+  }
   access {
     role          = "WRITER"
     user_by_email = google_service_account.dataops_jobs.email

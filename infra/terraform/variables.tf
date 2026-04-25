@@ -43,12 +43,12 @@ variable "app_image" {
   # Pass via: -var="app_image=..."  or  TF_VAR_app_image env var in CI.
 }
 
-variable "wif_pool_id" {
-  description = "Workload Identity Pool ID used by GitHub Actions OIDC auth"
+variable "github_repo" {
+  description = "GitHub repository in 'owner/repo' format for WIF subject binding"
   type        = string
 }
 
-variable "github_repo" {
-  description = "GitHub repository in 'owner/repo' format for WIF subject binding"
+variable "billing_account_id" {
+  description = "GCP Billing Account ID (format: XXXXXX-XXXXXX-XXXXXX) for budget alerts"
   type        = string
 }

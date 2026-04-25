@@ -1,18 +1,24 @@
 resource "google_secret_manager_secret" "anthropic_api_key" {
   secret_id = "ANTHROPIC_API_KEY"
-  replication { auto {} }
+  replication {
+    auto {}
+  }
   labels = local.labels
 }
 
 resource "google_secret_manager_secret" "meta_app_token" {
   secret_id = "META_APP_TOKEN"
-  replication { auto {} }
+  replication {
+    auto {}
+  }
   labels = local.labels
 }
 
 resource "google_secret_manager_secret" "youtube_api_key" {
   secret_id = "YOUTUBE_API_KEY"
-  replication { auto {} }
+  replication {
+    auto {}
+  }
   labels = local.labels
 }
 
@@ -33,4 +39,17 @@ resource "google_secret_manager_secret_iam_member" "cloud_run_youtube" {
   secret_id = google_secret_manager_secret.youtube_api_key.id
   role      = "roles/secretmanager.secretAccessor"
   member    = "serviceAccount:${google_service_account.cloud_run.email}"
+}
+
+# Grant DataOps Jobs SA access to secrets needed by digital_ingest job
+resource "google_secret_manager_secret_iam_member" "dataops_meta" {
+  secret_id = google_secret_manager_secret.meta_app_token.id
+  role      = "roles/secretmanager.secretAccessor"
+  member    = "serviceAccount:${google_service_account.dataops_jobs.email}"
+}
+
+resource "google_secret_manager_secret_iam_member" "dataops_youtube" {
+  secret_id = google_secret_manager_secret.youtube_api_key.id
+  role      = "roles/secretmanager.secretAccessor"
+  member    = "serviceAccount:${google_service_account.dataops_jobs.email}"
 }

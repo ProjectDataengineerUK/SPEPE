@@ -25,7 +25,7 @@ resource "google_cloud_run_v2_job" "spepe_jobs" {
 
   template {
     template {
-      service_account = google_service_account.cloud_run.email
+      service_account = google_service_account.dataops_jobs.email
       timeout         = each.value.timeout
 
       containers {
@@ -57,10 +57,19 @@ resource "google_cloud_run_v2_job" "spepe_jobs" {
           value = google_bigquery_dataset.spepe_gold.dataset_id
         }
         env {
-          name = "ANTHROPIC_API_KEY"
+          name = "META_APP_TOKEN"
           value_source {
             secret_key_ref {
-              secret  = google_secret_manager_secret.anthropic_api_key.secret_id
+              secret  = google_secret_manager_secret.meta_app_token.secret_id
+              version = "latest"
+            }
+          }
+        }
+        env {
+          name = "YOUTUBE_API_KEY"
+          value_source {
+            secret_key_ref {
+              secret  = google_secret_manager_secret.youtube_api_key.secret_id
               version = "latest"
             }
           }
@@ -70,7 +79,8 @@ resource "google_cloud_run_v2_job" "spepe_jobs" {
   }
 
   depends_on = [
-    google_secret_manager_secret_iam_member.cloud_run_anthropic,
+    google_secret_manager_secret_iam_member.dataops_meta,
+    google_secret_manager_secret_iam_member.dataops_youtube,
   ]
 }
 
