@@ -15,7 +15,19 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     && rm -rf /var/lib/apt/lists/*
 
 COPY requirements.txt .
-RUN pip install --no-cache-dir --user --prefer-binary --progress-bar off -r requirements.txt
+# Install in groups so failures are easy to identify in CI logs
+RUN pip install --no-cache-dir --user --prefer-binary --progress-bar off \
+    "numpy>=1.26.4,<2" "scipy==1.17.1" "pandas==3.0.2" "pyarrow==23.0.1"
+RUN pip install --no-cache-dir --user --prefer-binary --progress-bar off \
+    "scikit-learn==1.6.1" "shap==0.46.0" "statsmodels==0.14.6"
+RUN pip install --no-cache-dir --user --prefer-binary --progress-bar off \
+    "umap-learn==0.5.7"
+RUN pip install --no-cache-dir --user --prefer-binary --progress-bar off \
+    "pymc==5.19.1"
+RUN pip install --no-cache-dir --user --prefer-binary --progress-bar off \
+    "geopandas==0.14.4" "folium==0.19.0"
+RUN pip install --no-cache-dir --user --prefer-binary --progress-bar off \
+    -r requirements.txt
 
 
 FROM python:3.12-slim
