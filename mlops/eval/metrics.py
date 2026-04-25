@@ -1,4 +1,5 @@
 """LLM evaluation metrics: relevance, factuality, disclaimer presence."""
+
 from __future__ import annotations
 
 import re
@@ -38,14 +39,27 @@ def evaluate_response(response: str, golden: dict) -> EvalResult:
             field.lower() in response.lower() for field in golden["required_fields"]
         )
         if not checks["has_required_fields"]:
-            missing = [f for f in golden["required_fields"] if f.lower() not in response.lower()]
+            missing = [
+                f
+                for f in golden["required_fields"]
+                if f.lower() not in response.lower()
+            ]
             feedback.append(f"Campos obrigatórios ausentes: {missing}")
 
     if golden.get("check_routing"):
-        agent_triggers = ["/prever", "/arquétipos", "/perfil", "/coletar", "/explicar", "/relatorio"]
+        agent_triggers = [
+            "/prever",
+            "/arquétipos",
+            "/perfil",
+            "/coletar",
+            "/explicar",
+            "/relatorio",
+        ]
         checks["has_routing"] = any(t in response for t in agent_triggers)
         if not checks["has_routing"]:
-            feedback.append("Supervisor não indicou roteamento para agente especializado.")
+            feedback.append(
+                "Supervisor não indicou roteamento para agente especializado."
+            )
 
     agent = golden.get("agent", "")
     if agent == "modelista":

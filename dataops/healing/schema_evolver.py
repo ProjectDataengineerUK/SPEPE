@@ -9,6 +9,7 @@ Targets: BigQuery schemas. Local Parquet files tolerate schema drift by default.
 
 Referência: DESIGN_SPEPE.md — Decisão 17 (self-healing).
 """
+
 from __future__ import annotations
 
 import logging
@@ -149,9 +150,7 @@ def evolve_schema(
     evolver = SchemaEvolver(auto_apply_additive=auto_apply_additive)
     plan = evolver.plan(old_schema, new_schema)
     if plan.ok:
-        logger.info(
-            "schema_evolution_ok additive=%d", len(plan.applied)
-        )
+        logger.info("schema_evolution_ok additive=%d", len(plan.applied))
     else:
         logger.warning(
             "schema_evolution_blocked breaking=%d additive=%d",

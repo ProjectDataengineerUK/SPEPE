@@ -1,4 +1,5 @@
 """Rate limiting hook — per-user and per-session request throttling."""
+
 from __future__ import annotations
 
 import logging
@@ -29,7 +30,9 @@ def rate_limit_hook(session_id: str) -> str | None:
             f"RATE LIMIT: {requests_in_window} requests em 60s (max: {MAX_REQUESTS_PER_MINUTE}). "
             f"Aguarde antes de continuar."
         )
-        logger.warning(f"Rate limit atingido: session={session_id} requests/min={requests_in_window}")
+        logger.warning(
+            f"Rate limit atingido: session={session_id} requests/min={requests_in_window}"
+        )
         return msg
 
     _session_request_counts[session_id] += 1
@@ -43,7 +46,9 @@ def rate_limit_hook(session_id: str) -> str | None:
         return msg
 
     if total > MAX_REQUESTS_PER_SESSION * 0.9:
-        logger.info(f"Session {session_id}: {total}/{MAX_REQUESTS_PER_SESSION} requests")
+        logger.info(
+            f"Session {session_id}: {total}/{MAX_REQUESTS_PER_SESSION} requests"
+        )
 
     return None
 

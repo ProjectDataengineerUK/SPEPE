@@ -6,7 +6,6 @@ import logging
 import pickle
 from pathlib import Path
 
-
 logger = logging.getLogger("spepe.archetype.cache")
 
 CACHE_DIR = Path(__file__).parent.parent / "output" / "archetype_cache"

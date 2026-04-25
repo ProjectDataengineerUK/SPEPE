@@ -1,4 +1,5 @@
 """Load agent registry (agents/registry/*.md) and instantiate GeminiAgents."""
+
 from __future__ import annotations
 
 import re

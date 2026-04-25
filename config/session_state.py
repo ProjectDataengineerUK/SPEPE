@@ -1,4 +1,5 @@
 """Per-session state — replaces global variables in cost_guard_hook."""
+
 from __future__ import annotations
 
 from dataclasses import dataclass, field
@@ -46,12 +47,25 @@ class SessionState:
             )
         return None
 
-    def add_turn(self, role: Role, content: str, agent_id: str | None = None,
-                 tokens_in: int = 0, tokens_out: int = 0, cost_usd: float = 0.0) -> None:
-        self.turns.append(Turn(
-            role=role, content=content, agent_id=agent_id,
-            tokens_in=tokens_in, tokens_out=tokens_out, cost_usd=cost_usd,
-        ))
+    def add_turn(
+        self,
+        role: Role,
+        content: str,
+        agent_id: str | None = None,
+        tokens_in: int = 0,
+        tokens_out: int = 0,
+        cost_usd: float = 0.0,
+    ) -> None:
+        self.turns.append(
+            Turn(
+                role=role,
+                content=content,
+                agent_id=agent_id,
+                tokens_in=tokens_in,
+                tokens_out=tokens_out,
+                cost_usd=cost_usd,
+            )
+        )
 
     def recent_context(self, max_turns: int = 6) -> str:
         lines = []

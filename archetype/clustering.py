@@ -55,12 +55,16 @@ def select_best_algorithm(
 ) -> tuple[np.ndarray, str, float]:
     labels = run_hdbscan(X, min_cluster_size=min_cluster_size)
     score = compute_silhouette(X, labels)
-    logger.info(f"HDBSCAN silhouette={score:.3f}, clusters={len(set(labels)) - (1 if -1 in labels else 0)}")
+    logger.info(
+        f"HDBSCAN silhouette={score:.3f}, clusters={len(set(labels)) - (1 if -1 in labels else 0)}"
+    )
 
     if score >= silhouette_threshold:
         return labels, "hdbscan", score
 
-    logger.warning(f"HDBSCAN silhouette {score:.3f} < {silhouette_threshold}. Fallback para K-means k=8.")
+    logger.warning(
+        f"HDBSCAN silhouette {score:.3f} < {silhouette_threshold}. Fallback para K-means k=8."
+    )
     labels_km = run_kmeans(X, k=8)
     score_km = compute_silhouette(X, labels_km)
     logger.info(f"K-means silhouette={score_km:.3f}")

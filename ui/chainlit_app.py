@@ -1,4 +1,5 @@
 """SPEPE — Chainlit UI (Claude Sonnet routing + Gemini agents + session state)."""
+
 import uuid
 
 import chainlit as cl
@@ -9,6 +10,7 @@ from chainlit.server import app as _fastapi_app
 @_fastapi_app.get("/healthz")
 async def healthz() -> Response:
     return Response(content="ok", status_code=200)
+
 
 import ui.dashboard_api  # noqa: E402, F401
 from agents.supervisor import Supervisor  # noqa: E402
@@ -71,9 +73,7 @@ async def on_message(message: cl.Message) -> None:
 
     injection_check = validate_input_injection(user_input)
     if not injection_check.ok:
-        await cl.Message(
-            content=f"⚠️ Input bloqueado: {injection_check.reason}"
-        ).send()
+        await cl.Message(content=f"⚠️ Input bloqueado: {injection_check.reason}").send()
         return
 
     state: SessionState = cl.user_session.get("state")

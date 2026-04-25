@@ -1,4 +1,5 @@
 """SHAP explainability for electoral prediction models."""
+
 from __future__ import annotations
 
 import json
@@ -58,7 +59,9 @@ def get_shap_explanation(
     return result
 
 
-def _save_shap_summary(result: list[dict], filename: str = "shap_values_latest.json") -> None:
+def _save_shap_summary(
+    result: list[dict], filename: str = "shap_values_latest.json"
+) -> None:
     SHAP_OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
     path = SHAP_OUTPUT_DIR / filename
     with open(path, "w", encoding="utf-8") as f:
@@ -75,8 +78,13 @@ def load_shap_summary(path: str = "output/shap/shap_values_latest.json") -> list
 
 
 def shap_to_markdown(shap_values: list[dict]) -> str:
-    lines = ["| Rank | Variável | Importância | Direção |", "|------|----------|-------------|---------|"]
+    lines = [
+        "| Rank | Variável | Importância | Direção |",
+        "|------|----------|-------------|---------|",
+    ]
     for item in shap_values:
         arrow = "↑" if item["direction"] == "positivo" else "↓"
-        lines.append(f"| {item['rank']} | `{item['feature']}` | {item['importance']:.4f} | {arrow} {item['direction']} |")
+        lines.append(
+            f"| {item['rank']} | `{item['feature']}` | {item['importance']:.4f} | {arrow} {item['direction']} |"
+        )
     return "\n".join(lines)

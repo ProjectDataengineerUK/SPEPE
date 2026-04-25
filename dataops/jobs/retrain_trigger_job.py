@@ -1,4 +1,5 @@
 """Cloud Run job triggered by Eventarc (Pub/Sub drift-detected) to submit Vertex AI Pipeline."""
+
 from __future__ import annotations
 
 import base64
@@ -27,12 +28,14 @@ def handle_pubsub_event(event_data: dict) -> int:
     logger.info("Drift event received: feature=%s  JS=%.4f", feature, js_score)
 
     from mlops.deployment.auto_rollback import check_cooldown
+
     if not check_cooldown(project_id):
         logger.info("Cooldown active — skipping retrain trigger")
         return 0
 
     try:
         from mlops.vertex_pipeline import compile_pipeline, submit_pipeline
+
         pipeline_file = "/tmp/spepe_pipeline.yaml"
         compile_pipeline(pipeline_file)
         job_name = f"spepe-retrain-drift-{feature.replace('_', '-')}"
@@ -52,6 +55,7 @@ def handle_pubsub_event(event_data: dict) -> int:
 
 def main() -> None:
     import flask
+
     app = flask.Flask(__name__)
 
     @app.route("/jobs/retrain-trigger", methods=["POST"])

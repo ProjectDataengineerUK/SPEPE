@@ -39,4 +39,6 @@ class RegistryLoader:
         agent_dir = self.root / agent_name
         if not agent_dir.exists():
             return []
-        return sorted(p.stem for p in agent_dir.iterdir() if p.suffix in {".md", ".txt"})
+        return sorted(
+            p.stem for p in agent_dir.iterdir() if p.suffix in {".md", ".txt"}
+        )

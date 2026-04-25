@@ -1,4 +1,5 @@
 """Digital signals client — Google Trends (pytrends) + Meta Ad Library."""
+
 from __future__ import annotations
 
 import logging
@@ -26,11 +27,13 @@ def fetch_trends(
         return pd.DataFrame()
 
     try:
-        pt = TrendReq(hl="pt-BR", tz=-180, timeout=(10, 30), retries=3, backoff_factor=0.5)
+        pt = TrendReq(
+            hl="pt-BR", tz=-180, timeout=(10, 30), retries=3, backoff_factor=0.5
+        )
 
         # pytrends supports max 5 keywords per request
         frames: list[pd.DataFrame] = []
-        chunks = [keywords[i:i+5] for i in range(0, len(keywords), 5)]
+        chunks = [keywords[i : i + 5] for i in range(0, len(keywords), 5)]
 
         for chunk in chunks:
             pt.build_payload(chunk, timeframe=timeframe, geo=geo)
@@ -49,7 +52,9 @@ def fetch_trends(
         for df in frames[1:]:
             result = result.join(df, how="outer")
 
-        logger.info("Google Trends: %d linhas, %d candidatos", len(result), len(result.columns))
+        logger.info(
+            "Google Trends: %d linhas, %d candidatos", len(result), len(result.columns)
+        )
         return result
 
     except Exception as exc:
@@ -100,18 +105,20 @@ def fetch_meta_ads(
     for ad in data:
         spend = ad.get("spend", {})
         impr = ad.get("impressions", {})
-        rows.append({
-            "candidate_search": candidate,
-            "page_name":        ad.get("page_name", ""),
-            "funding_entity":   ad.get("funding_entity", ""),
-            "start_date":       ad.get("ad_delivery_start_time", ""),
-            "end_date":         ad.get("ad_delivery_stop_time", ""),
-            "spend_lower":      _safe_float(spend.get("lower_bound")),
-            "spend_upper":      _safe_float(spend.get("upper_bound")),
-            "impressions_lower":_safe_float(impr.get("lower_bound")),
-            "impressions_upper":_safe_float(impr.get("upper_bound")),
-            "currency":         ad.get("currency", "BRL"),
-        })
+        rows.append(
+            {
+                "candidate_search": candidate,
+                "page_name": ad.get("page_name", ""),
+                "funding_entity": ad.get("funding_entity", ""),
+                "start_date": ad.get("ad_delivery_start_time", ""),
+                "end_date": ad.get("ad_delivery_stop_time", ""),
+                "spend_lower": _safe_float(spend.get("lower_bound")),
+                "spend_upper": _safe_float(spend.get("upper_bound")),
+                "impressions_lower": _safe_float(impr.get("lower_bound")),
+                "impressions_upper": _safe_float(impr.get("upper_bound")),
+                "currency": ad.get("currency", "BRL"),
+            }
+        )
 
     df = pd.DataFrame(rows)
     logger.info("Meta Ads: %d anúncios para '%s'", len(df), candidate)

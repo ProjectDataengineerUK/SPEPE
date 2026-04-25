@@ -1,4 +1,5 @@
 """DLP hook — LGPD compliance: block PII in agent outputs."""
+
 from __future__ import annotations
 
 import logging
@@ -26,7 +27,9 @@ def check_dlp(text: str) -> list[tuple[str, str]]:
     return violations
 
 
-def dlp_hook(tool_name: str, tool_input: dict, tool_output: str | None = None) -> str | None:
+def dlp_hook(
+    tool_name: str, tool_input: dict, tool_output: str | None = None
+) -> str | None:
     """Hook to block PII in tool outputs. Returns block message or None."""
     text_to_check = tool_output or str(tool_input)
     violations = check_dlp(text_to_check)

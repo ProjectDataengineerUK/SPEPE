@@ -62,19 +62,13 @@ class CostAttributor:
         return event
 
     def session_total(self, session_id: str) -> float:
-        return sum(
-            v for (_a, s, _u), v in self._totals.items() if s == session_id
-        )
+        return sum(v for (_a, s, _u), v in self._totals.items() if s == session_id)
 
     def user_total(self, user_id: str) -> float:
-        return sum(
-            v for (_a, _s, u), v in self._totals.items() if u == user_id
-        )
+        return sum(v for (_a, _s, u), v in self._totals.items() if u == user_id)
 
     def agent_total(self, agent: str) -> float:
-        return sum(
-            v for (a, _s, _u), v in self._totals.items() if a == agent
-        )
+        return sum(v for (a, _s, _u), v in self._totals.items() if a == agent)
 
     def breakdown(self) -> list[dict[str, Any]]:
         return [

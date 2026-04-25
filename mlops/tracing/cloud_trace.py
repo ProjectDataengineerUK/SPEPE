@@ -1,4 +1,5 @@
 """Cloud Trace integration for session/agent/token tracing."""
+
 from __future__ import annotations
 
 import logging
@@ -25,6 +26,7 @@ class SpanContext:
 
 def start_span(session_id: str, agent_name: str, operation: str = "") -> SpanContext:
     import uuid
+
     span = SpanContext(
         session_id=session_id,
         agent_name=agent_name,
@@ -64,6 +66,7 @@ def _export_to_cloud_trace(span: SpanContext, duration_ms: int) -> None:
         project_name = f"projects/{GCP_PROJECT}"
 
         import uuid
+
         trace_id = uuid.uuid4().hex
         span_id = uuid.uuid4().hex[:16]
 
@@ -73,18 +76,34 @@ def _export_to_cloud_trace(span: SpanContext, duration_ms: int) -> None:
         end_ts = Timestamp()
         end_ts.FromSeconds(int(now))
 
-        spans = [trace_v2.Span(
-            name=f"{project_name}/traces/{trace_id}/spans/{span_id}",
-            span_id=span_id,
-            display_name=trace_v2.TruncatableString(value=f"{span.agent_name}/{span.attributes.get('operation', '')}"),
-            start_time=start_ts,
-            end_time=end_ts,
-            attributes=trace_v2.Span.Attributes(attribute_map={
-                "session_id": trace_v2.AttributeValue(string_value=trace_v2.TruncatableString(value=span.session_id)),
-                "agent": trace_v2.AttributeValue(string_value=trace_v2.TruncatableString(value=span.agent_name)),
-                "token_count": trace_v2.AttributeValue(int_value=span.token_count),
-            }),
-        )]
+        spans = [
+            trace_v2.Span(
+                name=f"{project_name}/traces/{trace_id}/spans/{span_id}",
+                span_id=span_id,
+                display_name=trace_v2.TruncatableString(
+                    value=f"{span.agent_name}/{span.attributes.get('operation', '')}"
+                ),
+                start_time=start_ts,
+                end_time=end_ts,
+                attributes=trace_v2.Span.Attributes(
+                    attribute_map={
+                        "session_id": trace_v2.AttributeValue(
+                            string_value=trace_v2.TruncatableString(
+                                value=span.session_id
+                            )
+                        ),
+                        "agent": trace_v2.AttributeValue(
+                            string_value=trace_v2.TruncatableString(
+                                value=span.agent_name
+                            )
+                        ),
+                        "token_count": trace_v2.AttributeValue(
+                            int_value=span.token_count
+                        ),
+                    }
+                ),
+            )
+        ]
 
         client.batch_write_spans(name=project_name, spans=spans)
     except Exception:

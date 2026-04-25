@@ -9,24 +9,28 @@ import pytest
 def clean_tse_df():
     rng = np.random.default_rng(42)
     n = 2000
-    return pd.DataFrame({
-        "CD_MUNICIPIO": rng.integers(10000, 99999, n).astype(str),
-        "SG_UF": ["SP"] * n,
-        "QT_VOTOS_NOMINAIS": rng.integers(1, 50000, n),
-        "NR_ZONA": rng.integers(1, 300, n),
-        "DS_CARGO": ["PRESIDENTE"] * n,
-        "NM_CANDIDATO": [f"CANDIDATO_{i % 5}" for i in range(n)],
-    })
+    return pd.DataFrame(
+        {
+            "CD_MUNICIPIO": rng.integers(10000, 99999, n).astype(str),
+            "SG_UF": ["SP"] * n,
+            "QT_VOTOS_NOMINAIS": rng.integers(1, 50000, n),
+            "NR_ZONA": rng.integers(1, 300, n),
+            "DS_CARGO": ["PRESIDENTE"] * n,
+            "NM_CANDIDATO": [f"CANDIDATO_{i % 5}" for i in range(n)],
+        }
+    )
 
 
 @pytest.fixture
 def clean_gold_df():
-    return pd.DataFrame({
-        "cd_municipio": [str(i) for i in range(5570)],
-        "sg_uf": ["SP"] * 5570,
-        "ano_eleicao": [2022] * 5570,
-        "qt_votos_total": range(5570),
-    })
+    return pd.DataFrame(
+        {
+            "cd_municipio": [str(i) for i in range(5570)],
+            "sg_uf": ["SP"] * 5570,
+            "ano_eleicao": [2022] * 5570,
+            "qt_votos_total": range(5570),
+        }
+    )
 
 
 class TestDQRunnerSuites:
@@ -51,8 +55,12 @@ class TestDQRunnerSuites:
         tiny_df = clean_tse_df.head(500)
         result = run_suite(tiny_df, "tse")
         row_check = next(
-            (r for r in result["results"] if r["expectation"] == "expect_table_row_count_to_be_between"),
-            None
+            (
+                r
+                for r in result["results"]
+                if r["expectation"] == "expect_table_row_count_to_be_between"
+            ),
+            None,
         )
         assert row_check is not None
         assert not row_check["passed"]
@@ -69,8 +77,12 @@ class TestDQRunnerSuites:
         bad_df = clean_gold_df.drop(columns=["cd_municipio"])
         result = run_suite(bad_df, "gold")
         col_check = next(
-            (r for r in result["results"] if r["expectation"] == "expect_column_to_exist"),
-            None
+            (
+                r
+                for r in result["results"]
+                if r["expectation"] == "expect_column_to_exist"
+            ),
+            None,
         )
         assert col_check is not None
         assert not col_check["passed"]

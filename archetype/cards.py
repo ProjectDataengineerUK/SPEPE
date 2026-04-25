@@ -75,20 +75,25 @@ def build_archetype_cards(
             if cols:
                 best = cluster_df[cols].mean().idxmax()
                 pct = float(cluster_df[cols].mean().max() * 100)
-                history[str(ano)] = (best.replace("pct_votos_", "").replace(f"_{ano}", "").upper(), pct)
+                history[str(ano)] = (
+                    best.replace("pct_votos_", "").replace(f"_{ano}", "").upper(),
+                    pct,
+                )
 
         reps = []
         if municipio_col in cluster_df.columns:
             reps = cluster_df[municipio_col].dropna().head(5).tolist()
 
-        cards.append(ArchetypeCard(
-            cluster_id=cid,
-            label=label_names.get(cid, f"Arquétipo {cid}"),
-            n_municipios=len(cluster_df),
-            pct_total=len(cluster_df) / n_total * 100,
-            top_features=top_features,
-            electoral_history=history,
-            representative_municipios=reps,
-        ))
+        cards.append(
+            ArchetypeCard(
+                cluster_id=cid,
+                label=label_names.get(cid, f"Arquétipo {cid}"),
+                n_municipios=len(cluster_df),
+                pct_total=len(cluster_df) / n_total * 100,
+                top_features=top_features,
+                electoral_history=history,
+                representative_municipios=reps,
+            )
+        )
 
     return cards

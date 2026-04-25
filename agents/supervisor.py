@@ -1,4 +1,5 @@
 """SPEPE Supervisor — Claude Sonnet routes via DOMA loop to Gemini sub-agents."""
+
 from __future__ import annotations
 
 import logging
@@ -17,7 +18,7 @@ logger = logging.getLogger("spepe.agents.supervisor")
 
 _MODEL = "claude-sonnet-4-6"
 _MAX_HOPS = 5
-_CLAUDE_INPUT_RATE  = 3.0  / 1_000_000
+_CLAUDE_INPUT_RATE = 3.0 / 1_000_000
 _CLAUDE_OUTPUT_RATE = 15.0 / 1_000_000
 
 _SYSTEM = """\
@@ -56,8 +57,15 @@ _ROUTING_TOOL: dict = {
         "properties": {
             "agent_id": {
                 "type": "string",
-                "enum": ["coletor", "analista", "perfilador", "modelista_bayesiano",
-                         "explicador", "narrador", "vigilante"],
+                "enum": [
+                    "coletor",
+                    "analista",
+                    "perfilador",
+                    "modelista_bayesiano",
+                    "explicador",
+                    "narrador",
+                    "vigilante",
+                ],
             },
             "refined_prompt": {"type": "string"},
             "done": {
@@ -127,7 +135,9 @@ class Supervisor:
                     yield "concluído com sucesso.\n\n"
                 else:
                     yield f"erro: {result.get('error') or result.get('stderr','')[:200]}\n\n"
-                state.add_turn("supervisor", f"job_result: {result}", agent_id="supervisor")
+                state.add_turn(
+                    "supervisor", f"job_result: {result}", agent_id="supervisor"
+                )
                 current_input = None
                 continue
 
@@ -154,7 +164,9 @@ class Supervisor:
                     artifacts=state.artifacts,
                 )
 
-                validated_text = await self._validate_output(agent_id, resp.text, agent, refined_prompt)
+                validated_text = await self._validate_output(
+                    agent_id, resp.text, agent, refined_prompt
+                )
 
                 try:
                     state.add_cost(resp.cost_usd)
@@ -162,9 +174,14 @@ class Supervisor:
                     yield validated_text + f"\n\n{e}"
                     return
 
-                state.add_turn("agent", validated_text, agent_id=agent_id,
-                               tokens_in=resp.input_tokens, tokens_out=resp.output_tokens,
-                               cost_usd=resp.cost_usd)
+                state.add_turn(
+                    "agent",
+                    validated_text,
+                    agent_id=agent_id,
+                    tokens_in=resp.input_tokens,
+                    tokens_out=resp.output_tokens,
+                    cost_usd=resp.cost_usd,
+                )
 
                 yield validated_text
                 yield (
@@ -209,7 +226,11 @@ class Supervisor:
                 if result.remediated:
                     logger.info("Output de %s remediado: %s", agent_id, result.reason)
                     return result.remediated
-                logger.warning("Output de %s falhou validação: %s — re-prompting", agent_id, result.reason)
+                logger.warning(
+                    "Output de %s falhou validação: %s — re-prompting",
+                    agent_id,
+                    result.reason,
+                )
                 retry = await agent.run_async(
                     f"Sua resposta anterior violou: {result.reason}. "
                     f"Reescreva seguindo rigorosamente o Formato de Resposta OBRIGATÓRIO.",

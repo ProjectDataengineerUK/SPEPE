@@ -1,4 +1,5 @@
 """Gemini sub-agent wrapper — stateful via session context injection."""
+
 from __future__ import annotations
 
 import asyncio
@@ -10,14 +11,14 @@ from config.settings import settings
 logger = logging.getLogger("spepe.agents.gemini")
 
 _VERTEX_MODEL_IDS = {
-    "gemini-2.5-pro":   "gemini-2.5-pro",
+    "gemini-2.5-pro": "gemini-2.5-pro",
     "gemini-2.5-flash": "gemini-2.5-flash",
     "gemini-2.0-flash": "gemini-2.0-flash-001",
 }
 
 _COST_PER_TOKEN = {
-    "gemini-2.5-pro":      (1.25e-6, 10e-6),
-    "gemini-2.5-flash":    (0.15e-6, 0.60e-6),
+    "gemini-2.5-pro": (1.25e-6, 10e-6),
+    "gemini-2.5-flash": (0.15e-6, 0.60e-6),
     "gemini-2.0-flash-001": (0.075e-6, 0.30e-6),
 }
 
@@ -47,6 +48,7 @@ class GeminiAgent:
     def client(self):
         if self._client is None:
             from google import genai
+
             self._client = genai.Client(
                 vertexai=True,
                 project=settings.gcp_project_id or "spepe-dev",
@@ -103,4 +105,6 @@ class GeminiAgent:
         artifacts: dict[str, str] | None = None,
     ) -> AgentResponse:
         loop = asyncio.get_event_loop()
-        return await loop.run_in_executor(None, self.run, prompt, session_ctx, artifacts)
+        return await loop.run_in_executor(
+            None, self.run, prompt, session_ctx, artifacts
+        )

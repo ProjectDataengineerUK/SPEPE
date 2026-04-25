@@ -1,4 +1,5 @@
 """Data Quality runner — executes GE-style checks and reports to Cloud Logging."""
+
 from __future__ import annotations
 
 import json
@@ -57,15 +58,28 @@ def _evaluate_expectation(df: pd.DataFrame, expectation: dict) -> dict:
         if exp_type == "expect_column_values_to_not_be_null":
             col = kwargs["column"]
             if col not in df.columns:
-                return {"success": False, "type": exp_type, "reason": f"Coluna '{col}' ausente"}
+                return {
+                    "success": False,
+                    "type": exp_type,
+                    "reason": f"Coluna '{col}' ausente",
+                }
             null_count = int(df[col].isna().sum())
             success = null_count == 0
-            return {"success": success, "type": exp_type, "column": col, "null_count": null_count}
+            return {
+                "success": success,
+                "type": exp_type,
+                "column": col,
+                "null_count": null_count,
+            }
 
         elif exp_type == "expect_column_values_to_be_between":
             col = kwargs["column"]
             if col not in df.columns:
-                return {"success": False, "type": exp_type, "reason": f"Coluna '{col}' ausente"}
+                return {
+                    "success": False,
+                    "type": exp_type,
+                    "reason": f"Coluna '{col}' ausente",
+                }
             min_val = kwargs.get("min_value")
             max_val = kwargs.get("max_value")
             series = pd.to_numeric(df[col], errors="coerce")
@@ -75,7 +89,12 @@ def _evaluate_expectation(df: pd.DataFrame, expectation: dict) -> dict:
                 fails = 0
             if max_val is not None:
                 fails += int((series > max_val).sum())
-            return {"success": fails == 0, "type": exp_type, "column": col, "violations": fails}
+            return {
+                "success": fails == 0,
+                "type": exp_type,
+                "column": col,
+                "violations": fails,
+            }
 
         elif exp_type == "expect_table_row_count_to_be_between":
             n = len(df)
@@ -89,7 +108,11 @@ def _evaluate_expectation(df: pd.DataFrame, expectation: dict) -> dict:
             return {"success": col in df.columns, "type": exp_type, "column": col}
 
         else:
-            return {"success": True, "type": exp_type, "note": "Tipo não implementado — skipped"}
+            return {
+                "success": True,
+                "type": exp_type,
+                "note": "Tipo não implementado — skipped",
+            }
 
     except Exception as e:
         return {"success": False, "type": exp_type, "error": str(e)}
@@ -107,8 +130,11 @@ def _log_result(result: dict) -> None:
 
     try:
         from google.cloud import logging as cloud_logging
+
         client = cloud_logging.Client()
         cloud_logger = client.logger("spepe-dataops-dq")
-        cloud_logger.log_struct(result, severity="INFO" if result["status"] == "pass" else "WARNING")
+        cloud_logger.log_struct(
+            result, severity="INFO" if result["status"] == "pass" else "WARNING"
+        )
     except Exception:
         pass

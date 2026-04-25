@@ -73,7 +73,9 @@ def label_all_clusters(
         top_features = dict(means.nlargest(10))
 
         electoral_cols = [c for c in feature_cols if "votos" in c or "pct" in c]
-        electoral_pattern = cluster_df[electoral_cols].mean().to_string() if electoral_cols else "N/A"
+        electoral_pattern = (
+            cluster_df[electoral_cols].mean().to_string() if electoral_cols else "N/A"
+        )
 
         result[cid] = generate_archetype_label(
             cluster_id=cid,

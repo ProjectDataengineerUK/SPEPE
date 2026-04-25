@@ -1,4 +1,5 @@
 """Cloud Run Job: Digital signal (Google Trends, Meta Ads) → Bronze layer."""
+
 from __future__ import annotations
 
 import logging
@@ -8,7 +9,9 @@ import pandas as pd
 
 from dataops.bronze_writer import write_bronze
 
-logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s %(message)s")
+logging.basicConfig(
+    level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s %(message)s"
+)
 logger = logging.getLogger("spepe.jobs.digital_ingest")
 
 CANDIDATES_2022 = ["Lula", "Bolsonaro", "Ciro Gomes", "Simone Tebet"]
@@ -22,6 +25,7 @@ def main() -> None:
 
 def _ingest_trends() -> None:
     from dataops.clients.digital_client import fetch_trends
+
     logger.info("Ingestão Google Trends...")
     df = fetch_trends(CANDIDATES_2022, timeframe=TIMEFRAME_2022, geo="BR")
     if df.empty:
@@ -47,6 +51,7 @@ def _ingest_meta_ads() -> None:
         return
 
     from dataops.clients.digital_client import fetch_meta_ads
+
     logger.info("Ingestão Meta Ad Library...")
     dfs = []
     for candidate in CANDIDATES_2022:

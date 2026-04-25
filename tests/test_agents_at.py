@@ -1,6 +1,6 @@
 """Acceptance tests AT-001 to AT-006 for SPEPE agents."""
-from unittest.mock import patch
 
+from unittest.mock import patch
 
 
 class TestAT001CollectorAgent:
@@ -33,6 +33,7 @@ class TestAT001CollectorAgent:
                 write_bronze(df, "test_source", 2022, "SP", "test.parquet")
 
         import pyarrow.parquet as pq
+
         files = list(tmp_path.rglob("*.parquet"))
         assert len(files) == 1
 
@@ -99,13 +100,17 @@ class TestAT003ModelistaAgent:
         import pandas as pd
         from datetime import date
 
-        polls = pd.DataFrame({
-            "candidate": ["Candidato A"] * 3,
-            "institute": ["datafolha", "sensus", "ibope"],
-            "estimate": [0.45, 0.47, 0.44],
-            "date": [date(2022, 9, 1), date(2022, 9, 5), date(2022, 9, 10)],
-        })
-        result = aggregate_polls(polls, candidate="Candidato A", reference_date=date(2022, 10, 1))
+        polls = pd.DataFrame(
+            {
+                "candidate": ["Candidato A"] * 3,
+                "institute": ["datafolha", "sensus", "ibope"],
+                "estimate": [0.45, 0.47, 0.44],
+                "date": [date(2022, 9, 1), date(2022, 9, 5), date(2022, 9, 10)],
+            }
+        )
+        result = aggregate_polls(
+            polls, candidate="Candidato A", reference_date=date(2022, 10, 1)
+        )
         assert "mean" in result
         assert "lower" in result
         assert "upper" in result
@@ -119,10 +124,12 @@ class TestAT004DQGate:
         import pandas as pd
         from dataops.dq.runner import run_suite
 
-        bad_df = pd.DataFrame({
-            "CD_MUNICIPIO": [None] * 100,
-            "QT_VOTOS_NOMINAIS": [-1] * 100,
-        })
+        bad_df = pd.DataFrame(
+            {
+                "CD_MUNICIPIO": [None] * 100,
+                "QT_VOTOS_NOMINAIS": [-1] * 100,
+            }
+        )
         result = run_suite(bad_df, "tse")
         assert result["score"] < 95.0
 

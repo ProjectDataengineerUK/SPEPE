@@ -1,4 +1,5 @@
 """TSE client — HTTP download from TSE CDN + column normalization."""
+
 from __future__ import annotations
 
 import io
@@ -18,28 +19,28 @@ _CDN = (
 
 # Raw TSE column → canonical lowercase name
 _COL_MAP: dict[str, str] = {
-    "SG_UF":                    "sg_uf",
-    "SG_UF_VOTO":               "sg_uf",
-    "CD_MUNICIPIO":             "cd_municipio",
-    "NM_MUNICIPIO":             "nm_municipio",
-    "NR_ZONA":                  "nr_zona",
-    "NR_SECAO":                 "nr_secao",
-    "NR_TURNO":                 "nr_turno",
-    "CD_CARGO":                 "cd_cargo",
-    "DS_CARGO":                 "ds_cargo",
-    "NR_CANDIDATO":             "nr_candidato",
-    "NR_VOTAVEL":               "nr_candidato",
-    "NM_CANDIDATO":             "nm_candidato",
-    "NM_URNA_CANDIDATO":        "nm_urna_candidato",
-    "NM_VOTAVEL":               "nm_candidato",
-    "SG_PARTIDO":               "sg_partido",
-    "NM_PARTIDO":               "nm_partido",
-    "SQ_CANDIDATO":             "sq_candidato",
-    "QT_VOTOS_NOMINAIS":        "qt_votos",
-    "QT_VOTOS_NOMINAIS_VALIDOS":"qt_votos",
-    "QT_VOTOS":                 "qt_votos",
-    "CD_SIT_TOT_TURNO":         "cd_situacao",
-    "DS_SIT_TOT_TURNO":         "ds_situacao",
+    "SG_UF": "sg_uf",
+    "SG_UF_VOTO": "sg_uf",
+    "CD_MUNICIPIO": "cd_municipio",
+    "NM_MUNICIPIO": "nm_municipio",
+    "NR_ZONA": "nr_zona",
+    "NR_SECAO": "nr_secao",
+    "NR_TURNO": "nr_turno",
+    "CD_CARGO": "cd_cargo",
+    "DS_CARGO": "ds_cargo",
+    "NR_CANDIDATO": "nr_candidato",
+    "NR_VOTAVEL": "nr_candidato",
+    "NM_CANDIDATO": "nm_candidato",
+    "NM_URNA_CANDIDATO": "nm_urna_candidato",
+    "NM_VOTAVEL": "nm_candidato",
+    "SG_PARTIDO": "sg_partido",
+    "NM_PARTIDO": "nm_partido",
+    "SQ_CANDIDATO": "sq_candidato",
+    "QT_VOTOS_NOMINAIS": "qt_votos",
+    "QT_VOTOS_NOMINAIS_VALIDOS": "qt_votos",
+    "QT_VOTOS": "qt_votos",
+    "CD_SIT_TOT_TURNO": "cd_situacao",
+    "DS_SIT_TOT_TURNO": "ds_situacao",
 }
 
 _CARGO_NAMES: dict[int, str] = {
@@ -54,8 +55,13 @@ _CARGO_NAMES: dict[int, str] = {
 }
 
 _NUMERIC_COLS = (
-    "cd_municipio", "nr_zona", "nr_secao", "nr_turno",
-    "nr_candidato", "cd_cargo", "qt_votos",
+    "cd_municipio",
+    "nr_zona",
+    "nr_secao",
+    "nr_turno",
+    "nr_candidato",
+    "cd_cargo",
+    "qt_votos",
 )
 
 
@@ -80,8 +86,11 @@ def download_tse_resultados(uf: str, year: int) -> pd.DataFrame:
             with zf.open(name) as f:
                 try:
                     df = pd.read_csv(
-                        f, sep=";", encoding="latin-1",
-                        dtype=str, low_memory=False,
+                        f,
+                        sep=";",
+                        encoding="latin-1",
+                        dtype=str,
+                        low_memory=False,
                     )
                     frames.append(df)
                     logger.debug("Lido %s: %d linhas", name, len(df))

@@ -1,4 +1,5 @@
 """Bronze layer writer — immutable raw data to GCS (or local fallback)."""
+
 from __future__ import annotations
 
 import logging
@@ -45,7 +46,14 @@ def write_bronze(
     return _write_local(df, source, year, uf, filename, base_path=base_path)
 
 
-def _write_local(df: pd.DataFrame, source: str, year: int, uf: str, filename: str, base_path: str = None) -> str:
+def _write_local(
+    df: pd.DataFrame,
+    source: str,
+    year: int,
+    uf: str,
+    filename: str,
+    base_path: str = None,
+) -> str:
     base = Path(base_path) if base_path else LOCAL_BRONZE_DIR
     out_dir = base / source / str(year) / uf.upper()
     out_dir.mkdir(parents=True, exist_ok=True)
@@ -78,7 +86,9 @@ def _write_gcs(df: pd.DataFrame, source: str, year: int, uf: str, filename: str)
         blob = bucket.blob(gcs_path)
 
         if blob.exists():
-            logger.info(f"Bronze GCS já existe (imutável): gs://{GCS_BUCKET}/{gcs_path}")
+            logger.info(
+                f"Bronze GCS já existe (imutável): gs://{GCS_BUCKET}/{gcs_path}"
+            )
             return f"gs://{GCS_BUCKET}/{gcs_path}"
 
         df_with_meta = df.copy()

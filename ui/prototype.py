@@ -1,4 +1,5 @@
 """SPEPE — Protótipo UI (respostas mockadas, sem dependência de backend/GCP)."""
+
 from __future__ import annotations
 
 import asyncio
@@ -9,7 +10,6 @@ import chainlit as cl
 # ── Mock responses por comando ──────────────────────────────────────────────
 
 _MOCK: dict[str, str] = {
-
     "/coletar": """\
 ✅ Job `tse_ingest` (SP / 2022) — concluído com sucesso.
 
@@ -32,7 +32,6 @@ _MOCK: dict[str, str] = {
 ---
 *gemini-2.5-flash | sessão: $0.00031 / $2.00*
 """,
-
     "/social": """\
 ✅ Job `digital_ingest` (BR / 2022-2026) — concluído com sucesso.
 
@@ -78,7 +77,6 @@ _MOCK: dict[str, str] = {
 *Fontes: Google Trends API · Meta Ad Library · YouTube Data API · X Academic API*
 *gemini-2.5-flash | sessão: $0.00058 / $2.00*
 """,
-
     "/pesquisas": """\
 *→ analista-eleitoral*
 
@@ -129,7 +127,6 @@ Pesquisas não registradas são sinalizadas e excluídas do modelo.
 *Fontes: TSE Sistema de Gerenciamento de Pesquisas Eleitorais · Datafolha · Quaest · AtlasIntel · Ipespe · PoderData*
 *gemini-2.5-pro | sessão: $0.00142 / $2.00*
 """,
-
     "/perfil": """\
 *→ analista-eleitoral*
 
@@ -176,7 +173,6 @@ Fonte: TSE 2022 · IBGE Censo 2022 · Google Trends · Meta Ad Library
 ---
 *gemini-2.5-pro | sessão: $0.00134 / $2.00*
 """,
-
     "/prever": """\
 *→ analista-eleitoral*
 
@@ -251,7 +247,6 @@ Esta análise integra cinco institutos de pesquisa com house effect ajustado, si
 ---
 *gemini-2.5-pro | sessão: $0.00521 / $2.00*
 """,
-
     "/arquétipos": """\
 *→ perfilador*
 
@@ -305,7 +300,6 @@ Modelo: K-Means + PCA (18 features — 12 socioeconômicas + 6 digitais)
 ---
 *gemini-2.5-flash | sessão: $0.00201 / $2.00*
 """,
-
     "/monitorar": """\
 *→ vigilante*
 
@@ -357,7 +351,6 @@ Retrain automático via Pub/Sub → Vertex AI Pipeline disparado em < 2h.
 ---
 *gemini-2.0-flash | sessão: $0.00031 / $2.00*
 """,
-
     "/relatorio": """\
 *→ narrador*
 
@@ -410,12 +403,12 @@ _HELP = """\
 def _match_command(text: str) -> str | None:
     t = text.strip().lower()
     pairs = [
-        ("/social",    ["social"]),
+        ("/social", ["social"]),
         ("/pesquisas", ["pesquisas", "polls", "pesquisa"]),
-        ("/coletar",   ["coletar"]),
-        ("/perfil",    ["perfil"]),
-        ("/prever",    ["prever", "previsão", "previsao"]),
-        ("/arquétipos",["arquétipos", "arquetipos", "arquétipos", "clusters"]),
+        ("/coletar", ["coletar"]),
+        ("/perfil", ["perfil"]),
+        ("/prever", ["prever", "previsão", "previsao"]),
+        ("/arquétipos", ["arquétipos", "arquetipos", "arquétipos", "clusters"]),
         ("/monitorar", ["monitorar", "monitor", "drift"]),
         ("/relatorio", ["relatorio", "relatório", "report"]),
     ]
@@ -441,14 +434,18 @@ async def on_start() -> None:
     cl.user_session.set("session_id", session_id)
 
     actions = [
-        cl.Action(name="cmd", value="/coletar SP 2022",       label="📥 /coletar SP 2022"),
-        cl.Action(name="cmd", value="/social BR 2026",         label="📱 /social BR 2026"),
-        cl.Action(name="cmd", value="/pesquisas presidente 2026", label="📊 /pesquisas 2026"),
-        cl.Action(name="cmd", value="/perfil São Paulo 2022",  label="🔍 /perfil SP 2022"),
-        cl.Action(name="cmd", value="/prever Lula 2026",       label="🎯 /prever Lula 2026"),
-        cl.Action(name="cmd", value="/arquétipos BR",          label="🗂️ /arquétipos BR"),
-        cl.Action(name="cmd", value="/monitorar",              label="👁️ /monitorar"),
-        cl.Action(name="cmd", value="/relatorio",              label="📄 /relatorio"),
+        cl.Action(name="cmd", value="/coletar SP 2022", label="📥 /coletar SP 2022"),
+        cl.Action(name="cmd", value="/social BR 2026", label="📱 /social BR 2026"),
+        cl.Action(
+            name="cmd", value="/pesquisas presidente 2026", label="📊 /pesquisas 2026"
+        ),
+        cl.Action(
+            name="cmd", value="/perfil São Paulo 2022", label="🔍 /perfil SP 2022"
+        ),
+        cl.Action(name="cmd", value="/prever Lula 2026", label="🎯 /prever Lula 2026"),
+        cl.Action(name="cmd", value="/arquétipos BR", label="🗂️ /arquétipos BR"),
+        cl.Action(name="cmd", value="/monitorar", label="👁️ /monitorar"),
+        cl.Action(name="cmd", value="/relatorio", label="📄 /relatorio"),
     ]
 
     await cl.Message(

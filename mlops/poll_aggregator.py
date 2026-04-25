@@ -1,4 +1,5 @@
 """Poll aggregation with house effect adjustment per institute."""
+
 from __future__ import annotations
 
 import logging
@@ -36,7 +37,9 @@ def aggregate_polls(
         return {"status": "no_data", "message": "Nenhuma pesquisa disponível."}
 
     if candidate_col in df_polls.columns:
-        df = df_polls[df_polls[candidate_col].str.contains(candidate, case=False, na=False)].copy()
+        df = df_polls[
+            df_polls[candidate_col].str.contains(candidate, case=False, na=False)
+        ].copy()
     else:
         df = df_polls.copy()
 
@@ -44,17 +47,25 @@ def aggregate_polls(
         return {"status": "no_data", "message": f"Nenhuma pesquisa para '{candidate}'."}
 
     if intencao_col not in df.columns:
-        return {"status": "error", "message": f"Coluna '{intencao_col}' não encontrada."}
+        return {
+            "status": "error",
+            "message": f"Coluna '{intencao_col}' não encontrada.",
+        }
 
     df["intencao_pct_num"] = pd.to_numeric(df[intencao_col], errors="coerce")
     df = df.dropna(subset=["intencao_pct_num"])
 
     if df.empty:
-        return {"status": "no_data", "message": f"Nenhum valor numérico válido para '{candidate}'."}
+        return {
+            "status": "no_data",
+            "message": f"Nenhum valor numérico válido para '{candidate}'.",
+        }
 
     if instituto_col in df.columns:
-        df["house_effect"] = df[instituto_col].str.lower().map(
-            lambda x: HOUSE_EFFECTS.get(x.strip(), 0.0) if pd.notna(x) else 0.0
+        df["house_effect"] = (
+            df[instituto_col]
+            .str.lower()
+            .map(lambda x: HOUSE_EFFECTS.get(x.strip(), 0.0) if pd.notna(x) else 0.0)
         )
     else:
         df["house_effect"] = 0.0
@@ -87,6 +98,8 @@ def aggregate_polls(
         "ci_lower_pct": ci_lo,
         "ci_upper_pct": ci_hi,
         "alpha": alpha,
-        "institutes": df[instituto_col].unique().tolist() if instituto_col in df.columns else [],
+        "institutes": (
+            df[instituto_col].unique().tolist() if instituto_col in df.columns else []
+        ),
         "summary": f"P({candidate}) = {weighted_mean:.1f}% [IC 95%: {ci_lo:.1f}%–{ci_hi:.1f}%] (n={n} pesquisas)",
     }

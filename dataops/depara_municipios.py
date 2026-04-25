@@ -3,6 +3,7 @@
 TSE uses a different municipality code than IBGE. This module provides
 the mapping required to join electoral data with socioeconomic indicators.
 """
+
 from __future__ import annotations
 
 import logging
@@ -38,18 +39,22 @@ def _build_depara() -> pd.DataFrame:
         municipios = r.json()
     except requests.RequestException as e:
         logger.error(f"Falha ao buscar municípios IBGE: {e}")
-        return pd.DataFrame(columns=["cd_municipio_tse", "cd_municipio_ibge", "nm_municipio", "sg_uf"])
+        return pd.DataFrame(
+            columns=["cd_municipio_tse", "cd_municipio_ibge", "nm_municipio", "sg_uf"]
+        )
 
     rows = []
     for m in municipios:
         ibge_code = int(m["id"])
         tse_code = ibge_code // 10
-        rows.append({
-            "cd_municipio_tse": tse_code,
-            "cd_municipio_ibge": ibge_code,
-            "nm_municipio": m["nome"],
-            "sg_uf": m["microrregiao"]["mesorregiao"]["UF"]["sigla"],
-        })
+        rows.append(
+            {
+                "cd_municipio_tse": tse_code,
+                "cd_municipio_ibge": ibge_code,
+                "nm_municipio": m["nome"],
+                "sg_uf": m["microrregiao"]["mesorregiao"]["UF"]["sigla"],
+            }
+        )
 
     df = pd.DataFrame(rows)
     DEPARA_PATH.parent.mkdir(parents=True, exist_ok=True)
@@ -81,10 +86,14 @@ def join_tse_ibge(
 
     df_ibge_str = df_ibge.copy()
     if ibge_key in df_ibge_str.columns:
-        df_ibge_str[ibge_key] = pd.to_numeric(df_ibge_str[ibge_key], errors="coerce").astype("Int64")
+        df_ibge_str[ibge_key] = pd.to_numeric(
+            df_ibge_str[ibge_key], errors="coerce"
+        ).astype("Int64")
 
     df_tse_mapped["cd_municipio_ibge"] = pd.to_numeric(
         df_tse_mapped["cd_municipio_ibge"], errors="coerce"
     ).astype("Int64")
 
-    return df_tse_mapped.merge(df_ibge_str, left_on="cd_municipio_ibge", right_on=ibge_key, how="left")
+    return df_tse_mapped.merge(
+        df_ibge_str, left_on="cd_municipio_ibge", right_on=ibge_key, how="left"
+    )

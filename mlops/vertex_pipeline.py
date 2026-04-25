@@ -2,6 +2,7 @@
 
 Pipeline: feature_extract → train_bootstrap → evaluate → promote
 """
+
 from __future__ import annotations
 
 import logging
@@ -25,7 +26,12 @@ def build_pipeline():
 
     @component(
         base_image="python:3.12-slim",
-        packages_to_install=["google-cloud-bigquery", "pandas", "pyarrow", "scikit-learn"],
+        packages_to_install=[
+            "google-cloud-bigquery",
+            "pandas",
+            "pyarrow",
+            "scikit-learn",
+        ],
     )
     def extract_features_component(
         project_id: str,
@@ -54,7 +60,13 @@ def build_pipeline():
 
     @component(
         base_image="python:3.12-slim",
-        packages_to_install=["pandas", "pyarrow", "statsmodels", "scikit-learn", "numpy"],
+        packages_to_install=[
+            "pandas",
+            "pyarrow",
+            "statsmodels",
+            "scikit-learn",
+            "numpy",
+        ],
     )
     def train_bootstrap_component(
         input_dataset: Input[Dataset],
@@ -68,7 +80,11 @@ def build_pipeline():
         from sklearn.linear_model import LogisticRegression
 
         df = pd.read_parquet(input_dataset.path)
-        feature_cols = [c for c in df.columns if any(ind in c for ind in ["idhm", "renda", "estudo", "pct"])]
+        feature_cols = [
+            c
+            for c in df.columns
+            if any(ind in c for ind in ["idhm", "renda", "estudo", "pct"])
+        ]
         target_col = f"pct_votos_{target_candidate.lower().replace(' ', '_')}_2022"
 
         if target_col not in df.columns or not feature_cols:
@@ -84,7 +100,10 @@ def build_pipeline():
             pickle.dump({"model": model, "feature_cols": feature_cols}, f)
 
         from sklearn.metrics import accuracy_score
-        output_metrics.log_metric("accuracy", float(accuracy_score(y, model.predict(X))))
+
+        output_metrics.log_metric(
+            "accuracy", float(accuracy_score(y, model.predict(X)))
+        )
         output_metrics.log_metric("n_train", len(X))
 
     @component(
@@ -101,6 +120,7 @@ def build_pipeline():
         from sklearn.metrics import accuracy_score, brier_score_loss
 
         from pathlib import Path
+
         df = pd.read_parquet(input_dataset.path)
         raw = Path(input_model.path).read_bytes()
         if len(raw) < 4:
@@ -117,8 +137,12 @@ def build_pipeline():
         y_true = (df[avail[0]] > df[avail[0]].mean()).astype(int).values
 
         y_proba = model.predict_proba(X)[:, 1]
-        output_metrics.log_metric("eval_accuracy", float(accuracy_score(y_true, (y_proba > 0.5).astype(int))))
-        output_metrics.log_metric("eval_brier_score", float(brier_score_loss(y_true, y_proba)))
+        output_metrics.log_metric(
+            "eval_accuracy", float(accuracy_score(y_true, (y_proba > 0.5).astype(int)))
+        )
+        output_metrics.log_metric(
+            "eval_brier_score", float(brier_score_loss(y_true, y_proba))
+        )
 
     @dsl.pipeline(
         name="spepe-ml-pipeline",
@@ -158,6 +182,7 @@ def compile_pipeline(output_path: str = "output/ml_pipeline.yaml") -> str:
         raise ImportError("kfp não instalado.")
 
     import os
+
     os.makedirs(os.path.dirname(output_path), exist_ok=True)
     pipeline = build_pipeline()
     compiler.Compiler().compile(pipeline_func=pipeline, package_path=output_path)
@@ -180,6 +205,7 @@ def submit_pipeline(
 
     try:
         from google.cloud import aiplatform
+
         aiplatform.init(project=project_id, location=location)
         job = aiplatform.PipelineJob(
             display_name=job_display_name,
@@ -208,7 +234,8 @@ def run_hptuning_then_pipeline(
     )
     logger.info(
         "HP tuning complete: best_params=%s brier=%.4f",
-        hp_result.best_params, hp_result.best_metric_value,
+        hp_result.best_params,
+        hp_result.best_metric_value,
     )
 
     pipeline_yaml = compile_pipeline("/tmp/spepe_pipeline_hp.yaml")

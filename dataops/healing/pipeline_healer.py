@@ -8,6 +8,7 @@ Failure modes handled:
 
 Referência: DESIGN_SPEPE.md — Decisão 17.
 """
+
 from __future__ import annotations
 
 import logging
@@ -32,7 +33,7 @@ class FailureType(str, Enum):
 @dataclass
 class HealingAction:
     failure_type: FailureType
-    action: str                              # "auto_heal" | "quarantine" | "manual_queue"
+    action: str  # "auto_heal" | "quarantine" | "manual_queue"
     details: dict[str, Any] = field(default_factory=dict)
     recovered_df: pd.DataFrame | None = None
 
@@ -116,7 +117,10 @@ class PipelineHealer:
             return HealingAction(
                 failure_type=failure,
                 action="auto_heal",
-                details={"strategy": "dedup_latest", "removed": len(df_new) - len(dedup)},
+                details={
+                    "strategy": "dedup_latest",
+                    "removed": len(df_new) - len(dedup),
+                },
                 recovered_df=dedup,
             )
 

@@ -14,7 +14,9 @@ def reduce_pca(X: np.ndarray, n_components: int = 50) -> np.ndarray:
     return PCA(n_components=n_components, random_state=42).fit_transform(X)
 
 
-def reduce_umap(X: np.ndarray, n_components: int = 2, random_state: int = 42) -> np.ndarray:
+def reduce_umap(
+    X: np.ndarray, n_components: int = 2, random_state: int = 42
+) -> np.ndarray:
     try:
         import umap
     except ImportError:

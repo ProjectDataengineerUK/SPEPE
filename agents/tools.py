@@ -1,4 +1,5 @@
 """Real Python tools executed by the Supervisor — not by LLM sub-agents."""
+
 from __future__ import annotations
 
 import logging
@@ -10,22 +11,24 @@ from pydantic import BaseModel, field_validator
 
 logger = logging.getLogger("spepe.agents.tools")
 
-JobName = Literal["tse_ingest", "ibge_sync", "silver_transform", "gold_build", "digital_ingest"]
+JobName = Literal[
+    "tse_ingest", "ibge_sync", "silver_transform", "gold_build", "digital_ingest"
+]
 
 ALLOWED_JOBS: dict[JobName, str] = {
-    "tse_ingest":       "dataops/jobs/tse_ingest_job.py",
-    "ibge_sync":        "dataops/jobs/ibge_sync_job.py",
+    "tse_ingest": "dataops/jobs/tse_ingest_job.py",
+    "ibge_sync": "dataops/jobs/ibge_sync_job.py",
     "silver_transform": "dataops/jobs/silver_transform_job.py",
-    "gold_build":       "dataops/jobs/gold_build_job.py",
-    "digital_ingest":   "dataops/jobs/digital_ingest_job.py",
+    "gold_build": "dataops/jobs/gold_build_job.py",
+    "digital_ingest": "dataops/jobs/digital_ingest_job.py",
 }
 
 CLOUD_RUN_JOBS: dict[JobName, str] = {
-    "tse_ingest":       "spepe-tse-ingest",
-    "ibge_sync":        "spepe-ibge-sync",
+    "tse_ingest": "spepe-tse-ingest",
+    "ibge_sync": "spepe-ibge-sync",
     "silver_transform": "spepe-silver-transform",
-    "gold_build":       "spepe-gold-build",
-    "digital_ingest":   "spepe-digital-ingest",
+    "gold_build": "spepe-gold-build",
+    "digital_ingest": "spepe-digital-ingest",
 }
 
 
@@ -38,7 +41,9 @@ class RunJobArgs(BaseModel):
     @classmethod
     def validate_job(cls, v: str) -> str:
         if v not in ALLOWED_JOBS:
-            raise ValueError(f"Job não permitido: {v}. Permitidos: {list(ALLOWED_JOBS)}")
+            raise ValueError(
+                f"Job não permitido: {v}. Permitidos: {list(ALLOWED_JOBS)}"
+            )
         return v
 
     @field_validator("uf")
@@ -71,7 +76,9 @@ def _run_cloud_run_job(args: RunJobArgs, project: str, region: str) -> dict:
         from google.cloud import run_v2
 
         client = run_v2.JobsClient()
-        job_name = f"projects/{project}/locations/{region}/jobs/{CLOUD_RUN_JOBS[args.job]}"
+        job_name = (
+            f"projects/{project}/locations/{region}/jobs/{CLOUD_RUN_JOBS[args.job]}"
+        )
 
         request = run_v2.RunJobRequest(
             name=job_name,
@@ -87,12 +94,16 @@ def _run_cloud_run_job(args: RunJobArgs, project: str, region: str) -> dict:
             ),
         )
         operation = client.run_job(request=request)
-        logger.info("Cloud Run Job disparado: %s (uf=%s year=%s)", args.job, args.uf, args.year)
+        logger.info(
+            "Cloud Run Job disparado: %s (uf=%s year=%s)", args.job, args.uf, args.year
+        )
         return {
             "ok": True,
             "mode": "cloud_run",
             "job": args.job,
-            "operation": operation.metadata.name if operation.metadata else "dispatched",
+            "operation": (
+                operation.metadata.name if operation.metadata else "dispatched"
+            ),
         }
     except Exception as e:
         logger.error("Cloud Run Job falhou: %s — fallback local", e)
@@ -116,7 +127,12 @@ def _run_local_subprocess(args: RunJobArgs) -> dict:
             "stderr": result.stderr[-1000:] if result.stderr else "",
         }
     except subprocess.TimeoutExpired:
-        return {"ok": False, "mode": "local", "job": args.job, "error": "Timeout 600s excedido"}
+        return {
+            "ok": False,
+            "mode": "local",
+            "job": args.job,
+            "error": "Timeout 600s excedido",
+        }
     except Exception as e:
         return {"ok": False, "mode": "local", "job": args.job, "error": str(e)}
 

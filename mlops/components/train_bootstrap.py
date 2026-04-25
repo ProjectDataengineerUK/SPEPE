@@ -1,4 +1,5 @@
 """Bootstrap logistic regression with IC 95% — MVP Bayesian approximation."""
+
 from __future__ import annotations
 
 import logging
@@ -45,11 +46,15 @@ def predict_with_ic(
     n = len(X_train)
 
     if n < 100:
-        warnings.append(f"Amostra pequena ({n} observações) — IC mais amplo que o usual.")
+        warnings.append(
+            f"Amostra pequena ({n} observações) — IC mais amplo que o usual."
+        )
         n_bootstrap = min(n_bootstrap * 2, 5000)
 
     X_train_c = sm.add_constant(X_train, has_constant="add")
-    X_pred_c = sm.add_constant(X_pred.reshape(1, -1) if X_pred.ndim == 1 else X_pred, has_constant="add")
+    X_pred_c = sm.add_constant(
+        X_pred.reshape(1, -1) if X_pred.ndim == 1 else X_pred, has_constant="add"
+    )
 
     predictions = []
     failed = 0
@@ -68,7 +73,9 @@ def predict_with_ic(
     predictions = [p for p in predictions if not np.isnan(p)]
 
     if len(predictions) < n_bootstrap * 0.5:
-        warnings.append(f"Alto índice de falhas no bootstrap ({failed}/{n_bootstrap}). IC pode ser impreciso.")
+        warnings.append(
+            f"Alto índice de falhas no bootstrap ({failed}/{n_bootstrap}). IC pode ser impreciso."
+        )
 
     if not predictions:
         return Prediction(
@@ -100,8 +107,12 @@ def prepare_features_from_gold(
     """Prepare X, y arrays from Gold fact_municipio_eleicao."""
     if feature_cols is None:
         feature_cols = [
-            c for c in df.columns
-            if any(ind in c for ind in ["idhm", "renda", "estudo", "pct_rural", "populacao", "pib"])
+            c
+            for c in df.columns
+            if any(
+                ind in c
+                for ind in ["idhm", "renda", "estudo", "pct_rural", "populacao", "pib"]
+            )
             and c in df.columns
         ]
 

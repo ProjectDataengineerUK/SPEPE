@@ -1,4 +1,5 @@
 """Fairness monitoring: Brier score by sg_uf, income quintile, and rural pct."""
+
 from __future__ import annotations
 
 import logging
@@ -78,18 +79,22 @@ def run_bias_monitor(
         bs = _brier_score(group["y_true"].values, group["y_pred"].values)
         ratio = bs / (global_brier + 1e-10)
         alert = ratio > BIAS_ALERT_THRESHOLD
-        results.append(BiasResult(
-            model_version=model_version,
-            group_type="sg_uf",
-            group_value=str(uf),
-            brier_score=bs,
-            global_brier=global_brier,
-            ratio=ratio,
-            alert_triggered=alert,
-            n_samples=len(group),
-        ))
+        results.append(
+            BiasResult(
+                model_version=model_version,
+                group_type="sg_uf",
+                group_value=str(uf),
+                brier_score=bs,
+                global_brier=global_brier,
+                ratio=ratio,
+                alert_triggered=alert,
+                n_samples=len(group),
+            )
+        )
         if alert:
-            logger.warning("BIAS ALERT: sg_uf=%s  Brier=%.4f  ratio=%.2f×global", uf, bs, ratio)
+            logger.warning(
+                "BIAS ALERT: sg_uf=%s  Brier=%.4f  ratio=%.2f×global", uf, bs, ratio
+            )
 
     # Group 2: income quintile
     df = _assign_income_quintile(df)
@@ -99,35 +104,42 @@ def run_bias_monitor(
         bs = _brier_score(group["y_true"].values, group["y_pred"].values)
         ratio = bs / (global_brier + 1e-10)
         alert = ratio > BIAS_ALERT_THRESHOLD
-        results.append(BiasResult(
-            model_version=model_version,
-            group_type="income_quintile",
-            group_value=str(quintile),
-            brier_score=bs,
-            global_brier=global_brier,
-            ratio=ratio,
-            alert_triggered=alert,
-            n_samples=len(group),
-        ))
+        results.append(
+            BiasResult(
+                model_version=model_version,
+                group_type="income_quintile",
+                group_value=str(quintile),
+                brier_score=bs,
+                global_brier=global_brier,
+                ratio=ratio,
+                alert_triggered=alert,
+                n_samples=len(group),
+            )
+        )
 
     # Group 3: rural vs urban (pct_zona_rural > 50%)
-    for label, mask in [("rural", df["pct_zona_rural"] > 50), ("urban", df["pct_zona_rural"] <= 50)]:
+    for label, mask in [
+        ("rural", df["pct_zona_rural"] > 50),
+        ("urban", df["pct_zona_rural"] <= 50),
+    ]:
         group = df[mask]
         if len(group) < 10:
             continue
         bs = _brier_score(group["y_true"].values, group["y_pred"].values)
         ratio = bs / (global_brier + 1e-10)
         alert = ratio > BIAS_ALERT_THRESHOLD
-        results.append(BiasResult(
-            model_version=model_version,
-            group_type="rural_urban",
-            group_value=label,
-            brier_score=bs,
-            global_brier=global_brier,
-            ratio=ratio,
-            alert_triggered=alert,
-            n_samples=len(group),
-        ))
+        results.append(
+            BiasResult(
+                model_version=model_version,
+                group_type="rural_urban",
+                group_value=label,
+                brier_score=bs,
+                global_brier=global_brier,
+                ratio=ratio,
+                alert_triggered=alert,
+                n_samples=len(group),
+            )
+        )
 
     _export_to_bigquery(results, project_id)
     return results
@@ -140,6 +152,7 @@ def _export_to_bigquery(results: list[BiasResult], project_id: str | None) -> No
 
     try:
         from google.cloud import bigquery
+
         client = bigquery.Client(project=project_id)
         table_id = f"{project_id}.spepe_mlops.bias_metrics"
         rows = [r.to_dict() for r in results]

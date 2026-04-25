@@ -28,6 +28,7 @@ def _get_cloud_logger():
     if _cloud_logging_client is None:
         try:
             from google.cloud import logging as cloud_logging
+
             client = cloud_logging.Client(project=project)
             _cloud_logging_client = client.logger("spepe-audit")
         except Exception:

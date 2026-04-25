@@ -1,4 +1,5 @@
 """Cloud Run canary deployment: 10% challenger traffic → evaluate → promote or rollback."""
+
 from __future__ import annotations
 
 import logging
@@ -10,9 +11,9 @@ from dataclasses import dataclass
 logger = logging.getLogger(__name__)
 
 _REVISION_RE = re.compile(r"^[a-z0-9][a-z0-9-]{0,62}$")
-_SERVICE_RE  = re.compile(r"^[a-z][a-z0-9-]{0,48}$")
-_REGION_RE   = re.compile(r"^[a-z]+-[a-z]+-[a-z0-9]+$")
-_PROJECT_RE  = re.compile(r"^[a-z][a-z0-9-]{4,29}$")
+_SERVICE_RE = re.compile(r"^[a-z][a-z0-9-]{0,48}$")
+_REGION_RE = re.compile(r"^[a-z]+-[a-z]+-[a-z0-9]+$")
+_PROJECT_RE = re.compile(r"^[a-z][a-z0-9-]{4,29}$")
 
 
 def _validate_gcloud_args(service: str, project_id: str, region: str) -> None:
@@ -28,6 +29,7 @@ def _validate_revision(rev: str) -> str:
     if not _REVISION_RE.match(rev):
         raise ValueError(f"Nome de revisão inválido: {rev}")
     return rev
+
 
 CANARY_TRAFFIC_PCT = 10
 EVAL_WINDOW_HOURS = 48
@@ -69,8 +71,10 @@ def start_canary(
     )
     logger.info(
         "Canary started: %d%% → %s, %d%% → %s",
-        CANARY_TRAFFIC_PCT, challenger_revision,
-        100 - CANARY_TRAFFIC_PCT, champion_revision,
+        CANARY_TRAFFIC_PCT,
+        challenger_revision,
+        100 - CANARY_TRAFFIC_PCT,
+        champion_revision,
     )
 
     return CanaryState(
@@ -101,17 +105,29 @@ def rollback_canary(state: CanaryState) -> None:
         splits={state.champion_revision: 100},
     )
     state.status = "rolled_back"
-    logger.warning("Canary ROLLED BACK: %s → 100%% traffic restored", state.champion_revision)
+    logger.warning(
+        "Canary ROLLED BACK: %s → 100%% traffic restored", state.champion_revision
+    )
 
 
 def _get_latest_serving_revision(service: str, project_id: str, region: str) -> str:
     result = subprocess.run(
         [
-            "gcloud", "run", "services", "describe", service,
-            "--project", project_id, "--region", region,
-            "--format", "value(status.traffic[0].revisionName)",
+            "gcloud",
+            "run",
+            "services",
+            "describe",
+            service,
+            "--project",
+            project_id,
+            "--region",
+            region,
+            "--format",
+            "value(status.traffic[0].revisionName)",
         ],
-        capture_output=True, text=True, timeout=30,
+        capture_output=True,
+        text=True,
+        timeout=30,
     )
     revision = result.stdout.strip()
     if not revision:
@@ -127,10 +143,17 @@ def _set_traffic_split(
 ) -> None:
     traffic_args = ",".join(f"{rev}={pct}" for rev, pct in splits.items())
     cmd = [
-        "gcloud", "run", "services", "update-traffic", service,
-        "--project", project_id,
-        "--region", region,
-        "--to-revisions", traffic_args,
+        "gcloud",
+        "run",
+        "services",
+        "update-traffic",
+        service,
+        "--project",
+        project_id,
+        "--region",
+        region,
+        "--to-revisions",
+        traffic_args,
     ]
     result = subprocess.run(cmd, capture_output=True, text=True, timeout=60)
     if result.returncode != 0:

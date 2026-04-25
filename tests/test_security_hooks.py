@@ -1,6 +1,6 @@
 """Tests for DLP, rate limit, security, and BigQuery cost hooks."""
-from unittest.mock import patch
 
+from unittest.mock import patch
 
 
 class TestDLPHook:
@@ -53,7 +53,11 @@ class TestDLPHook:
 
 class TestRateLimitHook:
     def test_allows_requests_under_limit(self):
-        from hooks.rate_limit_hook import rate_limit_hook, _request_log, _session_request_counts
+        from hooks.rate_limit_hook import (
+            rate_limit_hook,
+            _request_log,
+            _session_request_counts,
+        )
 
         session_id = "rl-test-under"
         _request_log[session_id].clear()
@@ -65,7 +69,9 @@ class TestRateLimitHook:
 
     def test_blocks_on_session_limit(self):
         from hooks.rate_limit_hook import (
-            rate_limit_hook, _session_request_counts, MAX_REQUESTS_PER_SESSION
+            rate_limit_hook,
+            _session_request_counts,
+            MAX_REQUESTS_PER_SESSION,
         )
 
         session_id = "rl-test-session-limit"
@@ -76,7 +82,11 @@ class TestRateLimitHook:
         assert "limit" in response.lower() or "excedido" in response.lower()
 
     def test_session_stats_tracking(self):
-        from hooks.rate_limit_hook import rate_limit_hook, get_session_stats, _session_request_counts
+        from hooks.rate_limit_hook import (
+            rate_limit_hook,
+            get_session_stats,
+            _session_request_counts,
+        )
 
         session_id = "rl-test-stats"
         _session_request_counts[session_id] = 0
@@ -93,13 +103,17 @@ class TestSecurityHook:
     def test_blocks_sql_injection_drop(self):
         from hooks.security_hook import check_sql_injection
 
-        result = check_sql_injection("run_query", {"sql": "SELECT * FROM table; DROP TABLE users;"})
+        result = check_sql_injection(
+            "run_query", {"sql": "SELECT * FROM table; DROP TABLE users;"}
+        )
         assert result is not None
 
     def test_blocks_sql_injection_union(self):
         from hooks.security_hook import check_sql_injection
 
-        result = check_sql_injection("run_query", {"sql": "' UNION ALL SELECT password FROM admin --"})
+        result = check_sql_injection(
+            "run_query", {"sql": "' UNION ALL SELECT password FROM admin --"}
+        )
         assert result is not None
 
     def test_allows_clean_sql(self):
@@ -107,8 +121,10 @@ class TestSecurityHook:
 
         result = check_sql_injection(
             "run_query",
-            {"sql": "SELECT cd_municipio, SUM(qt_votos) FROM spepe_silver.tse_2022 "
-                    "WHERE ano_eleicao = 2022 GROUP BY cd_municipio LIMIT 100"}
+            {
+                "sql": "SELECT cd_municipio, SUM(qt_votos) FROM spepe_silver.tse_2022 "
+                "WHERE ano_eleicao = 2022 GROUP BY cd_municipio LIMIT 100"
+            },
         )
         assert result is None
 
@@ -132,9 +148,7 @@ class TestSecurityHook:
     def test_allows_bigquery_with_limit(self):
         from hooks.security_hook import check_bigquery_cost
 
-        safe_query = (
-            "SELECT * FROM spepe_silver.tse_2022 LIMIT 1000"
-        )
+        safe_query = "SELECT * FROM spepe_silver.tse_2022 LIMIT 1000"
         result = check_bigquery_cost("bigquery", {"sql": safe_query})
         assert result is None
 

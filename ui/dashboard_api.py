@@ -11,6 +11,7 @@ Adaptação do protótipo spepe-app.html:
   - Chat mock → WebSocket /ws/chat
   - Login mock → Firebase Auth token validado em /api/auth/me
 """
+
 from __future__ import annotations
 
 import json
@@ -52,6 +53,7 @@ def _get_supervisor() -> Supervisor:
 async def serve_dashboard() -> FileResponse:
     """Serve o protótipo HTML do dashboard."""
     from pathlib import Path
+
     html_path = Path(__file__).parent / "static" / "spepe-app.html"
     return FileResponse(str(html_path), media_type="text/html")
 
@@ -63,6 +65,7 @@ async def serve_dashboard() -> FileResponse:
 async def auth_me(authorization: str = Header(default=None)) -> JSONResponse:
     """Retorna perfil do usuário autenticado. Valida Firebase ID token em produção."""
     import os
+
     if os.environ.get("FIREBASE_PROJECT_ID"):
         if not authorization or not authorization.startswith("Bearer "):
             raise HTTPException(status_code=401, detail="Token não fornecido")
@@ -70,18 +73,23 @@ async def auth_me(authorization: str = Header(default=None)) -> JSONResponse:
         try:
             from google.auth.transport import requests as grequests
             from google.oauth2 import id_token
+
             decoded = id_token.verify_firebase_token(token, grequests.Request())
-            return JSONResponse({
-                "uid": decoded["uid"],
-                "email": decoded.get("email", ""),
-                "name": decoded.get("name", ""),
-                "plan": "pro",
-            })
+            return JSONResponse(
+                {
+                    "uid": decoded["uid"],
+                    "email": decoded.get("email", ""),
+                    "name": decoded.get("name", ""),
+                    "plan": "pro",
+                }
+            )
         except Exception:
             raise HTTPException(status_code=401, detail="Token inválido")
 
     # Dev/local: stub sem auth
-    return JSONResponse({"uid": "demo-user", "email": "", "name": "Demo", "plan": "pro"})
+    return JSONResponse(
+        {"uid": "demo-user", "email": "", "name": "Demo", "plan": "pro"}
+    )
 
 
 # ── Candidatos por cargo / UF / ano ───────────────────────────────────────
@@ -89,32 +97,140 @@ async def auth_me(authorization: str = Header(default=None)) -> JSONResponse:
 
 _MOCK_CANDIDATOS: dict[str, list[dict]] = {
     "Presidente": [
-        {"nm": "Lula",       "partido": "PT",  "pct_t1": 43.8, "pct_t2": 50.9, "votos": "14.2M"},
-        {"nm": "Bolsonaro",  "partido": "PL",  "pct_t1": 43.0, "pct_t2": 49.1, "votos": "13.9M"},
-        {"nm": "Tebet",      "partido": "MDB", "pct_t1":  7.4, "pct_t2": None,  "votos": "2.4M"},
-        {"nm": "Ciro Gomes", "partido": "PDT", "pct_t1":  3.7, "pct_t2": None,  "votos": "1.2M"},
+        {
+            "nm": "Lula",
+            "partido": "PT",
+            "pct_t1": 43.8,
+            "pct_t2": 50.9,
+            "votos": "14.2M",
+        },
+        {
+            "nm": "Bolsonaro",
+            "partido": "PL",
+            "pct_t1": 43.0,
+            "pct_t2": 49.1,
+            "votos": "13.9M",
+        },
+        {
+            "nm": "Tebet",
+            "partido": "MDB",
+            "pct_t1": 7.4,
+            "pct_t2": None,
+            "votos": "2.4M",
+        },
+        {
+            "nm": "Ciro Gomes",
+            "partido": "PDT",
+            "pct_t1": 3.7,
+            "pct_t2": None,
+            "votos": "1.2M",
+        },
     ],
     "Governador": [
-        {"nm": "Tarcísio",       "partido": "Rep",  "pct_t1": 42.3, "pct_t2": 56.1, "votos": "13.7M"},
-        {"nm": "Haddad",         "partido": "PT",   "pct_t1": 35.7, "pct_t2": 43.9, "votos": "11.6M"},
-        {"nm": "Rodrigo Garcia", "partido": "PSDB", "pct_t1": 18.4, "pct_t2": None,  "votos": "5.9M"},
+        {
+            "nm": "Tarcísio",
+            "partido": "Rep",
+            "pct_t1": 42.3,
+            "pct_t2": 56.1,
+            "votos": "13.7M",
+        },
+        {
+            "nm": "Haddad",
+            "partido": "PT",
+            "pct_t1": 35.7,
+            "pct_t2": 43.9,
+            "votos": "11.6M",
+        },
+        {
+            "nm": "Rodrigo Garcia",
+            "partido": "PSDB",
+            "pct_t1": 18.4,
+            "pct_t2": None,
+            "votos": "5.9M",
+        },
     ],
     "Senador": [
-        {"nm": "Marcos Pontes", "partido": "PL",   "pct_t1": 36.5, "pct_t2": None, "votos": "11.8M"},
-        {"nm": "Marta Suplicy", "partido": "PT",   "pct_t1": 22.1, "pct_t2": None, "votos": "7.1M"},
-        {"nm": "José Aníbal",   "partido": "PSDB", "pct_t1": 15.3, "pct_t2": None, "votos": "4.9M"},
+        {
+            "nm": "Marcos Pontes",
+            "partido": "PL",
+            "pct_t1": 36.5,
+            "pct_t2": None,
+            "votos": "11.8M",
+        },
+        {
+            "nm": "Marta Suplicy",
+            "partido": "PT",
+            "pct_t1": 22.1,
+            "pct_t2": None,
+            "votos": "7.1M",
+        },
+        {
+            "nm": "José Aníbal",
+            "partido": "PSDB",
+            "pct_t1": 15.3,
+            "pct_t2": None,
+            "votos": "4.9M",
+        },
     ],
     "Dep. Federal": [
-        {"nm": "Eduardo Bolsonaro", "partido": "PL",  "pct_t1": 3.8, "pct_t2": None, "votos": "1.243M"},
-        {"nm": "Guilherme Boulos",  "partido": "PSB", "pct_t1": 1.1, "pct_t2": None, "votos": "349k"},
-        {"nm": "Tabata Amaral",     "partido": "PSB", "pct_t1": 0.9, "pct_t2": None, "votos": "288k"},
-        {"nm": "Paulo Teixeira",    "partido": "PT",  "pct_t1": 0.8, "pct_t2": None, "votos": "254k"},
-        {"nm": "Kim Kataguiri",     "partido": "MDB", "pct_t1": 0.7, "pct_t2": None, "votos": "213k"},
+        {
+            "nm": "Eduardo Bolsonaro",
+            "partido": "PL",
+            "pct_t1": 3.8,
+            "pct_t2": None,
+            "votos": "1.243M",
+        },
+        {
+            "nm": "Guilherme Boulos",
+            "partido": "PSB",
+            "pct_t1": 1.1,
+            "pct_t2": None,
+            "votos": "349k",
+        },
+        {
+            "nm": "Tabata Amaral",
+            "partido": "PSB",
+            "pct_t1": 0.9,
+            "pct_t2": None,
+            "votos": "288k",
+        },
+        {
+            "nm": "Paulo Teixeira",
+            "partido": "PT",
+            "pct_t1": 0.8,
+            "pct_t2": None,
+            "votos": "254k",
+        },
+        {
+            "nm": "Kim Kataguiri",
+            "partido": "MDB",
+            "pct_t1": 0.7,
+            "pct_t2": None,
+            "votos": "213k",
+        },
     ],
     "Dep. Estadual": [
-        {"nm": "Douglas Garcia",    "partido": "PL",   "pct_t1": 1.8, "pct_t2": None, "votos": "581k"},
-        {"nm": "Analice Fernandes", "partido": "PSDB", "pct_t1": 1.4, "pct_t2": None, "votos": "451k"},
-        {"nm": "Donato",            "partido": "PT",   "pct_t1": 1.1, "pct_t2": None, "votos": "356k"},
+        {
+            "nm": "Douglas Garcia",
+            "partido": "PL",
+            "pct_t1": 1.8,
+            "pct_t2": None,
+            "votos": "581k",
+        },
+        {
+            "nm": "Analice Fernandes",
+            "partido": "PSDB",
+            "pct_t1": 1.4,
+            "pct_t2": None,
+            "votos": "451k",
+        },
+        {
+            "nm": "Donato",
+            "partido": "PT",
+            "pct_t1": 1.1,
+            "pct_t2": None,
+            "votos": "356k",
+        },
     ],
 }
 
@@ -133,21 +249,29 @@ async def get_candidatos(
     if settings.gcp_project_id and os.environ.get("USE_BIGQUERY", "").lower() == "true":
         try:
             data = await _bq_candidatos(cargo, uf, ano)
-            return JSONResponse({"cargo": cargo, "uf": uf, "ano": ano, "candidatos": data})
+            return JSONResponse(
+                {"cargo": cargo, "uf": uf, "ano": ano, "candidatos": data}
+            )
         except Exception as exc:
             logger.warning("BigQuery candidatos falhou, usando mock: %s", exc)
 
     candidatos = _MOCK_CANDIDATOS.get(cargo, _MOCK_CANDIDATOS["Presidente"])
-    return JSONResponse({"cargo": cargo, "uf": uf, "ano": ano, "candidatos": candidatos})
+    return JSONResponse(
+        {"cargo": cargo, "uf": uf, "ano": ano, "candidatos": candidatos}
+    )
 
 
 async def _bq_candidatos(cargo: str, uf: str, ano: int) -> list[dict]:
     """Query real ao BigQuery Gold — quando dados estiverem ingeridos."""
     from google.cloud import bigquery
+
     client = bigquery.Client(project=settings.gcp_project_id)
     cargo_map = {
-        "Presidente": 1, "Governador": 3, "Senador": 5,
-        "Dep. Federal": 6, "Dep. Estadual": 7,
+        "Presidente": 1,
+        "Governador": 3,
+        "Senador": 5,
+        "Dep. Federal": 6,
+        "Dep. Estadual": 7,
     }
     cd_cargo = cargo_map.get(cargo, 1)
     query = f"""
@@ -165,11 +289,13 @@ async def _bq_candidatos(cargo: str, uf: str, ano: int) -> list[dict]:
         ORDER BY pct_t1 DESC
         LIMIT 10
     """
-    job_config = bigquery.QueryJobConfig(query_parameters=[
-        bigquery.ScalarQueryParameter("uf", "STRING", uf.upper()),
-        bigquery.ScalarQueryParameter("ano", "INT64", ano),
-        bigquery.ScalarQueryParameter("cd_cargo", "INT64", cd_cargo),
-    ])
+    job_config = bigquery.QueryJobConfig(
+        query_parameters=[
+            bigquery.ScalarQueryParameter("uf", "STRING", uf.upper()),
+            bigquery.ScalarQueryParameter("ano", "INT64", ano),
+            bigquery.ScalarQueryParameter("cd_cargo", "INT64", cd_cargo),
+        ]
+    )
     rows = client.query(query, job_config=job_config).result()
     return [dict(row) for row in rows]
 
@@ -189,31 +315,33 @@ async def get_kpi(
         return JSONResponse({"error": "sem dados"}, status_code=404)
 
     c0, c1 = cands[0], cands[1] if len(cands) > 1 else cands[0]
-    return JSONResponse({
-        "vencedor": c0["nm"],
-        "vencedor_partido": c0["partido"],
-        "vencedor_pct": c0["pct_t1"],
-        "segundo": c1["nm"],
-        "segundo_pct": c1["pct_t1"],
-        "margem_pp": round(abs(c0["pct_t1"] - c1["pct_t1"]), 1),
-        "total_votos": "32,5M" if uf == "SP" else "—",
-        "municipios": 645 if uf == "SP" else 0,
-        "dq_score": 98.5,
-    })
+    return JSONResponse(
+        {
+            "vencedor": c0["nm"],
+            "vencedor_partido": c0["partido"],
+            "vencedor_pct": c0["pct_t1"],
+            "segundo": c1["nm"],
+            "segundo_pct": c1["pct_t1"],
+            "margem_pp": round(abs(c0["pct_t1"] - c1["pct_t1"]), 1),
+            "total_votos": "32,5M" if uf == "SP" else "—",
+            "municipios": 645 if uf == "SP" else 0,
+            "dq_score": 98.5,
+        }
+    )
 
 
 # ── Municípios ────────────────────────────────────────────────────────────
 
 
 _MOCK_MUNICIPIOS = [
-    {"nm": "São Paulo",    "votos": "6.842k", "c1": 44.1, "c2": 43.2, "c3": 7.9},
-    {"nm": "Guarulhos",    "votos": "984k",   "c1": 52.3, "c2": 37.4, "c3": 6.1},
-    {"nm": "Campinas",     "votos": "733k",   "c1": 40.8, "c2": 47.2, "c3": 8.2},
-    {"nm": "S. Bernardo",  "votos": "541k",   "c1": 55.1, "c2": 34.6, "c3": 6.5},
-    {"nm": "Santo André",  "votos": "482k",   "c1": 53.8, "c2": 35.9, "c3": 7.0},
-    {"nm": "Ribeirão Pr.", "votos": "422k",   "c1": 38.2, "c2": 49.8, "c3": 8.1},
-    {"nm": "Sorocaba",     "votos": "389k",   "c1": 41.5, "c2": 45.9, "c3": 8.4},
-    {"nm": "Osasco",       "votos": "375k",   "c1": 58.2, "c2": 30.8, "c3": 6.7},
+    {"nm": "São Paulo", "votos": "6.842k", "c1": 44.1, "c2": 43.2, "c3": 7.9},
+    {"nm": "Guarulhos", "votos": "984k", "c1": 52.3, "c2": 37.4, "c3": 6.1},
+    {"nm": "Campinas", "votos": "733k", "c1": 40.8, "c2": 47.2, "c3": 8.2},
+    {"nm": "S. Bernardo", "votos": "541k", "c1": 55.1, "c2": 34.6, "c3": 6.5},
+    {"nm": "Santo André", "votos": "482k", "c1": 53.8, "c2": 35.9, "c3": 7.0},
+    {"nm": "Ribeirão Pr.", "votos": "422k", "c1": 38.2, "c2": 49.8, "c3": 8.1},
+    {"nm": "Sorocaba", "votos": "389k", "c1": 41.5, "c2": 45.9, "c3": 8.4},
+    {"nm": "Osasco", "votos": "375k", "c1": 58.2, "c2": 30.8, "c3": 6.7},
 ]
 
 
@@ -247,9 +375,12 @@ async def get_trends(
     try:
         df = fetch_trends(keywords, timeframe=timeframe, geo="BR")
         if not df.empty:
-            result = {kw: df[kw].tolist() if kw in df.columns else []
-                      for kw in keywords}
-            return JSONResponse({"labels": df.index.astype(str).tolist(), "series": result})
+            result = {
+                kw: df[kw].tolist() if kw in df.columns else [] for kw in keywords
+            }
+            return JSONResponse(
+                {"labels": df.index.astype(str).tolist(), "series": result}
+            )
     except Exception as exc:
         logger.warning("Google Trends real falhou: %s — usando mock", exc)
 
@@ -294,8 +425,9 @@ async def get_meta(
 
     # Mock fallback
     mock = [14200, 22800, 4100, 1900]
-    results = [{"candidato": c["nm"], "gasto_r": mock[i]}
-               for i, c in enumerate(cands[:4])]
+    results = [
+        {"candidato": c["nm"], "gasto_r": mock[i]} for i, c in enumerate(cands[:4])
+    ]
     return JSONResponse({"candidatos": results})
 
 
@@ -303,76 +435,327 @@ async def get_meta(
 
 
 class NivelGeo(str, Enum):
-    nacional  = "nacional"
-    regiao    = "regiao"
-    uf        = "uf"
+    nacional = "nacional"
+    regiao = "regiao"
+    uf = "uf"
     municipio = "municipio"
-    zona      = "zona"
-    secao     = "secao"
+    zona = "zona"
+    secao = "secao"
 
 
-_CARGO_CD = {"Presidente": 1, "Governador": 3, "Senador": 5, "Dep. Federal": 6, "Dep. Estadual": 7}
+_CARGO_CD = {
+    "Presidente": 1,
+    "Governador": 3,
+    "Senador": 5,
+    "Dep. Federal": 6,
+    "Dep. Estadual": 7,
+}
 
 _UF_IBGE = {
-    "AC": "12", "AL": "27", "AP": "16", "AM": "13", "BA": "29", "CE": "23", "DF": "53", "ES": "32",
-    "GO": "52", "MA": "21", "MT": "51", "MS": "50", "MG": "31", "PA": "15", "PB": "25", "PR": "41",
-    "PE": "26", "PI": "22", "RJ": "33", "RN": "24", "RS": "43", "RO": "11", "RR": "14", "SC": "42",
-    "SP": "35", "SE": "28", "TO": "17",
+    "AC": "12",
+    "AL": "27",
+    "AP": "16",
+    "AM": "13",
+    "BA": "29",
+    "CE": "23",
+    "DF": "53",
+    "ES": "32",
+    "GO": "52",
+    "MA": "21",
+    "MT": "51",
+    "MS": "50",
+    "MG": "31",
+    "PA": "15",
+    "PB": "25",
+    "PR": "41",
+    "PE": "26",
+    "PI": "22",
+    "RJ": "33",
+    "RN": "24",
+    "RS": "43",
+    "RO": "11",
+    "RR": "14",
+    "SC": "42",
+    "SP": "35",
+    "SE": "28",
+    "TO": "17",
 }
 
 _UF_REGIAO = {
-    "AC": "Norte", "AM": "Norte", "AP": "Norte", "PA": "Norte", "RO": "Norte", "RR": "Norte", "TO": "Norte",
-    "AL": "Nordeste", "BA": "Nordeste", "CE": "Nordeste", "MA": "Nordeste", "PB": "Nordeste",
-    "PE": "Nordeste", "PI": "Nordeste", "RN": "Nordeste", "SE": "Nordeste",
-    "DF": "Centro-Oeste", "GO": "Centro-Oeste", "MS": "Centro-Oeste", "MT": "Centro-Oeste",
-    "ES": "Sudeste", "MG": "Sudeste", "RJ": "Sudeste", "SP": "Sudeste",
-    "PR": "Sul", "RS": "Sul", "SC": "Sul",
+    "AC": "Norte",
+    "AM": "Norte",
+    "AP": "Norte",
+    "PA": "Norte",
+    "RO": "Norte",
+    "RR": "Norte",
+    "TO": "Norte",
+    "AL": "Nordeste",
+    "BA": "Nordeste",
+    "CE": "Nordeste",
+    "MA": "Nordeste",
+    "PB": "Nordeste",
+    "PE": "Nordeste",
+    "PI": "Nordeste",
+    "RN": "Nordeste",
+    "SE": "Nordeste",
+    "DF": "Centro-Oeste",
+    "GO": "Centro-Oeste",
+    "MS": "Centro-Oeste",
+    "MT": "Centro-Oeste",
+    "ES": "Sudeste",
+    "MG": "Sudeste",
+    "RJ": "Sudeste",
+    "SP": "Sudeste",
+    "PR": "Sul",
+    "RS": "Sul",
+    "SC": "Sul",
 }
 
 # Cores por partido
 _PARTIDO_COR = {
-    "PT": "#ef4444", "PL": "#1565c0", "MDB": "#f59e0b", "PSDB": "#00bcd4",
-    "Rep": "#7c3aed", "PDT": "#f97316", "PP": "#06b6d4", "PSD": "#84cc16",
-    "União": "#8b5cf6", "PSB": "#ec4899", "PSOL": "#ff6b35", "PCdoB": "#dc2626",
+    "PT": "#ef4444",
+    "PL": "#1565c0",
+    "MDB": "#f59e0b",
+    "PSDB": "#00bcd4",
+    "Rep": "#7c3aed",
+    "PDT": "#f97316",
+    "PP": "#06b6d4",
+    "PSD": "#84cc16",
+    "União": "#8b5cf6",
+    "PSB": "#ec4899",
+    "PSOL": "#ff6b35",
+    "PCdoB": "#dc2626",
 }
 
 # Mock data de resultado por UF (Presidente 2022, 1º turno)
 _MOCK_MAPA_UF = {
-    "SP": {"lider": "Bolsonaro", "partido": "PL", "pct": 47.7, "segundo": "Lula", "pct2": 40.9},
-    "RJ": {"lider": "Bolsonaro", "partido": "PL", "pct": 54.1, "segundo": "Lula", "pct2": 37.2},
-    "MG": {"lider": "Lula", "partido": "PT", "pct": 48.3, "segundo": "Bolsonaro", "pct2": 44.2},
-    "BA": {"lider": "Lula", "partido": "PT", "pct": 73.1, "segundo": "Bolsonaro", "pct2": 19.8},
-    "RS": {"lider": "Bolsonaro", "partido": "PL", "pct": 57.7, "segundo": "Lula", "pct2": 32.3},
-    "SC": {"lider": "Bolsonaro", "partido": "PL", "pct": 65.5, "segundo": "Lula", "pct2": 24.1},
-    "PR": {"lider": "Bolsonaro", "partido": "PL", "pct": 58.2, "segundo": "Lula", "pct2": 30.5},
-    "GO": {"lider": "Bolsonaro", "partido": "PL", "pct": 63.2, "segundo": "Lula", "pct2": 26.4},
-    "MT": {"lider": "Bolsonaro", "partido": "PL", "pct": 69.3, "segundo": "Lula", "pct2": 21.2},
-    "MS": {"lider": "Bolsonaro", "partido": "PL", "pct": 59.8, "segundo": "Lula", "pct2": 30.3},
-    "CE": {"lider": "Lula", "partido": "PT", "pct": 76.2, "segundo": "Bolsonaro", "pct2": 17.1},
-    "PE": {"lider": "Lula", "partido": "PT", "pct": 72.4, "segundo": "Bolsonaro", "pct2": 20.4},
-    "MA": {"lider": "Lula", "partido": "PT", "pct": 75.8, "segundo": "Bolsonaro", "pct2": 16.5},
-    "PI": {"lider": "Lula", "partido": "PT", "pct": 74.6, "segundo": "Bolsonaro", "pct2": 17.3},
-    "PB": {"lider": "Lula", "partido": "PT", "pct": 70.1, "segundo": "Bolsonaro", "pct2": 22.1},
-    "RN": {"lider": "Lula", "partido": "PT", "pct": 68.4, "segundo": "Bolsonaro", "pct2": 23.5},
-    "AL": {"lider": "Lula", "partido": "PT", "pct": 71.2, "segundo": "Bolsonaro", "pct2": 21.3},
-    "SE": {"lider": "Lula", "partido": "PT", "pct": 64.3, "segundo": "Bolsonaro", "pct2": 27.8},
-    "PA": {"lider": "Lula", "partido": "PT", "pct": 60.1, "segundo": "Bolsonaro", "pct2": 31.2},
-    "AM": {"lider": "Bolsonaro", "partido": "PL", "pct": 52.7, "segundo": "Lula", "pct2": 38.4},
-    "AC": {"lider": "Bolsonaro", "partido": "PL", "pct": 59.1, "segundo": "Lula", "pct2": 33.4},
-    "RO": {"lider": "Bolsonaro", "partido": "PL", "pct": 68.4, "segundo": "Lula", "pct2": 23.8},
-    "RR": {"lider": "Bolsonaro", "partido": "PL", "pct": 65.2, "segundo": "Lula", "pct2": 26.3},
-    "AP": {"lider": "Lula", "partido": "PT", "pct": 51.2, "segundo": "Bolsonaro", "pct2": 41.3},
-    "TO": {"lider": "Bolsonaro", "partido": "PL", "pct": 56.4, "segundo": "Lula", "pct2": 34.8},
-    "ES": {"lider": "Bolsonaro", "partido": "PL", "pct": 55.8, "segundo": "Lula", "pct2": 35.7},
-    "DF": {"lider": "Bolsonaro", "partido": "PL", "pct": 52.1, "segundo": "Lula", "pct2": 37.9},
+    "SP": {
+        "lider": "Bolsonaro",
+        "partido": "PL",
+        "pct": 47.7,
+        "segundo": "Lula",
+        "pct2": 40.9,
+    },
+    "RJ": {
+        "lider": "Bolsonaro",
+        "partido": "PL",
+        "pct": 54.1,
+        "segundo": "Lula",
+        "pct2": 37.2,
+    },
+    "MG": {
+        "lider": "Lula",
+        "partido": "PT",
+        "pct": 48.3,
+        "segundo": "Bolsonaro",
+        "pct2": 44.2,
+    },
+    "BA": {
+        "lider": "Lula",
+        "partido": "PT",
+        "pct": 73.1,
+        "segundo": "Bolsonaro",
+        "pct2": 19.8,
+    },
+    "RS": {
+        "lider": "Bolsonaro",
+        "partido": "PL",
+        "pct": 57.7,
+        "segundo": "Lula",
+        "pct2": 32.3,
+    },
+    "SC": {
+        "lider": "Bolsonaro",
+        "partido": "PL",
+        "pct": 65.5,
+        "segundo": "Lula",
+        "pct2": 24.1,
+    },
+    "PR": {
+        "lider": "Bolsonaro",
+        "partido": "PL",
+        "pct": 58.2,
+        "segundo": "Lula",
+        "pct2": 30.5,
+    },
+    "GO": {
+        "lider": "Bolsonaro",
+        "partido": "PL",
+        "pct": 63.2,
+        "segundo": "Lula",
+        "pct2": 26.4,
+    },
+    "MT": {
+        "lider": "Bolsonaro",
+        "partido": "PL",
+        "pct": 69.3,
+        "segundo": "Lula",
+        "pct2": 21.2,
+    },
+    "MS": {
+        "lider": "Bolsonaro",
+        "partido": "PL",
+        "pct": 59.8,
+        "segundo": "Lula",
+        "pct2": 30.3,
+    },
+    "CE": {
+        "lider": "Lula",
+        "partido": "PT",
+        "pct": 76.2,
+        "segundo": "Bolsonaro",
+        "pct2": 17.1,
+    },
+    "PE": {
+        "lider": "Lula",
+        "partido": "PT",
+        "pct": 72.4,
+        "segundo": "Bolsonaro",
+        "pct2": 20.4,
+    },
+    "MA": {
+        "lider": "Lula",
+        "partido": "PT",
+        "pct": 75.8,
+        "segundo": "Bolsonaro",
+        "pct2": 16.5,
+    },
+    "PI": {
+        "lider": "Lula",
+        "partido": "PT",
+        "pct": 74.6,
+        "segundo": "Bolsonaro",
+        "pct2": 17.3,
+    },
+    "PB": {
+        "lider": "Lula",
+        "partido": "PT",
+        "pct": 70.1,
+        "segundo": "Bolsonaro",
+        "pct2": 22.1,
+    },
+    "RN": {
+        "lider": "Lula",
+        "partido": "PT",
+        "pct": 68.4,
+        "segundo": "Bolsonaro",
+        "pct2": 23.5,
+    },
+    "AL": {
+        "lider": "Lula",
+        "partido": "PT",
+        "pct": 71.2,
+        "segundo": "Bolsonaro",
+        "pct2": 21.3,
+    },
+    "SE": {
+        "lider": "Lula",
+        "partido": "PT",
+        "pct": 64.3,
+        "segundo": "Bolsonaro",
+        "pct2": 27.8,
+    },
+    "PA": {
+        "lider": "Lula",
+        "partido": "PT",
+        "pct": 60.1,
+        "segundo": "Bolsonaro",
+        "pct2": 31.2,
+    },
+    "AM": {
+        "lider": "Bolsonaro",
+        "partido": "PL",
+        "pct": 52.7,
+        "segundo": "Lula",
+        "pct2": 38.4,
+    },
+    "AC": {
+        "lider": "Bolsonaro",
+        "partido": "PL",
+        "pct": 59.1,
+        "segundo": "Lula",
+        "pct2": 33.4,
+    },
+    "RO": {
+        "lider": "Bolsonaro",
+        "partido": "PL",
+        "pct": 68.4,
+        "segundo": "Lula",
+        "pct2": 23.8,
+    },
+    "RR": {
+        "lider": "Bolsonaro",
+        "partido": "PL",
+        "pct": 65.2,
+        "segundo": "Lula",
+        "pct2": 26.3,
+    },
+    "AP": {
+        "lider": "Lula",
+        "partido": "PT",
+        "pct": 51.2,
+        "segundo": "Bolsonaro",
+        "pct2": 41.3,
+    },
+    "TO": {
+        "lider": "Bolsonaro",
+        "partido": "PL",
+        "pct": 56.4,
+        "segundo": "Lula",
+        "pct2": 34.8,
+    },
+    "ES": {
+        "lider": "Bolsonaro",
+        "partido": "PL",
+        "pct": 55.8,
+        "segundo": "Lula",
+        "pct2": 35.7,
+    },
+    "DF": {
+        "lider": "Bolsonaro",
+        "partido": "PL",
+        "pct": 52.1,
+        "segundo": "Lula",
+        "pct2": 37.9,
+    },
 }
 
 _MOCK_MAPA_REGIAO = {
-    "Norte":        {"lider": "Bolsonaro", "partido": "PL", "pct": 55.2, "segundo": "Lula", "pct2": 34.1},
-    "Nordeste":     {"lider": "Lula", "partido": "PT", "pct": 71.8, "segundo": "Bolsonaro", "pct2": 20.7},
-    "Centro-Oeste": {"lider": "Bolsonaro", "partido": "PL", "pct": 62.4, "segundo": "Lula", "pct2": 27.6},
-    "Sudeste":      {"lider": "Bolsonaro", "partido": "PL", "pct": 49.1, "segundo": "Lula", "pct2": 42.3},
-    "Sul":          {"lider": "Bolsonaro", "partido": "PL", "pct": 60.2, "segundo": "Lula", "pct2": 29.8},
+    "Norte": {
+        "lider": "Bolsonaro",
+        "partido": "PL",
+        "pct": 55.2,
+        "segundo": "Lula",
+        "pct2": 34.1,
+    },
+    "Nordeste": {
+        "lider": "Lula",
+        "partido": "PT",
+        "pct": 71.8,
+        "segundo": "Bolsonaro",
+        "pct2": 20.7,
+    },
+    "Centro-Oeste": {
+        "lider": "Bolsonaro",
+        "partido": "PL",
+        "pct": 62.4,
+        "segundo": "Lula",
+        "pct2": 27.6,
+    },
+    "Sudeste": {
+        "lider": "Bolsonaro",
+        "partido": "PL",
+        "pct": 49.1,
+        "segundo": "Lula",
+        "pct2": 42.3,
+    },
+    "Sul": {
+        "lider": "Bolsonaro",
+        "partido": "PL",
+        "pct": 60.2,
+        "segundo": "Lula",
+        "pct2": 29.8,
+    },
 }
 
 
@@ -396,27 +779,37 @@ async def get_mapa(
     if nivel == "nacional":
         lula_votos = sum(1 for v in _MOCK_MAPA_UF.values() if v["lider"] == "Lula")
         total = len(_MOCK_MAPA_UF)
-        return JSONResponse({
-            "nivel": "nacional",
-            "features": [{
-                "id": "BR",
-                "label": "Brasil",
-                "lider": "Lula" if lula_votos > total / 2 else "Bolsonaro",
-                "partido": "PT" if lula_votos > total / 2 else "PL",
-                "pct": 50.9,
-                "segundo": "Bolsonaro" if lula_votos > total / 2 else "Lula",
-                "pct2": 49.1,
-                "total_votos": 118228830,
-                "ibge_code": "BR",
-            }],
-        })
+        return JSONResponse(
+            {
+                "nivel": "nacional",
+                "features": [
+                    {
+                        "id": "BR",
+                        "label": "Brasil",
+                        "lider": "Lula" if lula_votos > total / 2 else "Bolsonaro",
+                        "partido": "PT" if lula_votos > total / 2 else "PL",
+                        "pct": 50.9,
+                        "segundo": "Bolsonaro" if lula_votos > total / 2 else "Lula",
+                        "pct2": 49.1,
+                        "total_votos": 118228830,
+                        "ibge_code": "BR",
+                    }
+                ],
+            }
+        )
 
     if nivel == "regiao":
         features = [
             {
                 "id": reg,
                 "label": reg,
-                "ibge_code": {"Norte": "1", "Nordeste": "2", "Centro-Oeste": "5", "Sudeste": "3", "Sul": "4"}.get(reg, ""),
+                "ibge_code": {
+                    "Norte": "1",
+                    "Nordeste": "2",
+                    "Centro-Oeste": "5",
+                    "Sudeste": "3",
+                    "Sul": "4",
+                }.get(reg, ""),
                 **data,
             }
             for reg, data in _MOCK_MAPA_REGIAO.items()
@@ -439,23 +832,63 @@ async def get_mapa(
     if nivel == "municipio":
         uf_upper = (uf or "SP").upper()
         mock_muns = [
-            {"id": f"{uf_upper}_71072", "cd_municipio": "71072", "label": "São Paulo",
-             "lider": "Bolsonaro", "partido": "PL", "pct": 47.7, "segundo": "Lula", "pct2": 40.9, "ibge_code": "3550308"},
-            {"id": f"{uf_upper}_69922", "cd_municipio": "69922", "label": "Guarulhos",
-             "lider": "Lula", "partido": "PT", "pct": 52.3, "segundo": "Bolsonaro", "pct2": 37.4, "ibge_code": "3518800"},
-            {"id": f"{uf_upper}_72843", "cd_municipio": "72843", "label": "Campinas",
-             "lider": "Bolsonaro", "partido": "PL", "pct": 47.2, "segundo": "Lula", "pct2": 40.8, "ibge_code": "3509502"},
-            {"id": f"{uf_upper}_62910", "cd_municipio": "62910", "label": "Santos",
-             "lider": "Lula", "partido": "PT", "pct": 51.1, "segundo": "Bolsonaro", "pct2": 38.2, "ibge_code": "3548100"},
+            {
+                "id": f"{uf_upper}_71072",
+                "cd_municipio": "71072",
+                "label": "São Paulo",
+                "lider": "Bolsonaro",
+                "partido": "PL",
+                "pct": 47.7,
+                "segundo": "Lula",
+                "pct2": 40.9,
+                "ibge_code": "3550308",
+            },
+            {
+                "id": f"{uf_upper}_69922",
+                "cd_municipio": "69922",
+                "label": "Guarulhos",
+                "lider": "Lula",
+                "partido": "PT",
+                "pct": 52.3,
+                "segundo": "Bolsonaro",
+                "pct2": 37.4,
+                "ibge_code": "3518800",
+            },
+            {
+                "id": f"{uf_upper}_72843",
+                "cd_municipio": "72843",
+                "label": "Campinas",
+                "lider": "Bolsonaro",
+                "partido": "PL",
+                "pct": 47.2,
+                "segundo": "Lula",
+                "pct2": 40.8,
+                "ibge_code": "3509502",
+            },
+            {
+                "id": f"{uf_upper}_62910",
+                "cd_municipio": "62910",
+                "label": "Santos",
+                "lider": "Lula",
+                "partido": "PT",
+                "pct": 51.1,
+                "segundo": "Bolsonaro",
+                "pct2": 38.2,
+                "ibge_code": "3548100",
+            },
         ]
-        return JSONResponse({"nivel": "municipio", "uf": uf_upper, "features": mock_muns})
+        return JSONResponse(
+            {"nivel": "municipio", "uf": uf_upper, "features": mock_muns}
+        )
 
     if nivel == "zona":
         uf_upper = (uf or "SP").upper()
         mun = cd_municipio or "71072"
         features = [
             {
-                "id": f"z{z}", "label": f"Zona {z:03d}", "nr_zona": z,
+                "id": f"z{z}",
+                "label": f"Zona {z:03d}",
+                "nr_zona": z,
                 "lider": "Bolsonaro" if z % 2 == 0 else "Lula",
                 "partido": "PL" if z % 2 == 0 else "PT",
                 "pct": round(45 + (z % 10), 1),
@@ -464,17 +897,22 @@ async def get_mapa(
             }
             for z in range(1, 16)
         ]
-        return JSONResponse({"nivel": "zona", "uf": uf_upper, "cd_municipio": mun, "features": features})
+        return JSONResponse(
+            {"nivel": "zona", "uf": uf_upper, "cd_municipio": mun, "features": features}
+        )
 
     if nivel == "secao":
         uf_upper = (uf or "SP").upper()
         mun = cd_municipio or "71072"
         zona = nr_zona or "1"
         import random
+
         random.seed(42)
         features = [
             {
-                "id": f"s{s}", "label": f"Seção {s:04d}", "nr_secao": s,
+                "id": f"s{s}",
+                "label": f"Seção {s:04d}",
+                "nr_secao": s,
                 "lider": random.choice(["Lula", "Bolsonaro"]),
                 "partido": random.choice(["PT", "PL"]),
                 "pct": round(random.uniform(35, 65), 1),
@@ -483,9 +921,15 @@ async def get_mapa(
             }
             for s in range(1, 51)
         ]
-        return JSONResponse({
-            "nivel": "secao", "uf": uf_upper, "cd_municipio": mun, "nr_zona": zona, "features": features,
-        })
+        return JSONResponse(
+            {
+                "nivel": "secao",
+                "uf": uf_upper,
+                "cd_municipio": mun,
+                "nr_zona": zona,
+                "features": features,
+            }
+        )
 
     return JSONResponse({"error": "Nível não implementado"}, status_code=400)
 
@@ -529,10 +973,12 @@ async def ws_chat(websocket: WebSocket) -> None:
             # Validação de segurança
             check = validate_input_injection(user_text)
             if not check.ok:
-                await websocket.send_json({
-                    "type": "error",
-                    "message": f"Input bloqueado: {check.reason}",
-                })
+                await websocket.send_json(
+                    {
+                        "type": "error",
+                        "message": f"Input bloqueado: {check.reason}",
+                    }
+                )
                 continue
 
             # Stream do Supervisor
@@ -552,12 +998,14 @@ async def ws_chat(websocket: WebSocket) -> None:
                 await websocket.send_json({"type": "error", "message": str(exc)})
                 continue
 
-            await websocket.send_json({
-                "type": "done",
-                "cost": round(state.total_cost_usd, 5),
-                "budget_remaining": round(2.0 - state.total_cost_usd, 4),
-                "dashboard_update": dashboard_update,
-            })
+            await websocket.send_json(
+                {
+                    "type": "done",
+                    "cost": round(state.total_cost_usd, 5),
+                    "budget_remaining": round(2.0 - state.total_cost_usd, 4),
+                    "dashboard_update": dashboard_update,
+                }
+            )
 
     except WebSocketDisconnect:
         logger.info("WS chat desconectado: %s", state.session_id)

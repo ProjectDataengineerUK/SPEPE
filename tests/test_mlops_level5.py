@@ -1,4 +1,5 @@
 """Tests for MLOps Level 5: drift→retrain, canary, rollback, HP tuning, prediction store, bias."""
+
 import os
 from unittest.mock import patch
 
@@ -14,7 +15,9 @@ class TestDriftMonitor:
         rng = np.random.default_rng(42)
         data = rng.normal(0, 1, 500)
         score = _js_divergence(data, data.copy())
-        assert score < 0.01, "Identical distributions should have near-zero JS divergence"
+        assert (
+            score < 0.01
+        ), "Identical distributions should have near-zero JS divergence"
 
     def test_js_divergence_different_distributions(self):
         from mlops.monitoring.drift_monitor import _js_divergence
@@ -23,7 +26,9 @@ class TestDriftMonitor:
         p = rng.normal(0, 1, 500)
         q = rng.normal(5, 1, 500)  # Very different mean
         score = _js_divergence(p, q)
-        assert score > 0.05, "Clearly different distributions should have high JS divergence"
+        assert (
+            score > 0.05
+        ), "Clearly different distributions should have high JS divergence"
 
     def test_js_divergence_bounded(self):
         from mlops.monitoring.drift_monitor import _js_divergence
@@ -39,14 +44,18 @@ class TestDriftMonitor:
 
         rng = np.random.default_rng(42)
         n = 300
-        ref = pd.DataFrame({
-            "idhm_2010": rng.normal(0.7, 0.05, n),
-            "renda_media_domiciliar": rng.normal(1500, 200, n),
-        })
-        cur = pd.DataFrame({
-            "idhm_2010": rng.normal(0.7, 0.05, n),
-            "renda_media_domiciliar": rng.normal(1500, 200, n),
-        })
+        ref = pd.DataFrame(
+            {
+                "idhm_2010": rng.normal(0.7, 0.05, n),
+                "renda_media_domiciliar": rng.normal(1500, 200, n),
+            }
+        )
+        cur = pd.DataFrame(
+            {
+                "idhm_2010": rng.normal(0.7, 0.05, n),
+                "renda_media_domiciliar": rng.normal(1500, 200, n),
+            }
+        )
 
         with patch("mlops.monitoring.drift_monitor._load_config") as mock_cfg:
             mock_cfg.return_value = {
@@ -94,8 +103,12 @@ class TestPubSubPublisher:
     def test_publish_returns_none_without_credentials(self):
         from mlops.monitoring.pubsub_publisher import publish_drift_event
 
-        with patch("mlops.monitoring.pubsub_publisher._get_publisher", return_value=None):
-            result = publish_drift_event("idhm_2010", 0.15, 0.10, project_id="spepe-test")
+        with patch(
+            "mlops.monitoring.pubsub_publisher._get_publisher", return_value=None
+        ):
+            result = publish_drift_event(
+                "idhm_2010", 0.15, 0.10, project_id="spepe-test"
+            )
         assert result is None
 
 
@@ -105,13 +118,15 @@ class TestBiasMonitor:
         rng = np.random.default_rng(42)
         n = 200
         ufs = ["SP", "MG", "RJ", "BA", "RS"] * (n // 5)
-        return pd.DataFrame({
-            "y_true": rng.integers(0, 2, n).astype(float),
-            "y_pred": rng.uniform(0.1, 0.9, n),
-            "sg_uf": ufs,
-            "renda_media_domiciliar": rng.uniform(800, 3000, n),
-            "pct_zona_rural": rng.uniform(0, 80, n),
-        })
+        return pd.DataFrame(
+            {
+                "y_true": rng.integers(0, 2, n).astype(float),
+                "y_pred": rng.uniform(0.1, 0.9, n),
+                "sg_uf": ufs,
+                "renda_media_domiciliar": rng.uniform(800, 3000, n),
+                "pct_zona_rural": rng.uniform(0, 80, n),
+            }
+        )
 
     def test_bias_monitor_returns_results(self, predictions_df):
         from mlops.monitoring.bias_monitor import run_bias_monitor
@@ -247,7 +262,9 @@ class TestAutoRollback:
             region="southamerica-east1",
         )
 
-        with patch("mlops.deployment.auto_rollback._fetch_brier_score", return_value=None):
+        with patch(
+            "mlops.deployment.auto_rollback._fetch_brier_score", return_value=None
+        ):
             decision = evaluate_canary(state)
 
         assert decision.action == "continue"
@@ -260,9 +277,17 @@ class TestPromoteV2:
 
         with patch.object(promote_mod, "MODEL_DIR", tmp_path):
             with patch.object(promote_mod, "CHAMPION_PATH", tmp_path / "champion.pkl"):
-                with patch.object(promote_mod, "CHAMPION_META_PATH", tmp_path / "champion_meta.json"):
-                    with patch.object(promote_mod, "CHALLENGER_PATH", tmp_path / "challenger.pkl"):
-                        with patch.object(promote_mod, "CHALLENGER_META_PATH", tmp_path / "challenger_meta.json"):
+                with patch.object(
+                    promote_mod, "CHAMPION_META_PATH", tmp_path / "champion_meta.json"
+                ):
+                    with patch.object(
+                        promote_mod, "CHALLENGER_PATH", tmp_path / "challenger.pkl"
+                    ):
+                        with patch.object(
+                            promote_mod,
+                            "CHALLENGER_META_PATH",
+                            tmp_path / "challenger_meta.json",
+                        ):
                             model = LogisticRegression()
                             result = promote_mod.promote_if_better(
                                 model,

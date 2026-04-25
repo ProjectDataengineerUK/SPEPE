@@ -1,4 +1,5 @@
 """LLM eval runner — executes golden dataset against live agents."""
+
 from __future__ import annotations
 
 import argparse
@@ -48,13 +49,15 @@ def run_eval_offline(responses: dict[str, str]) -> dict:
         else:
             result = evaluate_response(response, item)
 
-        results.append({
-            "id": result.eval_id,
-            "agent": result.agent,
-            "score": result.score,
-            "passed": result.passed,
-            "feedback": result.feedback,
-        })
+        results.append(
+            {
+                "id": result.eval_id,
+                "agent": result.agent,
+                "score": result.score,
+                "passed": result.passed,
+                "feedback": result.feedback,
+            }
+        )
         total_score += result.score
         if result.passed:
             passed += 1
@@ -77,9 +80,13 @@ def run_eval_offline(responses: dict[str, str]) -> dict:
         json.dump(report, f, ensure_ascii=False, indent=2)
 
     if not ci_pass:
-        logger.warning(f"LLM eval FALHOU: score={overall_score:.3f} < {EVAL_SCORE_THRESHOLD}")
+        logger.warning(
+            f"LLM eval FALHOU: score={overall_score:.3f} < {EVAL_SCORE_THRESHOLD}"
+        )
     else:
-        logger.info(f"LLM eval OK: score={overall_score:.3f} passed={passed}/{len(dataset)}")
+        logger.info(
+            f"LLM eval OK: score={overall_score:.3f} passed={passed}/{len(dataset)}"
+        )
 
     return report
 
@@ -87,7 +94,7 @@ def run_eval_offline(responses: dict[str, str]) -> dict:
 if __name__ == "__main__":
     logging.basicConfig(
         level=logging.INFO,
-        format="%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+        format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
     )
 
     parser = argparse.ArgumentParser(description="Run SPEPE LLM eval suite")
@@ -95,13 +102,13 @@ if __name__ == "__main__":
         "--responses-file",
         type=str,
         default=None,
-        help="JSON file with pre-generated responses (format: {eval_id: response})"
+        help="JSON file with pre-generated responses (format: {eval_id: response})",
     )
     parser.add_argument(
         "--limit",
         type=int,
         default=None,
-        help="Limit number of evaluations (for testing)"
+        help="Limit number of evaluations (for testing)",
     )
     args = parser.parse_args()
 
@@ -111,9 +118,13 @@ if __name__ == "__main__":
     if args.responses_file:
         with open(args.responses_file, "r", encoding="utf-8") as f:
             responses = json.load(f)
-        logger.info(f"Loaded {len(responses)} pre-generated responses from {args.responses_file}")
+        logger.info(
+            f"Loaded {len(responses)} pre-generated responses from {args.responses_file}"
+        )
     else:
-        logger.info("No responses file provided — using empty responses (all will fail)")
+        logger.info(
+            "No responses file provided — using empty responses (all will fail)"
+        )
 
     report = run_eval_offline(responses)
 
@@ -121,7 +132,9 @@ if __name__ == "__main__":
     exit_code = 0 if ci_pass else 1
 
     print(f"\n{'='*60}")
-    print(f"EVAL REPORT: {report['overall_score']:.3f} (threshold: {report['threshold']})")
+    print(
+        f"EVAL REPORT: {report['overall_score']:.3f} (threshold: {report['threshold']})"
+    )
     print(f"Results: {report['passed']}/{report['total']} passed")
     print(f"Report saved to: {EVAL_REPORT_PATH}")
     print(f"{'='*60}\n")

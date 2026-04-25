@@ -1,4 +1,5 @@
 """Cost guard — stateless classifier. Budget tracking moved to SessionState."""
+
 import logging
 
 logger = logging.getLogger("spepe.hooks.cost_guard")

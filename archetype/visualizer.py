@@ -8,9 +8,20 @@ import pandas as pd
 logger = logging.getLogger("spepe.archetype.visualizer")
 
 ARCHETYPE_PALETTE = [
-    "#e63946", "#457b9d", "#2a9d8f", "#e9c46a", "#f4a261",
-    "#264653", "#a8dadc", "#f1faee", "#6a994e", "#bc4749",
-    "#8338ec", "#fb5607", "#ffbe0b", "#3a86ff",
+    "#e63946",
+    "#457b9d",
+    "#2a9d8f",
+    "#e9c46a",
+    "#f4a261",
+    "#264653",
+    "#a8dadc",
+    "#f1faee",
+    "#6a994e",
+    "#bc4749",
+    "#8338ec",
+    "#fb5607",
+    "#ffbe0b",
+    "#3a86ff",
 ]
 
 
@@ -27,7 +38,9 @@ def build_brazil_choropleth(
         import folium
         import geopandas as gpd
     except ImportError:
-        raise ImportError("folium e geopandas são necessários. Execute: pip install folium geopandas")
+        raise ImportError(
+            "folium e geopandas são necessários. Execute: pip install folium geopandas"
+        )
 
     gdf = gpd.read_file(geojson_path)
     merged = gdf.merge(
@@ -61,7 +74,9 @@ def build_brazil_choropleth(
     tooltip_fields = ["NM_MUN", label_col, archetype_col]
     tooltip_aliases = ["Município", "Arquétipo", "ID"]
     available_fields = [f for f in tooltip_fields if f in merged.columns]
-    available_aliases = [a for f, a in zip(tooltip_fields, tooltip_aliases) if f in merged.columns]
+    available_aliases = [
+        a for f, a in zip(tooltip_fields, tooltip_aliases) if f in merged.columns
+    ]
 
     folium.GeoJson(
         merged.__geo_interface__,
@@ -94,12 +109,14 @@ def build_umap_scatter(
         logger.warning("plotly não disponível — scatter UMAP não gerado")
         return ""
 
-    df_plot = pd.DataFrame({
-        "UMAP-1": embedding_2d[:, 0],
-        "UMAP-2": embedding_2d[:, 1],
-        "cluster": [str(lbl) for lbl in labels],
-        "arquetipo": [label_names.get(lbl, f"Cluster {lbl}") for lbl in labels],
-    })
+    df_plot = pd.DataFrame(
+        {
+            "UMAP-1": embedding_2d[:, 0],
+            "UMAP-2": embedding_2d[:, 1],
+            "cluster": [str(lbl) for lbl in labels],
+            "arquetipo": [label_names.get(lbl, f"Cluster {lbl}") for lbl in labels],
+        }
+    )
 
     fig = px.scatter(
         df_plot,

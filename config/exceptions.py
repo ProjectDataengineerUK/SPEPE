@@ -18,7 +18,9 @@ class DataNotFoundError(SPEPEError):
     def __init__(self, uf: str, ano: int):
         self.uf = uf
         self.ano = ano
-        super().__init__(f"Dados não encontrados para {uf}/{ano}. Execute /coletar {uf} {ano} primeiro.")
+        super().__init__(
+            f"Dados não encontrados para {uf}/{ano}. Execute /coletar {uf} {ano} primeiro."
+        )
 
 
 class IBGEAPIError(SPEPEError):

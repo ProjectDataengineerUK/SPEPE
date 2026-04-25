@@ -41,7 +41,9 @@ class ContextManager:
     def should_summarize(self, text: str) -> bool:
         return self.approx_tokens(text) / self.max_tokens >= self.trigger_fill_rate
 
-    def summarize(self, messages: list[dict[str, str]]) -> tuple[list[dict[str, str]], ContextSnapshot]:
+    def summarize(
+        self, messages: list[dict[str, str]]
+    ) -> tuple[list[dict[str, str]], ContextSnapshot]:
         preserved: list[dict[str, str]] = []
         regular: list[dict[str, str]] = []
         for m in messages:
@@ -53,7 +55,9 @@ class ContextManager:
         summary_text = self._compact(regular)
         new_messages: list[dict[str, str]] = preserved.copy()
         if summary_text:
-            new_messages.append({"role": "system", "content": f"[context_summary] {summary_text}"})
+            new_messages.append(
+                {"role": "system", "content": f"[context_summary] {summary_text}"}
+            )
         used = sum(self.approx_tokens(m["content"]) for m in new_messages)
         snapshot = ContextSnapshot(
             used_tokens=used,

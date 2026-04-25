@@ -1,4 +1,5 @@
 """Gold layer builder: Silver → 3 Gold tables (~200 features each)."""
+
 from __future__ import annotations
 
 import logging
@@ -21,7 +22,10 @@ def build_gold(use_bigquery: bool = False) -> dict:
 
     silver_files = list(LOCAL_SILVER_DIR.glob("tse_*.parquet"))
     if not silver_files:
-        return {"status": "error", "message": "Nenhum arquivo Silver disponível. Execute silver_transform primeiro."}
+        return {
+            "status": "error",
+            "message": "Nenhum arquivo Silver disponível. Execute silver_transform primeiro.",
+        }
 
     dfs = {str(f): pd.read_parquet(f) for f in silver_files}
     df_all = pd.concat(list(dfs.values()), ignore_index=True) if dfs else pd.DataFrame()
@@ -29,13 +33,19 @@ def build_gold(use_bigquery: bool = False) -> dict:
     result = {}
 
     fact_mun = _build_fact_municipio_eleicao(df_all)
-    result["fact_municipio_eleicao"] = _write_gold(fact_mun, "fact_municipio_eleicao", use_bigquery)
+    result["fact_municipio_eleicao"] = _write_gold(
+        fact_mun, "fact_municipio_eleicao", use_bigquery
+    )
 
     fact_sec = _build_fact_secao_eleicao(df_all)
-    result["fact_secao_eleicao"] = _write_gold(fact_sec, "fact_secao_eleicao", use_bigquery)
+    result["fact_secao_eleicao"] = _write_gold(
+        fact_sec, "fact_secao_eleicao", use_bigquery
+    )
 
     fact_cand = _build_fact_candidato_dia(df_all)
-    result["fact_candidato_dia"] = _write_gold(fact_cand, "fact_candidato_dia", use_bigquery)
+    result["fact_candidato_dia"] = _write_gold(
+        fact_cand, "fact_candidato_dia", use_bigquery
+    )
 
     ibge_data = _load_ibge_silver()
     fact_pesq = _build_fact_pesquisa(ibge_data)
@@ -56,13 +66,15 @@ def _build_fact_municipio_eleicao(df: pd.DataFrame) -> pd.DataFrame:
     # Convert Arrow strings to regular strings to avoid pandas dtype issues
     df = df.copy()
     for col in df.columns:
-        if hasattr(df[col].dtype, 'name') and 'string' in str(df[col].dtype):
+        if hasattr(df[col].dtype, "name") and "string" in str(df[col].dtype):
             df[col] = df[col].astype(str)
 
     preferred_keys = ["cod_municipio_ibge", "cd_municipio"]
     municipality_key = next((k for k in preferred_keys if k in df.columns), None)
     if municipality_key is None:
-        logger.warning("fact_municipio_eleicao: no municipality key found in Silver data")
+        logger.warning(
+            "fact_municipio_eleicao: no municipality key found in Silver data"
+        )
         return pd.DataFrame()
 
     group_cols = [municipality_key, "sg_uf", "ano_eleicao"]
@@ -82,7 +94,11 @@ def _build_fact_municipio_eleicao(df: pd.DataFrame) -> pd.DataFrame:
 
         agg_cols["qt_votos"] = "sum"
 
-    ibge_cols = [c for c in df.columns if any(ind in c for ind in ["idhm", "renda", "estudo", "populacao", "ibge"])]
+    ibge_cols = [
+        c
+        for c in df.columns
+        if any(ind in c for ind in ["idhm", "renda", "estudo", "populacao", "ibge"])
+    ]
     for col in ibge_cols:
         if col in df.columns:
             agg_cols[col] = "first"
@@ -98,7 +114,9 @@ def _build_fact_municipio_eleicao(df: pd.DataFrame) -> pd.DataFrame:
 
     # Use as_index=False to keep groupby columns as regular columns (avoid index conflicts)
     fact = df.groupby(avail_group, as_index=False).agg(avail_agg)
-    logger.info(f"fact_municipio_eleicao: {len(fact)} rows, {len(fact.columns)} colunas")
+    logger.info(
+        f"fact_municipio_eleicao: {len(fact)} rows, {len(fact.columns)} colunas"
+    )
     return fact
 
 
@@ -110,9 +128,21 @@ def _build_fact_candidato_dia(df: pd.DataFrame) -> pd.DataFrame:
     if "nm_candidato" not in df.columns:
         return pd.DataFrame()
 
-    cand_agg = df.groupby(["nm_candidato", "ano_eleicao"] if "ano_eleicao" in df.columns else ["nm_candidato"]).agg(
-        qt_votos_total=("qt_votos", "sum") if "qt_votos" in df.columns else ("nm_candidato", "count"),
-    ).reset_index()
+    cand_agg = (
+        df.groupby(
+            ["nm_candidato", "ano_eleicao"]
+            if "ano_eleicao" in df.columns
+            else ["nm_candidato"]
+        )
+        .agg(
+            qt_votos_total=(
+                ("qt_votos", "sum")
+                if "qt_votos" in df.columns
+                else ("nm_candidato", "count")
+            ),
+        )
+        .reset_index()
+    )
 
     logger.info(f"fact_candidato_dia: {len(cand_agg)} candidatos")
     return cand_agg
@@ -129,7 +159,16 @@ def _build_fact_pesquisa(df_ibge: pd.DataFrame) -> pd.DataFrame:
     """Build survey aggregation table (placeholder — populated by pesquisas MCP)."""
     pesquisa_files = list((Path("data/bronze/pesquisas")).glob("*.parquet"))
     if not pesquisa_files:
-        return pd.DataFrame(columns=["data_pesquisa", "instituto", "candidato", "intencao_pct", "house_effect", "intencao_ajustada"])
+        return pd.DataFrame(
+            columns=[
+                "data_pesquisa",
+                "instituto",
+                "candidato",
+                "intencao_pct",
+                "house_effect",
+                "intencao_ajustada",
+            ]
+        )
 
     dfs = [pd.read_parquet(f) for f in pesquisa_files]
     return pd.concat(dfs, ignore_index=True)
@@ -151,16 +190,16 @@ def _write_gold(df: pd.DataFrame, table_name: str, use_bigquery: bool) -> str:
 
 _GOLD_PARTITION_FIELD = {
     "fact_municipio_eleicao": "ano_eleicao",
-    "fact_secao_eleicao":     "ano_eleicao",
-    "fact_candidato_dia":     "data",
-    "fact_pesquisa":          "data_pesquisa",
+    "fact_secao_eleicao": "ano_eleicao",
+    "fact_candidato_dia": "data",
+    "fact_pesquisa": "data_pesquisa",
 }
 
 _GOLD_CLUSTER_FIELDS = {
     "fact_municipio_eleicao": ["sg_uf", "cod_municipio_ibge", "ano_eleicao"],
-    "fact_secao_eleicao":     ["sg_uf", "cod_municipio_ibge", "nr_zona"],
-    "fact_candidato_dia":     ["nm_candidato", "sg_uf", "ano_eleicao"],
-    "fact_pesquisa":          ["instituto", "candidato", "sg_uf"],
+    "fact_secao_eleicao": ["sg_uf", "cod_municipio_ibge", "nr_zona"],
+    "fact_candidato_dia": ["nm_candidato", "sg_uf", "ano_eleicao"],
+    "fact_pesquisa": ["instituto", "candidato", "sg_uf"],
 }
 
 
@@ -181,11 +220,13 @@ def _write_bigquery_gold(df: pd.DataFrame, table_name: str) -> str:
             create_disposition="CREATE_IF_NEEDED",
             time_partitioning=(
                 bigquery.TimePartitioning(field=partition_field)
-                if partition_field else None
+                if partition_field
+                else None
             ),
             clustering_fields=(
                 [f for f in cluster_fields if f in df.columns]
-                if cluster_fields else None
+                if cluster_fields
+                else None
             ),
             autodetect=False,
             schema=_dataframe_to_bq_schema(df),
@@ -208,15 +249,15 @@ def _dataframe_to_bq_schema(df: pd.DataFrame) -> list:
     from google.cloud import bigquery
 
     _type_map = {
-        "int64":   "INT64",
-        "int32":   "INT64",
+        "int64": "INT64",
+        "int32": "INT64",
         "float64": "FLOAT64",
         "float32": "FLOAT64",
-        "bool":    "BOOL",
-        "object":  "STRING",
-        "datetime64[ns]":    "TIMESTAMP",
+        "bool": "BOOL",
+        "object": "STRING",
+        "datetime64[ns]": "TIMESTAMP",
         "datetime64[ns, UTC]": "TIMESTAMP",
-        "date":    "DATE",
+        "date": "DATE",
     }
     fields = []
     for col, dtype in df.dtypes.items():
@@ -226,12 +267,33 @@ def _dataframe_to_bq_schema(df: pd.DataFrame) -> list:
 
 
 UF_REGIAO = {
-    "AC": "Norte", "AM": "Norte", "AP": "Norte", "PA": "Norte", "RO": "Norte", "RR": "Norte", "TO": "Norte",
-    "AL": "Nordeste", "BA": "Nordeste", "CE": "Nordeste", "MA": "Nordeste", "PB": "Nordeste",
-    "PE": "Nordeste", "PI": "Nordeste", "RN": "Nordeste", "SE": "Nordeste",
-    "DF": "Centro-Oeste", "GO": "Centro-Oeste", "MS": "Centro-Oeste", "MT": "Centro-Oeste",
-    "ES": "Sudeste", "MG": "Sudeste", "RJ": "Sudeste", "SP": "Sudeste",
-    "PR": "Sul", "RS": "Sul", "SC": "Sul",
+    "AC": "Norte",
+    "AM": "Norte",
+    "AP": "Norte",
+    "PA": "Norte",
+    "RO": "Norte",
+    "RR": "Norte",
+    "TO": "Norte",
+    "AL": "Nordeste",
+    "BA": "Nordeste",
+    "CE": "Nordeste",
+    "MA": "Nordeste",
+    "PB": "Nordeste",
+    "PE": "Nordeste",
+    "PI": "Nordeste",
+    "RN": "Nordeste",
+    "SE": "Nordeste",
+    "DF": "Centro-Oeste",
+    "GO": "Centro-Oeste",
+    "MS": "Centro-Oeste",
+    "MT": "Centro-Oeste",
+    "ES": "Sudeste",
+    "MG": "Sudeste",
+    "RJ": "Sudeste",
+    "SP": "Sudeste",
+    "PR": "Sul",
+    "RS": "Sul",
+    "SC": "Sul",
 }
 
 
@@ -240,9 +302,16 @@ def _build_fact_secao_eleicao(df: pd.DataFrame) -> pd.DataFrame:
     if df.empty:
         return pd.DataFrame()
     required = [
-        "sg_uf", "cd_municipio", "nr_zona", "nr_secao",
-        "nm_candidato", "sg_partido", "cd_cargo", "nr_turno",
-        "qt_votos", "ano_eleicao",
+        "sg_uf",
+        "cd_municipio",
+        "nr_zona",
+        "nr_secao",
+        "nm_candidato",
+        "sg_partido",
+        "cd_cargo",
+        "nr_turno",
+        "qt_votos",
+        "ano_eleicao",
     ]
     cols = [c for c in required if c in df.columns]
     if len(cols) < 5:

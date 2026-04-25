@@ -9,6 +9,7 @@ Usage:
 
 Referência: DESIGN_SPEPE.md — Decisão 17.
 """
+
 from __future__ import annotations
 
 import hashlib
@@ -31,7 +32,9 @@ def _validate_table_ref(table_ref: str) -> None:
         raise ValueError(f"source_table deve ser 'dataset.tabela': {table_ref}")
     dataset, table = parts
     if dataset not in _ALLOWED_DATASETS:
-        raise ValueError(f"Dataset não permitido: {dataset}. Permitidos: {_ALLOWED_DATASETS}")
+        raise ValueError(
+            f"Dataset não permitido: {dataset}. Permitidos: {_ALLOWED_DATASETS}"
+        )
     if not _TABLE_RE.match(table):
         raise ValueError(f"Nome de tabela inválido: {table}")
 

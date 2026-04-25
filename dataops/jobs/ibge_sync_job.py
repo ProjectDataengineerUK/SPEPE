@@ -1,4 +1,5 @@
 """Cloud Run Job: IBGE SIDRA + Localidades → Bronze layer."""
+
 from __future__ import annotations
 
 import logging
@@ -10,19 +11,46 @@ import pandas as pd
 from dataops.bronze_writer import write_bronze
 from dataops.clients.ibge_client import fetch_sidra_indicators, load_municipios
 
-logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s %(message)s")
+logging.basicConfig(
+    level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s %(message)s"
+)
 logger = logging.getLogger("spepe.jobs.ibge_sync")
 
 UF_CODES = {
-    "AC": "12", "AL": "27", "AP": "16", "AM": "13", "BA": "29", "CE": "23",
-    "DF": "53", "ES": "32", "GO": "52", "MA": "21", "MT": "51", "MS": "50",
-    "MG": "31", "PA": "15", "PB": "25", "PR": "41", "PE": "26", "PI": "22",
-    "RJ": "33", "RN": "24", "RS": "43", "RO": "11", "RR": "14", "SC": "42",
-    "SP": "35", "SE": "28", "TO": "17",
+    "AC": "12",
+    "AL": "27",
+    "AP": "16",
+    "AM": "13",
+    "BA": "29",
+    "CE": "23",
+    "DF": "53",
+    "ES": "32",
+    "GO": "52",
+    "MA": "21",
+    "MT": "51",
+    "MS": "50",
+    "MG": "31",
+    "PA": "15",
+    "PB": "25",
+    "PR": "41",
+    "PE": "26",
+    "PI": "22",
+    "RJ": "33",
+    "RN": "24",
+    "RS": "43",
+    "RO": "11",
+    "RR": "14",
+    "SC": "42",
+    "SP": "35",
+    "SE": "28",
+    "TO": "17",
 }
 
 DEFAULT_INDICADORES = [
-    "populacao", "renda_media", "taxa_desemprego", "pct_analfabetos",
+    "populacao",
+    "renda_media",
+    "taxa_desemprego",
+    "pct_analfabetos",
 ]
 
 
@@ -62,6 +90,7 @@ def main(uf: str) -> None:
 
 if __name__ == "__main__":
     import argparse
+
     parser = argparse.ArgumentParser()
     parser.add_argument("--uf", default=os.environ.get("DEFAULT_UF", "SP"))
     args = parser.parse_args()

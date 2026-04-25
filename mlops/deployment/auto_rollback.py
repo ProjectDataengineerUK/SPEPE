@@ -1,4 +1,5 @@
 """Auto-rollback: monitors challenger Brier score every 6h; reverts if > champion * 1.05."""
+
 from __future__ import annotations
 
 import logging
@@ -10,10 +11,10 @@ from mlops.deployment.canary_manager import CanaryState, rollback_canary, promot
 
 logger = logging.getLogger(__name__)
 
-ROLLBACK_THRESHOLD = 1.05   # 5% worse than champion triggers rollback
+ROLLBACK_THRESHOLD = 1.05  # 5% worse than champion triggers rollback
 CHECK_INTERVAL_SECONDS = 6 * 3600
 EVAL_WINDOW_HOURS = 48
-COOLDOWN_HOURS = 72         # Minimum hours between retrain runs (prevents retrain loops)
+COOLDOWN_HOURS = 72  # Minimum hours between retrain runs (prevents retrain loops)
 
 
 @dataclass
@@ -25,12 +26,17 @@ class RollbackDecision:
     ratio: float
 
 
-def _fetch_brier_score(revision: str, window_hours: int, project_id: str) -> float | None:
+def _fetch_brier_score(
+    revision: str, window_hours: int, project_id: str
+) -> float | None:
     """Fetch average Brier score for a Cloud Run revision from fact_predictions."""
     try:
         from google.cloud import bigquery
+
         client = bigquery.Client(project=project_id)
-        cutoff = (datetime.now(timezone.utc) - timedelta(hours=window_hours)).isoformat()
+        cutoff = (
+            datetime.now(timezone.utc) - timedelta(hours=window_hours)
+        ).isoformat()
         query = f"""
             SELECT AVG(brier_score) as avg_brier
             FROM `{project_id}.spepe_mlops.fact_predictions`
@@ -49,8 +55,12 @@ def _fetch_brier_score(revision: str, window_hours: int, project_id: str) -> flo
 def evaluate_canary(state: CanaryState, window_hours: int = 6) -> RollbackDecision:
     project_id = state.project_id
 
-    challenger_brier = _fetch_brier_score(state.challenger_revision, window_hours, project_id)
-    champion_brier = _fetch_brier_score(state.champion_revision, window_hours, project_id)
+    challenger_brier = _fetch_brier_score(
+        state.challenger_revision, window_hours, project_id
+    )
+    champion_brier = _fetch_brier_score(
+        state.champion_revision, window_hours, project_id
+    )
 
     if challenger_brier is None or champion_brier is None:
         logger.info("Insufficient data for canary evaluation — continuing")
@@ -90,7 +100,12 @@ def watch_canary(state: CanaryState, max_hours: int = EVAL_WINDOW_HOURS) -> str:
         time.sleep(CHECK_INTERVAL_SECONDS)
         checks += 1
         decision = evaluate_canary(state)
-        logger.info("Canary check #%d: action=%s ratio=%.3f", checks, decision.action, decision.ratio)
+        logger.info(
+            "Canary check #%d: action=%s ratio=%.3f",
+            checks,
+            decision.action,
+            decision.ratio,
+        )
 
         if decision.action == "rollback":
             rollback_canary(state)
@@ -99,7 +114,9 @@ def watch_canary(state: CanaryState, max_hours: int = EVAL_WINDOW_HOURS) -> str:
             promote_canary(state)
             return "promoted"
 
-    logger.warning("Canary window expired without clear decision — promoting challenger")
+    logger.warning(
+        "Canary window expired without clear decision — promoting challenger"
+    )
     promote_canary(state)
     return "promoted"
 
@@ -108,8 +125,11 @@ def check_cooldown(project_id: str) -> bool:
     """Returns True if cooldown period has passed (safe to retrain)."""
     try:
         from google.cloud import bigquery
+
         client = bigquery.Client(project=project_id)
-        cutoff = (datetime.now(timezone.utc) - timedelta(hours=COOLDOWN_HOURS)).isoformat()
+        cutoff = (
+            datetime.now(timezone.utc) - timedelta(hours=COOLDOWN_HOURS)
+        ).isoformat()
         query = f"""
             SELECT COUNT(*) as recent_retrains
             FROM `{project_id}.spepe_mlops.model_evaluations`

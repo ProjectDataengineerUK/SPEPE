@@ -9,32 +9,36 @@ import pytest
 def sample_municipios_df():
     rng = np.random.default_rng(42)
     n = 200
-    return pd.DataFrame({
-        "cd_municipio": range(3500000, 3500000 + n),
-        "nm_municipio": [f"Municipio_{i}" for i in range(n)],
-        "sg_uf": ["SP"] * n,
-        "idhm_2010": rng.uniform(0.5, 0.9, n),
-        "renda_media_domiciliar": rng.uniform(800, 5000, n),
-        "pct_analfabetos": rng.uniform(0.01, 0.25, n),
-        "pct_rural": rng.uniform(0.0, 0.8, n),
-        "pib_per_capita": rng.uniform(5000, 80000, n),
-        "pct_votos_pt_2022": rng.uniform(0.1, 0.8, n),
-        "pct_votos_pl_2022": rng.uniform(0.1, 0.8, n),
-        "populacao_2022": rng.integers(5000, 12_000_000, n),
-        "taxa_desemprego": rng.uniform(0.03, 0.25, n),
-        "anos_estudo_medio": rng.uniform(5.0, 12.0, n),
-    })
+    return pd.DataFrame(
+        {
+            "cd_municipio": range(3500000, 3500000 + n),
+            "nm_municipio": [f"Municipio_{i}" for i in range(n)],
+            "sg_uf": ["SP"] * n,
+            "idhm_2010": rng.uniform(0.5, 0.9, n),
+            "renda_media_domiciliar": rng.uniform(800, 5000, n),
+            "pct_analfabetos": rng.uniform(0.01, 0.25, n),
+            "pct_rural": rng.uniform(0.0, 0.8, n),
+            "pib_per_capita": rng.uniform(5000, 80000, n),
+            "pct_votos_pt_2022": rng.uniform(0.1, 0.8, n),
+            "pct_votos_pl_2022": rng.uniform(0.1, 0.8, n),
+            "populacao_2022": rng.integers(5000, 12_000_000, n),
+            "taxa_desemprego": rng.uniform(0.03, 0.25, n),
+            "anos_estudo_medio": rng.uniform(5.0, 12.0, n),
+        }
+    )
 
 
 class TestFeatureSelection:
     def test_select_features_returns_available_cols(self, sample_municipios_df):
         from archetype.features import select_features
+
         _, cols = select_features(sample_municipios_df, "socioeconomic")
         assert len(cols) > 0
         assert all(c in sample_municipios_df.columns for c in cols)
 
     def test_prepare_feature_matrix_no_nans(self, sample_municipios_df):
         from archetype.features import prepare_feature_matrix, select_features
+
         _, cols = select_features(sample_municipios_df, "socioeconomic+electoral")
         X = prepare_feature_matrix(sample_municipios_df, cols)
         assert not X.isnull().any().any()
@@ -115,6 +119,7 @@ class TestCards:
 class TestCache:
     def test_save_and_load_cache(self, tmp_path, monkeypatch, sample_municipios_df):
         import archetype.cache as cache_module
+
         monkeypatch.setattr(cache_module, "CACHE_DIR", tmp_path / "cache")
         from archetype.cache import load_pipeline_result, save_pipeline_result
 

@@ -37,8 +37,13 @@ class SPEPESettings(BaseSettings):
 
     def startup_diagnostics(self) -> None:
         import logging
+
         logger = logging.getLogger("spepe.settings")
-        logger.info("SPEPE iniciando | project=%s | model=%s", self.gcp_project_id, self.default_model)
+        logger.info(
+            "SPEPE iniciando | project=%s | model=%s",
+            self.gcp_project_id,
+            self.default_model,
+        )
         if not self.anthropic_api_key:
             logger.warning("ANTHROPIC_API_KEY não configurada")
 

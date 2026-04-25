@@ -1,4 +1,5 @@
 """Pub/Sub publisher for drift-detected events."""
+
 from __future__ import annotations
 
 import json
@@ -18,6 +19,7 @@ def _get_publisher():
     if _publisher is None:
         try:
             from google.cloud import pubsub_v1
+
             _publisher = pubsub_v1.PublisherClient()
         except ImportError:
             logger.warning("google-cloud-pubsub not installed — using local fallback")
@@ -49,7 +51,12 @@ def publish_drift_event(
         topic_path = publisher.topic_path(project_id, TOPIC_ID)
         future = publisher.publish(topic_path, data=data)
         message_id = future.result(timeout=10)
-        logger.info("Drift event published: %s (score=%.4f) → msg_id=%s", feature, js_score, message_id)
+        logger.info(
+            "Drift event published: %s (score=%.4f) → msg_id=%s",
+            feature,
+            js_score,
+            message_id,
+        )
         return message_id
     except Exception as exc:
         logger.error("Failed to publish drift event: %s", exc)
@@ -59,6 +66,7 @@ def publish_drift_event(
 
 def _fallback_log(payload: dict[str, Any]) -> None:
     import pathlib
+
     log_path = pathlib.Path("output/logs/drift_events.jsonl")
     log_path.parent.mkdir(parents=True, exist_ok=True)
     with log_path.open("a") as f:

@@ -1,4 +1,5 @@
 """Model evaluation: backtesting 2018→2022, error metrics."""
+
 from __future__ import annotations
 
 import json
@@ -21,7 +22,11 @@ def backtest_2018_2022(
     """Train on 2018 data, predict 2022, compute observed error."""
     from sklearn.metrics import accuracy_score, brier_score_loss, log_loss
 
-    y_pred_proba = model.predict_proba(X_2018)[:, 1] if hasattr(model, "predict_proba") else model.predict(X_2018)
+    y_pred_proba = (
+        model.predict_proba(X_2018)[:, 1]
+        if hasattr(model, "predict_proba")
+        else model.predict(X_2018)
+    )
     y_pred = (y_pred_proba >= 0.5).astype(int)
 
     metrics = {
@@ -33,11 +38,15 @@ def backtest_2018_2022(
     }
 
     _save_eval(metrics, "backtest_2018_2022.json")
-    logger.info(f"Backtest 2018→2022: accuracy={metrics['accuracy']:.3f} MAE={metrics['mean_absolute_error']:.3f}")
+    logger.info(
+        f"Backtest 2018→2022: accuracy={metrics['accuracy']:.3f} MAE={metrics['mean_absolute_error']:.3f}"
+    )
     return metrics
 
 
-def compute_calibration(y_true: np.ndarray, y_pred_proba: np.ndarray, n_bins: int = 10) -> dict:
+def compute_calibration(
+    y_true: np.ndarray, y_pred_proba: np.ndarray, n_bins: int = 10
+) -> dict:
     """Compute calibration metrics (reliability diagram data)."""
     bins = np.linspace(0, 1, n_bins + 1)
     bin_means = []

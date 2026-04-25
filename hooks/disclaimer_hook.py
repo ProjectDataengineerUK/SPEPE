@@ -8,6 +8,7 @@ verifica a presença do disclaimer correspondente e injeta se ausente.
 
 Referência: DESIGN_SPEPE.md — Política de Disclaimer.
 """
+
 from __future__ import annotations
 
 import logging
@@ -35,8 +36,7 @@ TRIGGERS: dict[str, re.Pattern[str]] = {
         re.IGNORECASE,
     ),
     "tipo_c_pesquisa": re.compile(
-        r"pesquisa|instituto\s+\w+|PesqEle|margem\s+de\s+erro|"
-        r"intenção\s+de\s+voto",
+        r"pesquisa|instituto\s+\w+|PesqEle|margem\s+de\s+erro|" r"intenção\s+de\s+voto",
         re.IGNORECASE,
     ),
     "tipo_d_recomendacao": re.compile(
@@ -94,17 +94,13 @@ def disclaimer_hook(output: str, agent_name: str | None = None) -> tuple[str, bo
     ]
 
     if not missing:
-        logger.debug(
-            "disclaimer_ok agent=%s required=%s", agent_name, required
-        )
+        logger.debug("disclaimer_ok agent=%s required=%s", agent_name, required)
         return output, False
 
     disclaimer_block = "\n\n---\n" + "\n\n".join(
         templates[t].strip() for t in missing if t in templates
     )
-    logger.info(
-        "disclaimer_injected agent=%s types=%s", agent_name, missing
-    )
+    logger.info("disclaimer_injected agent=%s types=%s", agent_name, missing)
     return output + disclaimer_block, True
 
 
@@ -113,9 +109,7 @@ def audit_disclaimer(output: str, agent_name: str | None = None) -> dict:
     required = detect_required_disclaimers(output)
     templates = _load_templates()
     present = [
-        t
-        for t in required
-        if _disclaimer_already_present(output, templates.get(t, ""))
+        t for t in required if _disclaimer_already_present(output, templates.get(t, ""))
     ]
     return {
         "agent": agent_name,

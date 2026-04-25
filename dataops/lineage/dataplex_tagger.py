@@ -1,4 +1,5 @@
 """Dataplex lineage tagger for Bronze→Silver→Gold pipeline runs."""
+
 from __future__ import annotations
 
 import logging
@@ -21,6 +22,7 @@ def tag_lineage_event(
     """Register a lineage event in Dataplex Data Lineage API."""
     try:
         from google.cloud import datacatalog_lineage_v1
+
         client = datacatalog_lineage_v1.LineageClient()
 
         process = datacatalog_lineage_v1.Process(
@@ -41,8 +43,16 @@ def tag_lineage_event(
         run = client.create_run(parent=process.name, run=run)
 
         event = datacatalog_lineage_v1.LineageEvent(
-            sources=[datacatalog_lineage_v1.EntityReference(fully_qualified_name=f"bigquery:{source_table}")],
-            targets=[datacatalog_lineage_v1.EntityReference(fully_qualified_name=f"bigquery:{target_table}")],
+            sources=[
+                datacatalog_lineage_v1.EntityReference(
+                    fully_qualified_name=f"bigquery:{source_table}"
+                )
+            ],
+            targets=[
+                datacatalog_lineage_v1.EntityReference(
+                    fully_qualified_name=f"bigquery:{target_table}"
+                )
+            ],
         )
         client.create_lineage_event(parent=run.name, lineage_event=event)
 
@@ -50,18 +60,27 @@ def tag_lineage_event(
         return True
 
     except ImportError:
-        logger.debug("google-cloud-datacatalog-lineage não disponível — lineage local apenas")
-        _log_local_lineage(source_table, target_table, pipeline_run_id, rows_written, dq_score)
+        logger.debug(
+            "google-cloud-datacatalog-lineage não disponível — lineage local apenas"
+        )
+        _log_local_lineage(
+            source_table, target_table, pipeline_run_id, rows_written, dq_score
+        )
         return False
     except Exception as e:
         logger.warning(f"Dataplex lineage falhou: {e}")
-        _log_local_lineage(source_table, target_table, pipeline_run_id, rows_written, dq_score)
+        _log_local_lineage(
+            source_table, target_table, pipeline_run_id, rows_written, dq_score
+        )
         return False
 
 
-def _log_local_lineage(source: str, target: str, run_id: str, rows: int, dq_score: float) -> None:
+def _log_local_lineage(
+    source: str, target: str, run_id: str, rows: int, dq_score: float
+) -> None:
     import json
     from pathlib import Path
+
     lineage_path = Path("output/logs/lineage.jsonl")
     lineage_path.parent.mkdir(parents=True, exist_ok=True)
     entry = {

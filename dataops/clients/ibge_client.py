@@ -1,4 +1,5 @@
 """IBGE client — Localidades API + SIDRA API."""
+
 from __future__ import annotations
 
 import logging
@@ -23,9 +24,9 @@ _SIDRA_URL = (
 # SIDRA: tabela, periodo, variavel, col_name
 # Sources: Censo 2022 (9514) + PNAD Contínua 2023 (9532, 9605)
 _SIDRA_TABLES: dict[str, tuple[str, str, str]] = {
-    "populacao":       ("9514", "2022", "9324"),
+    "populacao": ("9514", "2022", "9324"),
     "pct_analfabetos": ("9543", "2022", "4104"),
-    "renda_media":     ("9532", "2023", "9531"),
+    "renda_media": ("9532", "2023", "9531"),
     "taxa_desemprego": ("9605", "2023", "4099"),
 }
 
@@ -45,17 +46,19 @@ def load_municipios(uf: str) -> pd.DataFrame:
 
     rows = []
     for m in data:
-        rows.append({
-            "cd_municipio_ibge": int(m["id"]),
-            "cd_municipio_tse":  int(m["id"]) // 10,
-            "nm_municipio":      m["nome"],
-            "sg_uf":             m["microrregiao"]["mesorregiao"]["UF"]["sigla"],
-            "nm_uf":             m["microrregiao"]["mesorregiao"]["UF"]["nome"],
-            "cd_mesorregiao":    m["microrregiao"]["mesorregiao"]["id"],
-            "nm_mesorregiao":    m["microrregiao"]["mesorregiao"]["nome"],
-            "cd_microrregiao":   m["microrregiao"]["id"],
-            "nm_microrregiao":   m["microrregiao"]["nome"],
-        })
+        rows.append(
+            {
+                "cd_municipio_ibge": int(m["id"]),
+                "cd_municipio_tse": int(m["id"]) // 10,
+                "nm_municipio": m["nome"],
+                "sg_uf": m["microrregiao"]["mesorregiao"]["UF"]["sigla"],
+                "nm_uf": m["microrregiao"]["mesorregiao"]["UF"]["nome"],
+                "cd_mesorregiao": m["microrregiao"]["mesorregiao"]["id"],
+                "nm_mesorregiao": m["microrregiao"]["mesorregiao"]["nome"],
+                "cd_microrregiao": m["microrregiao"]["id"],
+                "nm_microrregiao": m["microrregiao"]["nome"],
+            }
+        )
 
     df = pd.DataFrame(rows)
     logger.info("Municípios IBGE carregados: %d para UF=%s", len(df), uf)
@@ -112,14 +115,16 @@ def fetch_sidra_indicators(
 
         for ibge_id, value in values.items():
             if ibge_id in ibge_codes:
-                rows.append({
-                    "cd_municipio_ibge": int(ibge_id),
-                    "sg_uf": uf.upper(),
-                    "indicador": indicator,
-                    "valor": value,
-                    "periodo": periodo,
-                    "fonte": f"IBGE SIDRA tabela {tabela}",
-                })
+                rows.append(
+                    {
+                        "cd_municipio_ibge": int(ibge_id),
+                        "sg_uf": uf.upper(),
+                        "indicador": indicator,
+                        "valor": value,
+                        "periodo": periodo,
+                        "fonte": f"IBGE SIDRA tabela {tabela}",
+                    }
+                )
 
     logger.info("SIDRA retornou %d linhas para UF=%s", len(rows), uf)
     return rows

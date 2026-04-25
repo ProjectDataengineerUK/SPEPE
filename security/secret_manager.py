@@ -1,4 +1,5 @@
 """Google Secret Manager helper with local .env fallback."""
+
 from __future__ import annotations
 
 import logging
@@ -26,6 +27,7 @@ def get_secret(secret_id: str, project_id: str | None = None) -> str:
 
     try:
         from google.cloud import secretmanager
+
         client = secretmanager.SecretManagerServiceClient()
         name = f"projects/{gcp_project}/secrets/{secret_id}/versions/latest"
         response = client.access_secret_version(request={"name": name})

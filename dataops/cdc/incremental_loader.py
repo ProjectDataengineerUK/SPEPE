@@ -5,6 +5,7 @@ Falls back to full-refresh if source has no watermark column.
 
 Referência: DESIGN_SPEPE.md — Decisão 17 (DataOps L5).
 """
+
 from __future__ import annotations
 
 import logging
@@ -56,9 +57,7 @@ class IncrementalLoader:
             logger.debug("BigQuery SDK not available; skipping checkpoint read")
             return None
 
-        table = self.defaults.get(
-            "checkpoint_table", "spepe_mlops.cdc_checkpoints"
-        )
+        table = self.defaults.get("checkpoint_table", "spepe_mlops.cdc_checkpoints")
         import os
 
         project = os.environ.get("GCP_PROJECT_ID", "")
@@ -100,9 +99,7 @@ class IncrementalLoader:
         project = os.environ.get("GCP_PROJECT_ID", "")
         if not project:
             return
-        table = self.defaults.get(
-            "checkpoint_table", "spepe_mlops.cdc_checkpoints"
-        )
+        table = self.defaults.get("checkpoint_table", "spepe_mlops.cdc_checkpoints")
         client = bigquery.Client(project=project)
         row = {
             "source": self.source,
@@ -123,10 +120,7 @@ class IncrementalLoader:
 
         If watermark column missing, returns full dataframe (fallback).
         """
-        if (
-            not self.watermark_col
-            or self.watermark_col not in df_bronze.columns
-        ):
+        if not self.watermark_col or self.watermark_col not in df_bronze.columns:
             logger.info(
                 "source=%s strategy=fallback_full_refresh reason=no_watermark",
                 self.source,
@@ -150,12 +144,16 @@ class IncrementalLoader:
                 self.source,
                 len(df_bronze),
             )
-            watermark_series = pd.to_datetime(df_bronze[self.watermark_col], errors="coerce")
+            watermark_series = pd.to_datetime(
+                df_bronze[self.watermark_col], errors="coerce"
+            )
             new_watermark = watermark_series.max()
             delta_df = df_bronze
             watermark_from = None
         else:
-            watermark_series = pd.to_datetime(df_bronze[self.watermark_col], errors="coerce")
+            watermark_series = pd.to_datetime(
+                df_bronze[self.watermark_col], errors="coerce"
+            )
             mask = watermark_series > pd.Timestamp(last_watermark)
             delta_df = df_bronze[mask].copy()
             new_watermark = watermark_series.max()

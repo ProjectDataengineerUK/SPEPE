@@ -1,4 +1,5 @@
 """Silver layer transformer: Bronze → Silver (clean, joined, schema-enforced)."""
+
 from __future__ import annotations
 
 import logging
@@ -15,8 +16,17 @@ LOCAL_SILVER_DIR = Path(os.environ.get("DATA_DIR", "data")) / "silver"
 LOCAL_BRONZE_DIR = Path(os.environ.get("DATA_DIR", "data")) / "bronze"
 
 CANONICAL_TSE_COLS = [
-    "sg_uf", "cd_municipio", "nm_municipio", "nr_zona", "nr_secao",
-    "nr_candidato", "nm_candidato", "qt_votos", "ds_cargo", "cd_cargo", "nr_turno",
+    "sg_uf",
+    "cd_municipio",
+    "nm_municipio",
+    "nr_zona",
+    "nr_secao",
+    "nr_candidato",
+    "nm_candidato",
+    "qt_votos",
+    "ds_cargo",
+    "cd_cargo",
+    "nr_turno",
 ]
 
 
@@ -32,7 +42,10 @@ def transform_to_silver(
     df_ibge = _load_bronze_ibge(uf)
 
     if df_tse.empty:
-        return {"status": "error", "message": f"Bronze TSE não encontrado para {uf}/{year}"}
+        return {
+            "status": "error",
+            "message": f"Bronze TSE não encontrado para {uf}/{year}",
+        }
 
     df_tse = _normalize_tse(df_tse, year)
     df_joined = join_tse_ibge(df_tse, df_ibge)
@@ -78,6 +91,7 @@ def _load_bronze_ibge(uf: str) -> pd.DataFrame:
 
 def _normalize_tse(df: pd.DataFrame, year: int) -> pd.DataFrame:
     from dataops.clients.tse_client import normalize_columns
+
     return normalize_columns(df, year)
 
 
@@ -88,7 +102,9 @@ def _enforce_silver_schema(df: pd.DataFrame, uf: str, year: int) -> pd.DataFrame
     if "ano_eleicao" not in df.columns:
         df["ano_eleicao"] = year
     if "qt_votos" in df.columns:
-        df["qt_votos"] = pd.to_numeric(df["qt_votos"], errors="coerce").fillna(0).astype(int)
+        df["qt_votos"] = (
+            pd.to_numeric(df["qt_votos"], errors="coerce").fillna(0).astype(int)
+        )
     return df
 
 
@@ -177,13 +193,13 @@ def _dataframe_to_bq_schema(df: pd.DataFrame) -> list:
     from google.cloud import bigquery
 
     _type_map = {
-        "int64":   "INT64",
-        "int32":   "INT64",
+        "int64": "INT64",
+        "int32": "INT64",
         "float64": "FLOAT64",
         "float32": "FLOAT64",
-        "bool":    "BOOL",
-        "object":  "STRING",
-        "datetime64[ns]":      "TIMESTAMP",
+        "bool": "BOOL",
+        "object": "STRING",
+        "datetime64[ns]": "TIMESTAMP",
         "datetime64[ns, UTC]": "TIMESTAMP",
     }
     return [

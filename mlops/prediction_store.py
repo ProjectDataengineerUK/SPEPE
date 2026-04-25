@@ -1,4 +1,5 @@
 """Stores model predictions in BigQuery for deferred evaluation post-election."""
+
 from __future__ import annotations
 
 import hashlib
@@ -58,6 +59,7 @@ def store_prediction(record: PredictionRecord, project_id: str | None = None) ->
 
     try:
         from google.cloud import bigquery
+
         client = bigquery.Client(project=project_id)
         table_id = TABLE_ID_TEMPLATE.format(project_id=project_id)
         row = record.to_bq_row()
@@ -65,7 +67,12 @@ def store_prediction(record: PredictionRecord, project_id: str | None = None) ->
         if errors:
             logger.error("Prediction store insert error: %s", errors)
             return False
-        logger.debug("Prediction stored: %s → %s (%.1f%%)", record.candidato, record.session_id, record.p_mean * 100)
+        logger.debug(
+            "Prediction stored: %s → %s (%.1f%%)",
+            record.candidato,
+            record.session_id,
+            record.p_mean * 100,
+        )
         return True
     except Exception as exc:
         logger.warning("Failed to store prediction: %s", exc)
@@ -85,6 +92,7 @@ def evaluate_deferred(
 
     try:
         from google.cloud import bigquery
+
         client = bigquery.Client(project=project_id)
 
         where_clauses = [f"candidato = '{candidato}'", "actual_result IS NULL"]
@@ -103,7 +111,11 @@ def evaluate_deferred(
         job = client.query(query)
         job.result()
         rows_updated = job.num_dml_affected_rows or 0
-        logger.info("Deferred evaluation: %d predictions updated for %s", rows_updated, candidato)
+        logger.info(
+            "Deferred evaluation: %d predictions updated for %s",
+            rows_updated,
+            candidato,
+        )
         return rows_updated
     except Exception as exc:
         logger.error("Deferred evaluation failed: %s", exc)
@@ -120,6 +132,7 @@ def load_predictions_for_eval(
 
     try:
         from google.cloud import bigquery
+
         client = bigquery.Client(project=project_id)
         query = f"""
             SELECT prediction_id, candidato, sg_uf, p_mean, actual_result, brier_score

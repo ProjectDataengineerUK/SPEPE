@@ -1,4 +1,5 @@
 """Load agent prompts from versioned YAML registry."""
+
 from __future__ import annotations
 
 import logging
@@ -18,7 +19,9 @@ def load_prompt(agent_name: str, version: str | None = None) -> dict:
     else:
         files = sorted(REGISTRY_DIR.glob(f"{agent_name}_v*.yaml"), reverse=True)
         if not files:
-            raise FileNotFoundError(f"Nenhum prompt encontrado para agente: {agent_name}")
+            raise FileNotFoundError(
+                f"Nenhum prompt encontrado para agente: {agent_name}"
+            )
         path = files[0]
 
     with open(path, encoding="utf-8") as f:
@@ -42,13 +45,15 @@ def list_available_prompts() -> list[dict]:
         try:
             with open(path, encoding="utf-8") as f:
                 config = yaml.safe_load(f)
-            result.append({
-                "file": path.name,
-                "name": config.get("name", ""),
-                "version": config.get("version", ""),
-                "model": config.get("model", ""),
-                "description": config.get("description", ""),
-            })
+            result.append(
+                {
+                    "file": path.name,
+                    "name": config.get("name", ""),
+                    "version": config.get("version", ""),
+                    "model": config.get("model", ""),
+                    "description": config.get("description", ""),
+                }
+            )
         except Exception as e:
             logger.warning(f"Erro ao ler {path}: {e}")
     return result

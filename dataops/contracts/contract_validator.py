@@ -16,6 +16,7 @@ Invocation points:
 
 Reference: DESIGN_SPEPE.md — Decisão 15.
 """
+
 from __future__ import annotations
 
 import logging

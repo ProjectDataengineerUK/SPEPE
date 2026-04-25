@@ -1,4 +1,5 @@
 """Model promotion: champion/challenger comparison, Vertex Model Registry, rollback support."""
+
 from __future__ import annotations
 
 import json
@@ -35,19 +36,27 @@ def promote_if_better(
     if CHAMPION_META_PATH.exists():
         with open(CHAMPION_META_PATH, encoding="utf-8") as f:
             champion_meta = json.load(f)
-        champion_score = champion_meta.get("metrics", {}).get(metric_key, 0.0 if higher_is_better else float("inf"))
+        champion_score = champion_meta.get("metrics", {}).get(
+            metric_key, 0.0 if higher_is_better else float("inf")
+        )
     else:
         champion_score = 0.0 if higher_is_better else float("inf")
         champion_meta = {}
 
     new_score = new_metrics.get(metric_key, 0.0)
-    should_promote = (new_score > champion_score) if higher_is_better else (new_score < champion_score)
+    should_promote = (
+        (new_score > champion_score)
+        if higher_is_better
+        else (new_score < champion_score)
+    )
 
     if should_promote and save_as_challenger:
         _save_challenger(new_model, new_metrics, champion_score, metric_key)
         logger.info(
             "Challenger saved for canary: %s=%.4f vs champion=%.4f",
-            metric_key, new_score, champion_score,
+            metric_key,
+            new_score,
+            champion_score,
         )
         return True
 
@@ -81,9 +90,12 @@ def finalize_promotion(rollback: bool = False) -> None:
     with open(CHALLENGER_META_PATH, encoding="utf-8") as f:
         challenger_meta = json.load(f)
 
-    _save_champion(challenger_model, challenger_meta["metrics"],
-                   challenger_meta.get("previous_champion_score", 0.0),
-                   challenger_meta.get("metric_key", "brier_score"))
+    _save_champion(
+        challenger_model,
+        challenger_meta["metrics"],
+        challenger_meta.get("previous_champion_score", 0.0),
+        challenger_meta.get("metric_key", "brier_score"),
+    )
     CHALLENGER_PATH.unlink(missing_ok=True)
     CHALLENGER_META_PATH.unlink(missing_ok=True)
     _register_vertex(challenger_model, challenger_meta["metrics"])
@@ -114,12 +126,19 @@ def _save_champion(model, metrics: dict, prev_score: float, metric_key: str) -> 
     }
     with open(CHAMPION_META_PATH, "w", encoding="utf-8") as f:
         json.dump(meta, f, ensure_ascii=False, indent=2)
-    logger.info("Champion saved: %s=%.4f (was %.4f)", metric_key, metrics.get(metric_key, 0), prev_score)
+    logger.info(
+        "Champion saved: %s=%.4f (was %.4f)",
+        metric_key,
+        metrics.get(metric_key, 0),
+        prev_score,
+    )
 
 
 def load_champion():
     if not CHAMPION_PATH.exists():
-        raise FileNotFoundError("Nenhum modelo champion disponível. Execute o pipeline de treino primeiro.")
+        raise FileNotFoundError(
+            "Nenhum modelo champion disponível. Execute o pipeline de treino primeiro."
+        )
     raw = CHAMPION_PATH.read_bytes()
     if len(raw) < 4:
         raise RuntimeError("Arquivo champion.pkl corrompido")
@@ -132,9 +151,13 @@ def _register_vertex(model, metrics: dict) -> None:
         return
     try:
         from google.cloud import aiplatform
-        aiplatform.init(project=project, location=os.environ.get("VERTEX_LOCATION", "us-central1"))
+
+        aiplatform.init(
+            project=project, location=os.environ.get("VERTEX_LOCATION", "us-central1")
+        )
 
         import tempfile
+
         with tempfile.NamedTemporaryFile(suffix=".pkl", delete=False) as tmp:
             pickle.dump(model, tmp)
 
@@ -144,6 +167,8 @@ def _register_vertex(model, metrics: dict) -> None:
             serving_container_image_uri="us-docker.pkg.dev/vertex-ai/prediction/sklearn-cpu.1-3:latest",
             description=f"SPEPE electoral model | accuracy={metrics.get('accuracy', 0):.3f}",
         )
-        logger.info(f"Modelo registrado no Vertex AI Model Registry: {model_obj.resource_name}")
+        logger.info(
+            f"Modelo registrado no Vertex AI Model Registry: {model_obj.resource_name}"
+        )
     except Exception as e:
         logger.warning(f"Vertex Model Registry falhou: {e}")
