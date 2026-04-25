@@ -11,16 +11,12 @@ def run_hdbscan(
     min_cluster_size: int = 30,
     min_samples: int = 5,
 ) -> np.ndarray:
-    try:
-        import hdbscan
-    except ImportError:
-        raise ImportError("hdbscan não instalado. Execute: pip install hdbscan")
+    from sklearn.cluster import HDBSCAN
 
-    clusterer = hdbscan.HDBSCAN(
+    clusterer = HDBSCAN(
         min_cluster_size=min_cluster_size,
         min_samples=min_samples,
         cluster_selection_method="eom",
-        prediction_data=True,
     )
     return clusterer.fit_predict(X)
 

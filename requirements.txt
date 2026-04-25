@@ -15,7 +15,6 @@ google-genai==1.10.0
 
 # ML — Clustering & Dimensionality Reduction
 scikit-learn==1.6.1
-hdbscan==0.8.40
 umap-learn==0.5.7
 
 # ML — Bayesian & Statistical
