@@ -36,6 +36,12 @@ from security.output_validators import validate_input_injection
 
 logger = logging.getLogger("spepe.dashboard_api")
 
+
+@_fastapi_app.get("/healthz")
+async def healthz() -> JSONResponse:
+    return JSONResponse({"status": "ok"})
+
+
 _supervisor: Supervisor | None = None
 
 
