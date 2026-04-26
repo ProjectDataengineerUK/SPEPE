@@ -250,6 +250,36 @@ tr.rhl td{background:rgba(0,200,83,.07)!important}
 .map-stats{background:var(--bg3);border-radius:8px;padding:10px;font-size:.72rem}
 .map-stats strong{color:var(--green);display:block;margin-bottom:4px;font-size:.8rem}
 .map-stats div{color:var(--text2);margin-bottom:2px}
+
+/* ZONA / SEÇÃO GRID */
+.zona-grid-wrap{padding:12px;overflow-y:auto;height:100%;background:var(--bg)}
+.zona-grid-hdr{display:flex;align-items:center;gap:10px;margin-bottom:10px;flex-wrap:wrap}
+.zona-grid-hdr h4{font-size:.82rem;font-weight:700;flex:1}
+.zona-grid-stat{background:var(--bg3);border:1px solid var(--border);border-radius:8px;padding:6px 12px;font-size:.7rem;color:var(--text2)}
+.zona-grid-stat strong{color:var(--text);display:block;font-size:.92rem}
+.zona-sort-btns{display:flex;gap:4px}
+.zona-sort-btn{padding:3px 10px;font-size:.65rem;border-radius:12px;border:1px solid var(--border);color:var(--text2);background:transparent;cursor:pointer;transition:all .2s}
+.zona-sort-btn:hover{border-color:var(--border2);color:var(--text)}
+.zona-sort-btn.active{border-color:var(--green);color:var(--green2);background:var(--green-dim)}
+.zona-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:8px}
+.zona-card{background:var(--bg2);border:1px solid var(--border);border-radius:10px;padding:12px;transition:all .2s;cursor:pointer}
+.zona-card:hover{border-color:var(--border2);transform:translateY(-1px);box-shadow:0 4px 12px rgba(0,0,0,.3)}
+.zona-card-nr{font-size:.62rem;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:var(--text3);margin-bottom:5px}
+.zona-card-lider{display:flex;align-items:center;gap:6px;margin-bottom:5px}
+.zona-card-dot{width:8px;height:8px;border-radius:50%;flex-shrink:0}
+.zona-card-nm{font-size:.78rem;font-weight:600;flex:1}
+.zona-card-pct{font-size:.9rem;font-weight:700;font-family:'JetBrains Mono',monospace}
+.zona-card-bar-wrap{height:3px;background:var(--bg4);border-radius:2px;margin-bottom:6px}
+.zona-card-bar{height:100%;border-radius:2px;transition:width .5s ease}
+.zona-card-meta{display:flex;justify-content:space-between;font-size:.64rem;color:var(--text3)}
+.zona-card-turnout{display:flex;align-items:center;gap:4px;margin-top:5px}
+.zona-card-turnout-bar{flex:1;height:3px;background:var(--bg4);border-radius:2px}
+.zona-card-turnout-fill{height:100%;border-radius:2px}
+.zona-card-turnout-val{font-size:.62rem;font-family:'JetBrains Mono',monospace;color:var(--text2)}
+.zona-card-btn{margin-top:7px;width:100%;background:transparent;border:1px solid var(--border);border-radius:6px;padding:4px 8px;font-size:.66rem;color:var(--text2);cursor:pointer;transition:all .2s}
+.zona-card-btn:hover{border-color:var(--green);color:var(--green2)}
+.leg-gradient{display:flex;align-items:stretch;border-radius:4px;overflow:hidden;height:12px;margin:4px 0}
+.leg-grad-labels{display:flex;justify-content:space-between;font-size:.6rem;color:var(--text3);font-family:'JetBrains Mono',monospace}
 </style>
 </head>
 <body>
@@ -1372,6 +1402,7 @@ const UF_IBGE = {
 const REGIAO_IBGE = {'Norte':'1','Nordeste':'2','Centro-Oeste':'5','Sudeste':'3','Sul':'4'};
 
 const IBGE_GEO = {
+  nacional:  ()=> 'https://servicodados.ibge.gov.br/api/v3/malhas/paises/BR?resolucao=1&formato=application/vnd.geo+json',
   regiao:    ()=> 'https://servicodados.ibge.gov.br/api/v3/malhas/paises/BR?resolucao=1&formato=application/vnd.geo+json',
   uf:        ()=> 'https://servicodados.ibge.gov.br/api/v3/malhas/paises/BR?resolucao=2&formato=application/vnd.geo+json',
   municipio: (uf)=> `https://servicodados.ibge.gov.br/api/v3/malhas/estados/${UF_IBGE[uf]||'35'}?resolucao=5&formato=application/vnd.geo+json`,
@@ -1406,9 +1437,11 @@ async function reloadMap(){
   if(!_map) return;
   const cargo = document.getElementById('map-cargo-sel')?.value || 'Presidente';
   const colorBy = document.getElementById('map-color-by')?.value || 'lider';
+  const layer = document.getElementById('map-layer-sel')?.value || 'electoral';
+  const turnoRaw = document.getElementById('f-turno')?.value || '1º Turno';
+  const turno = turnoRaw.includes('2') ? 2 : 1;
 
-  // Busca dados da API
-  let url = `/api/mapa/${_mapLevel}?cargo=${encodeURIComponent(cargo)}&ano=2022`;
+  let url = `/api/mapa/${_mapLevel}?cargo=${encodeURIComponent(cargo)}&ano=2022&turno=${turno}&layer=${layer}`;
   if(_mapCtx.uf) url += `&uf=${_mapCtx.uf}`;
   if(_mapCtx.cd_municipio) url += `&cd_municipio=${_mapCtx.cd_municipio}`;
   if(_mapCtx.nr_zona) url += `&nr_zona=${_mapCtx.nr_zona}`;
@@ -1418,24 +1451,22 @@ async function reloadMap(){
     _loadGeoJSON(_mapLevel),
   ]);
 
-  // Index dos dados por ID
   _mapData = {};
   (apiRes.features||[]).forEach(f=> _mapData[String(f.ibge_code||f.id||f.label)] = f);
 
-  // Remove layer anterior
   if(_geoLayer){ _map.removeLayer(_geoLayer); _geoLayer=null; }
 
-  if(!geoRes) { _renderListFallback(apiRes.features||[]); return; }
+  if(!geoRes) { _renderZonaSecaoGrid(apiRes.features||[], _mapLevel); return; }
 
   _geoLayer = L.geoJSON(geoRes, {
-    style: feat => _styleFeature(feat, colorBy),
-    onEachFeature: (feat, layer) => {
+    style: feat => _styleFeature(feat, colorBy, layer),
+    onEachFeature: (feat, lyr) => {
       const d = _getFeatureData(feat);
       if(!d) return;
-      layer.bindTooltip(_buildTooltip(d), {
+      lyr.bindTooltip(_buildTooltip(d, layer), {
         className:'map-tooltip', sticky:true, direction:'top'
       });
-      layer.on({
+      lyr.on({
         mouseover(e){ e.target.setStyle({weight:2,fillOpacity:.95}); _updateStats(d); },
         mouseout(e){ _geoLayer.resetStyle(e.target); },
         click(){ _drillDown(feat, d); },
@@ -1444,12 +1475,13 @@ async function reloadMap(){
   }).addTo(_map);
 
   _updateBreadcrumb();
-  _updateLegend(apiRes.features||[], colorBy);
+  _updateLegend(apiRes.features||[], colorBy, layer);
   _updateLevelButtons();
 }
 
 async function _loadGeoJSON(level){
   const geoUrls = {
+    nacional:  IBGE_GEO.nacional(),
     regiao:    IBGE_GEO.regiao(),
     uf:        IBGE_GEO.uf(),
     municipio: IBGE_GEO.municipio(_mapCtx.uf||'SP'),
@@ -1469,23 +1501,43 @@ function _getFeatureData(feat){
   return _mapData[id] || _mapData[id.slice(0,2)] || Object.values(_mapData)[0] || null;
 }
 
-function _styleFeature(feat, colorBy){
+function _styleFeature(feat, colorBy, layer){
   const d = _getFeatureData(feat);
   if(!d) return {fillColor:'#21262d',weight:1,color:'#30363d',fillOpacity:.7};
 
   let color = '#21262d';
-  if(colorBy === 'partido' || colorBy === 'lider'){
-    color = PARTIDO_COR[d.partido] || '#57606a';
-  } else if(colorBy === 'margem'){
-    const margem = Math.abs((d.pct||0) - (d.pct2||0));
-    color = margem > 20 ? '#ef4444' : margem > 10 ? '#f59e0b' : '#22c55e';
+  if(layer && layer !== 'electoral'){
+    const val = (d.pct||50) / 100;
+    if(layer === 'archetype'){
+      const r=Math.round(124-val*90), g=Math.round(58+val*130), b=Math.round(237-val*50);
+      color = `rgb(${r},${g},${b})`;
+    } else if(layer === 'security'){
+      const i=Math.round(val*200+55);
+      color = `rgb(${i},${Math.round(68-val*40)},${Math.round(68-val*40)})`;
+    } else if(layer === 'health'){
+      color = val>0.7?'#00c853':val>0.5?'#66bb6a':val>0.35?'#ffd54f':'#ef9a9a';
+    } else if(layer === 'economic'){
+      color = val>0.7?'#00c853':val>0.5?'#c6e400':val>0.35?'#ffd54f':'#ff8f00';
+    }
+  } else {
+    if(colorBy === 'partido' || colorBy === 'lider'){
+      color = PARTIDO_COR[d.partido] || '#57606a';
+    } else if(colorBy === 'margem'){
+      const margem = Math.abs((d.pct||0) - (d.pct2||0));
+      color = margem > 20 ? '#ef4444' : margem > 10 ? '#f59e0b' : '#22c55e';
+    }
   }
   return { fillColor:color, weight:1, color:'#30363d', fillOpacity:.78 };
 }
 
-function _buildTooltip(d){
+function _buildTooltip(d, layer){
   const cor = PARTIDO_COR[d.partido]||'#888';
-  return `<div style="min-width:160px">
+  let layerLine = '';
+  if(layer==='archetype') layerLine=`<div style="color:#7c3aed;font-size:.7rem;margin-top:3px">🧩 Arquétipo: ${d.archetype||'N/D'}</div>`;
+  else if(layer==='security') layerLine=`<div style="color:#ef4444;font-size:.7rem;margin-top:3px">🛡 IVS: ${d.ivs||'N/D'}</div>`;
+  else if(layer==='health') layerLine=`<div style="color:#00c853;font-size:.7rem;margin-top:3px">🏥 Cobertura: ${d.health_coverage||'N/D'}</div>`;
+  else if(layer==='economic') layerLine=`<div style="color:#f59e0b;font-size:.7rem;margin-top:3px">💰 Renda/cesta: ${d.income_index||'N/D'}</div>`;
+  return `<div style="min-width:168px">
     <div style="font-weight:700;font-size:.82rem;margin-bottom:6px">${d.label||d.id}</div>
     <div style="display:flex;align-items:center;gap:6px;margin-bottom:4px">
       <div style="width:10px;height:10px;border-radius:2px;background:${cor};flex-shrink:0"></div>
@@ -1493,7 +1545,9 @@ function _buildTooltip(d){
       <span style="margin-left:auto;font-family:monospace;color:${cor};font-weight:700">${d.pct}%</span>
     </div>
     <div style="color:#8d96a0;font-size:.7rem">${d.segundo}: ${d.pct2}%</div>
-    ${d.total_votos?`<div style="color:#57606a;font-size:.67rem;margin-top:4px">${Number(d.total_votos).toLocaleString('pt-BR')} votos</div>`:''}
+    ${d.turnout?`<div style="color:#57606a;font-size:.7rem;margin-top:2px">Comparecimento: ${(d.turnout*100).toFixed(1)}%</div>`:''}
+    ${d.total_votos?`<div style="color:#57606a;font-size:.67rem;margin-top:2px">${Number(d.total_votos).toLocaleString('pt-BR')} votos</div>`:''}
+    ${layerLine}
     <div style="color:#3d444d;font-size:.62rem;margin-top:6px">Clique para detalhar →</div>
   </div>`;
 }
@@ -1501,17 +1555,19 @@ function _buildTooltip(d){
 function _drillDown(feat, d){
   const nextLevel = {nacional:'regiao',regiao:'uf',uf:'municipio',municipio:'zona',zona:'secao'}[_mapLevel];
   if(!nextLevel) return;
+  if(_mapLevel === 'regiao') _mapCtx.regiao = d.id || d.label;
   if(_mapLevel === 'uf') _mapCtx.uf = d.id;
   if(_mapLevel === 'municipio') _mapCtx.cd_municipio = d.cd_municipio || d.id;
   if(_mapLevel === 'zona') _mapCtx.nr_zona = d.nr_zona || (d.id?String(d.id).replace('z','') : '');
   _mapLevel = nextLevel;
   _updateLevelButtons();
   reloadMap();
-  if(feat.geometry) try{ _map.fitBounds(L.geoJSON(feat).getBounds(),{padding:[20,20]}); }catch(e){}
+  if(feat && feat.geometry) try{ _map.fitBounds(L.geoJSON(feat).getBounds(),{padding:[20,20]}); }catch(e){}
 }
 
 function _updateBreadcrumb(){
   const parts = ['<span onclick="resetMap()">Brasil</span>'];
+  if(_mapCtx.regiao) parts.push(`<span onclick="goToLevel(\'regiao\')">${_mapCtx.regiao}</span>`);
   if(_mapCtx.uf) parts.push(`<span onclick="goToLevel(\'uf\')">${_mapCtx.uf}</span>`);
   if(_mapCtx.cd_municipio) parts.push(`<span onclick="goToLevel(\'municipio\')">${_mapCtx.cd_municipio}</span>`);
   if(_mapCtx.nr_zona) parts.push(`Zona ${_mapCtx.nr_zona}`);
@@ -1526,6 +1582,7 @@ function resetMap(){
 }
 
 function goToLevel(level){
+  if(level==='regiao'){ delete _mapCtx.uf; delete _mapCtx.cd_municipio; delete _mapCtx.nr_zona; }
   if(level==='uf'){ delete _mapCtx.cd_municipio; delete _mapCtx.nr_zona; }
   if(level==='municipio'){ delete _mapCtx.nr_zona; }
   _mapLevel = level;
@@ -1547,11 +1604,30 @@ function _updateLevelButtons(){
   });
 }
 
-function _updateLegend(features, colorBy){
+function _updateLegend(features, colorBy, layer){
+  const el = document.getElementById('map-legend-items');
+  if(layer && layer !== 'electoral'){
+    const LAYER_LEGEND = {
+      archetype: [{c:'#7c3aed',l:'Urbano cosmopolita'},{c:'#00bcd4',l:'Suburbano'},{c:'#f59e0b',l:'Rural conservador'},{c:'#ef4444',l:'Vulnerável'}],
+      security:  [{c:'#ef4444',l:'Alto risco'},{c:'#f97316',l:'Moderado'},{c:'#ffd54f',l:'Baixo'},{c:'#22c55e',l:'Seguro'}],
+      health:    [{c:'#00c853',l:'Boa cobertura'},{c:'#66bb6a',l:'Média'},{c:'#ffd54f',l:'Baixa'},{c:'#ef9a9a',l:'Crítica'}],
+      economic:  [{c:'#00c853',l:'Alta renda'},{c:'#c6e400',l:'Média-alta'},{c:'#ffd54f',l:'Média-baixa'},{c:'#ff8f00',l:'Baixa renda'}],
+    };
+    el.innerHTML = (LAYER_LEGEND[layer]||[]).map(i=>`
+      <div class="leg-item"><div class="leg-dot" style="background:${i.c}"></div><span class="leg-label">${i.l}</span></div>`).join('');
+    return;
+  }
+  if(colorBy === 'margem'){
+    el.innerHTML = `
+      <div class="leg-item"><div class="leg-dot" style="background:#ef4444"></div><span class="leg-label">&gt;20pp</span></div>
+      <div class="leg-item"><div class="leg-dot" style="background:#f59e0b"></div><span class="leg-label">10–20pp</span></div>
+      <div class="leg-item"><div class="leg-dot" style="background:#22c55e"></div><span class="leg-label">&lt;10pp</span></div>`;
+    return;
+  }
   const counts = {};
   features.forEach(f=>{ counts[f.partido]=(counts[f.partido]||0)+1; });
   const sorted = Object.entries(counts).sort((a,b)=>b[1]-a[1]).slice(0,6);
-  document.getElementById('map-legend-items').innerHTML = sorted.map(([p,n])=>`
+  el.innerHTML = sorted.map(([p,n])=>`
     <div class="leg-item">
       <div class="leg-dot" style="background:${PARTIDO_COR[p]||'#57606a'}"></div>
       <span class="leg-label">${p}</span>
@@ -1566,26 +1642,51 @@ function _updateStats(d){
   document.getElementById('ms-total').textContent = d.total_votos?`${Number(d.total_votos).toLocaleString('pt-BR')} votos`:'';
 }
 
-function _renderListFallback(features){
-  // Se GeoJSON não carregar (zona/seção), mostra lista
-  if(!_geoLayer){
-    const el = document.getElementById('leaflet-map');
-    el.innerHTML = `<div style="padding:20px;overflow-y:auto;height:100%">
-      <table style="width:100%;border-collapse:collapse">
-        <thead><tr>
-          <th style="text-align:left;padding:6px 10px;font-size:.65rem;color:#8d96a0;border-bottom:1px solid #30363d">Área</th>
-          <th style="text-align:left;padding:6px 10px;font-size:.65rem;color:#8d96a0;border-bottom:1px solid #30363d">Líder</th>
-          <th style="text-align:right;padding:6px 10px;font-size:.65rem;color:#8d96a0;border-bottom:1px solid #30363d">%</th>
-          <th style="text-align:left;padding:6px 10px;font-size:.65rem;color:#8d96a0;border-bottom:1px solid #30363d">2º</th>
-        </tr></thead>
-        <tbody>${features.map(f=>`<tr>
-          <td style="padding:6px 10px;font-size:.74rem;border-bottom:1px solid #21262d">${f.label||f.id}</td>
-          <td style="padding:6px 10px"><span style="color:${PARTIDO_COR[f.partido]||'#888'};font-weight:600">${f.lider}</span></td>
-          <td style="padding:6px 10px;text-align:right;font-family:monospace;color:${PARTIDO_COR[f.partido]||'#888'}">${f.pct}%</td>
-          <td style="padding:6px 10px;font-size:.7rem;color:#8d96a0">${f.segundo} ${f.pct2}%</td>
-        </tr>`).join('')}</tbody>
-      </table>
+function _renderZonaSecaoGrid(features, level){
+  const el = document.getElementById('leaflet-map');
+  const isSecao = level === 'secao';
+  const noun = isSecao ? 'Seções Eleitorais' : 'Zonas Eleitorais';
+  const sorted = [...features].sort((a,b)=>(b.total_votos||0)-(a.total_votos||0));
+  const winner = sorted[0];
+  const sumVotos = sorted.reduce((s,f)=>s+(f.total_votos||0),0);
+  el.innerHTML = `
+    <div style="padding:16px;overflow-y:auto;height:100%;background:var(--bg)">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px">
+        <div style="font-size:.82rem;font-weight:600;color:var(--text)">${noun} — <span style="color:var(--green2)">${features.length}</span> unidade${features.length>1?'s':''}</div>
+        <div style="font-size:.68rem;color:var(--text3)">${Number(sumVotos).toLocaleString('pt-BR')} votos totais</div>
+      </div>
+      <div style="font-size:.7rem;color:var(--text3);margin-bottom:12px">Clique em uma ${isSecao?'seção':'zona'} para ${isSecao?'ver detalhe':'ver seções'}</div>
+      <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(188px,1fr));gap:8px">
+        ${sorted.map(f=>{
+          const cor = PARTIDO_COR[f.partido]||'#888';
+          const margin = ((f.pct||0)-(f.pct2||0)).toFixed(1);
+          const tp = f.turnout?(f.turnout*100).toFixed(1)+'%':'—';
+          const liderColor = (f.lider===winner?.lider)?cor:'var(--text2)';
+          return `<div style="background:var(--bg2);border:1px solid var(--border);border-left:3px solid ${cor};border-radius:var(--radius);padding:10px 12px;cursor:pointer;transition:border-color .15s"
+                       onmouseover="this.style.borderColor='${cor}'" onmouseout="this.style.borderLeftColor='${cor}';this.style.borderTopColor=this.style.borderRightColor=this.style.borderBottomColor='var(--border)'"
+                       onclick="_drillFromCard('${f.id}','${f.nr_zona||''}','${f.nr_secao||''}','${level}')">
+            <div style="font-size:.68rem;font-weight:600;color:var(--text2);margin-bottom:5px">${f.label}</div>
+            <div style="display:flex;align-items:center;gap:5px;margin-bottom:3px">
+              <span style="color:${cor};font-weight:700;font-size:.82rem">${f.lider}</span>
+              <span style="margin-left:auto;font-family:monospace;color:${cor};font-weight:700">${f.pct}%</span>
+            </div>
+            <div style="color:var(--text3);font-size:.65rem;margin-bottom:3px">${f.segundo}: ${f.pct2}% · <span style="color:${margin>0?'var(--green)':'var(--red)'}">${margin>0?'+':''}${margin}pp</span></div>
+            <div style="display:flex;justify-content:space-between;font-size:.62rem;color:var(--text3)">
+              <span>${Number(f.total_votos||0).toLocaleString('pt-BR')} vts</span>
+              <span>comp. ${tp}</span>
+            </div>
+          </div>`;
+        }).join('')}
+      </div>
     </div>`;
+}
+
+function _drillFromCard(id, nr_zona, nr_secao, level){
+  if(level === 'zona' && nr_zona){
+    _mapCtx.nr_zona = nr_zona;
+    _mapLevel = 'secao';
+    _updateLevelButtons();
+    reloadMap();
   }
 }
 </script>
