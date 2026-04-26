@@ -3,8 +3,6 @@
 Pipeline: feature_extract → train_bootstrap → evaluate → promote
 """
 
-from __future__ import annotations
-
 import logging
 import os
 
@@ -140,7 +138,7 @@ def build_pipeline():
 
     @dsl.pipeline(
         name="spepe-ml-pipeline",
-        description="SPEPE Electoral ML Pipeline: Feature Extract → Train → Evaluate → Promote",
+        description="SPEPE Electoral ML Pipeline: Feature Extract -> Train -> Evaluate -> Promote",
         pipeline_root=PIPELINE_ROOT,
     )
     def spepe_pipeline(

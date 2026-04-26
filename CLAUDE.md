@@ -3,7 +3,7 @@
 **Sistema de Perfilamento do Eleitorado e Previsão Eleitoral**
 Análise eleitoral brasileira via multi-agentes LLM com arquitetura Medallion no GCP.
 
-**Estado atual:** v4.2 — Design completo, Fase 1 em implementação
+**Estado atual:** v1.0.0-rc — Código completo, aguardando ingestão 27 UFs + deploy GCP
 **Próximo:** v1.0.0 — Produção com 5 domínios de dados (2026-Q2)
 
 ---
@@ -522,25 +522,25 @@ Chaves-mestras: `cod_municipio_ibge`, `uf`, `ano_eleitoral`, `data_referencia`
 ## Pendências v1.0.0 — Crítico
 
 ### 🔴 **Bloqueia Deploy**
-- [x] **FEITO**: ANTHROPIC_API_KEY exposta revogada em console.anthropic.com (2026-04-26)
+- [x] ANTHROPIC_API_KEY exposta revogada em console.anthropic.com (2026-04-26)
 - [x] CI/CD verde no GitHub — Docker build + Cloud Run deploy confirmado (2026-04-26)
-- [ ] Committar arquivos pendentes (chainlit_app.py fix routing + prototype.py deletado)
-- [ ] Adicionar `__main__` em mlops/eval/eval_runner.py para CI
+- [x] Routing chainlit_app.py corrigido — custom routes antes do SPA catch-all (2026-04-26)
+- [x] `__main__` em mlops/eval/eval_runner.py — já existia, CI usa --responses-file
 
 ### 🟠 **Valida Funcionalidade (Fase 1)**
-- [ ] Pipeline end-to-end: ingerir **todas 27 UFs** 2022 (TSE + IBGE)
-- [ ] Validar coluna `cd_cargo` em Gold (quebra filtro multi-cargo)
-- [ ] Testes passando: pytest + eval_runner + security scan
-- [ ] Compilar e testar Vertex AI pipeline KFP 2.x
+- [ ] Pipeline end-to-end: ingerir **todas 27 UFs** 2022 (TSE + IBGE) — requer GCP
+- [x] Validar coluna `cd_cargo` em Gold — test_schema_gold_cd_cargo.py passando
+- [x] Testes passando: 82 pytest + eval_runner (0.995 score) + security scan
+- [x] Compilar Vertex AI pipeline KFP 2.x — output/ml_pipeline.yaml gerado (2026-04-26)
 
 ### 🟡 **Produção Segura**
-- [ ] Secrets em Secret Manager (ANTHROPIC_API_KEY, META_APP_TOKEN, YOUTUBE_API_KEY)
-- [ ] Provisionar IAP via Terraform (security/iap_config.yaml → google_iap_*)
-- [ ] Validar imports: nenhuma referência a `mcp_servers.*`
+- [ ] Secrets em Secret Manager (ANTHROPIC_API_KEY, META_APP_TOKEN, YOUTUBE_API_KEY) — requer GCP
+- [ ] Provisionar IAP via Terraform (security/iap_config.yaml → google_iap_*) — requer GCP
+- [x] Validar imports: nenhuma referência a `mcp_servers.*` em agentes/dataops
 
 ### 🟢 **Infraestrutura**
-- [ ] Documentar .env local (README: Quick Start)
-- [ ] Release v1.0.0: branch release/ → tag v1.0.0 → push
+- [x] README Quick Start — seção existe com variáveis mínimas locais
+- [ ] Release v1.0.0: tag v1.0.0 → push
 - [ ] Deploy: Terraform apply staging → deploy.yml workflow → prod
 
 ---
