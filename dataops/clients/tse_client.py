@@ -2,8 +2,9 @@
 
 from __future__ import annotations
 
-import io
 import logging
+import os
+import tempfile
 import zipfile
 
 import pandas as pd
@@ -64,35 +65,50 @@ _NUMERIC_COLS = (
 
 @retry(stop=stop_after_attempt(3), wait=wait_exponential(min=2, max=30))
 def download_tse_resultados(uf: str, year: int) -> pd.DataFrame:
-    """Download TSE votacao_secao ZIP and return concatenated DataFrame."""
+    """Download TSE votacao_secao ZIP and return concatenated DataFrame.
+
+    Streams the ZIP to a temp file to avoid OOM on large states (SP ~1.5 GB).
+    Reads each CSV in 500k-row chunks for the same reason.
+    """
     url = _CDN.format(year=year, uf=uf.upper())
     logger.info("Baixando TSE: %s", url)
 
-    resp = requests.get(url, timeout=180, stream=True)
-    resp.raise_for_status()
+    tmp_fd, tmp_path = tempfile.mkstemp(suffix=".zip")
+    try:
+        with requests.get(url, timeout=300, stream=True) as resp:
+            resp.raise_for_status()
+            with os.fdopen(tmp_fd, "wb") as fout:
+                for chunk in resp.iter_content(chunk_size=8 * 1024 * 1024):
+                    fout.write(chunk)
+        logger.info("ZIP baixado: %s (%.1f MB)", tmp_path, os.path.getsize(tmp_path) / 1e6)
 
-    buf = io.BytesIO(resp.content)
-    frames: list[pd.DataFrame] = []
+        frames: list[pd.DataFrame] = []
+        with zipfile.ZipFile(tmp_path) as zf:
+            csv_files = [n for n in zf.namelist() if n.lower().endswith(".csv")]
+            if not csv_files:
+                raise ValueError(f"ZIP TSE vazio para {uf}/{year}: {zf.namelist()}")
 
-    with zipfile.ZipFile(buf) as zf:
-        csv_files = [n for n in zf.namelist() if n.lower().endswith(".csv")]
-        if not csv_files:
-            raise ValueError(f"ZIP TSE vazio para {uf}/{year}: {zf.namelist()}")
-
-        for name in csv_files:
-            with zf.open(name) as f:
-                try:
-                    df = pd.read_csv(
-                        f,
-                        sep=";",
-                        encoding="latin-1",
-                        dtype=str,
-                        low_memory=False,
-                    )
-                    frames.append(df)
-                    logger.debug("Lido %s: %d linhas", name, len(df))
-                except Exception as exc:
-                    logger.warning("Falha ao ler %s: %s", name, exc)
+            for name in csv_files:
+                with zf.open(name) as f:
+                    try:
+                        chunks = []
+                        for chunk in pd.read_csv(
+                            f,
+                            sep=";",
+                            encoding="latin-1",
+                            dtype=str,
+                            chunksize=500_000,
+                        ):
+                            chunks.append(chunk)
+                        if chunks:
+                            df = pd.concat(chunks, ignore_index=True)
+                            frames.append(df)
+                            logger.info("Lido %s: %d linhas", name, len(df))
+                    except Exception as exc:
+                        logger.warning("Falha ao ler %s: %s", name, exc)
+    finally:
+        if os.path.exists(tmp_path):
+            os.unlink(tmp_path)
 
     if not frames:
         raise ValueError(f"Nenhum CSV lido do ZIP TSE {uf}/{year}")
