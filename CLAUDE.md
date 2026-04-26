@@ -440,18 +440,37 @@ FONTES (Fase 2+)
 
 ---
 
+## Estratégia de Ambientes — Dev-First até Fase 3
+
+**Princípio:** Todo desenvolvimento (Fases 1, 2 e 3) acontece em `spepe-dev`.
+`spepe-prod` só é criado quando Fase 3 estiver validada em dev.
+
+```
+spepe-dev  ←── desenvolvimento ativo (Fases 1 → 2 → 3)
+                Bronze full (27 UFs), todos os jobs, todos os modelos
+                Custo controlado: único projeto GCP até validação completa
+
+spepe-prod ←── criado apenas após Fase 3 aprovada em dev
+                terraform apply -var="project_id=spepe-prod" -var="environment=prod"
+                CI/CD deploy.yml promove imagem já validada
+```
+
+Staging eliminado desta fase — dev vai direto para prod quando o sistema estiver maduro.
+
+---
+
 ## Roadmap — 4 Fases
 
-### Fase 1 (v1.0.0 — Atual, ~2026-Q2)
+### Fase 1 (v1.0.0 — ~2026-Q2) — spepe-dev
 **MVP: Pesquisas + Dados Públicos + Histórico Fixo**
 - ✅ Arquitetura Medallion single-project (spepe-dev)
 - ✅ TSE (pesquisas) + IBGE (contexto) + Histórico 2018/2022 ingeridos
 - ✅ 7 agentes Claude/Gemini (análise, predição, narrativa)
-- ⏳ Todas as 27 UFs + dados reais
-- ⏳ Dashboard tático (multi-cargo, comparação UFs)
-- ⏳ CI/CD completo (test → staging → prod)
+- ✅ Pipeline KFP 2.x compilado, 82 testes passando
+- ⏳ Ingestão das 27 UFs 2022 (Cloud Run Jobs em spepe-dev)
+- ⏳ Secrets em Secret Manager + IAP Terraform
 
-### Fase 2 (v1.5 — ~2026-Q4)
+### Fase 2 (v1.5 — ~2026-Q4) — spepe-dev
 **Adição: Social + DATASUS + Camada Semântica**
 - Módulo social (Twitter/X, Facebook): sentimento + polarização
 - DATASUS: contexto de saúde + vulnerabilidade territorial
@@ -459,27 +478,28 @@ FONTES (Fase 2+)
 - Alertas de crise por narrativa/tema
 - NLP melhorado (Vertex AI)
 
-### Fase 3 (v2.0 — ~2027-Q2)
+### Fase 3 (v2.0 — ~2027-Q2) — spepe-dev
 **MLOps Formal + Vertex AI Pipelines**
 - Modelo de cenários (PyMC + Bayesiano)
 - Feature store (características sociais, pesquisas, estruturais)
 - Score territorial (risco político, força narrativa)
 - Auto-retrain com drift detection
 - Canary deployment (10% challenger)
+- **Gate de promoção:** Brier score < 0.20, drift < 0.10, eval LLM > 0.85 → promove para prod
 
-### Fase 4 (v2.5+ — 2027+)
-**Otimização de Custos + Feature Store Maduro**
-- Segregação em projetos GCP (core-analytics, social, pesquisas, dados-públicos, eleições)
-- Folders por ambiente (dev/stg/prod)
+### Fase 4 (v2.5+ — 2027+) — spepe-prod criado aqui
+**Promoção para Produção + Otimização**
+- Criar spepe-prod: `terraform apply -var="project_id=spepe-prod" -var="environment=prod"`
+- CI/CD `deploy.yml` promove imagem validada de dev
+- Segregação futura em projetos GCP por domínio (social, pesquisas, dados-públicos, eleições)
 - API interna de inteligência (REST)
 - Dashboard executivo (Looker Studio)
-- Automação pesada
 
 ---
 
-## Arquitetura Futura — Multi-Projeto (Fases 2+)
+## Arquitetura Futura — Multi-Projeto (Fase 4+)
 
-Após validar Fase 1, SPEPE migrará para **3+ projetos GCP por ambiente**:
+Após validar Fase 3 em dev e promover para prod, SPEPE poderá migrar para **projetos GCP separados por domínio**:
 
 ```
 org-eleicoes/
