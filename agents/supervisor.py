@@ -154,7 +154,7 @@ class Supervisor:
         # Rebuild routing tool with live enum (catches new agents added to registry)
         self._tools = [_build_routing_tool(), RUN_JOB_TOOL_SCHEMA, _EMIT_INTENT_TOOL]
 
-    async def run(  # type: ignore[override]
+    async def run(
         self,
         user_input: str,
         state: SessionState,
