@@ -26,13 +26,11 @@ _IPEADATA_MORTALITY = (
 
 _MORTALITY_SERIES = {
     "taxa_mortalidade_infantil_1000": "SAÚDE_TMORTALINF",
-    "taxa_mortalidade_materna_100k":  "SAÚDE_TMORTALMAT",
+    "taxa_mortalidade_materna_100k": "SAÚDE_TMORTALMAT",
 }
 
 # ANS — Agência Nacional de Saúde Suplementar open data
-_ANS_BENEFICIARIOS_URL = (
-    "https://dadosabertos.ans.gov.br/FTP/PDA/beneficiarios_por_municipio/"
-)
+_ANS_BENEFICIARIOS_URL = "https://dadosabertos.ans.gov.br/FTP/PDA/beneficiarios_por_municipio/"
 
 
 @retry(stop=stop_after_attempt(3), wait=wait_exponential(min=2, max=20))

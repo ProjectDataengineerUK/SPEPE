@@ -17,10 +17,10 @@ _IPEADATA_BASE = "http://www.ipeadata.gov.br/api/odata4"
 
 # IVS (Índice de Vulnerabilidade Social) — IPEA, nível municipal, 2010+
 _IVS_SERIES = {
-    "ivs_total":            "IVS_IVSTOTAL",
-    "ivs_infraestrutura":   "IVS_IVSINF",
-    "ivs_capital_humano":   "IVS_IVSCH",
-    "ivs_renda_trabalho":   "IVS_IVSRT",
+    "ivs_total": "IVS_IVSTOTAL",
+    "ivs_infraestrutura": "IVS_IVSINF",
+    "ivs_capital_humano": "IVS_IVSCH",
+    "ivs_renda_trabalho": "IVS_IVSRT",
 }
 
 # SINESP ocorrências — dados.gov.br (CSV nacional por tipo)
@@ -36,23 +36,46 @@ _SINESP_DIRECT = (
 
 # Atlas da Violência — IPEA, taxa de homicídios por 100k (nível municipal)
 _ATLAS_CSV = (
-    "https://www.ipea.gov.br/atlasviolencia/arquivos/"
-    "indicadores/taxa-homicidios-municipios.csv"
+    "https://www.ipea.gov.br/atlasviolencia/arquivos/indicadores/taxa-homicidios-municipios.csv"
 )
 
 # Macro-regiões por UF
 _UF_REGIAO: dict[str, str] = {
-    "AC": "N", "AM": "N", "AP": "N", "PA": "N", "RO": "N", "RR": "N", "TO": "N",
-    "AL": "NE", "BA": "NE", "CE": "NE", "MA": "NE", "PB": "NE",
-    "PE": "NE", "PI": "NE", "RN": "NE", "SE": "NE",
-    "DF": "CO", "GO": "CO", "MS": "CO", "MT": "CO",
-    "ES": "SE", "MG": "SE", "RJ": "SE", "SP": "SE",
-    "PR": "S", "RS": "S", "SC": "S",
+    "AC": "N",
+    "AM": "N",
+    "AP": "N",
+    "PA": "N",
+    "RO": "N",
+    "RR": "N",
+    "TO": "N",
+    "AL": "NE",
+    "BA": "NE",
+    "CE": "NE",
+    "MA": "NE",
+    "PB": "NE",
+    "PE": "NE",
+    "PI": "NE",
+    "RN": "NE",
+    "SE": "NE",
+    "DF": "CO",
+    "GO": "CO",
+    "MS": "CO",
+    "MT": "CO",
+    "ES": "SE",
+    "MG": "SE",
+    "RJ": "SE",
+    "SP": "SE",
+    "PR": "S",
+    "RS": "S",
+    "SC": "S",
 }
 
 _REGIAO_NOME: dict[str, str] = {
-    "N": "Norte", "NE": "Nordeste", "CO": "Centro-Oeste",
-    "SE": "Sudeste", "S": "Sul",
+    "N": "Norte",
+    "NE": "Nordeste",
+    "CO": "Centro-Oeste",
+    "SE": "Sudeste",
+    "S": "Sul",
 }
 
 
@@ -70,6 +93,7 @@ def _get_json(url: str, **kwargs: Any) -> Any:
 # ---------------------------------------------------------------------------
 # IVS — Índice de Vulnerabilidade Social (IPEA, nível municipal)
 # ---------------------------------------------------------------------------
+
 
 def _fetch_ivs_serie(serie_code: str) -> dict[str, float]:
     """Return {cd_municipio_ibge_str: float} for a given IVS series."""
@@ -122,6 +146,7 @@ def fetch_ivs(uf: str, municipios_ibge: list[int]) -> list[dict]:
 # ---------------------------------------------------------------------------
 # Atlas da Violência — taxa de homicídios por 100k (IPEA/FBSP)
 # ---------------------------------------------------------------------------
+
 
 def fetch_atlas_homicidios(uf: str, year: int, cache_dir: Path) -> list[dict]:
     """Download Atlas da Violência homicide rates, filter by UF and year."""
@@ -181,6 +206,7 @@ def fetch_atlas_homicidios(uf: str, year: int, cache_dir: Path) -> list[dict]:
 # SINESP — ocorrências criminais estaduais/municipais
 # ---------------------------------------------------------------------------
 
+
 def fetch_sinesp_ocorrencias(uf: str, year: int, cache_dir: Path) -> list[dict]:
     """Download SINESP crime occurrence data. Returns empty list if unavailable."""
     cache_file = cache_dir / f"sinesp_{uf.upper()}_{year}.csv"
@@ -214,6 +240,7 @@ def fetch_sinesp_ocorrencias(uf: str, year: int, cache_dir: Path) -> list[dict]:
 # Interface unificada
 # ---------------------------------------------------------------------------
 
+
 def build_seguranca_dataframe(
     uf: str,
     year: int,
@@ -241,9 +268,7 @@ def build_seguranca_dataframe(
         df_atlas["cd_municipio_ibge"] = pd.to_numeric(
             df_atlas["cd_municipio_ibge"], errors="coerce"
         )
-        df_ivs["cd_municipio_ibge"] = pd.to_numeric(
-            df_ivs["cd_municipio_ibge"], errors="coerce"
-        )
+        df_ivs["cd_municipio_ibge"] = pd.to_numeric(df_ivs["cd_municipio_ibge"], errors="coerce")
         df = df_ivs.merge(
             df_atlas[["cd_municipio_ibge", "taxa_homicidio_100k", "qt_homicidios"]],
             on="cd_municipio_ibge",

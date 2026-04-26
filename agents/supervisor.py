@@ -24,6 +24,7 @@ def _get_registry() -> dict:
         _AGENT_REGISTRY = load_agents()
     return _AGENT_REGISTRY
 
+
 logger = logging.getLogger("spepe.agents.supervisor")
 
 _MODEL = "claude-sonnet-4-6"
@@ -65,6 +66,7 @@ Após cada route_to_agent, SEMPRE chame emit_dashboard_intent com as ações de 
 Responda APENAS via ferramentas — nunca com texto livre.
 """
 
+
 def _build_routing_tool() -> dict:
     """Build routing tool with agent enum derived from the live registry."""
     agent_ids = sorted(_get_registry().keys())
@@ -105,9 +107,13 @@ _EMIT_INTENT_TOOL: dict = {
                         "op": {
                             "type": "string",
                             "enum": [
-                                "set_geo", "set_election", "switch_tab",
-                                "set_map_layer", "compare_candidates",
-                                "highlight", "open_prediction",
+                                "set_geo",
+                                "set_election",
+                                "switch_tab",
+                                "set_map_layer",
+                                "compare_candidates",
+                                "highlight",
+                                "open_prediction",
                             ],
                         },
                         "level": {"type": "string"},

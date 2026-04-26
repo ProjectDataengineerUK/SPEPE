@@ -18,17 +18,17 @@ _CETIC_API_BASE = "https://cetic.br/api/indicadores/"
 _CETIC_INDICATORS = {
     "pct_internet_domiciliar": {
         "pesquisa": "tic-domicilios",
-        "indicador": "C1",          # % domicílios com acesso à internet
+        "indicador": "C1",  # % domicílios com acesso à internet
         "dimensao": "Total",
     },
     "pct_computador_domiciliar": {
         "pesquisa": "tic-domicilios",
-        "indicador": "B7",          # % domicílios com computador
+        "indicador": "B7",  # % domicílios com computador
         "dimensao": "Total",
     },
     "pct_smartphone_domiciliar": {
         "pesquisa": "tic-domicilios",
-        "indicador": "C2B",         # % domicílios com smartphone
+        "indicador": "C2B",  # % domicílios com smartphone
         "dimensao": "Total",
     },
 }
@@ -39,14 +39,33 @@ _PNAD_TIC_SIDRA = {
 }
 
 _CETIC_UF_MAP: dict[str, str] = {
-    "AC": "Acre", "AL": "Alagoas", "AM": "Amazonas", "AP": "Amapá",
-    "BA": "Bahia", "CE": "Ceará", "DF": "Distrito Federal",
-    "ES": "Espírito Santo", "GO": "Goiás", "MA": "Maranhão",
-    "MG": "Minas Gerais", "MS": "Mato Grosso do Sul", "MT": "Mato Grosso",
-    "PA": "Pará", "PB": "Paraíba", "PE": "Pernambuco", "PI": "Piauí",
-    "PR": "Paraná", "RJ": "Rio de Janeiro", "RN": "Rio Grande do Norte",
-    "RO": "Rondônia", "RR": "Roraima", "RS": "Rio Grande do Sul",
-    "SC": "Santa Catarina", "SE": "Sergipe", "SP": "São Paulo", "TO": "Tocantins",
+    "AC": "Acre",
+    "AL": "Alagoas",
+    "AM": "Amazonas",
+    "AP": "Amapá",
+    "BA": "Bahia",
+    "CE": "Ceará",
+    "DF": "Distrito Federal",
+    "ES": "Espírito Santo",
+    "GO": "Goiás",
+    "MA": "Maranhão",
+    "MG": "Minas Gerais",
+    "MS": "Mato Grosso do Sul",
+    "MT": "Mato Grosso",
+    "PA": "Pará",
+    "PB": "Paraíba",
+    "PE": "Pernambuco",
+    "PI": "Piauí",
+    "PR": "Paraná",
+    "RJ": "Rio de Janeiro",
+    "RN": "Rio Grande do Norte",
+    "RO": "Rondônia",
+    "RR": "Roraima",
+    "RS": "Rio Grande do Sul",
+    "SC": "Santa Catarina",
+    "SE": "Sergipe",
+    "SP": "São Paulo",
+    "TO": "Tocantins",
 }
 
 
@@ -89,7 +108,9 @@ def fetch_cetic_indicators(uf: str, year: int) -> dict[str, float | None]:
 
     logger.info(
         "CETIC TIC UF=%s year=%d: internet=%s%%",
-        uf_upper, year, result["pct_internet_domiciliar"],
+        uf_upper,
+        year,
+        result["pct_internet_domiciliar"],
     )
     return result
 

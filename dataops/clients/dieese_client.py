@@ -26,13 +26,33 @@ _IPEADATA_DIEESE_BASE = (
 
 # Map UF → capital IBGE code (for annual reference price)
 _UF_CAPITAL_IBGE: dict[str, int] = {
-    "AC": 1200401, "AL": 2704302, "AM": 1302603, "AP": 1600303,
-    "BA": 2927408, "CE": 2304400, "DF": 5300108, "ES": 3205309,
-    "GO": 5208707, "MA": 2111300, "MG": 3106200, "MS": 5002704,
-    "MT": 5103403, "PA": 1501402, "PB": 2507507, "PE": 2611606,
-    "PI": 2211001, "PR": 4106902, "RJ": 3304557, "RN": 2408102,
-    "RO": 1100205, "RR": 1400100, "RS": 4314902, "SC": 4205407,
-    "SE": 2800308, "SP": 3550308, "TO": 1721000,
+    "AC": 1200401,
+    "AL": 2704302,
+    "AM": 1302603,
+    "AP": 1600303,
+    "BA": 2927408,
+    "CE": 2304400,
+    "DF": 5300108,
+    "ES": 3205309,
+    "GO": 5208707,
+    "MA": 2111300,
+    "MG": 3106200,
+    "MS": 5002704,
+    "MT": 5103403,
+    "PA": 1501402,
+    "PB": 2507507,
+    "PE": 2611606,
+    "PI": 2211001,
+    "PR": 4106902,
+    "RJ": 3304557,
+    "RN": 2408102,
+    "RO": 1100205,
+    "RR": 1400100,
+    "RS": 4314902,
+    "SC": 4205407,
+    "SE": 2800308,
+    "SP": 3550308,
+    "TO": 1721000,
 }
 
 # DIEESE keeps separate series codes per city — SP as reference
@@ -79,9 +99,7 @@ def fetch_cesta_basica_uf(uf: str, year: int) -> dict[str, float | None]:
         logger.warning("IPEADATA DIEESE fetch failed for UF=%s: %s", uf, exc)
         entries = []
 
-    year_entries = [
-        e for e in entries if str(year) in str(e.get("VALDATA", ""))
-    ]
+    year_entries = [e for e in entries if str(year) in str(e.get("VALDATA", ""))]
     if year_entries:
         vals = []
         for e in year_entries:
@@ -94,7 +112,9 @@ def fetch_cesta_basica_uf(uf: str, year: int) -> dict[str, float | None]:
 
     logger.info(
         "DIEESE cesta básica UF=%s year=%d: R$ %s",
-        uf_upper, year, result["cesta_basica_capital_brl"],
+        uf_upper,
+        year,
+        result["cesta_basica_capital_brl"],
     )
     return result
 

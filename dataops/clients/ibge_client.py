@@ -24,28 +24,28 @@ _SIDRA_URL = (
 #          Censo 2010 para religião (2094) — Censo 2022 tabelas ainda em consolidação
 _SIDRA_TABLES: dict[str, tuple[str, str, str]] = {
     # Core
-    "populacao":              ("9514", "2022", "9324"),
-    "pct_analfabetos":        ("9543", "2022", "4104"),
-    "renda_media":            ("9532", "2023", "9531"),
-    "taxa_desemprego":        ("9605", "2023", "4099"),
+    "populacao": ("9514", "2022", "9324"),
+    "pct_analfabetos": ("9543", "2022", "4104"),
+    "renda_media": ("9532", "2023", "9531"),
+    "taxa_desemprego": ("9605", "2023", "4099"),
     # Faixas etárias — Censo 2022 tabela 9662
-    "pct_0_14":               ("9662", "2022", "9325"),
-    "pct_15_29":              ("9662", "2022", "9326"),
-    "pct_30_59":              ("9662", "2022", "9327"),
-    "pct_60_mais":            ("9662", "2022", "9328"),
+    "pct_0_14": ("9662", "2022", "9325"),
+    "pct_15_29": ("9662", "2022", "9326"),
+    "pct_30_59": ("9662", "2022", "9327"),
+    "pct_60_mais": ("9662", "2022", "9328"),
     # Gênero — Censo 2022
-    "pct_mulheres":           ("9514", "2022", "9329"),
+    "pct_mulheres": ("9514", "2022", "9329"),
     # Escolaridade — Censo 2022
-    "pct_ensino_medio":       ("9543", "2022", "4103"),
-    "pct_superior_completo":  ("9543", "2022", "4102"),
+    "pct_ensino_medio": ("9543", "2022", "4103"),
+    "pct_superior_completo": ("9543", "2022", "4102"),
     # Religião — Censo 2010 (2022 ainda consolidando)
-    "pct_catolico":           ("2094", "2010", "4150"),
-    "pct_sem_religiao":       ("2094", "2010", "4154"),
+    "pct_catolico": ("2094", "2010", "4150"),
+    "pct_sem_religiao": ("2094", "2010", "4154"),
     # Urbanização — Censo 2022 tabela 9714
-    "pct_urbano":             ("9714", "2022", "9325"),
-    "densidade_demografica":  ("9514", "2022", "616"),
+    "pct_urbano": ("9714", "2022", "9325"),
+    "densidade_demografica": ("9514", "2022", "616"),
     # Pobreza — PNAD 2022
-    "pct_extrema_pobreza":    ("9532", "2022", "9535"),
+    "pct_extrema_pobreza": ("9532", "2022", "9535"),
     # Acesso digital — PNAD TIC 2023
     "pct_internet_domiciliar": ("9606", "2023", "9607"),
 }
