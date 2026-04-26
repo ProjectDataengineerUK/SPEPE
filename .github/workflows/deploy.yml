@@ -112,6 +112,11 @@ jobs:
             --set-env-vars "GCP_PROJECT_ID=${{ vars.GCP_PROJECT_ID }},USE_BIGQUERY=false,DEFAULT_UF=SP,DEFAULT_ANO=2022,ENVIRONMENT=staging" \
             --set-secrets "ANTHROPIC_API_KEY=ANTHROPIC_API_KEY:latest" \
             --allow-unauthenticated \
+            --port 8080 \
+            --memory 2Gi \
+            --cpu 1 \
+            --cpu-boost \
+            --timeout 60 \
             --region "${{ env.GCP_REGION }}" \
             --project "${{ vars.GCP_PROJECT_ID }}"
           URL=$(gcloud run services describe spepe-staging \
