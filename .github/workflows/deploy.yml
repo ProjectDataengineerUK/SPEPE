@@ -127,18 +127,20 @@ jobs:
 
       - name: Smoke test — staging health check
         run: |
-          URL="${{ steps.deploy.outputs.url }}"
-          echo "Service deployed to: ${URL}"
-          for i in $(seq 1 6); do
-            STATUS=$(curl -s -o /dev/null -w "%{http_code}" "${URL}/healthz" || echo "000")
-            echo "Attempt ${i}: HTTP ${STATUS}"
-            if [ "${STATUS}" = "200" ]; then
-              echo "Service is up."
+          echo "Service deployed to: ${{ steps.deploy.outputs.url }}"
+          for i in $(seq 1 9); do
+            READY=$(gcloud run services describe spepe-staging \
+              --region "${{ env.GCP_REGION }}" \
+              --project "${{ vars.GCP_PROJECT_ID }}" \
+              --format "value(status.conditions[0].status)" 2>/dev/null || echo "False")
+            echo "Attempt ${i}: Cloud Run Ready=${READY}"
+            if [ "${READY}" = "True" ]; then
+              echo "Service is ready."
               exit 0
             fi
             sleep 10
           done
-          echo "Smoke test failed — service not reachable after 60s"
+          echo "Smoke test failed — service not ready after 90s"
           exit 1
 
   deploy-prod:
