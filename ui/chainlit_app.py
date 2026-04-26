@@ -15,20 +15,17 @@ async def healthz() -> Response:
 import ui.dashboard_api  # noqa: E402, F401
 from agents.supervisor import Supervisor  # noqa: E402
 
-# Chainlit registers /{full_path:path} as a catch-all when imported.
-# Routes added after that import (dashboard_api) are appended after the catch-all
-# and are never reached. Move /dash, /admin, /healthz before the catch-all.
+# Chainlit registers a SPA catch-all (Route or Mount) when imported.
+# All routes added after (dashboard_api) are appended after the catch-all
+# and are never reached. Fix: prepend our routes to index 0 so they win
+# regardless of whether the catch-all is a Route or a StaticFiles Mount.
 _r = _fastapi_app.router.routes
-_our_paths = {"/dash", "/admin", "/healthz"}
-_ours = [r for r in _r if getattr(r, "path", "") in _our_paths]
+_our_prefixes = ("/dash", "/admin", "/api/", "/healthz")
+_ours = [r for r in _r if any(getattr(r, "path", "").startswith(p) for p in _our_prefixes)]
 for _route in _ours:
     _r.remove(_route)
-_catchall_idx = next(
-    (i for i, r in enumerate(_r) if getattr(r, "path", "") == "/{full_path:path}"),
-    len(_r),
-)
-for i, _route in enumerate(_ours):
-    _r.insert(_catchall_idx + i, _route)
+for _i, _route in enumerate(_ours):
+    _r.insert(_i, _route)
 from config.logging_config import setup_logging  # noqa: E402
 from config.session_state import SessionState  # noqa: E402
 from config.settings import settings  # noqa: E402

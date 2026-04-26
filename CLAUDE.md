@@ -522,8 +522,9 @@ Chaves-mestras: `cod_municipio_ibge`, `uf`, `ano_eleitoral`, `data_referencia`
 ## Pendências v1.0.0 — Crítico
 
 ### 🔴 **Bloqueia Deploy**
-- [ ] **URGENTE**: Revogar ANTHROPIC_API_KEY exposta em `.env` — ir em console.anthropic.com
-- [ ] Committar 4 arquivos .py pendentes + gitignore audit logs
+- [x] **FEITO**: ANTHROPIC_API_KEY exposta revogada em console.anthropic.com (2026-04-26)
+- [x] CI/CD verde no GitHub — Docker build + Cloud Run deploy confirmado (2026-04-26)
+- [ ] Committar arquivos pendentes (chainlit_app.py fix routing + prototype.py deletado)
 - [ ] Adicionar `__main__` em mlops/eval/eval_runner.py para CI
 
 ### 🟠 **Valida Funcionalidade (Fase 1)**
