@@ -3250,14 +3250,16 @@ async def ws_chat(websocket: WebSocket) -> None:
     await websocket.accept()
     state = SessionState(session_id=str(uuid.uuid4()))
 
-    await websocket.send_json({
-        "type": "welcome",
-        "text": (
-            f"## SPEPE — Sistema de Perfilamento do Eleitorado\n\n"
-            f"Digite `/help` para ver os comandos disponíveis.\n\n"
-            f"*Sessão `{state.session_id[:8]}` | Budget: $2.00*"
-        ),
-    })
+    await websocket.send_json(
+        {
+            "type": "welcome",
+            "text": (
+                f"## SPEPE — Sistema de Perfilamento do Eleitorado\n\n"
+                f"Digite `/help` para ver os comandos disponíveis.\n\n"
+                f"*Sessão `{state.session_id[:8]}` | Budget: $2.00*"
+            ),
+        }
+    )
 
     try:
         while True:
@@ -3277,7 +3279,14 @@ async def ws_chat(websocket: WebSocket) -> None:
 
             if user_text.lower() in ("/help", "help", "ajuda"):
                 await websocket.send_json({"type": "chunk", "text": _HELP_TEXT})
-                await websocket.send_json({"type": "done", "cost": 0, "budget_remaining": round(2.0 - state.total_cost_usd, 4), "dashboard_update": {}})
+                await websocket.send_json(
+                    {
+                        "type": "done",
+                        "cost": 0,
+                        "budget_remaining": round(2.0 - state.total_cost_usd, 4),
+                        "dashboard_update": {},
+                    }
+                )
                 continue
 
             # Validação de segurança
