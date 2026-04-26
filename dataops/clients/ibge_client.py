@@ -1,4 +1,4 @@
-"""IBGE client — Localidades API + SIDRA API."""
+"""IBGE client — Localidades API + SIDRA API (apisidra.ibge.gov.br)."""
 
 from __future__ import annotations
 
@@ -13,42 +13,36 @@ from tenacity import retry, stop_after_attempt, wait_exponential
 logger = logging.getLogger("spepe.clients.ibge")
 
 _LOCALIDADES_URL = "https://servicodados.ibge.gov.br/api/v1/localidades/estados/{uf}/municipios"
-_SIDRA_URL = (
-    "https://servicodados.ibge.gov.br/api/v3/agregados"
-    "/{tabela}/periodos/{periodo}/variaveis/{variavel}"
-    "?localidades=N6[all]"
-)
 
-# SIDRA: tabela, periodo, variavel, col_name
-# Sources: Censo 2022 (9514, 9543, 9662, 9714) + PNAD Contínua 2023 (9532, 9605)
-#          Censo 2010 para religião (2094) — Censo 2022 tabelas ainda em consolidação
+# apisidra.ibge.gov.br — API estável para consultas SIDRA
+# Formato: /values/t/{tabela}/n6/all/v/{variavel}/p/{periodo}
+# Resposta: array onde [0] é cabeçalho, [1:] são dados com D1C=cod_municipio, V=valor
+_APISIDRA_URL = "https://apisidra.ibge.gov.br/values/t/{tabela}/n6/all/v/{variavel}/p/{periodo}"
+
+# (tabela, periodo, variavel) — confirmados funcionando em apisidra.ibge.gov.br
+# Censo 2022: N6 (município) disponível
+# PNAD Contínua: apenas N3 (UF) — não disponível em N6
 _SIDRA_TABLES: dict[str, tuple[str, str, str]] = {
-    # Core
-    "populacao": ("9514", "2022", "9324"),
-    "pct_analfabetos": ("9543", "2022", "4104"),
-    "renda_media": ("9532", "2023", "9531"),
-    "taxa_desemprego": ("9605", "2023", "4099"),
-    # Faixas etárias — Censo 2022 tabela 9662
+    # Estimativas populacao — última disponível (2021 confirmado; 2022 sem dado nesta tabela)
+    "populacao": ("6579", "last", "9324"),
+    # Censo 2022 — município (N6) — CONFIRMADOS
+    "taxa_alfabetizacao": ("9543", "2022", "2513"),  # Taxa alfabetização ≥15 anos
+    # Censo 2022 — faixas etárias (N6) — a confirmar quando API estabilizar
     "pct_0_14": ("9662", "2022", "9325"),
     "pct_15_29": ("9662", "2022", "9326"),
     "pct_30_59": ("9662", "2022", "9327"),
     "pct_60_mais": ("9662", "2022", "9328"),
-    # Gênero — Censo 2022
-    "pct_mulheres": ("9514", "2022", "9329"),
-    # Escolaridade — Censo 2022
-    "pct_ensino_medio": ("9543", "2022", "4103"),
-    "pct_superior_completo": ("9543", "2022", "4102"),
-    # Religião — Censo 2010 (2022 ainda consolidando)
+    # Censo 2022 — urbanização (N6)
+    "pct_urbano": ("9714", "2022", "9325"),
+    # Religião — Censo 2010 (Censo 2022 ainda consolidando)
     "pct_catolico": ("2094", "2010", "4150"),
     "pct_sem_religiao": ("2094", "2010", "4154"),
-    # Urbanização — Censo 2022 tabela 9714
-    "pct_urbano": ("9714", "2022", "9325"),
-    "densidade_demografica": ("9514", "2022", "616"),
-    # Pobreza — PNAD 2022
-    "pct_extrema_pobreza": ("9532", "2022", "9535"),
-    # Acesso digital — PNAD TIC 2023
-    "pct_internet_domiciliar": ("9606", "2023", "9607"),
 }
+
+# pct_analfabetos = 100 - taxa_alfabetizacao (derivado, não busca direta)
+# renda_media e taxa_desemprego: PNAD só disponível em N3 (UF) — implementar v2
+
+_SIDRA_BATCH_SIZE = 50  # municípios por requisição
 
 _IPEADATA_URL = (
     "http://www.ipeadata.gov.br/api/odata4/ValoresSerie"
@@ -120,27 +114,57 @@ def load_municipios(uf: str) -> pd.DataFrame:
     return df
 
 
-def _fetch_sidra(tabela: str, periodo: str, variavel: str) -> dict[str, float]:
-    """Return {ibge_municipio_code: value} from a SIDRA table."""
-    url = _SIDRA_URL.format(tabela=tabela, periodo=periodo, variavel=variavel)
+def _parse_sidra_rows(data: list[dict]) -> dict[str, float]:
+    """Parse apisidra flat-array response into {ibge_code: value}."""
+    result: dict[str, float] = {}
+    for row in data[1:]:  # row[0] is header
+        cod = str(row.get("D1C", "")).strip()
+        val_str = str(row.get("V", "")).strip()
+        if not cod or val_str in ("", "-", "...", "X"):
+            continue
+        try:
+            result[cod] = float(val_str.replace(",", "."))
+        except (ValueError, TypeError):
+            pass
+    return result
+
+
+def _fetch_sidra(
+    tabela: str, periodo: str, variavel: str, ibge_codes: list[str] | None = None
+) -> dict[str, float]:
+    """Return {ibge_municipio_code: value} via apisidra.ibge.gov.br.
+
+    If ibge_codes provided, fetches in batches of _SIDRA_BATCH_SIZE (avoids N6[all] timeout).
+    """
+    if ibge_codes:
+        result: dict[str, float] = {}
+        for i in range(0, len(ibge_codes), _SIDRA_BATCH_SIZE):
+            batch = ibge_codes[i : i + _SIDRA_BATCH_SIZE]
+            codes_str = ",".join(batch)
+            url = (
+                f"https://apisidra.ibge.gov.br/values/t/{tabela}"
+                f"/n6/{codes_str}/v/{variavel}/p/{periodo}"
+            )
+            try:
+                data = _get(url)
+                result.update(_parse_sidra_rows(data))
+            except Exception as exc:
+                logger.warning("SIDRA batch %s/%s/%s falhou: %s", tabela, periodo, variavel, exc)
+        return result
+
+    # Fallback: N6[all] (pode falhar para tabelas grandes)
+    url = _APISIDRA_URL.format(tabela=tabela, periodo=periodo, variavel=variavel)
     try:
         data = _get(url)
     except Exception as exc:
         logger.warning("SIDRA %s/%s/%s falhou: %s", tabela, periodo, variavel, exc)
         return {}
 
-    result: dict[str, float] = {}
-    for item in data:
-        for res in item.get("resultados", []):
-            for loc in res.get("series", []):
-                loc_id = loc.get("localidade", {}).get("id", "")
-                val_str = list(loc.get("serie", {}).values())
-                if loc_id and val_str:
-                    try:
-                        result[loc_id] = float(str(val_str[0]).replace(",", "."))
-                    except (ValueError, TypeError):
-                        pass
-    return result
+    if not isinstance(data, list) or len(data) < 2:
+        logger.warning("SIDRA %s/%s/%s resposta vazia", tabela, periodo, variavel)
+        return {}
+
+    return _parse_sidra_rows(data)
 
 
 def fetch_sidra_indicators(
@@ -152,21 +176,34 @@ def fetch_sidra_indicators(
     """Fetch SIDRA indicators for all municipalities in a UF.
 
     Returns a list of dicts, one per municipality × indicator.
+    pct_analfabetos is derived as 100 - taxa_alfabetizacao when requested.
     """
     cache_dir.mkdir(parents=True, exist_ok=True)
 
     df_mun = load_municipios(uf)
-    ibge_codes = set(df_mun["cd_municipio_ibge"].astype(str).tolist())
+    ibge_codes_list = df_mun["cd_municipio_ibge"].astype(str).tolist()
+    ibge_codes = set(ibge_codes_list)
+
+    # Expand pct_analfabetos → fetch taxa_alfabetizacao and invert
+    expanded = list(indicators)
+    needs_analfabetos = "pct_analfabetos" in expanded
+    if needs_analfabetos and "taxa_alfabetizacao" not in expanded:
+        expanded.append("taxa_alfabetizacao")
 
     rows: list[dict] = []
-    for indicator in indicators:
+    fetched: dict[str, dict[str, float]] = {}
+
+    for indicator in expanded:
+        if indicator == "pct_analfabetos":
+            continue  # derived below
         if indicator not in _SIDRA_TABLES:
             logger.debug("Indicador não mapeado no SIDRA: %s — pulando", indicator)
             continue
 
         tabela, periodo, variavel = _SIDRA_TABLES[indicator]
         logger.info("SIDRA %s (tabela=%s, periodo=%s)", indicator, tabela, periodo)
-        values = _fetch_sidra(tabela, periodo, variavel)
+        values = _fetch_sidra(tabela, periodo, variavel, ibge_codes=ibge_codes_list)
+        fetched[indicator] = values
 
         for ibge_id, value in values.items():
             if ibge_id in ibge_codes:
@@ -178,6 +215,22 @@ def fetch_sidra_indicators(
                         "valor": value,
                         "periodo": periodo,
                         "fonte": f"IBGE SIDRA tabela {tabela}",
+                    }
+                )
+
+    # Derive pct_analfabetos = 100 - taxa_alfabetizacao
+    if needs_analfabetos and "taxa_alfabetizacao" in fetched:
+        _, periodo, _ = _SIDRA_TABLES["taxa_alfabetizacao"]
+        for ibge_id, alfa in fetched["taxa_alfabetizacao"].items():
+            if ibge_id in ibge_codes:
+                rows.append(
+                    {
+                        "cd_municipio_ibge": int(ibge_id),
+                        "sg_uf": uf.upper(),
+                        "indicador": "pct_analfabetos",
+                        "valor": round(100.0 - alfa, 4),
+                        "periodo": periodo,
+                        "fonte": "IBGE SIDRA tabela 9543 (derivado)",
                     }
                 )
 
