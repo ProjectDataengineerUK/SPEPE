@@ -1,15 +1,10 @@
 """
-SPEPE Dashboard API — FastAPI bridge entre o frontend HTML e o backend.
+SPEPE Dashboard API — FastAPI standalone (uvicorn).
 
-Monta sobre o mesmo processo do Chainlit via _fastapi_app:
   - REST:      GET /api/candidatos, /api/kpi, /api/municipios, /api/trends, /api/meta
   - WebSocket: /ws/chat  → Supervisor stream em tempo real
-  - Static:    GET /dash  → Serve o dashboard HTML
-
-Adaptação do protótipo spepe-app.html:
-  - Mock data JS → fetch('/api/*')
-  - Chat mock → WebSocket /ws/chat
-  - Login mock → Firebase Auth token validado em /api/auth/me
+  - Static:    GET /dash  → Dashboard HTML  |  GET /admin → Admin Panel
+  - Health:    GET /healthz
 """
 
 from __future__ import annotations
@@ -18,26 +13,63 @@ import json
 import logging
 import os
 import uuid
+from contextlib import asynccontextmanager
+from enum import Enum
 from typing import Any
 
-from enum import Enum
-
-from fastapi import Header, HTTPException, Query, Request, WebSocket, WebSocketDisconnect
-from fastapi.responses import FileResponse, JSONResponse
-
-# Monta sobre o app Chainlit existente
-from chainlit.server import app as _fastapi_app
+from fastapi import FastAPI, Header, HTTPException, Query, Request, WebSocket, WebSocketDisconnect
+from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import FileResponse, JSONResponse, RedirectResponse
 
 from agents.supervisor import Supervisor
+from config.logging_config import setup_logging
 from config.session_state import SessionState
 from config.settings import settings
 from dataops.clients.digital_client import fetch_meta_ads, fetch_trends
 from security.output_validators import validate_input_injection
 
+
+@asynccontextmanager
+async def lifespan(application: FastAPI):
+    setup_logging(log_level=settings.log_level, console_log_level="WARNING")
+    yield
+
+
+app = FastAPI(title="SPEPE", version="1.0.0", lifespan=lifespan)
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
 logger = logging.getLogger("spepe.dashboard_api")
 
+_HELP_TEXT = """\
+## SPEPE — Comandos disponíveis
 
-@_fastapi_app.get("/healthz")
+| Comando | Agente | Modelo |
+|---------|--------|--------|
+| `/coletar SP 2022` | Coletor | Gemini Flash |
+| `/perfil São Paulo 2022` | Analista | Gemini Pro |
+| `/arquétipos BR` | Perfilador | Gemini Flash |
+| `/prever Lula 2026` | Modelista → Explicador → Narrador | Gemini Pro |
+| `/explicar` | Explicador | Gemini Pro |
+| `/relatorio` | Narrador | Gemini Flash |
+| `/monitorar` | Vigilante | Gemini Flash |
+| `/help` | — | — |
+
+*Arquitetura: Claude Sonnet 4.6 (roteamento) + Google Gemini (execução) via Vertex AI*
+*Budget por sessão: $2.00*
+"""
+
+
+@app.get("/", include_in_schema=False)
+async def root() -> RedirectResponse:
+    return RedirectResponse(url="/dash")
+
+
+@app.get("/healthz")
 async def healthz() -> JSONResponse:
     return JSONResponse({"status": "ok"})
 
@@ -55,7 +87,7 @@ def _get_supervisor() -> Supervisor:
 # ── Servir o dashboard HTML ────────────────────────────────────────────────
 
 
-@_fastapi_app.get("/dash")
+@app.get("/dash")
 async def serve_dashboard() -> FileResponse:
     """Serve o protótipo HTML do dashboard."""
     from pathlib import Path
@@ -67,7 +99,7 @@ async def serve_dashboard() -> FileResponse:
 # ── Auth (stub — trocar por Firebase Auth / IAP em prod) ──────────────────
 
 
-@_fastapi_app.get("/api/auth/me")
+@app.get("/api/auth/me")
 async def auth_me(authorization: str = Header(default=None)) -> JSONResponse:
     """Retorna perfil do usuário autenticado. Valida Firebase ID token em produção."""
     import os
@@ -239,7 +271,7 @@ _MOCK_CANDIDATOS: dict[str, list[dict]] = {
 }
 
 
-@_fastapi_app.get("/api/candidatos")
+@app.get("/api/candidatos")
 async def get_candidatos(
     cargo: str = Query("Presidente"),
     uf: str = Query("SP"),
@@ -303,7 +335,7 @@ async def _bq_candidatos(cargo: str, uf: str, ano: int) -> list[dict]:
 # ── KPIs ──────────────────────────────────────────────────────────────────
 
 
-@_fastapi_app.get("/api/kpi")
+@app.get("/api/kpi")
 async def get_kpi(
     cargo: str = Query("Presidente"),
     uf: str = Query("SP"),
@@ -345,7 +377,7 @@ _MOCK_MUNICIPIOS = [
 ]
 
 
-@_fastapi_app.get("/api/municipios")
+@app.get("/api/municipios")
 async def get_municipios(
     cargo: str = Query("Presidente"),
     uf: str = Query("SP"),
@@ -358,7 +390,7 @@ async def get_municipios(
 # ── Google Trends ─────────────────────────────────────────────────────────
 
 
-@_fastapi_app.get("/api/trends")
+@app.get("/api/trends")
 async def get_trends(
     cargo: str = Query("Presidente"),
     uf: str = Query("SP"),
@@ -394,7 +426,7 @@ async def get_trends(
 # ── Meta Ads ──────────────────────────────────────────────────────────────
 
 
-@_fastapi_app.get("/api/meta")
+@app.get("/api/meta")
 async def get_meta(
     cargo: str = Query("Presidente"),
     uf: str = Query("SP"),
@@ -2616,7 +2648,7 @@ _MOCK_MAPA_MUN_BY_UF: dict[str, list[dict]] = {
 }
 
 
-@_fastapi_app.get("/api/mapa/{nivel}")
+@app.get("/api/mapa/{nivel}")
 async def get_mapa(
     nivel: NivelGeo,
     cargo: str = Query("Presidente"),
@@ -3201,7 +3233,7 @@ async def _bq_mapa_secao(
 # ── WebSocket Chat → Supervisor ────────────────────────────────────────────
 
 
-@_fastapi_app.websocket("/ws/chat")
+@app.websocket("/ws/chat")
 async def ws_chat(websocket: WebSocket) -> None:
     """
     WebSocket que conecta o dashboard HTML ao Supervisor SPEPE real.
@@ -3218,6 +3250,15 @@ async def ws_chat(websocket: WebSocket) -> None:
     await websocket.accept()
     state = SessionState(session_id=str(uuid.uuid4()))
 
+    await websocket.send_json({
+        "type": "welcome",
+        "text": (
+            f"## SPEPE — Sistema de Perfilamento do Eleitorado\n\n"
+            f"Digite `/help` para ver os comandos disponíveis.\n\n"
+            f"*Sessão `{state.session_id[:8]}` | Budget: $2.00*"
+        ),
+    })
+
     try:
         while True:
             raw = await websocket.receive_text()
@@ -3232,6 +3273,11 @@ async def ws_chat(websocket: WebSocket) -> None:
 
             user_text = msg.get("text", "").strip()
             if not user_text:
+                continue
+
+            if user_text.lower() in ("/help", "help", "ajuda"):
+                await websocket.send_json({"type": "chunk", "text": _HELP_TEXT})
+                await websocket.send_json({"type": "done", "cost": 0, "budget_remaining": round(2.0 - state.total_cost_usd, 4), "dashboard_update": {}})
                 continue
 
             # Validação de segurança
@@ -3286,7 +3332,7 @@ async def ws_chat(websocket: WebSocket) -> None:
 # ── Admin Panel ───────────────────────────────────────────────────────────────
 
 
-@_fastapi_app.get("/admin")
+@app.get("/admin")
 async def serve_admin() -> FileResponse:
     """Serve the Admin Panel HTML."""
     from pathlib import Path
@@ -3298,12 +3344,12 @@ async def serve_admin() -> FileResponse:
 _USER_STORE: list[dict] = []  # in-memory stub; replace with Firestore/Cloud SQL in prod
 
 
-@_fastapi_app.get("/admin/api/users")
+@app.get("/admin/api/users")
 async def admin_list_users() -> JSONResponse:
     return JSONResponse({"users": _USER_STORE})
 
 
-@_fastapi_app.post("/admin/api/users")
+@app.post("/admin/api/users")
 async def admin_create_user(request: Request) -> JSONResponse:
     import uuid
     from datetime import date
@@ -3314,7 +3360,7 @@ async def admin_create_user(request: Request) -> JSONResponse:
     return JSONResponse({"ok": True, "user": user})
 
 
-@_fastapi_app.put("/admin/api/users/{user_id}")
+@app.put("/admin/api/users/{user_id}")
 async def admin_update_user(user_id: str, request: Request) -> JSONResponse:
     body = await request.json()
     for i, u in enumerate(_USER_STORE):
@@ -3324,7 +3370,7 @@ async def admin_update_user(user_id: str, request: Request) -> JSONResponse:
     return JSONResponse({"ok": False, "error": "not found"}, status_code=404)
 
 
-@_fastapi_app.delete("/admin/api/users/{user_id}")
+@app.delete("/admin/api/users/{user_id}")
 async def admin_delete_user(user_id: str) -> JSONResponse:
     global _USER_STORE
     _USER_STORE = [u for u in _USER_STORE if u["id"] != user_id]
@@ -3334,19 +3380,19 @@ async def admin_delete_user(user_id: str) -> JSONResponse:
 _ACCESS_MATRIX: dict = {}  # profile → {feature_id: bool}
 
 
-@_fastapi_app.get("/admin/api/access")
+@app.get("/admin/api/access")
 async def admin_get_access() -> JSONResponse:
     return JSONResponse({"matrix": _ACCESS_MATRIX})
 
 
-@_fastapi_app.post("/admin/api/access")
+@app.post("/admin/api/access")
 async def admin_save_access(request: Request) -> JSONResponse:
     global _ACCESS_MATRIX
     _ACCESS_MATRIX = await request.json()
     return JSONResponse({"ok": True})
 
 
-@_fastapi_app.get("/admin/api/jobs")
+@app.get("/admin/api/jobs")
 async def admin_list_jobs() -> JSONResponse:
     """List Cloud Run Jobs with last execution status."""
     jobs_config = [
@@ -3389,7 +3435,7 @@ async def admin_list_jobs() -> JSONResponse:
     return JSONResponse({"jobs": jobs_config})
 
 
-@_fastapi_app.post("/admin/api/jobs/{job_name}/run")
+@app.post("/admin/api/jobs/{job_name}/run")
 async def admin_run_job(job_name: str, uf: str = "SP", year: int = 2022) -> JSONResponse:
     """Trigger a Cloud Run Job execution (admin only)."""
     from agents.tools import RunJobArgs, run_dataops_job
@@ -3411,7 +3457,7 @@ async def admin_run_job(job_name: str, uf: str = "SP", year: int = 2022) -> JSON
     return JSONResponse(result)
 
 
-@_fastapi_app.get("/admin/api/sentinel/status")
+@app.get("/admin/api/sentinel/status")
 async def admin_sentinel_status() -> JSONResponse:
     """Return snapshot of all Sentinel resource statuses."""
     if settings.gcp_project_id and os.environ.get("USE_BIGQUERY", "").lower() == "true":
@@ -3533,7 +3579,7 @@ async def admin_sentinel_status() -> JSONResponse:
     return JSONResponse({"resources": stub, "source": "stub"})
 
 
-@_fastapi_app.get("/admin/api/catalog")
+@app.get("/admin/api/catalog")
 async def admin_catalog() -> JSONResponse:
     """Return BigQuery table metadata for all SPEPE datasets."""
     datasets = ["spepe_silver", "spepe_gold", "spepe_mlops"]
@@ -3635,7 +3681,7 @@ async def admin_catalog() -> JSONResponse:
 _sentinel_ws_clients: list[WebSocket] = []
 
 
-@_fastapi_app.websocket("/ws/sentinel")
+@app.websocket("/ws/sentinel")
 async def ws_sentinel(websocket: WebSocket) -> None:
     """WebSocket for real-time Sentinel status updates to the admin panel."""
     import asyncio

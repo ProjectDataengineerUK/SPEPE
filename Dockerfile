@@ -50,4 +50,4 @@ EXPOSE 8080
 HEALTHCHECK --interval=30s --timeout=10s --start-period=30s --retries=3 \
     CMD curl -f "http://localhost:${PORT}/healthz" || exit 1
 
-CMD ["sh", "-c", "chainlit run ui/chainlit_app.py --port=${PORT} --host=0.0.0.0 --headless"]
+CMD ["sh", "-c", "uvicorn ui.dashboard_api:app --port=${PORT} --host=0.0.0.0 --workers=2"]

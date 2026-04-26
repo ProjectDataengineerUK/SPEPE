@@ -1,13 +1,13 @@
-# Runtime deps for the Chainlit web app (Cloud Run service)
-# Heavy ML libs (pymc, umap-learn, shap, geopandas) run in Cloud Run Jobs — not needed here
+# Runtime deps para o Cloud Run service (uvicorn + FastAPI standalone)
+# Heavy ML libs (pymc, umap-learn, shap, geopandas) rodam nos Cloud Run Jobs
 
 # Core SDK
 anthropic==0.49.0
 
-# Web UI
-chainlit==2.11.0
+# Web
 fastapi==0.136.0
 uvicorn==0.44.0
+websockets==15.0.1
 
 # Data processing
 pandas==3.0.2
