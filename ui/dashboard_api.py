@@ -522,7 +522,7 @@ _PARTIDO_COR = {
 }
 
 # Mock data de resultado por UF (Presidente 2022, 1º turno)
-_MOCK_MAPA_UF = {
+_MOCK_MAPA_UF: dict[str, dict[str, Any]] = {
     "SP": {
         "lider": "Bolsonaro",
         "partido": "PL",
@@ -2813,8 +2813,8 @@ async def get_mapa(
         lider_uf = uf_data["lider"]
         segundo_uf = uf_data["segundo"]
         partido_uf = uf_data["partido"]
-        base_pct = uf_data["pct"]
-        base_pct2 = uf_data["pct2"]
+        base_pct: float = uf_data["pct"]
+        base_pct2: float = uf_data["pct2"]
         _rand.seed(hash(mun) % 9999)
         num_zonas = _rand.randint(15, 25)
         features = []
@@ -3373,19 +3373,19 @@ async def admin_list_jobs() -> JSONResponse:
                     jcfg["last_status"] = (
                         gj.terminal_condition.type_ if gj.terminal_condition else "UNKNOWN"
                     )
-                    jcfg["last_run_at"] = str(gj.update_time) if gj.update_time else None
+                    jcfg["last_run_at"] = str(gj.update_time) if gj.update_time else ""
                 else:
                     jcfg["last_status"] = "NOT_DEPLOYED"
-                    jcfg["last_run_at"] = None
+                    jcfg["last_run_at"] = ""
         except Exception as exc:
             logger.warning("Cloud Run jobs list failed: %s", exc)
             for jcfg in jobs_config:
                 jcfg.setdefault("last_status", "UNKNOWN")
-                jcfg.setdefault("last_run_at", None)
+                jcfg.setdefault("last_run_at", "")
     else:
         for jcfg in jobs_config:
             jcfg["last_status"] = "LOCAL_DEV"
-            jcfg["last_run_at"] = None
+            jcfg["last_run_at"] = ""
     return JSONResponse({"jobs": jobs_config})
 
 
@@ -3645,7 +3645,7 @@ async def ws_sentinel(websocket: WebSocket) -> None:
     try:
         # Send initial snapshot wrapped as typed message
         status_resp = await admin_sentinel_status()
-        status_data = status_resp.body.decode()
+        status_data = bytes(status_resp.body).decode()
         import json as _json
 
         parsed = _json.loads(status_data)
