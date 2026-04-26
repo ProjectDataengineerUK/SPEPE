@@ -14,6 +14,21 @@ async def healthz() -> Response:
 
 import ui.dashboard_api  # noqa: E402, F401
 from agents.supervisor import Supervisor  # noqa: E402
+
+# Chainlit registers /{full_path:path} as a catch-all when imported.
+# Routes added after that import (dashboard_api) are appended after the catch-all
+# and are never reached. Move /dash, /admin, /healthz before the catch-all.
+_r = _fastapi_app.router.routes
+_our_paths = {"/dash", "/admin", "/healthz"}
+_ours = [r for r in _r if getattr(r, "path", "") in _our_paths]
+for _route in _ours:
+    _r.remove(_route)
+_catchall_idx = next(
+    (i for i, r in enumerate(_r) if getattr(r, "path", "") == "/{full_path:path}"),
+    len(_r),
+)
+for i, _route in enumerate(_ours):
+    _r.insert(_catchall_idx + i, _route)
 from config.logging_config import setup_logging  # noqa: E402
 from config.session_state import SessionState  # noqa: E402
 from config.settings import settings  # noqa: E402
