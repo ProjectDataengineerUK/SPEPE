@@ -78,6 +78,28 @@ resource "google_bigquery_table" "model_evaluations" {
   ])
 }
 
+resource "google_bigquery_table" "sentinel_state" {
+  dataset_id          = google_bigquery_dataset.spepe_mlops.dataset_id
+  table_id            = "sentinel_state"
+  description         = "Live Sentinel watcher state — single source of truth for admin monitor panel"
+  labels              = local.labels
+  deletion_protection = false
+
+  clustering = ["category", "status"]
+
+  schema = jsonencode([
+    { name = "resource_id",    type = "STRING",    mode = "REQUIRED" },
+    { name = "category",       type = "STRING",    mode = "REQUIRED" },  # dataops|mlops|infra|social|crews
+    { name = "watcher",        type = "STRING",    mode = "REQUIRED" },
+    { name = "status",         type = "STRING",    mode = "REQUIRED" },  # ok|warn|breach|unknown|cooldown
+    { name = "metrics",        type = "JSON",      mode = "NULLABLE" },
+    { name = "alert_message",  type = "STRING",    mode = "NULLABLE" },
+    { name = "last_check",     type = "TIMESTAMP", mode = "REQUIRED" },
+    { name = "cooldown_until", type = "TIMESTAMP", mode = "NULLABLE" },
+    { name = "updated_at",     type = "TIMESTAMP", mode = "REQUIRED" },
+  ])
+}
+
 resource "google_bigquery_table" "bias_metrics" {
   dataset_id          = google_bigquery_dataset.spepe_mlops.dataset_id
   table_id            = "bias_metrics"

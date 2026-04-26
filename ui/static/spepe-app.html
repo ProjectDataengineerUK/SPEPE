@@ -289,10 +289,12 @@ tr.rhl td{background:rgba(0,200,83,.07)!important}
   <div class="main-tabs">
     <div class="main-tab active" onclick="switchTab(this,'Dashboard')">📊 Dashboard</div>
     <div class="main-tab" onclick="switchTab(this,'Mapa')">🗺️ Mapa</div>
-    <div class="main-tab" onclick="switchTab(this,'Previsão 2026')">🎯 Previsão 2026</div>
-    <div class="main-tab" onclick="switchTab(this,'Digital & Social')">📱 Digital &amp; Social</div>
-    <div class="main-tab" onclick="switchTab(this,'Perfis Eleitorais')">🗂️ Perfis Eleitorais</div>
+    <div class="main-tab" onclick="switchTab(this,'Socioeconômico')">📈 Socioeconômico</div>
+    <div class="main-tab" onclick="switchTab(this,'Segurança')">🛡️ Segurança</div>
+    <div class="main-tab" onclick="switchTab(this,'Saúde')">🏥 Saúde</div>
     <div class="main-tab" onclick="switchTab(this,'Pesquisas')">📋 Pesquisas</div>
+    <div class="main-tab" onclick="switchTab(this,'Predição')">🎯 Predição</div>
+    <div class="main-tab" onclick="switchTab(this,'Perfis Eleitorais')">🗂️ Perfis</div>
     <div class="main-tab" onclick="switchTab(this,'Relatórios')">📄 Relatórios</div>
   </div>
 
@@ -512,6 +514,13 @@ tr.rhl td{background:rgba(0,200,83,.07)!important}
           <option>Dep. Federal</option>
           <option>Dep. Estadual</option>
         </select>
+        <select class="map-cargo-sel" id="map-layer-sel" onchange="reloadMap()" title="Camada temática">
+          <option value="electoral">🗳 Eleitoral</option>
+          <option value="archetype">🧩 Arquétipos</option>
+          <option value="security">🛡 Segurança</option>
+          <option value="health">🏥 Saúde</option>
+          <option value="economic">💰 Econômico</option>
+        </select>
       </div>
       <div class="map-body">
         <div id="leaflet-map"></div>
@@ -534,6 +543,38 @@ tr.rhl td{background:rgba(0,200,83,.07)!important}
             </select>
           </div>
         </div>
+      </div>
+    </div>
+
+    <!-- SOCIOECONÔMICO TAB -->
+    <div id="tab-socioeconomico" class="tab-content" style="display:none;flex:1;overflow-y:auto;padding:16px;flex-direction:column;gap:12px">
+      <div style="color:var(--text2);font-size:.84rem;padding:20px 0">
+        <div style="font-size:1rem;font-weight:700;margin-bottom:8px">Perfil Socioeconômico</div>
+        <div style="color:var(--text3)">Cruza indicadores IBGE (renda, escolaridade, urbanização, religião) com resultados eleitorais TSE por município e UF. <em>Disponível após ingestão IBGE completa.</em></div>
+      </div>
+    </div>
+
+    <!-- SEGURANÇA TAB -->
+    <div id="tab-seguranca" class="tab-content" style="display:none;flex:1;overflow-y:auto;padding:16px;flex-direction:column;gap:12px">
+      <div style="color:var(--text2);font-size:.84rem;padding:20px 0">
+        <div style="font-size:1rem;font-weight:700;margin-bottom:8px">Segurança Pública</div>
+        <div style="color:var(--text3)">Correlação violência/segurança (IVS, Atlas da Violência, SINESP) × comportamento eleitoral. <em>Disponível após ingestão Security completa.</em></div>
+      </div>
+    </div>
+
+    <!-- SAÚDE TAB -->
+    <div id="tab-saude" class="tab-content" style="display:none;flex:1;overflow-y:auto;padding:16px;flex-direction:column;gap:12px">
+      <div style="color:var(--text2);font-size:.84rem;padding:20px 0">
+        <div style="font-size:1rem;font-weight:700;margin-bottom:8px">Saúde &amp; Economia</div>
+        <div style="color:var(--text3)">Mortalidade infantil (DATASUS), cobertura ANS, cesta básica DIEESE e acesso digital CETIC por UF. <em>Disponível após ingestão DataSUS/DIEESE/CETIC.</em></div>
+      </div>
+    </div>
+
+    <!-- PREDIÇÃO TAB -->
+    <div id="tab-predicao" class="tab-content" style="display:none;flex:1;overflow-y:auto;padding:16px;flex-direction:column;gap:12px">
+      <div style="color:var(--text2);font-size:.84rem;padding:20px 0">
+        <div style="font-size:1rem;font-weight:700;margin-bottom:8px">Predição Bayesiana 2026</div>
+        <div style="color:var(--text3)">Modelo PyMC com IC 95% para probabilidade de vitória por candidato × cargo × UF. SHAP explicabilidade por feature. <em>Requer perfil Consultor ou superior.</em></div>
       </div>
     </div>
 
@@ -715,19 +756,35 @@ function doLogout(){
 // ══════════════════════════════════════════════════════
 // TABS & FILTERS
 // ══════════════════════════════════════════════════════
+const TAB_IDS = {
+  'Dashboard':'dash', 'Mapa':'tab-mapa', 'Socioeconômico':'tab-socioeconomico',
+  'Segurança':'tab-seguranca', 'Saúde':'tab-saude', 'Pesquisas':'dash',
+  'Predição':'tab-predicao', 'Perfis Eleitorais':'dash', 'Relatórios':'dash',
+};
 function switchTab(el,nm){
   document.querySelectorAll('.main-tab').forEach(t=>t.classList.remove('active'));
   el.classList.add('active');
   document.getElementById('bc').innerHTML=`<strong>${nm}</strong> · São Paulo · 2022`;
-  // Toggle main view: dashboard vs map
   const dash=document.getElementById('dash');
   const mapa=document.getElementById('tab-mapa');
+  // Hide all alternate panels
+  ['tab-mapa','tab-socioeconomico','tab-seguranca','tab-saude','tab-predicao'].forEach(id=>{
+    const el=document.getElementById(id);
+    if(el){ el.classList.remove('active'); el.style.display='none'; }
+  });
   if(nm==='Mapa'){
     if(dash) dash.style.display='none';
-    if(mapa) mapa.classList.add('active');
+    if(mapa){ mapa.style.display='flex'; mapa.classList.add('active'); }
     setTimeout(initMap,50);
+  } else if(['Socioeconômico','Segurança','Saúde','Predição'].includes(nm)){
+    if(dash) dash.style.display='none';
+    const panelId='tab-'+{
+      'Socioeconômico':'socioeconomico','Segurança':'seguranca',
+      'Saúde':'saude','Predição':'predicao'
+    }[nm];
+    const panel=document.getElementById(panelId);
+    if(panel) panel.style.display='flex';
   } else {
-    if(mapa) mapa.classList.remove('active');
     if(dash) dash.style.display='';
   }
   toast(`Carregando: ${nm}`);
@@ -1077,6 +1134,118 @@ const ACTIONS={
 };
 
 let busy=false;
+let _chatWs=null;
+let _aiBuffer='';
+let _aiMsgEl=null;
+
+function _ensureChatWs(){
+  if(_chatWs && _chatWs.readyState<2) return;
+  const proto=location.protocol==='https:'?'wss':'ws';
+  _chatWs=new WebSocket(`${proto}://${location.host}/ws/chat`);
+  _chatWs.onmessage=_onChatMsg;
+  _chatWs.onclose=()=>{ _chatWs=null; };
+}
+
+function _onChatMsg(e){
+  let data;
+  try{ data=JSON.parse(e.data); }catch{ return; }
+
+  if(data.type==='chunk'){
+    _aiBuffer+=data.text;
+    if(_aiMsgEl) _aiMsgEl.innerHTML=_aiBuffer.replace(/\n/g,'<br>');
+    const m=document.getElementById('msgs');m.scrollTop=m.scrollHeight;
+  } else if(data.type==='done'){
+    syncBar();
+    if(data.dashboard_update){
+      const upd=data.dashboard_update;
+      if(upd.intent_schema==='v1' && upd.actions?.length){
+        setTimeout(()=>applyIntent(upd.actions),300);
+      } else {
+        _fallbackIntent(_aiBuffer);
+      }
+    }
+    _aiBuffer=''; _aiMsgEl=null;
+    busy=false; document.getElementById('bsend').disabled=false;
+  } else if(data.type==='error'){
+    if(_aiMsgEl) _aiMsgEl.innerHTML=`<span style="color:var(--red)">${esc(data.message||'Erro')}</span>`;
+    busy=false; document.getElementById('bsend').disabled=false;
+  }
+}
+
+// Structured intent reducer — processes emit_dashboard_intent actions array
+function applyIntent(actions){
+  if(!actions?.length) return;
+  actions.forEach(action=>{
+    switch(action.op){
+      case 'set_geo':{
+        if(action.uf){
+          const sel=document.getElementById('f-uf');
+          if(sel) sel.value=action.uf;
+        }
+        if(action.level==='municipio' && action.cd_municipio){
+          const t=[...document.querySelectorAll('.main-tab')].find(t=>t.textContent.includes('Mapa'));
+          if(t) switchTab(t,'Mapa');
+          _mapCtx={uf:action.uf||_mapCtx.uf, cd_municipio:action.cd_municipio};
+          _mapLevel='municipio'; setTimeout(reloadMap,300);
+        }
+        break;
+      }
+      case 'set_election':{
+        if(action.ano){ const sel=document.getElementById('f-ano'); if(sel) sel.value=String(action.ano); }
+        if(action.cargo){ const sel=document.getElementById('f-cargo'); if(sel) sel.value=action.cargo; }
+        if(action.turno){ const sel=document.getElementById('f-turno'); if(sel) sel.value=action.turno===1?'1º Turno':'2º Turno'; }
+        setTimeout(applyFilters,100);
+        break;
+      }
+      case 'switch_tab':{
+        const tabMap={
+          dashboard:'Dashboard', mapa:'Mapa', socioeconomico:'Socioeconômico',
+          seguranca:'Segurança', saude:'Saúde', pesquisas:'Pesquisas',
+          predicao:'Predição', perfis:'Perfis Eleitorais', relatorios:'Relatórios'
+        };
+        const nm=tabMap[action.tab]||action.tab;
+        const t=[...document.querySelectorAll('.main-tab')].find(t=>t.textContent.includes(nm.split(' ')[0]));
+        if(t) switchTab(t,nm);
+        break;
+      }
+      case 'set_map_layer':{
+        const sel=document.getElementById('map-layer-sel');
+        if(sel && action.layer){ sel.value=action.layer; setTimeout(reloadMap,100); }
+        const t=[...document.querySelectorAll('.main-tab')].find(t=>t.textContent.includes('Mapa'));
+        if(t) switchTab(t,'Mapa');
+        break;
+      }
+      case 'compare_candidates':{
+        const tab=[...document.querySelectorAll('.cargo-tab')].find(t=>t.textContent.includes('Comparar'));
+        if(tab) tab.click();
+        break;
+      }
+      case 'highlight':{
+        if(action.card_id) hlCard(action.card_id);
+        break;
+      }
+      case 'open_prediction':{
+        const t=[...document.querySelectorAll('.main-tab')].find(t=>t.textContent.includes('Pred'));
+        if(t) switchTab(t,'Predição');
+        if(action.candidato_id){ hlCard('card-previsao'); }
+        break;
+      }
+    }
+  });
+}
+
+// Heuristic fallback when no structured intent emitted (local/demo mode)
+function _fallbackIntent(q){
+  const act=ACTIONS[q];
+  if(act){ setTimeout(act,250); return; }
+  if(/governador/i.test(q)){const t=[...document.querySelectorAll('.cargo-tab')].find(t=>t.textContent.includes('Gov'));if(t)switchCargo(t,'Governador');}
+  else if(/senador/i.test(q)){const t=[...document.querySelectorAll('.cargo-tab')].find(t=>t.textContent.includes('Senador'));if(t)switchCargo(t,'Senador');}
+  else if(/dep.*federal/i.test(q)){const t=[...document.querySelectorAll('.cargo-tab')].find(t=>t.textContent.includes('Federal'));if(t)switchCargo(t,'Dep. Federal');}
+  else if(/mapa|choropleth|estados|municip/i.test(q)){const t=[...document.querySelectorAll('.main-tab')].find(t=>t.textContent.includes('Mapa'));if(t)switchTab(t,'Mapa');}
+  else if(/compare|comparar|cargos/i.test(q)){const t=[...document.querySelectorAll('.cargo-tab')].find(t=>t.textContent.includes('Comparar'));if(t){t.click();}}
+  else{hlCard('card-resultado');}
+}
+
 function sendMsg(){
   if(busy)return;
   const el=document.getElementById('cin');
@@ -1090,32 +1259,36 @@ function addMsg(txt,role){
   const d=document.createElement('div');d.className=`msg ${role}`;
   d.innerHTML=role==='u'
     ?`<div class="mav u">EU</div><div><div class="mb">${esc(txt)}</div><div class="mmeta"><span class="mtime">${ts}</span></div></div>`
-    :`<div class="mav ai">AI</div><div><div class="mb">${txt}</div><div class="mmeta"><span class="mtime">${ts}</span><span class="sync-pill">📊 dash sync</span></div></div>`;
+    :`<div class="mav ai">AI</div><div id="ai-mb-${Date.now()}"><div class="mb" id="ai-live"></div><div class="mmeta"><span class="mtime">${ts}</span><span class="sync-pill">📊 dash sync</span></div></div>`;
   m.appendChild(d);m.scrollTop=m.scrollHeight;
+  if(role==='ai') _aiMsgEl=d.querySelector('#ai-live');
+  return d;
 }
 function esc(s){return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')}
 function deliver(q){
-  busy=true;document.getElementById('bsend').disabled=true;
+  busy=true; document.getElementById('bsend').disabled=true;
+  _aiBuffer=''; _aiMsgEl=null;
   const m=document.getElementById('msgs');
   const ti=document.createElement('div');ti.id='ti';ti.className='msg';
   ti.innerHTML=`<div class="mav ai">AI</div><div class="typing"><span class="td"></span><span class="td"></span><span class="td"></span></div>`;
-  m.appendChild(ti);m.scrollTop=m.scrollHeight;
-  setTimeout(()=>{
+  m.appendChild(ti); m.scrollTop=m.scrollHeight;
+
+  // Try real WebSocket; on failure fall back to local demo
+  _ensureChatWs();
+  if(_chatWs && _chatWs.readyState===1){
     ti.remove();
-    addMsg(AI_RESP[q]||DEF[Math.floor(Math.random()*DEF.length)],'ai');
-    syncBar();
-    const act=ACTIONS[q];
-    if(act)setTimeout(act,250);
-    else{
-      if(/governador/i.test(q)){const t=[...document.querySelectorAll('.cargo-tab')].find(t=>t.textContent.includes('Gov'));if(t)switchCargo(t,'Governador');}
-      else if(/senador/i.test(q)){const t=[...document.querySelectorAll('.cargo-tab')].find(t=>t.textContent.includes('Senador'));if(t)switchCargo(t,'Senador');}
-      else if(/dep.*federal/i.test(q)){const t=[...document.querySelectorAll('.cargo-tab')].find(t=>t.textContent.includes('Federal'));if(t)switchCargo(t,'Dep. Federal');}
-      else if(/mapa|choropleth|estados|municip/i.test(q)){const t=[...document.querySelectorAll('.main-tab')].find(t=>t.textContent.includes('Mapa'));if(t)switchTab(t,'Mapa');}
-      else if(/compare|comparar|cargos/i.test(q)){const t=[...document.querySelectorAll('.cargo-tab')].find(t=>t.textContent.includes('Comparar'));if(t){t.click();}}
-      else{hlCard('card-resultado');}
-    }
-    busy=false;document.getElementById('bsend').disabled=false;
-  },1100+Math.random()*700);
+    addMsg('','ai'); // creates _aiMsgEl
+    _chatWs.send(JSON.stringify({type:'chat',text:q}));
+  } else {
+    // Demo fallback
+    setTimeout(()=>{
+      ti.remove();
+      const aiEl=addMsg(AI_RESP[q]||DEF[Math.floor(Math.random()*DEF.length)],'ai');
+      syncBar();
+      setTimeout(()=>_fallbackIntent(q),250);
+      busy=false; document.getElementById('bsend').disabled=false;
+    },1100+Math.random()*700);
+  }
 }
 function toast(msg){
   const t=document.getElementById('tst');t.textContent=msg;t.classList.add('on');

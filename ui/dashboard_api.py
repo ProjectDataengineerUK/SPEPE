@@ -22,7 +22,7 @@ from typing import Any
 
 from enum import Enum
 
-from fastapi import Header, HTTPException, Query, WebSocket, WebSocketDisconnect
+from fastapi import Header, HTTPException, Query, Request, WebSocket, WebSocketDisconnect
 from fastapi.responses import FileResponse, JSONResponse
 
 # Monta sobre o app Chainlit existente
@@ -975,20 +975,28 @@ async def ws_chat(websocket: WebSocket) -> None:
 
             # Stream do Supervisor
             full_text = ""
-            dashboard_update: dict[str, Any] = {}
+            intent_sink: list[dict[str, Any]] = []
             try:
                 supervisor = _get_supervisor()
-                async for chunk in supervisor.run(user_text, state):
+                async for chunk in supervisor.run(user_text, state, _intent_sink=intent_sink):
                     full_text += chunk
                     await websocket.send_json({"type": "chunk", "text": chunk})
-
-                # Extrai dashboard_update se o agente emitiu JSON estruturado
-                dashboard_update = _extract_dashboard_update(full_text, user_text)
 
             except Exception as exc:
                 logger.error("Supervisor WS erro: %s", exc)
                 await websocket.send_json({"type": "error", "message": str(exc)})
                 continue
+
+            # Prefer structured intent from emit_dashboard_intent tool; fall back to heuristic
+            if intent_sink:
+                last_intent = intent_sink[-1]
+                dashboard_update: dict[str, Any] = {
+                    "intent_schema": "v1",
+                    "actions": last_intent.get("actions", []),
+                    "narration": last_intent.get("narration", ""),
+                }
+            else:
+                dashboard_update = _extract_dashboard_update(full_text, user_text)
 
             await websocket.send_json(
                 {
@@ -1001,6 +1009,271 @@ async def ws_chat(websocket: WebSocket) -> None:
 
     except WebSocketDisconnect:
         logger.info("WS chat desconectado: %s", state.session_id)
+
+
+# ── Admin Panel ───────────────────────────────────────────────────────────────
+
+
+@_fastapi_app.get("/admin")
+async def serve_admin() -> FileResponse:
+    """Serve the Admin Panel HTML."""
+    from pathlib import Path
+    html_path = Path(__file__).parent / "static" / "admin.html"
+    return FileResponse(str(html_path), media_type="text/html")
+
+
+_USER_STORE: list[dict] = []  # in-memory stub; replace with Firestore/Cloud SQL in prod
+
+
+@_fastapi_app.get("/admin/api/users")
+async def admin_list_users() -> JSONResponse:
+    return JSONResponse({"users": _USER_STORE})
+
+
+@_fastapi_app.post("/admin/api/users")
+async def admin_create_user(request: Request) -> JSONResponse:
+    import uuid
+    from datetime import date
+    body = await request.json()
+    user = {**body, "id": str(uuid.uuid4()), "created_at": str(date.today())}
+    _USER_STORE.append(user)
+    return JSONResponse({"ok": True, "user": user})
+
+
+@_fastapi_app.put("/admin/api/users/{user_id}")
+async def admin_update_user(user_id: str, request: Request) -> JSONResponse:
+    body = await request.json()
+    for i, u in enumerate(_USER_STORE):
+        if u["id"] == user_id:
+            _USER_STORE[i] = {**u, **body, "id": user_id}
+            return JSONResponse({"ok": True})
+    return JSONResponse({"ok": False, "error": "not found"}, status_code=404)
+
+
+@_fastapi_app.delete("/admin/api/users/{user_id}")
+async def admin_delete_user(user_id: str) -> JSONResponse:
+    global _USER_STORE
+    _USER_STORE = [u for u in _USER_STORE if u["id"] != user_id]
+    return JSONResponse({"ok": True})
+
+
+_ACCESS_MATRIX: dict = {}  # profile → {feature_id: bool}
+
+
+@_fastapi_app.get("/admin/api/access")
+async def admin_get_access() -> JSONResponse:
+    return JSONResponse({"matrix": _ACCESS_MATRIX})
+
+
+@_fastapi_app.post("/admin/api/access")
+async def admin_save_access(request: Request) -> JSONResponse:
+    global _ACCESS_MATRIX
+    _ACCESS_MATRIX = await request.json()
+    return JSONResponse({"ok": True})
+
+
+@_fastapi_app.get("/admin/api/jobs")
+async def admin_list_jobs() -> JSONResponse:
+    """List Cloud Run Jobs with last execution status."""
+    jobs_config = [
+        {"name": "spepe-tse-ingest",       "module": "tse_ingest",       "timeout": "3600s"},
+        {"name": "spepe-ibge-sync",         "module": "ibge_sync",        "timeout": "1800s"},
+        {"name": "spepe-security-ingest",   "module": "security_ingest",  "timeout": "1800s"},
+        {"name": "spepe-datasus-ingest",    "module": "datasus_ingest",   "timeout": "1800s"},
+        {"name": "spepe-dieese-ingest",     "module": "dieese_ingest",    "timeout": "900s"},
+        {"name": "spepe-cetic-ingest",      "module": "cetic_ingest",     "timeout": "900s"},
+        {"name": "spepe-silver-transform",  "module": "silver_transform", "timeout": "1800s"},
+        {"name": "spepe-gold-build",        "module": "gold_build",       "timeout": "1800s"},
+        {"name": "spepe-digital-ingest",    "module": "digital_ingest",   "timeout": "900s"},
+    ]
+    if settings.gcp_project_id:
+        try:
+            from google.cloud import run_v2
+            client = run_v2.JobsClient()
+            parent = f"projects/{settings.gcp_project_id}/locations/southamerica-east1"
+            gcp_jobs = {j.name.split("/")[-1]: j for j in client.list_jobs(parent=parent)}
+            for jcfg in jobs_config:
+                gj = gcp_jobs.get(jcfg["name"])
+                if gj:
+                    jcfg["last_status"] = gj.terminal_condition.type_ if gj.terminal_condition else "UNKNOWN"
+                    jcfg["last_run_at"] = str(gj.update_time) if gj.update_time else None
+                else:
+                    jcfg["last_status"] = "NOT_DEPLOYED"
+                    jcfg["last_run_at"] = None
+        except Exception as exc:
+            logger.warning("Cloud Run jobs list failed: %s", exc)
+            for jcfg in jobs_config:
+                jcfg.setdefault("last_status", "UNKNOWN")
+                jcfg.setdefault("last_run_at", None)
+    else:
+        for jcfg in jobs_config:
+            jcfg["last_status"] = "LOCAL_DEV"
+            jcfg["last_run_at"] = None
+    return JSONResponse({"jobs": jobs_config})
+
+
+@_fastapi_app.post("/admin/api/jobs/{job_name}/run")
+async def admin_run_job(job_name: str, uf: str = "SP", year: int = 2022) -> JSONResponse:
+    """Trigger a Cloud Run Job execution (admin only)."""
+    from agents.tools import RunJobArgs, run_dataops_job
+    # Map Cloud Run job name → internal job id
+    name_map = {
+        "spepe-tse-ingest": "tse_ingest",
+        "spepe-ibge-sync": "ibge_sync",
+        "spepe-security-ingest": "security_ingest",
+        "spepe-datasus-ingest": "datasus_ingest",
+        "spepe-dieese-ingest": "dieese_ingest",
+        "spepe-cetic-ingest": "cetic_ingest",
+        "spepe-silver-transform": "silver_transform",
+        "spepe-gold-build": "gold_build",
+        "spepe-digital-ingest": "digital_ingest",
+    }
+    job_id = name_map.get(job_name, job_name.replace("spepe-", "").replace("-", "_"))
+    result = run_dataops_job(RunJobArgs(job=job_id, uf=uf, year=year))
+    return JSONResponse(result)
+
+
+@_fastapi_app.get("/admin/api/sentinel/status")
+async def admin_sentinel_status() -> JSONResponse:
+    """Return snapshot of all Sentinel resource statuses."""
+    if settings.gcp_project_id and os.environ.get("USE_BIGQUERY", "").lower() == "true":
+        try:
+            from google.cloud import bigquery
+            client = bigquery.Client(project=settings.gcp_project_id)
+            rows = client.query(
+                f"SELECT * FROM `{settings.gcp_project_id}.spepe_mlops.sentinel_state` "
+                "ORDER BY category, resource_id"
+            ).result()
+            resources = [dict(r) for r in rows]
+            return JSONResponse({"resources": resources, "source": "bigquery"})
+        except Exception as exc:
+            logger.warning("Sentinel state BQ query failed: %s", exc)
+
+    # Stub data for dev/demo
+    stub = [
+        {"resource_id": "dataops:fact_municipio_eleicao", "category": "dataops",
+         "watcher": "DataOpsWatcher", "status": "ok",
+         "metrics": {"freshness_min": 30, "dq": 0.987, "rows": 2400000},
+         "alert_message": None, "last_check": "2026-04-25T17:00:00Z"},
+        {"resource_id": "dataops:fact_secao_eleicao", "category": "dataops",
+         "watcher": "DataOpsWatcher", "status": "ok",
+         "metrics": {"freshness_min": 30, "dq": 0.981, "rows": 580000000},
+         "alert_message": None, "last_check": "2026-04-25T17:00:00Z"},
+        {"resource_id": "dataops:fact_seguranca_municipio", "category": "dataops",
+         "watcher": "DataOpsWatcher", "status": "warn",
+         "metrics": {"freshness_min": 1440, "dq": 0.91},
+         "alert_message": "DQ score 0.91 abaixo do threshold 0.95",
+         "last_check": "2026-04-25T17:00:00Z"},
+        {"resource_id": "mlops:champion_model", "category": "mlops",
+         "watcher": "MLOpsWatcher", "status": "ok",
+         "metrics": {"brier_score": 0.18, "js_divergence": 0.04},
+         "alert_message": None, "last_check": "2026-04-25T17:00:00Z"},
+        {"resource_id": "mlops:bias_monitor", "category": "mlops",
+         "watcher": "BiasWatcher", "status": "ok",
+         "metrics": {"max_group_ratio": 1.08},
+         "alert_message": None, "last_check": "2026-04-25T17:00:00Z"},
+        {"resource_id": "infra:cloud_run", "category": "infra",
+         "watcher": "InfraWatcher", "status": "ok",
+         "metrics": {"latency_p99_ms": 420, "error_rate": 0.001},
+         "alert_message": None, "last_check": "2026-04-25T17:00:00Z"},
+        {"resource_id": "infra:budget", "category": "infra",
+         "watcher": "BudgetWatcher", "status": "ok",
+         "metrics": {"pct_used": 12},
+         "alert_message": None, "last_check": "2026-04-25T17:00:00Z"},
+        {"resource_id": "crews:observadores", "category": "crews",
+         "watcher": "SentinelOrchestrator", "status": "ok",
+         "metrics": {"events_1h": 4, "errors_1h": 0},
+         "alert_message": None, "last_check": "2026-04-25T17:00:00Z"},
+        {"resource_id": "crews:analisadores", "category": "crews",
+         "watcher": "SentinelOrchestrator", "status": "ok",
+         "metrics": {"queue_depth": 0, "error_rate_5m": 0},
+         "alert_message": None, "last_check": "2026-04-25T17:00:00Z"},
+        {"resource_id": "crews:interpretadores", "category": "crews",
+         "watcher": "SentinelOrchestrator", "status": "ok",
+         "metrics": {"latency_last_s": 3.1},
+         "alert_message": None, "last_check": "2026-04-25T17:00:00Z"},
+        {"resource_id": "crews:despachantes", "category": "crews",
+         "watcher": "SentinelOrchestrator", "status": "ok",
+         "metrics": {"actions_24h": 1},
+         "alert_message": None, "last_check": "2026-04-25T17:00:00Z"},
+    ]
+    return JSONResponse({"resources": stub, "source": "stub"})
+
+
+@_fastapi_app.get("/admin/api/catalog")
+async def admin_catalog() -> JSONResponse:
+    """Return BigQuery table metadata for all SPEPE datasets."""
+    datasets = ["spepe_silver", "spepe_gold", "spepe_mlops"]
+    catalog = []
+    if settings.gcp_project_id and os.environ.get("USE_BIGQUERY", "").lower() == "true":
+        try:
+            from google.cloud import bigquery
+            client = bigquery.Client(project=settings.gcp_project_id)
+            for ds in datasets:
+                for tbl in client.list_tables(f"{settings.gcp_project_id}.{ds}"):
+                    t = client.get_table(tbl)
+                    catalog.append({
+                        "dataset": ds, "table": t.table_id,
+                        "rows": t.num_rows, "size_mb": round(t.num_bytes / 1e6, 1),
+                        "last_modified": str(t.modified),
+                        "description": t.description or "",
+                    })
+            return JSONResponse({"tables": catalog, "source": "bigquery"})
+        except Exception as exc:
+            logger.warning("Catalog BQ query failed: %s", exc)
+
+    stub_catalog = [
+        {"dataset": "spepe_gold", "table": "fact_municipio_eleicao", "rows": 11140,
+         "size_mb": 48.2, "last_modified": "2026-04-25 14:32:00", "description": "~240 features por município × eleição"},
+        {"dataset": "spepe_gold", "table": "fact_secao_eleicao", "rows": 0,
+         "size_mb": 0, "last_modified": "-", "description": "Granular seção × candidato"},
+        {"dataset": "spepe_gold", "table": "fact_seguranca_municipio", "rows": 0,
+         "size_mb": 0, "last_modified": "-", "description": "IVS + Atlas + SINESP"},
+        {"dataset": "spepe_gold", "table": "fact_saude_municipio", "rows": 0,
+         "size_mb": 0, "last_modified": "-", "description": "DataSUS SIM + ANS"},
+        {"dataset": "spepe_gold", "table": "fact_economico_municipio", "rows": 0,
+         "size_mb": 0, "last_modified": "-", "description": "DIEESE + PIB IBGE"},
+        {"dataset": "spepe_gold", "table": "fact_pesquisa", "rows": 0,
+         "size_mb": 0, "last_modified": "-", "description": "Pesquisas eleitorais"},
+        {"dataset": "spepe_mlops", "table": "fact_predictions", "rows": 0,
+         "size_mb": 0, "last_modified": "-", "description": "Predições com IC 95%"},
+        {"dataset": "spepe_mlops", "table": "sentinel_state", "rows": 11,
+         "size_mb": 0.01, "last_modified": "2026-04-25 17:00:00", "description": "Estado Sentinel"},
+    ]
+    return JSONResponse({"tables": stub_catalog, "source": "stub"})
+
+
+# ── Sentinel WebSocket ────────────────────────────────────────────────────────
+
+
+_sentinel_ws_clients: list[WebSocket] = []
+
+
+@_fastapi_app.websocket("/ws/sentinel")
+async def ws_sentinel(websocket: WebSocket) -> None:
+    """WebSocket for real-time Sentinel status updates to the admin panel."""
+    import asyncio
+    await websocket.accept()
+    _sentinel_ws_clients.append(websocket)
+    try:
+        # Send initial snapshot wrapped as typed message
+        status_resp = await admin_sentinel_status()
+        status_data = status_resp.body.decode()
+        import json as _json
+        parsed = _json.loads(status_data)
+        await websocket.send_json({
+            "type": "sentinel_update",
+            "data": parsed.get("resources", parsed.get("watchers", [])),
+        })
+        # Keep connection alive — server pushes updates when Pub/Sub fires
+        while True:
+            await asyncio.sleep(30)
+            await websocket.send_json({"type": "heartbeat"})
+    except WebSocketDisconnect:
+        pass
+    finally:
+        if websocket in _sentinel_ws_clients:
+            _sentinel_ws_clients.remove(websocket)
 
 
 def _extract_dashboard_update(response_text: str, query: str) -> dict[str, Any]:

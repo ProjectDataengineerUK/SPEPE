@@ -1,0 +1,1013 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SPEPE — Admin</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+:root{
+  --bg:#0d1117;--bg2:#161b22;--bg3:#1c2128;--bg4:#21262d;
+  --border:#30363d;--border2:#3d444d;
+  --text:#e6edf3;--text2:#8d96a0;--text3:#57606a;
+  --green:#00c853;--green2:#00e676;--green-dim:#003d19;
+  --blue:#1565c0;--blue2:#1976d2;--blue-dim:#0a2540;
+  --purple:#7c3aed;--purple-dim:#2e1065;
+  --red:#ef4444;--red-dim:#3f0f0f;
+  --yellow:#f59e0b;--yellow-dim:#3f2800;
+  --orange:#f97316;--orange-dim:#431407;
+  --teal:#00bcd4;--teal-dim:#003c44;
+  --radius:8px;--radius2:12px;
+}
+html,body{height:100%;background:var(--bg);color:var(--text);font-family:'Inter',sans-serif;font-size:14px;line-height:1.5}
+button{cursor:pointer;font-family:inherit}
+select,input,textarea{font-family:inherit}
+::-webkit-scrollbar{width:5px;height:5px}
+::-webkit-scrollbar-track{background:var(--bg2)}
+::-webkit-scrollbar-thumb{background:var(--border2);border-radius:3px}
+
+/* TOPNAV */
+.topnav{height:50px;background:var(--bg2);border-bottom:1px solid var(--border);display:flex;align-items:center;padding:0 18px;gap:12px;flex-shrink:0;z-index:20}
+.topnav .logo{font-size:1.1rem;font-weight:800;letter-spacing:-.02em}
+.topnav .logo span{color:var(--green)}
+.topnav .admin-badge{background:var(--purple-dim);color:var(--purple);font-size:.6rem;font-weight:700;padding:2px 8px;border-radius:20px;border:1px solid var(--purple);letter-spacing:.07em;text-transform:uppercase}
+.topnav-sep{width:1px;height:18px;background:var(--border)}
+.breadcrumb{font-size:.78rem;color:var(--text2)}
+.topnav-right{margin-left:auto;display:flex;align-items:center;gap:8px}
+.btn-dash{background:var(--green-dim);color:var(--green2);border:1px solid var(--green);border-radius:6px;padding:5px 12px;font-size:.72rem;font-weight:600;text-decoration:none}
+.btn-dash:hover{opacity:.85}
+.user-pill{display:flex;align-items:center;gap:7px;background:var(--bg3);border:1px solid var(--border);border-radius:20px;padding:3px 10px 3px 3px}
+.user-avatar{width:24px;height:24px;border-radius:50%;background:linear-gradient(135deg,var(--purple),var(--blue2));display:flex;align-items:center;justify-content:center;font-size:.6rem;font-weight:700;color:#fff}
+.user-name{font-size:.78rem;font-weight:500}
+
+/* SHELL */
+.shell{height:calc(100vh - 50px);display:flex;overflow:hidden}
+
+/* SIDENAV */
+.sidenav{width:200px;background:var(--bg2);border-right:1px solid var(--border);display:flex;flex-direction:column;flex-shrink:0;overflow-y:auto}
+.sidenav-section{padding:6px 0}
+.sidenav-section + .sidenav-section{border-top:1px solid var(--border)}
+.sn-label{font-size:.58rem;font-weight:700;text-transform:uppercase;letter-spacing:.1em;color:var(--text3);padding:8px 16px 4px}
+.sn-item{display:flex;align-items:center;gap:9px;padding:8px 16px;cursor:pointer;transition:background .15s;font-size:.78rem;color:var(--text2);border-left:2px solid transparent}
+.sn-item:hover{background:var(--bg3);color:var(--text)}
+.sn-item.active{background:var(--bg3);color:var(--green2);border-left-color:var(--green)}
+.sn-icon{font-size:1rem;width:18px;text-align:center}
+.sn-badge{margin-left:auto;background:var(--red-dim);color:var(--red);font-size:.58rem;font-weight:700;padding:1px 5px;border-radius:10px}
+
+/* MAIN CONTENT */
+.main{flex:1;overflow-y:auto;padding:18px;display:flex;flex-direction:column;gap:14px;min-width:0}
+.section-page{display:none}
+.section-page.active{display:flex;flex-direction:column;gap:14px}
+
+/* PAGE HEADER */
+.page-hdr{display:flex;align-items:center;justify-content:space-between}
+.page-title{font-size:1rem;font-weight:700}
+.page-sub{font-size:.74rem;color:var(--text2);margin-top:2px}
+
+/* CARD */
+.card{background:var(--bg2);border:1px solid var(--border);border-radius:var(--radius2);padding:16px}
+.card-hdr{display:flex;align-items:center;justify-content:space-between;margin-bottom:12px}
+.card-title{font-size:.8rem;font-weight:600}
+.card-sub{font-size:.66rem;color:var(--text2)}
+
+/* BUTTONS */
+.btn{border:none;border-radius:var(--radius);padding:7px 14px;font-size:.76rem;font-weight:600;transition:opacity .15s}
+.btn:hover{opacity:.85}
+.btn-sm{padding:4px 10px;font-size:.7rem}
+.btn-xs{padding:2px 7px;font-size:.66rem}
+.btn-primary{background:var(--green);color:#000}
+.btn-danger{background:var(--red-dim);color:var(--red);border:1px solid var(--red)}
+.btn-secondary{background:var(--bg3);color:var(--text);border:1px solid var(--border)}
+.btn-secondary:hover{border-color:var(--border2)}
+.btn-purple{background:var(--purple-dim);color:var(--purple);border:1px solid var(--purple)}
+.btn-blue{background:var(--blue-dim);color:var(--blue2);border:1px solid var(--blue2)}
+.btn-icon{background:transparent;border:1px solid var(--border);border-radius:6px;padding:4px 8px;font-size:.8rem;color:var(--text2)}
+.btn-icon:hover{border-color:var(--border2);color:var(--text)}
+
+/* TABLE */
+.tbl{width:100%;border-collapse:collapse}
+.tbl th{font-size:.62rem;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:var(--text3);padding:7px 10px;text-align:left;border-bottom:1px solid var(--border)}
+.tbl td{padding:8px 10px;font-size:.78rem;border-bottom:1px solid var(--border)}
+.tbl tr:last-child td{border-bottom:none}
+.tbl tr:hover td{background:var(--bg3)}
+
+/* PROFILE BADGES */
+.prof{display:inline-block;font-size:.62rem;font-weight:700;padding:2px 8px;border-radius:10px;text-transform:uppercase;letter-spacing:.05em}
+.prof-jornalista{background:var(--blue-dim);color:var(--blue2);border:1px solid var(--blue2)}
+.prof-consultor{background:var(--green-dim);color:var(--green2);border:1px solid var(--green)}
+.prof-cientista{background:var(--purple-dim);color:var(--purple);border:1px solid var(--purple)}
+.prof-pesquisador{background:var(--orange-dim);color:var(--orange);border:1px solid var(--orange)}
+.prof-admin{background:#1a1a1a;color:#aaa;border:1px solid #444}
+
+/* STATUS PILL */
+.status-pill{display:inline-flex;align-items:center;gap:4px;font-size:.66rem;font-weight:600;padding:2px 8px;border-radius:10px}
+.status-active{background:var(--green-dim);color:var(--green2)}
+.status-inactive{background:var(--bg3);color:var(--text3)}
+.status-pending{background:var(--yellow-dim);color:var(--yellow)}
+
+/* MODAL */
+.modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:200;display:none;align-items:center;justify-content:center}
+.modal-overlay.open{display:flex}
+.modal{background:var(--bg2);border:1px solid var(--border);border-radius:var(--radius2);width:520px;max-width:95vw;max-height:90vh;overflow-y:auto;box-shadow:0 8px 40px rgba(0,0,0,.6)}
+.modal-hdr{display:flex;align-items:center;justify-content:space-between;padding:16px 20px;border-bottom:1px solid var(--border)}
+.modal-title{font-size:.88rem;font-weight:700}
+.modal-close{background:transparent;border:none;color:var(--text2);font-size:1.1rem;padding:2px 6px}
+.modal-close:hover{color:var(--red)}
+.modal-body{padding:20px}
+.form-row{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.form-group{margin-bottom:14px}
+.form-group label{display:block;font-size:.66rem;font-weight:700;color:var(--text2);margin-bottom:5px;text-transform:uppercase;letter-spacing:.06em}
+.form-group input,.form-group select{width:100%;background:var(--bg3);border:1px solid var(--border);border-radius:var(--radius);padding:8px 11px;color:var(--text);font-size:.82rem;outline:none;transition:border-color .2s}
+.form-group input:focus,.form-group select:focus{border-color:var(--green)}
+.modal-footer{padding:14px 20px;border-top:1px solid var(--border);display:flex;justify-content:flex-end;gap:8px}
+
+/* SENTINEL */
+.sentinel-tabs{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:12px}
+.sentinel-tab{padding:5px 14px;font-size:.72rem;font-weight:600;border-radius:20px;border:1px solid var(--border);color:var(--text2);cursor:pointer;transition:all .2s}
+.sentinel-tab.active{border-color:var(--green);color:var(--green2);background:var(--green-dim)}
+.sentinel-tab:hover:not(.active){color:var(--text);border-color:var(--border2)}
+.sentinel-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:10px}
+.sentinel-card{background:var(--bg3);border:1px solid var(--border);border-radius:var(--radius2);padding:14px;cursor:pointer;transition:all .25s;position:relative;overflow:hidden}
+.sentinel-card::before{content:'';position:absolute;top:0;left:0;right:0;height:3px}
+.sentinel-card.ok::before{background:var(--green)}
+.sentinel-card.warn::before{background:var(--yellow)}
+.sentinel-card.breach::before{background:var(--red)}
+.sentinel-card.unknown::before{background:var(--border2)}
+.sentinel-card.cooldown::before{background:var(--teal)}
+.sentinel-card:hover{border-color:var(--border2);transform:translateY(-1px)}
+.scard-hdr{display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:8px}
+.scard-watcher{font-size:.74rem;font-weight:600;color:var(--text)}
+.scard-category{font-size:.6rem;color:var(--text3);margin-top:2px}
+.scard-dot{width:10px;height:10px;border-radius:50%;flex-shrink:0;margin-top:3px}
+.scard-dot.ok{background:var(--green);box-shadow:0 0 8px var(--green)}
+.scard-dot.warn{background:var(--yellow);box-shadow:0 0 8px var(--yellow)}
+.scard-dot.breach{background:var(--red);box-shadow:0 0 8px var(--red)}
+.scard-dot.unknown{background:var(--border2)}
+.scard-dot.cooldown{background:var(--teal);box-shadow:0 0 8px var(--teal)}
+.scard-msg{font-size:.7rem;color:var(--text2);line-height:1.4;margin-bottom:8px;min-height:22px}
+.scard-footer{display:flex;align-items:center;justify-content:space-between}
+.scard-time{font-size:.62rem;color:var(--text3);font-family:'JetBrains Mono',monospace}
+.scard-status-label{font-size:.62rem;font-weight:700;text-transform:uppercase;letter-spacing:.06em}
+.scard-status-label.ok{color:var(--green)}
+.scard-status-label.warn{color:var(--yellow)}
+.scard-status-label.breach{color:var(--red)}
+.scard-status-label.unknown{color:var(--text3)}
+.scard-status-label.cooldown{color:var(--teal)}
+.sentinel-ws-badge{display:flex;align-items:center;gap:5px;font-size:.66rem;color:var(--text3)}
+.ws-dot{width:6px;height:6px;border-radius:50%;background:var(--border2)}
+.ws-dot.connected{background:var(--green);animation:pulse-green 2s infinite}
+@keyframes pulse-green{0%,100%{opacity:1}50%{opacity:.5}}
+
+/* DRAWER */
+.drawer-overlay{position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:180;display:none}
+.drawer-overlay.open{display:block}
+.drawer{position:fixed;right:0;top:0;bottom:0;width:380px;background:var(--bg2);border-left:1px solid var(--border);z-index:190;transform:translateX(100%);transition:transform .25s ease;overflow-y:auto;padding:20px}
+.drawer.open{transform:translateX(0)}
+.drawer-hdr{display:flex;align-items:center;justify-content:space-between;margin-bottom:16px}
+.drawer-title{font-size:.9rem;font-weight:700}
+.metrics-list{display:flex;flex-direction:column;gap:7px}
+.metric-row{display:flex;align-items:center;justify-content:space-between;padding:7px 10px;background:var(--bg3);border-radius:6px}
+.metric-key{font-size:.72rem;color:var(--text2)}
+.metric-val{font-size:.76rem;font-weight:600;font-family:'JetBrains Mono',monospace}
+
+/* JOBS */
+.jobs-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:10px}
+.job-card{background:var(--bg3);border:1px solid var(--border);border-radius:var(--radius2);padding:14px;transition:all .2s}
+.job-card:hover{border-color:var(--border2)}
+.jcard-hdr{display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:6px}
+.jcard-name{font-size:.8rem;font-weight:600;font-family:'JetBrains Mono',monospace}
+.jcard-desc{font-size:.69rem;color:var(--text2);margin-bottom:10px}
+.jcard-footer{display:flex;align-items:center;justify-content:space-between;gap:8px}
+.jcard-status{font-size:.66rem;color:var(--text3)}
+.job-running{animation:spin 1s linear infinite;display:inline-block}
+@keyframes spin{from{transform:rotate(0deg)}to{transform:rotate(360deg)}}
+
+/* CATALOG */
+.catalog-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:10px}
+.cata-card{background:var(--bg3);border:1px solid var(--border);border-radius:var(--radius2);padding:14px}
+.cata-hdr{display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:4px}
+.cata-table{font-size:.78rem;font-weight:600;font-family:'JetBrains Mono',monospace}
+.cata-dataset{font-size:.62rem;color:var(--text3);margin-bottom:8px}
+.cata-desc{font-size:.69rem;color:var(--text2);margin-bottom:10px;line-height:1.45}
+.cata-meta{display:flex;flex-wrap:wrap;gap:6px}
+.cata-tag{font-size:.6rem;background:var(--bg4);border:1px solid var(--border);border-radius:4px;padding:2px 6px;color:var(--text2)}
+.freshness-ok{color:var(--green);font-size:.66rem;font-weight:600}
+.freshness-stale{color:var(--yellow);font-size:.66rem;font-weight:600}
+.freshness-unknown{color:var(--text3);font-size:.66rem}
+
+/* ACCESS MATRIX */
+.matrix-table{width:100%;border-collapse:collapse}
+.matrix-table th{font-size:.62rem;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--text3);padding:8px 10px;border-bottom:1px solid var(--border);text-align:center}
+.matrix-table th:first-child{text-align:left}
+.matrix-table td{padding:7px 10px;border-bottom:1px solid var(--border);text-align:center;font-size:.74rem}
+.matrix-table td:first-child{text-align:left;font-weight:500;color:var(--text2)}
+.matrix-table tr:last-child td{border-bottom:none}
+.toggle-cell{display:flex;align-items:center;justify-content:center}
+.toggle{position:relative;width:28px;height:15px}
+.toggle input{opacity:0;width:0;height:0}
+.toggle-slider{position:absolute;cursor:pointer;top:0;left:0;right:0;bottom:0;background:var(--bg4);border-radius:15px;transition:.3s;border:1px solid var(--border2)}
+.toggle-slider:before{position:absolute;content:'';height:9px;width:9px;left:2px;bottom:2px;background:var(--text3);border-radius:50%;transition:.3s}
+.toggle input:checked + .toggle-slider{background:var(--green-dim);border-color:var(--green)}
+.toggle input:checked + .toggle-slider:before{transform:translateX(13px);background:var(--green)}
+
+/* TOAST */
+.toast-container{position:fixed;bottom:20px;right:20px;z-index:999;display:flex;flex-direction:column;gap:8px}
+.toast{background:var(--bg2);border:1px solid var(--border);border-radius:8px;padding:10px 16px;font-size:.76rem;display:flex;align-items:center;gap:8px;box-shadow:0 4px 20px rgba(0,0,0,.5);animation:slide-in .2s ease;max-width:300px}
+@keyframes slide-in{from{transform:translateX(100%);opacity:0}to{transform:translateX(0);opacity:1}}
+.toast.ok{border-left:3px solid var(--green)}
+.toast.err{border-left:3px solid var(--red)}
+.toast.info{border-left:3px solid var(--blue2)}
+
+/* STAT SUMMARY */
+.stats-row{display:grid;grid-template-columns:repeat(4,1fr);gap:10px}
+.stat-box{background:var(--bg2);border:1px solid var(--border);border-radius:var(--radius2);padding:14px 16px}
+.stat-val{font-size:1.6rem;font-weight:700;line-height:1}
+.stat-label{font-size:.65rem;color:var(--text2);margin-top:4px;text-transform:uppercase;letter-spacing:.06em}
+</style>
+</head>
+<body>
+
+<!-- TOPNAV -->
+<nav class="topnav">
+  <div class="logo">SP<span>E</span>PE</div>
+  <span class="admin-badge">Admin</span>
+  <div class="topnav-sep"></div>
+  <span class="breadcrumb">Painel Administrativo</span>
+  <div class="topnav-right">
+    <a href="/dash" class="btn-dash">← Dashboard</a>
+    <div class="user-pill">
+      <div class="user-avatar">AD</div>
+      <span class="user-name">Administrador</span>
+    </div>
+  </div>
+</nav>
+
+<div class="shell">
+
+  <!-- SIDENAV -->
+  <nav class="sidenav">
+    <div class="sidenav-section">
+      <div class="sn-label">Monitoramento</div>
+      <div class="sn-item active" onclick="showSection('sentinel')">
+        <span class="sn-icon">🔭</span> Sentinel Monitor
+        <span class="sn-badge" id="breach-badge" style="display:none">0</span>
+      </div>
+    </div>
+    <div class="sidenav-section">
+      <div class="sn-label">Gestão</div>
+      <div class="sn-item" onclick="showSection('users')">
+        <span class="sn-icon">👥</span> Usuários
+      </div>
+      <div class="sn-item" onclick="showSection('access')">
+        <span class="sn-icon">🔐</span> Controle de Acesso
+      </div>
+    </div>
+    <div class="sidenav-section">
+      <div class="sn-label">Operações</div>
+      <div class="sn-item" onclick="showSection('jobs')">
+        <span class="sn-icon">⚙️</span> Jobs de Dados
+      </div>
+      <div class="sn-item" onclick="showSection('catalog')">
+        <span class="sn-icon">🗄️</span> Catálogo de Dados
+      </div>
+    </div>
+  </nav>
+
+  <!-- MAIN -->
+  <main class="main">
+
+    <!-- ===== SENTINEL ===== -->
+    <div id="page-sentinel" class="section-page active">
+      <div class="page-hdr">
+        <div>
+          <div class="page-title">Sentinel Monitor</div>
+          <div class="page-sub">Status em tempo real de todos os recursos monitorados</div>
+        </div>
+        <div style="display:flex;align-items:center;gap:10px">
+          <div class="sentinel-ws-badge">
+            <div class="ws-dot" id="ws-dot"></div>
+            <span id="ws-label">Conectando…</span>
+          </div>
+          <button class="btn btn-sm btn-secondary" onclick="refreshSentinel()">↺ Atualizar</button>
+        </div>
+      </div>
+
+      <!-- Summary stats -->
+      <div class="stats-row" id="sentinel-summary">
+        <div class="stat-box"><div class="stat-val" id="s-ok" style="color:var(--green)">—</div><div class="stat-label">OK</div></div>
+        <div class="stat-box"><div class="stat-val" id="s-warn" style="color:var(--yellow)">—</div><div class="stat-label">Atenção</div></div>
+        <div class="stat-box"><div class="stat-val" id="s-breach" style="color:var(--red)">—</div><div class="stat-label">Crítico</div></div>
+        <div class="stat-box"><div class="stat-val" id="s-other" style="color:var(--text3)">—</div><div class="stat-label">Indefinido</div></div>
+      </div>
+
+      <!-- Category tabs -->
+      <div class="sentinel-tabs" id="sentinel-tabs">
+        <div class="sentinel-tab active" onclick="filterSentinel('all',this)">Todos</div>
+        <div class="sentinel-tab" onclick="filterSentinel('dataops',this)">DataOps</div>
+        <div class="sentinel-tab" onclick="filterSentinel('mlops',this)">MLOps</div>
+        <div class="sentinel-tab" onclick="filterSentinel('infra',this)">Infra</div>
+        <div class="sentinel-tab" onclick="filterSentinel('social',this)">Social</div>
+        <div class="sentinel-tab" onclick="filterSentinel('crews',this)">Crews</div>
+      </div>
+
+      <div class="sentinel-grid" id="sentinel-grid">
+        <div style="grid-column:1/-1;color:var(--text3);font-size:.78rem;padding:20px 0">Carregando…</div>
+      </div>
+    </div>
+
+    <!-- ===== USERS ===== -->
+    <div id="page-users" class="section-page">
+      <div class="page-hdr">
+        <div>
+          <div class="page-title">Gestão de Usuários</div>
+          <div class="page-sub">Crie e gerencie acessos ao Dashboard SPEPE</div>
+        </div>
+        <button class="btn btn-primary" onclick="openUserModal()">+ Novo Usuário</button>
+      </div>
+
+      <div class="card">
+        <div class="card-hdr">
+          <div>
+            <div class="card-title">Usuários Cadastrados</div>
+            <div class="card-sub" id="user-count">Carregando…</div>
+          </div>
+          <input type="text" id="user-search" placeholder="Buscar por nome ou email…"
+            style="background:var(--bg3);border:1px solid var(--border);border-radius:6px;padding:6px 11px;color:var(--text);font-size:.76rem;width:220px;outline:none"
+            oninput="filterUsers(this.value)">
+        </div>
+        <table class="tbl" id="users-table">
+          <thead>
+            <tr>
+              <th>Nome</th><th>Email</th><th>Perfil</th><th>UFs</th><th>Status</th><th>Criado em</th><th style="width:100px">Ações</th>
+            </tr>
+          </thead>
+          <tbody id="users-tbody">
+            <tr><td colspan="7" style="color:var(--text3);text-align:center;padding:24px">Carregando…</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- ===== ACCESS CONTROL ===== -->
+    <div id="page-access" class="section-page">
+      <div class="page-hdr">
+        <div>
+          <div class="page-title">Controle de Acesso</div>
+          <div class="page-sub">Recursos disponíveis por perfil de usuário</div>
+        </div>
+        <button class="btn btn-primary btn-sm" onclick="saveAccessMatrix()">Salvar Alterações</button>
+      </div>
+
+      <div class="card">
+        <div class="card-hdr">
+          <div class="card-title">Matriz de Permissões por Perfil</div>
+        </div>
+        <div style="overflow-x:auto">
+          <table class="matrix-table" id="access-matrix">
+            <thead>
+              <tr>
+                <th style="min-width:180px">Recurso / Feature</th>
+                <th><span class="prof prof-jornalista">Jornalista</span></th>
+                <th><span class="prof prof-consultor">Consultor</span></th>
+                <th><span class="prof prof-cientista">Cientista</span></th>
+                <th><span class="prof prof-pesquisador">Pesquisador</span></th>
+              </tr>
+            </thead>
+            <tbody id="access-tbody"></tbody>
+          </table>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-hdr">
+          <div class="card-title">Perfis — Descrição</div>
+        </div>
+        <div style="display:grid;grid-template-columns:repeat(2,1fr);gap:10px">
+          <div style="background:var(--bg3);border-radius:8px;padding:12px">
+            <div class="prof prof-jornalista" style="margin-bottom:6px">Jornalista</div>
+            <div style="font-size:.74rem;color:var(--text2)">Acesso aos dados públicos consolidados, mapas e narrativas. Sem acesso a modelos preditivos ou dados brutos.</div>
+          </div>
+          <div style="background:var(--bg3);border-radius:8px;padding:12px">
+            <div class="prof prof-consultor" style="margin-bottom:6px">Consultor</div>
+            <div style="font-size:.74rem;color:var(--text2)">Acesso a análises, perfis eleitorais e comparações. Predição básica disponível (sem IC avançado).</div>
+          </div>
+          <div style="background:var(--bg3);border-radius:8px;padding:12px">
+            <div class="prof prof-cientista" style="margin-bottom:6px">Cientista de Dados</div>
+            <div style="font-size:.74font;color:var(--text2)">Acesso completo: modelos, SHAP, bias metrics, feature store. Pode exportar dados brutos.</div>
+          </div>
+          <div style="background:var(--bg3);border-radius:8px;padding:12px">
+            <div class="prof prof-pesquisador" style="margin-bottom:6px">Pesquisador</div>
+            <div style="font-size:.74rem;color:var(--text2)">Acesso a dados históricos completos e APIs de consulta. Foco em reprodutibilidade e análise longitudinal.</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ===== JOBS ===== -->
+    <div id="page-jobs" class="section-page">
+      <div class="page-hdr">
+        <div>
+          <div class="page-title">Jobs de Dados</div>
+          <div class="page-sub">Cloud Run Jobs — ingestão, transformação e enriquecimento</div>
+        </div>
+        <button class="btn btn-secondary btn-sm" onclick="loadJobs()">↺ Atualizar</button>
+      </div>
+
+      <div class="jobs-grid" id="jobs-grid">
+        <div style="grid-column:1/-1;color:var(--text3);font-size:.78rem;padding:20px 0">Carregando…</div>
+      </div>
+    </div>
+
+    <!-- ===== CATALOG ===== -->
+    <div id="page-catalog" class="section-page">
+      <div class="page-hdr">
+        <div>
+          <div class="page-title">Catálogo de Dados</div>
+          <div class="page-sub">Tabelas BigQuery — esquema, particionamento e freshness</div>
+        </div>
+        <button class="btn btn-secondary btn-sm" onclick="loadCatalog()">↺ Atualizar</button>
+      </div>
+      <div class="catalog-grid" id="catalog-grid">
+        <div style="grid-column:1/-1;color:var(--text3);font-size:.78rem;padding:20px 0">Carregando…</div>
+      </div>
+    </div>
+
+  </main>
+</div>
+
+<!-- MODAL: User Create/Edit -->
+<div class="modal-overlay" id="user-modal">
+  <div class="modal">
+    <div class="modal-hdr">
+      <div class="modal-title" id="modal-title">Novo Usuário</div>
+      <button class="modal-close" onclick="closeUserModal()">✕</button>
+    </div>
+    <div class="modal-body">
+      <input type="hidden" id="edit-user-id">
+      <div class="form-row">
+        <div class="form-group">
+          <label>Nome completo</label>
+          <input type="text" id="f-name" placeholder="Ex: João Silva">
+        </div>
+        <div class="form-group">
+          <label>Email</label>
+          <input type="email" id="f-email" placeholder="joao@exemplo.com">
+        </div>
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label>Perfil</label>
+          <select id="f-profile">
+            <option value="jornalista">Jornalista</option>
+            <option value="consultor">Consultor</option>
+            <option value="cientista">Cientista de Dados</option>
+            <option value="pesquisador">Pesquisador</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label>Status</label>
+          <select id="f-status">
+            <option value="active">Ativo</option>
+            <option value="inactive">Inativo</option>
+            <option value="pending">Pendente</option>
+          </select>
+        </div>
+      </div>
+      <div class="form-group">
+        <label>UFs com acesso (separadas por vírgula, vazio = todas)</label>
+        <input type="text" id="f-ufs" placeholder="SP, RJ, MG  — ou vazio para todas">
+      </div>
+      <div class="form-group">
+        <label>Observações</label>
+        <input type="text" id="f-notes" placeholder="Contexto de uso, organização…">
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" onclick="closeUserModal()">Cancelar</button>
+      <button class="btn btn-primary" onclick="saveUser()">Salvar</button>
+    </div>
+  </div>
+</div>
+
+<!-- DRAWER: Sentinel detail -->
+<div class="drawer-overlay" id="drawer-overlay" onclick="closeDrawer()"></div>
+<div class="drawer" id="sentinel-drawer">
+  <div class="drawer-hdr">
+    <div class="drawer-title" id="drawer-title">Detalhe</div>
+    <button class="btn-icon" onclick="closeDrawer()">✕</button>
+  </div>
+  <div id="drawer-body"></div>
+</div>
+
+<!-- TOAST CONTAINER -->
+<div class="toast-container" id="toasts"></div>
+
+<script>
+// ============================================================
+// STATE
+// ============================================================
+let sentinelData = [];
+let sentinelFilter = 'all';
+let usersData = [];
+let ws = null;
+
+const ACCESS_FEATURES = [
+  { id: 'tab_mapa',          label: 'Aba: Mapa Eleitoral' },
+  { id: 'tab_socioeconomico',label: 'Aba: Perfil Socioeconômico' },
+  { id: 'tab_seguranca',     label: 'Aba: Segurança' },
+  { id: 'tab_saude',         label: 'Aba: Saúde / Economia' },
+  { id: 'tab_pesquisas',     label: 'Aba: Pesquisas' },
+  { id: 'tab_comparar',      label: 'Aba: Comparar Candidatos' },
+  { id: 'tab_predicao',      label: 'Aba: Predição (IC 95%)' },
+  { id: 'chat_ai',           label: 'Chat IA' },
+  { id: 'export_data',       label: 'Exportar Dados (CSV/PDF)' },
+  { id: 'shap_detail',       label: 'Explicabilidade SHAP' },
+  { id: 'bias_metrics',      label: 'Métricas de Viés' },
+  { id: 'model_confidence',  label: 'Confiança do Modelo' },
+  { id: 'raw_api',           label: 'Acesso à API Raw' },
+];
+
+const ACCESS_DEFAULTS = {
+  jornalista:  { tab_mapa:1, tab_socioeconomico:1, chat_ai:1, export_data:1 },
+  consultor:   { tab_mapa:1, tab_socioeconomico:1, tab_seguranca:1, tab_saude:1, tab_pesquisas:1, tab_comparar:1, chat_ai:1, export_data:1, tab_predicao:1 },
+  cientista:   { tab_mapa:1, tab_socioeconomico:1, tab_seguranca:1, tab_saude:1, tab_pesquisas:1, tab_comparar:1, tab_predicao:1, chat_ai:1, export_data:1, shap_detail:1, bias_metrics:1, model_confidence:1, raw_api:1 },
+  pesquisador: { tab_mapa:1, tab_socioeconomico:1, tab_seguranca:1, tab_saude:1, tab_pesquisas:1, tab_comparar:1, tab_predicao:1, chat_ai:1, export_data:1, shap_detail:1, bias_metrics:1, model_confidence:1, raw_api:1 },
+};
+
+const JOB_DESCS = {
+  tse_ingest:       'Baixa resultados eleitorais TSE e ingere no Bronze (GCS).',
+  ibge_sync:        'Sincroniza indicadores IBGE SIDRA + IPEADATA no Bronze.',
+  digital_ingest:   'Google Trends + Meta Ad Library → Bronze.',
+  silver_transform: 'Bronze → Silver BigQuery. Normaliza, faz join TSE+IBGE, aplica DQ score.',
+  gold_build:       'Silver → Gold BigQuery. Agrega fatos por município, candidato e ano.',
+  security_ingest:  'IVS, Atlas da Violência, SINESP → Bronze.',
+  datasus_ingest:   'Mortalidade SIM + cobertura ANS → Bronze.',
+  dieese_ingest:    'Cesta básica DIEESE por UF via IPEADATA → Bronze.',
+  cetic_ingest:     'TIC Domicílios CETIC.br (acesso digital) → Bronze.',
+};
+
+// ============================================================
+// SECTION NAVIGATION
+// ============================================================
+function showSection(name) {
+  document.querySelectorAll('.section-page').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('.sn-item').forEach(i => i.classList.remove('active'));
+  document.getElementById('page-' + name).classList.add('active');
+  event.currentTarget.classList.add('active');
+
+  if (name === 'sentinel' && sentinelData.length === 0) loadSentinel();
+  if (name === 'users' && usersData.length === 0) loadUsers();
+  if (name === 'access') renderAccessMatrix();
+  if (name === 'jobs') loadJobs();
+  if (name === 'catalog') loadCatalog();
+}
+
+// ============================================================
+// TOAST
+// ============================================================
+function toast(msg, type = 'info') {
+  const el = document.createElement('div');
+  el.className = `toast ${type}`;
+  el.textContent = msg;
+  document.getElementById('toasts').appendChild(el);
+  setTimeout(() => el.remove(), 3500);
+}
+
+// ============================================================
+// SENTINEL
+// ============================================================
+function initSentinelWS() {
+  const proto = location.protocol === 'https:' ? 'wss' : 'ws';
+  ws = new WebSocket(`${proto}://${location.host}/ws/sentinel`);
+  const dot = document.getElementById('ws-dot');
+  const label = document.getElementById('ws-label');
+  ws.onopen = () => { dot.className = 'ws-dot connected'; label.textContent = 'Ao vivo'; };
+  ws.onmessage = (e) => {
+    try {
+      const msg = JSON.parse(e.data);
+      if (msg.type === 'sentinel_update' && msg.data) {
+        sentinelData = msg.data;
+        renderSentinel();
+      }
+    } catch {}
+  };
+  ws.onclose = () => {
+    dot.className = 'ws-dot';
+    label.textContent = 'Desconectado';
+    setTimeout(initSentinelWS, 5000);
+  };
+}
+
+async function loadSentinel() {
+  try {
+    const r = await fetch('/admin/api/sentinel/status');
+    const data = await r.json();
+    sentinelData = data.resources || data.watchers || [];
+    renderSentinel();
+  } catch (e) {
+    document.getElementById('sentinel-grid').innerHTML = '<div style="color:var(--red);font-size:.78rem">Erro ao carregar dados do Sentinel.</div>';
+  }
+}
+
+function refreshSentinel() { loadSentinel(); }
+
+function renderSentinel() {
+  const filtered = sentinelFilter === 'all'
+    ? sentinelData
+    : sentinelData.filter(w => w.category === sentinelFilter);
+
+  const counts = { ok: 0, warn: 0, breach: 0, other: 0 };
+  sentinelData.forEach(w => {
+    if (w.status === 'ok') counts.ok++;
+    else if (w.status === 'warn') counts.warn++;
+    else if (w.status === 'breach') counts.breach++;
+    else counts.other++;
+  });
+
+  document.getElementById('s-ok').textContent = counts.ok;
+  document.getElementById('s-warn').textContent = counts.warn;
+  document.getElementById('s-breach').textContent = counts.breach;
+  document.getElementById('s-other').textContent = counts.other;
+
+  const badge = document.getElementById('breach-badge');
+  if (counts.breach > 0) { badge.textContent = counts.breach; badge.style.display = 'inline'; }
+  else badge.style.display = 'none';
+
+  const grid = document.getElementById('sentinel-grid');
+  if (filtered.length === 0) {
+    grid.innerHTML = '<div style="color:var(--text3);font-size:.78rem;padding:20px 0">Nenhum watcher nesta categoria.</div>';
+    return;
+  }
+
+  grid.innerHTML = filtered.map((w, i) => {
+    const time = w.last_check ? new Date(w.last_check).toLocaleTimeString('pt-BR') : '—';
+    const msg = w.alert_message || 'Sistema operando normalmente.';
+    return `
+    <div class="sentinel-card ${w.status}" onclick="openDrawer(${i})">
+      <div class="scard-hdr">
+        <div>
+          <div class="scard-watcher">${w.watcher}</div>
+          <div class="scard-category">${w.category}</div>
+        </div>
+        <div class="scard-dot ${w.status}"></div>
+      </div>
+      <div class="scard-msg">${msg}</div>
+      <div class="scard-footer">
+        <span class="scard-time">${time}</span>
+        <span class="scard-status-label ${w.status}">${statusLabel(w.status)}</span>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function statusLabel(s) {
+  return { ok: 'OK', warn: 'ATENÇÃO', breach: 'CRÍTICO', unknown: 'DESCONHECIDO', cooldown: 'COOLDOWN' }[s] || s.toUpperCase();
+}
+
+function filterSentinel(cat, el) {
+  sentinelFilter = cat;
+  document.querySelectorAll('.sentinel-tab').forEach(t => t.classList.remove('active'));
+  el.classList.add('active');
+  renderSentinel();
+}
+
+function openDrawer(idx) {
+  const filtered = sentinelFilter === 'all'
+    ? sentinelData
+    : sentinelData.filter(w => w.category === sentinelFilter);
+  const w = filtered[idx];
+  if (!w) return;
+
+  document.getElementById('drawer-title').textContent = `${w.watcher} — ${statusLabel(w.status)}`;
+
+  let metricsHtml = '';
+  if (w.metrics && typeof w.metrics === 'object') {
+    metricsHtml = '<div class="metrics-list">' + Object.entries(w.metrics).map(([k,v]) =>
+      `<div class="metric-row"><span class="metric-key">${k}</span><span class="metric-val">${v}</span></div>`
+    ).join('') + '</div>';
+  } else {
+    metricsHtml = '<div style="color:var(--text3);font-size:.74rem">Sem métricas disponíveis.</div>';
+  }
+
+  const cooldown = w.cooldown_until
+    ? `<div style="color:var(--teal);font-size:.72rem;margin-top:8px">⏱ Cooldown até: ${new Date(w.cooldown_until).toLocaleString('pt-BR')}</div>`
+    : '';
+
+  document.getElementById('drawer-body').innerHTML = `
+    <div style="margin-bottom:14px">
+      <div style="font-size:.7rem;color:var(--text3);margin-bottom:4px">CATEGORIA</div>
+      <div style="font-size:.8rem">${w.category} — resource: <code style="font-family:'JetBrains Mono',monospace;font-size:.74rem">${w.resource_id}</code></div>
+    </div>
+    <div style="margin-bottom:14px">
+      <div style="font-size:.7rem;color:var(--text3);margin-bottom:4px">MENSAGEM</div>
+      <div style="font-size:.78rem;color:var(--text2);line-height:1.5">${w.alert_message || 'Nenhuma mensagem de alerta.'}</div>
+    </div>
+    <div style="margin-bottom:14px">
+      <div style="font-size:.7rem;color:var(--text3);margin-bottom:8px">MÉTRICAS</div>
+      ${metricsHtml}
+    </div>
+    ${cooldown}
+    <div style="margin-top:14px;font-size:.66rem;color:var(--text3)">
+      Última verificação: ${w.last_check ? new Date(w.last_check).toLocaleString('pt-BR') : '—'}<br>
+      Atualizado em: ${w.updated_at ? new Date(w.updated_at).toLocaleString('pt-BR') : '—'}
+    </div>`;
+
+  document.getElementById('drawer-overlay').classList.add('open');
+  document.getElementById('sentinel-drawer').classList.add('open');
+}
+
+function closeDrawer() {
+  document.getElementById('drawer-overlay').classList.remove('open');
+  document.getElementById('sentinel-drawer').classList.remove('open');
+}
+
+// ============================================================
+// USERS
+// ============================================================
+async function loadUsers() {
+  try {
+    const r = await fetch('/admin/api/users');
+    const data = await r.json();
+    usersData = data.users || _stubUsers();
+  } catch {
+    usersData = _stubUsers();
+  }
+  renderUsers(usersData);
+}
+
+function _stubUsers() {
+  return [
+    { id: 'u1', name: 'Ana Lima', email: 'ana.lima@folha.com', profile: 'jornalista', ufs: 'SP,RJ', status: 'active', created_at: '2026-03-01' },
+    { id: 'u2', name: 'Bruno Costa', email: 'bruno@consultoria.com', profile: 'consultor', ufs: '', status: 'active', created_at: '2026-03-15' },
+    { id: 'u3', name: 'Carla Sousa', email: 'carla@usp.br', profile: 'cientista', ufs: '', status: 'active', created_at: '2026-04-01' },
+    { id: 'u4', name: 'Diego Alves', email: 'diego@pesquisa.org', profile: 'pesquisador', ufs: 'MG,ES,BA', status: 'pending', created_at: '2026-04-20' },
+  ];
+}
+
+function renderUsers(list) {
+  document.getElementById('user-count').textContent = `${list.length} usuário${list.length !== 1 ? 's' : ''} cadastrado${list.length !== 1 ? 's' : ''}`;
+  const tbody = document.getElementById('users-tbody');
+  if (list.length === 0) {
+    tbody.innerHTML = '<tr><td colspan="7" style="color:var(--text3);text-align:center;padding:24px">Nenhum usuário encontrado.</td></tr>';
+    return;
+  }
+  tbody.innerHTML = list.map(u => `
+    <tr>
+      <td style="font-weight:500">${u.name}</td>
+      <td style="color:var(--text2);font-family:'JetBrains Mono',monospace;font-size:.72rem">${u.email}</td>
+      <td><span class="prof prof-${u.profile}">${u.profile}</span></td>
+      <td style="color:var(--text2);font-size:.72rem">${u.ufs || '<span style="color:var(--text3)">Todas</span>'}</td>
+      <td><span class="status-pill status-${u.status}">${{active:'Ativo',inactive:'Inativo',pending:'Pendente'}[u.status]||u.status}</span></td>
+      <td style="color:var(--text3);font-size:.72rem">${u.created_at||'—'}</td>
+      <td style="display:flex;gap:5px">
+        <button class="btn-icon btn-xs" onclick="editUser('${u.id}')">✏️</button>
+        <button class="btn-icon btn-xs" onclick="toggleUserStatus('${u.id}')" title="Ativar/Desativar">⏸</button>
+        <button class="btn-icon btn-xs" onclick="deleteUser('${u.id}')" style="color:var(--red)">🗑</button>
+      </td>
+    </tr>`).join('');
+}
+
+function filterUsers(q) {
+  const low = q.toLowerCase();
+  renderUsers(usersData.filter(u =>
+    u.name.toLowerCase().includes(low) || u.email.toLowerCase().includes(low)
+  ));
+}
+
+function openUserModal(user = null) {
+  document.getElementById('modal-title').textContent = user ? 'Editar Usuário' : 'Novo Usuário';
+  document.getElementById('edit-user-id').value = user ? user.id : '';
+  document.getElementById('f-name').value = user ? user.name : '';
+  document.getElementById('f-email').value = user ? user.email : '';
+  document.getElementById('f-profile').value = user ? user.profile : 'jornalista';
+  document.getElementById('f-status').value = user ? user.status : 'active';
+  document.getElementById('f-ufs').value = user ? (user.ufs || '') : '';
+  document.getElementById('f-notes').value = user ? (user.notes || '') : '';
+  document.getElementById('user-modal').classList.add('open');
+}
+
+function closeUserModal() {
+  document.getElementById('user-modal').classList.remove('open');
+}
+
+async function saveUser() {
+  const id = document.getElementById('edit-user-id').value;
+  const payload = {
+    name: document.getElementById('f-name').value.trim(),
+    email: document.getElementById('f-email').value.trim(),
+    profile: document.getElementById('f-profile').value,
+    status: document.getElementById('f-status').value,
+    ufs: document.getElementById('f-ufs').value.trim(),
+    notes: document.getElementById('f-notes').value.trim(),
+  };
+  if (!payload.name || !payload.email) { toast('Nome e email são obrigatórios.', 'err'); return; }
+
+  try {
+    const url = id ? `/admin/api/users/${id}` : '/admin/api/users';
+    const method = id ? 'PUT' : 'POST';
+    const r = await fetch(url, { method, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
+    if (!r.ok) throw new Error(await r.text());
+    toast(id ? 'Usuário atualizado.' : 'Usuário criado com sucesso.', 'ok');
+    closeUserModal();
+    loadUsers();
+  } catch (e) {
+    // stub: update local
+    if (id) {
+      const idx = usersData.findIndex(u => u.id === id);
+      if (idx >= 0) Object.assign(usersData[idx], payload);
+    } else {
+      usersData.push({ id: 'u' + Date.now(), ...payload, created_at: new Date().toISOString().split('T')[0] });
+    }
+    toast(id ? 'Usuário atualizado (local).' : 'Usuário criado (local).', 'ok');
+    closeUserModal();
+    renderUsers(usersData);
+  }
+}
+
+function editUser(id) {
+  const u = usersData.find(u => u.id === id);
+  if (u) openUserModal(u);
+}
+
+function toggleUserStatus(id) {
+  const u = usersData.find(u => u.id === id);
+  if (!u) return;
+  u.status = u.status === 'active' ? 'inactive' : 'active';
+  toast(`Usuário ${u.name} ${u.status === 'active' ? 'ativado' : 'desativado'}.`, 'info');
+  renderUsers(usersData);
+}
+
+function deleteUser(id) {
+  const u = usersData.find(u => u.id === id);
+  if (!u || !confirm(`Remover usuário ${u.name}?`)) return;
+  usersData = usersData.filter(u => u.id !== id);
+  toast('Usuário removido.', 'info');
+  renderUsers(usersData);
+}
+
+// ============================================================
+// ACCESS MATRIX
+// ============================================================
+const profiles = ['jornalista', 'consultor', 'cientista', 'pesquisador'];
+let accessState = JSON.parse(JSON.stringify(ACCESS_DEFAULTS));
+
+function renderAccessMatrix() {
+  const tbody = document.getElementById('access-tbody');
+  tbody.innerHTML = ACCESS_FEATURES.map(f => `
+    <tr>
+      <td>${f.label}</td>
+      ${profiles.map(p => `
+        <td>
+          <div class="toggle-cell">
+            <label class="toggle">
+              <input type="checkbox" id="acc-${p}-${f.id}" ${accessState[p]?.[f.id] ? 'checked' : ''}
+                onchange="toggleAccess('${p}','${f.id}',this.checked)">
+              <span class="toggle-slider"></span>
+            </label>
+          </div>
+        </td>`).join('')}
+    </tr>`).join('');
+}
+
+function toggleAccess(profile, feature, val) {
+  if (!accessState[profile]) accessState[profile] = {};
+  accessState[profile][feature] = val ? 1 : 0;
+}
+
+async function saveAccessMatrix() {
+  try {
+    await fetch('/admin/api/access', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(accessState) });
+    toast('Permissões salvas com sucesso.', 'ok');
+  } catch {
+    toast('Permissões atualizadas (local).', 'ok');
+  }
+}
+
+// ============================================================
+// JOBS
+// ============================================================
+const jobState = {};
+
+async function loadJobs() {
+  try {
+    const r = await fetch('/admin/api/jobs');
+    const data = await r.json();
+    renderJobs(data.jobs || _stubJobs());
+  } catch {
+    renderJobs(_stubJobs());
+  }
+}
+
+function _stubJobs() {
+  return Object.keys(JOB_DESCS).map(name => ({
+    name, description: JOB_DESCS[name],
+    last_run: null, last_status: 'unknown'
+  }));
+}
+
+function renderJobs(jobs) {
+  const grid = document.getElementById('jobs-grid');
+  grid.innerHTML = jobs.map(j => {
+    const running = jobState[j.name] === 'running';
+    const st = running ? 'running' : (j.last_status || 'unknown');
+    const stColor = { ok: 'var(--green)', success: 'var(--green)', running: 'var(--blue2)', error: 'var(--red)', unknown: 'var(--text3)', failed: 'var(--red)' }[st] || 'var(--text3)';
+    const stLabel = { ok: '✅ OK', success: '✅ OK', running: '⟳ Executando', error: '❌ Erro', unknown: '— Nunca executado', failed: '❌ Falhou' }[st] || st;
+    return `
+    <div class="job-card" id="jcard-${j.name}">
+      <div class="jcard-hdr">
+        <div class="jcard-name">${j.name}</div>
+        ${running ? '<span class="job-running" style="color:var(--blue2)">⟳</span>' : ''}
+      </div>
+      <div class="jcard-desc">${j.description || JOB_DESCS[j.name] || ''}</div>
+      <div class="jcard-footer">
+        <span class="jcard-status" style="color:${stColor}">${stLabel}</span>
+        <button class="btn btn-sm btn-primary" ${running ? 'disabled' : ''} onclick="runJob('${j.name}')">
+          ${running ? 'Executando…' : '▶ Executar'}
+        </button>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+async function runJob(name) {
+  jobState[name] = 'running';
+  loadJobs();
+  toast(`Job ${name} iniciado.`, 'info');
+  try {
+    const r = await fetch(`/admin/api/jobs/${name}/run`, { method: 'POST' });
+    const data = await r.json();
+    jobState[name] = data.ok ? 'success' : 'error';
+    toast(`Job ${name}: ${data.ok ? 'concluído' : 'erro — ' + (data.error || '')}`, data.ok ? 'ok' : 'err');
+  } catch (e) {
+    jobState[name] = 'error';
+    toast(`Falha ao executar ${name}.`, 'err');
+  }
+  loadJobs();
+}
+
+// ============================================================
+// CATALOG
+// ============================================================
+async function loadCatalog() {
+  try {
+    const r = await fetch('/admin/api/catalog');
+    const data = await r.json();
+    renderCatalog(data.tables || _stubCatalog());
+  } catch {
+    renderCatalog(_stubCatalog());
+  }
+}
+
+function _stubCatalog() {
+  return [
+    { table_id: 'fact_municipio_eleicao', dataset_id: 'spepe_gold', description: 'Resultados eleitorais por município, particionado por ano_eleicao, clusterizado por sg_uf e cd_cargo.', partitioning: 'DAY (ano_eleicao)', clustering: ['sg_uf','cd_cargo','nr_turno'], num_rows: null, last_modified: null },
+    { table_id: 'fact_ibge_municipio', dataset_id: 'spepe_gold', description: 'Indicadores socioeconômicos IBGE por município. Populacao, renda, educação, religião, urbanização.', partitioning: 'RANGE (ano)', clustering: ['sg_uf'], num_rows: null, last_modified: null },
+    { table_id: 'fact_candidato_eleicao', dataset_id: 'spepe_gold', description: 'Desempenho por candidato × eleição × turno. Base para análise de carreira política.', partitioning: 'DAY (data_eleicao)', clustering: ['sg_uf','cd_cargo','ds_partido'], num_rows: null, last_modified: null },
+    { table_id: 'fact_saude_municipio', dataset_id: 'spepe_gold', description: 'Mortalidade infantil, ANS cobertura e indicadores de saúde pública por município.', partitioning: 'YEAR (ano)', clustering: ['sg_uf'], num_rows: null, last_modified: null },
+    { table_id: 'fact_economico_municipio', dataset_id: 'spepe_gold', description: 'Cesta básica DIEESE e acesso digital CETIC por UF. Série temporal mensal.', partitioning: 'YEAR (data_referencia)', clustering: ['sg_uf'], num_rows: null, last_modified: null },
+    { table_id: 'fact_predictions', dataset_id: 'spepe_mlops', description: 'Predições do modelo com IC 95%. Inclui actual_result e brier_score pós-eleição.', partitioning: 'DAY (prediction_date)', clustering: ['candidato','sg_uf','model_version'], num_rows: null, last_modified: null },
+    { table_id: 'model_evaluations', dataset_id: 'spepe_mlops', description: 'Backtests e canary evaluation por versão de modelo. Retido até 2030.', partitioning: 'DAY (evaluated_at)', clustering: ['model_version','eval_type'], num_rows: null, last_modified: null },
+    { table_id: 'bias_metrics', dataset_id: 'spepe_mlops', description: 'Fairness metrics por sg_uf, quintil de renda e zona rural. Trigger de alerta automático.', partitioning: 'DAY (measured_at)', clustering: ['model_version','group_type'], num_rows: null, last_modified: null },
+    { table_id: 'sentinel_state', dataset_id: 'spepe_mlops', description: 'Estado live de todos os watchers do Sentinel. Fonte única de verdade para o Admin Monitor.', partitioning: null, clustering: ['category','status'], num_rows: null, last_modified: null },
+  ];
+}
+
+function renderCatalog(tables) {
+  const grid = document.getElementById('catalog-grid');
+  grid.innerHTML = tables.map(t => {
+    const fresh = t.last_modified
+      ? (Date.now() - new Date(t.last_modified) < 86400000
+        ? `<span class="freshness-ok">● Atualizado</span>`
+        : `<span class="freshness-stale">● Dados antigos</span>`)
+      : `<span class="freshness-unknown">● Não verificado</span>`;
+    const rowsFmt = t.num_rows != null ? Number(t.num_rows).toLocaleString('pt-BR') + ' rows' : null;
+    return `
+    <div class="cata-card">
+      <div class="cata-hdr">
+        <div>
+          <div class="cata-table">${t.table_id}</div>
+          <div class="cata-dataset">${t.dataset_id}</div>
+        </div>
+        ${fresh}
+      </div>
+      <div class="cata-desc">${t.description || '—'}</div>
+      <div class="cata-meta">
+        ${t.partitioning ? `<span class="cata-tag">⊘ ${t.partitioning}</span>` : ''}
+        ${(t.clustering || []).map(c => `<span class="cata-tag">≡ ${c}</span>`).join('')}
+        ${rowsFmt ? `<span class="cata-tag">${rowsFmt}</span>` : ''}
+      </div>
+    </div>`;
+  }).join('');
+}
+
+// ============================================================
+// INIT
+// ============================================================
+document.addEventListener('DOMContentLoaded', () => {
+  loadSentinel();
+  initSentinelWS();
+});
+</script>
+</body>
+</html>

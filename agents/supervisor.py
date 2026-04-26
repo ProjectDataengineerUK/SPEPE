@@ -10,6 +10,16 @@ import anthropic
 from agents.gemini_agent import AgentResponse
 from agents.loader import load_agents
 from agents.tools import RunJobArgs, RUN_JOB_TOOL_SCHEMA, run_dataops_job
+
+# Loaded once at module init — ensures Supervisor enum stays in sync with registry
+_AGENT_REGISTRY: dict = {}
+
+
+def _get_registry() -> dict:
+    global _AGENT_REGISTRY
+    if not _AGENT_REGISTRY:
+        _AGENT_REGISTRY = load_agents()
+    return _AGENT_REGISTRY
 from config.session_state import SessionState, BUDGET_USD
 from config.settings import settings
 from security.output_validators import AGENT_VALIDATORS, validate_input_injection
@@ -27,6 +37,7 @@ Você é o Supervisor do SPEPE. Use as ferramentas disponíveis para rotear e ex
 Agentes disponíveis (via route_to_agent):
 - coletor: sumariza resultado de jobs de ingestão já executados
 - analista: cruzamento socioeconômico × resultados eleitorais — /analisar, /perfil
+- analista_seguranca: correlação violência/segurança × voto — /seguranca, /violencia, /correlacao_seguranca
 - perfilador: clustering e arquétipos — /arquétipos, /perfis
 - modelista_bayesiano: previsão probabilística com IC 95% — /prever, /simular
 - explicador: SHAP em linguagem natural — /explicar, /shap
@@ -35,7 +46,11 @@ Agentes disponíveis (via route_to_agent):
 
 Jobs de dados (via run_dataops_job — execução REAL):
 - tse_ingest: baixa e ingere dados TSE
-- ibge_sync: sincroniza IBGE
+- ibge_sync: sincroniza IBGE (demographics + socioeconomic)
+- security_ingest: segurança pública (IVS, Atlas da Violência, SINESP)
+- datasus_ingest: saúde pública (mortalidade, cobertura ANS)
+- dieese_ingest: cesta básica DIEESE por UF
+- cetic_ingest: acesso digital TIC Domicílios CETIC.br
 - silver_transform: Bronze → Silver BigQuery
 - gold_build: Silver → Gold BigQuery
 - digital_ingest: sinal digital (Google Trends, Meta, YouTube)
@@ -46,47 +61,100 @@ O — Para /coletar: execute run_dataops_job ANTES de route_to_agent (coletor s�
 M — Budget: ${budget:.2f}/sessão, usado: ${used:.4f}
 A — Para cadeias (/prever requer análise→modelagem→explicação→narração): chame um agente por vez; o próximo hop decide o seguinte
 
+Após cada route_to_agent, SEMPRE chame emit_dashboard_intent com as ações de UI adequadas ao conteúdo da resposta.
 Responda APENAS via ferramentas — nunca com texto livre.
 """
 
-_ROUTING_TOOL: dict = {
-    "name": "route_to_agent",
-    "description": "Rotear para um agente SPEPE especializado que responde em linguagem natural.",
+def _build_routing_tool() -> dict:
+    """Build routing tool with agent enum derived from the live registry."""
+    agent_ids = sorted(_get_registry().keys())
+    return {
+        "name": "route_to_agent",
+        "description": "Rotear para um agente SPEPE especializado que responde em linguagem natural.",
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "agent_id": {"type": "string", "enum": agent_ids},
+                "refined_prompt": {"type": "string"},
+                "done": {
+                    "type": "boolean",
+                    "description": "True se esta é a última chamada e a tarefa está completa.",
+                    "default": False,
+                },
+            },
+            "required": ["agent_id", "refined_prompt"],
+        },
+    }
+
+
+_EMIT_INTENT_TOOL: dict = {
+    "name": "emit_dashboard_intent",
+    "description": (
+        "Emite ações estruturadas para o dashboard atualizar a UI. "
+        "Chamar APÓS route_to_agent com as mudanças de estado adequadas."
+    ),
     "input_schema": {
         "type": "object",
         "properties": {
-            "agent_id": {
-                "type": "string",
-                "enum": [
-                    "coletor",
-                    "analista",
-                    "perfilador",
-                    "modelista_bayesiano",
-                    "explicador",
-                    "narrador",
-                    "vigilante",
-                ],
+            "actions": {
+                "type": "array",
+                "description": "Lista de ações de UI a executar no dashboard.",
+                "items": {
+                    "type": "object",
+                    "properties": {
+                        "op": {
+                            "type": "string",
+                            "enum": [
+                                "set_geo", "set_election", "switch_tab",
+                                "set_map_layer", "compare_candidates",
+                                "highlight", "open_prediction",
+                            ],
+                        },
+                        "level": {"type": "string"},
+                        "uf": {"type": "string"},
+                        "cd_municipio": {"type": "string"},
+                        "nr_zona": {"type": "integer"},
+                        "region": {"type": "string"},
+                        "ano": {"type": "integer"},
+                        "cargo": {"type": "string"},
+                        "turno": {"type": "integer"},
+                        "candidato_id": {"type": "string"},
+                        "tab": {"type": "string"},
+                        "layer": {"type": "string"},
+                        "indicator": {"type": "string"},
+                        "candidates": {"type": "array", "items": {"type": "string"}},
+                        "card_id": {"type": "string"},
+                        "prediction_id": {"type": "string"},
+                    },
+                    "required": ["op"],
+                },
             },
-            "refined_prompt": {"type": "string"},
-            "done": {
-                "type": "boolean",
-                "description": "True se esta é a última chamada e a tarefa está completa.",
-                "default": False,
+            "narration": {
+                "type": "string",
+                "description": "Texto de acompanhamento exibido ao usuário.",
             },
         },
-        "required": ["agent_id", "refined_prompt"],
+        "required": ["actions"],
     },
 }
 
-_ALL_TOOLS = [_ROUTING_TOOL, RUN_JOB_TOOL_SCHEMA]
+_ALL_TOOLS = [_build_routing_tool(), RUN_JOB_TOOL_SCHEMA, _EMIT_INTENT_TOOL]
 
 
 class Supervisor:
     def __init__(self) -> None:
         self._client = anthropic.Anthropic(api_key=settings.anthropic_api_key)
-        self._agents = load_agents()
+        self._agents = _get_registry()
+        # Rebuild routing tool with live enum (catches new agents added to registry)
+        self._tools = [_build_routing_tool(), RUN_JOB_TOOL_SCHEMA, _EMIT_INTENT_TOOL]
 
-    async def run(self, user_input: str, state: SessionState) -> AsyncGenerator[str, None]:
+    async def run(  # type: ignore[override]
+        self,
+        user_input: str,
+        state: SessionState,
+        *,
+        _intent_sink: list | None = None,
+    ) -> AsyncGenerator[str, None]:
         if state.total_cost_usd >= BUDGET_USD:
             yield f"⚠️ Budget esgotado: ${state.total_cost_usd:.4f} / ${BUDGET_USD:.2f}"
             return
@@ -105,7 +173,7 @@ class Supervisor:
                 max_tokens=512,
                 system=_SYSTEM.format(budget=BUDGET_USD, used=state.total_cost_usd),
                 messages=messages,
-                tools=_ALL_TOOLS,
+                tools=self._tools,
                 tool_choice={"type": "required"},
             )
 
@@ -123,6 +191,12 @@ class Supervisor:
             if not tool_use:
                 yield "Não consegui determinar a próxima ação."
                 return
+
+            if tool_use.name == "emit_dashboard_intent":
+                if _intent_sink is not None:
+                    _intent_sink.append(tool_use.input)
+                current_input = None
+                continue
 
             if tool_use.name == "run_dataops_job":
                 result = self._execute_job(tool_use.input)
