@@ -5,7 +5,6 @@ from __future__ import annotations
 import logging
 from io import BytesIO
 from pathlib import Path
-from urllib.parse import urljoin
 
 import pandas as pd
 import requests
@@ -75,7 +74,7 @@ def fetch_ipeadata_mortality(
             if tercodigo not in ibge_set:
                 continue
             val_data = item.get("VALDATA", "")
-            if not str(year) in str(val_data):
+            if str(year) not in str(val_data):
                 continue
             try:
                 val = float(item["VALVALOR"])

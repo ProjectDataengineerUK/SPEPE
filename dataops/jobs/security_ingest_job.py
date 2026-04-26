@@ -14,8 +14,6 @@ import os
 from datetime import datetime, timezone
 from pathlib import Path
 
-import pandas as pd
-
 from dataops.bronze_writer import write_bronze
 from dataops.clients.ibge_client import load_municipios
 from dataops.clients.seguranca_client import build_seguranca_dataframe

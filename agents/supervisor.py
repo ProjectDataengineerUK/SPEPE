@@ -10,6 +10,9 @@ import anthropic
 from agents.gemini_agent import AgentResponse
 from agents.loader import load_agents
 from agents.tools import RunJobArgs, RUN_JOB_TOOL_SCHEMA, run_dataops_job
+from config.session_state import SessionState, BUDGET_USD
+from config.settings import settings
+from security.output_validators import AGENT_VALIDATORS, validate_input_injection
 
 # Loaded once at module init — ensures Supervisor enum stays in sync with registry
 _AGENT_REGISTRY: dict = {}
@@ -20,9 +23,6 @@ def _get_registry() -> dict:
     if not _AGENT_REGISTRY:
         _AGENT_REGISTRY = load_agents()
     return _AGENT_REGISTRY
-from config.session_state import SessionState, BUDGET_USD
-from config.settings import settings
-from security.output_validators import AGENT_VALIDATORS, validate_input_injection
 
 logger = logging.getLogger("spepe.agents.supervisor")
 

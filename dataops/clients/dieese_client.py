@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import logging
 from io import BytesIO
-from pathlib import Path
 
 import pandas as pd
 import requests
