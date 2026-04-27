@@ -76,3 +76,30 @@ resource "google_secret_manager_secret_iam_member" "dataops_youtube" {
   role      = "roles/secretmanager.secretAccessor"
   member    = "serviceAccount:${google_service_account.dataops_jobs.email}"
 }
+
+# ── X (Twitter) Bearer Token — Fase 2 Social ─────────────────────────────
+resource "google_secret_manager_secret" "x_bearer_token" {
+  secret_id = "X_BEARER_TOKEN"
+  replication {
+    auto {}
+  }
+  labels = local.labels
+}
+
+resource "google_secret_manager_secret_version" "x_bearer_token_placeholder" {
+  secret      = google_secret_manager_secret.x_bearer_token.id
+  secret_data = "placeholder"
+  lifecycle { ignore_changes = [secret_data] }
+}
+
+resource "google_secret_manager_secret_iam_member" "cloud_run_x_bearer" {
+  secret_id = google_secret_manager_secret.x_bearer_token.id
+  role      = "roles/secretmanager.secretAccessor"
+  member    = "serviceAccount:${google_service_account.cloud_run.email}"
+}
+
+resource "google_secret_manager_secret_iam_member" "dataops_x_bearer" {
+  secret_id = google_secret_manager_secret.x_bearer_token.id
+  role      = "roles/secretmanager.secretAccessor"
+  member    = "serviceAccount:${google_service_account.dataops_jobs.email}"
+}

@@ -8,7 +8,8 @@ locals {
     cetic_ingest     = { timeout = "900s",  memory = "512Mi", cpu = "1", args = ["--uf", "SP"] }
     silver_transform = { timeout = "1800s", memory = "2Gi", cpu = "2", args = ["--uf", "SP"] }
     gold_build       = { timeout = "1800s", memory = "2Gi", cpu = "2", args = [] }
-    digital_ingest   = { timeout = "900s", memory = "1Gi", cpu = "1", args = [] }
+    digital_ingest   = { timeout = "900s",  memory = "1Gi",  cpu = "1", args = [] }
+    social_ingest    = { timeout = "1800s", memory = "1Gi",  cpu = "1", args = [] }
   }
 
   job_entrypoints = {
@@ -21,6 +22,7 @@ locals {
     silver_transform = ["python", "-m", "dataops.jobs.silver_transform_job"]
     gold_build       = ["python", "-m", "dataops.jobs.gold_build_job"]
     digital_ingest   = ["python", "-m", "dataops.jobs.digital_ingest_job"]
+    social_ingest    = ["python", "-m", "dataops.jobs.social_ingest_job"]
   }
 }
 
@@ -82,6 +84,15 @@ resource "google_cloud_run_v2_job" "spepe_jobs" {
             }
           }
         }
+        env {
+          name = "X_BEARER_TOKEN"
+          value_source {
+            secret_key_ref {
+              secret  = google_secret_manager_secret.x_bearer_token.secret_id
+              version = "latest"
+            }
+          }
+        }
       }
     }
   }
@@ -89,6 +100,7 @@ resource "google_cloud_run_v2_job" "spepe_jobs" {
   depends_on = [
     google_secret_manager_secret_iam_member.dataops_meta,
     google_secret_manager_secret_iam_member.dataops_youtube,
+    google_secret_manager_secret_iam_member.dataops_x_bearer,
   ]
 }
 
