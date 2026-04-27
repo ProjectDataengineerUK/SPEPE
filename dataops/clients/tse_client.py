@@ -82,6 +82,8 @@ def download_tse_resultados(uf: str, year: int) -> pd.DataFrame:
                     fout.write(chunk)
         logger.info("ZIP baixado: %s (%.1f MB)", tmp_path, os.path.getsize(tmp_path) / 1e6)
 
+        _KEEP_COLS = set(_COL_MAP.keys())
+
         frames: list[pd.DataFrame] = []
         with zipfile.ZipFile(tmp_path) as zf:
             csv_files = [n for n in zf.namelist() if n.lower().endswith(".csv")]
@@ -99,7 +101,9 @@ def download_tse_resultados(uf: str, year: int) -> pd.DataFrame:
                             dtype=str,
                             chunksize=500_000,
                         ):
-                            chunks.append(chunk)
+                            # Filtra colunas irrelevantes em-chunk — reduz ~70% da memória
+                            keep = [c for c in chunk.columns if c in _KEEP_COLS]
+                            chunks.append(chunk[keep])
                         if chunks:
                             df = pd.concat(chunks, ignore_index=True)
                             frames.append(df)
