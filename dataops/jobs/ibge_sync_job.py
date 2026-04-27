@@ -46,9 +46,15 @@ UF_CODES = {
 
 DEFAULT_INDICADORES = [
     "populacao",
-    "renda_media",
-    "taxa_desemprego",
+    "taxa_alfabetizacao",
     "pct_analfabetos",
+    "pct_0_14",
+    "pct_15_29",
+    "pct_30_59",
+    "pct_60_mais",
+    "pct_urbano",
+    "pct_catolico",
+    "pct_sem_religiao",
 ]
 
 
