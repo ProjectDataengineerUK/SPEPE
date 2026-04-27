@@ -10,13 +10,13 @@ record_confidence_score scale:
 
 from __future__ import annotations
 
+import importlib.util
 import io
 import logging
 import os
 import tempfile
 import time
 from pathlib import Path
-from typing import Any
 
 import pandas as pd
 import requests
@@ -205,9 +205,7 @@ def enrich_with_pdfs(
 @retry(stop=stop_after_attempt(2), wait=wait_exponential(min=1, max=10))
 def _download_and_parse_pdf(poll_id: str) -> dict | None:
     """Download TSE PesqEle PDF for poll_id and extract table data via pdfplumber."""
-    try:
-        import pdfplumber
-    except ImportError:
+    if importlib.util.find_spec("pdfplumber") is None:
         logger.warning("pdfplumber não instalado — PDF pipeline desabilitado")
         return None
 
