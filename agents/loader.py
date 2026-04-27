@@ -20,6 +20,8 @@ _MODEL_ASSIGNMENT = {
     "explicador": "gemini-2.5-pro",
     "narrador": "gemini-2.0-flash",
     "vigilante": "gemini-2.0-flash",
+    "sentinela_social": "gemini-2.0-flash",
+    "contextualizador_saude": "gemini-2.5-flash",
 }
 
 _ID_ALIASES = {

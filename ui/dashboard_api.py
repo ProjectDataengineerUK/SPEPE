@@ -67,7 +67,10 @@ _HELP_TEXT = """\
 @app.get("/", include_in_schema=False)
 async def root() -> FileResponse:
     from pathlib import Path
-    return FileResponse(str(Path(__file__).parent / "static" / "index.html"), media_type="text/html")
+
+    return FileResponse(
+        str(Path(__file__).parent / "static" / "index.html"), media_type="text/html"
+    )
 
 
 @app.get("/entrar", include_in_schema=False)
@@ -428,7 +431,7 @@ async def _bq_kpi(cargo: str, uf: str, ano: int) -> dict:
         "segundo": r.get("segundo", "—"),
         "segundo_pct": s_pct,
         "margem_pp": round(abs(v_pct - s_pct), 1),
-        "total_votos": f"{total/1_000_000:.1f}M" if total >= 1_000_000 else str(total),
+        "total_votos": f"{total / 1_000_000:.1f}M" if total >= 1_000_000 else str(total),
         "municipios": r.get("municipios", 0),
         "dq_score": 99.0,
         "fonte": "bigquery",
@@ -513,17 +516,19 @@ async def _bq_municipios(cargo: str, uf: str, ano: int, limit: int) -> list[dict
     result = []
     for r in rows:
         total = r.get("total") or 0
-        votos_fmt = f"{total/1000:.0f}k" if total >= 1000 else str(total)
-        result.append({
-            "nm": r.get("nm", ""),
-            "votos": votos_fmt,
-            "c1": r.get("c1") or 0.0,
-            "c2": r.get("c2") or 0.0,
-            "c3": r.get("c3") or 0.0,
-            "nm_c1": r.get("nm_c1", ""),
-            "nm_c2": r.get("nm_c2", ""),
-            "partido_c1": r.get("partido_c1", ""),
-        })
+        votos_fmt = f"{total / 1000:.0f}k" if total >= 1000 else str(total)
+        result.append(
+            {
+                "nm": r.get("nm", ""),
+                "votos": votos_fmt,
+                "c1": r.get("c1") or 0.0,
+                "c2": r.get("c2") or 0.0,
+                "c3": r.get("c3") or 0.0,
+                "nm_c1": r.get("nm_c1", ""),
+                "nm_c2": r.get("nm_c2", ""),
+                "partido_c1": r.get("partido_c1", ""),
+            }
+        )
     return result
 
 
