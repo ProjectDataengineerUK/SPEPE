@@ -27,3 +27,14 @@ output "dataops_sa" {
   description = "DataOps jobs service account email"
   value       = google_service_account.dataops_jobs.email
 }
+
+output "domain_mapping_records" {
+  description = "DNS records to add at your registrar (only when var.domain is set)"
+  value = var.domain != "" ? [
+    for r in google_cloud_run_domain_mapping.spepe[0].status[0].resource_records : {
+      type  = r.type
+      name  = r.name
+      value = r.rrdata
+    }
+  ] : []
+}
