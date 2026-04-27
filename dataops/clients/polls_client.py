@@ -26,9 +26,7 @@ logger = logging.getLogger("spepe.clients.polls")
 
 # TSE PesqEle — bulk CSV of registered polls
 # Endpoint documented at pesquisaeleitorais.tse.jus.br
-_PESQELE_BASE = os.environ.get(
-    "PESQELE_BASE_URL", "https://pesquisaeleitorais.tse.jus.br"
-)
+_PESQELE_BASE = os.environ.get("PESQELE_BASE_URL", "https://pesquisaeleitorais.tse.jus.br")
 _PESQELE_CSV_PATH = "/media/arquivos/planilhas/pesquisas_registradas_{year}.csv"
 _PESQELE_PDF_PATH = "/media/arquivos/{poll_id}/formulario.pdf"
 
@@ -177,9 +175,7 @@ def enrich_with_pdfs(
 
     total = success + fail
     fail_rate = fail / total if total > 0 else 0.0
-    logger.info(
-        "PDF pipeline: %d ok / %d falhas (taxa=%.0f%%)", success, fail, fail_rate * 100
-    )
+    logger.info("PDF pipeline: %d ok / %d falhas (taxa=%.0f%%)", success, fail, fail_rate * 100)
 
     if fail_rate > _PDF_FAIL_RATE_THRESHOLD and fail > 0:
         logger.warning(
@@ -251,15 +247,9 @@ def _parse_pdf_table(table: list[list[str | None]]) -> list[dict]:
 
     header = [str(c or "").lower() for c in table[0]]
 
-    candidato_idx = next(
-        (i for i, h in enumerate(header) if "candidato" in h or "nome" in h), None
-    )
+    candidato_idx = next((i for i, h in enumerate(header) if "candidato" in h or "nome" in h), None)
     intencao_idx = next(
-        (
-            i
-            for i, h in enumerate(header)
-            if "inten" in h or "%" in h or "votos" in h
-        ),
+        (i for i, h in enumerate(header) if "inten" in h or "%" in h or "votos" in h),
         None,
     )
 
@@ -292,11 +282,7 @@ def _llm_fallback_extraction(
     Assigns record_confidence_score = 0.30 for LLM-extracted rows.
     """
     parsed_ids = {r["poll_id"] for r in already_parsed}
-    failed_ids = [
-        pid
-        for pid in df[poll_id_col].dropna().unique()
-        if pid not in parsed_ids
-    ]
+    failed_ids = [pid for pid in df[poll_id_col].dropna().unique() if pid not in parsed_ids]
 
     if not failed_ids:
         return []
@@ -450,9 +436,7 @@ def _parse_atlas_csv(raw: bytes, year: int) -> pd.DataFrame:
     return df
 
 
-def reconcile_atlas_with_pesqele(
-    df_atlas: pd.DataFrame, df_pesqele: pd.DataFrame
-) -> pd.DataFrame:
+def reconcile_atlas_with_pesqele(df_atlas: pd.DataFrame, df_pesqele: pd.DataFrame) -> pd.DataFrame:
     """Upgrade Atlas confidence to 0.80 for rows that match a TSE PesqEle entry."""
     if df_atlas.empty or df_pesqele.empty:
         return df_atlas
@@ -497,23 +481,78 @@ def build_dim_instituto() -> pd.DataFrame:
     Values calibrated from Datafolha as baseline (0.0).
     """
     records = [
-        {"instituto": "datafolha",        "house_effect_score":  0.0,  "metodologia": "presencial/telefone", "pais": "BR"},
-        {"instituto": "ibope",             "house_effect_score": -1.2,  "metodologia": "presencial",          "pais": "BR"},
-        {"instituto": "ipsos",             "house_effect_score": -1.2,  "metodologia": "telefone",            "pais": "BR"},
-        {"instituto": "quaest",            "house_effect_score":  0.3,  "metodologia": "telefone",            "pais": "BR"},
-        {"instituto": "genial_quaest",     "house_effect_score":  0.3,  "metodologia": "telefone",            "pais": "BR"},
-        {"instituto": "atlas",             "house_effect_score": -0.5,  "metodologia": "online",              "pais": "BR"},
-        {"instituto": "atlas_politico",    "house_effect_score": -0.5,  "metodologia": "online",              "pais": "BR"},
-        {"instituto": "sensus",            "house_effect_score":  1.5,  "metodologia": "presencial",          "pais": "BR"},
-        {"instituto": "vox_populi",        "house_effect_score":  0.8,  "metodologia": "presencial",          "pais": "BR"},
-        {"instituto": "parana_pesquisas",  "house_effect_score": -0.7,  "metodologia": "presencial",          "pais": "BR"},
-        {"instituto": "ipespe",            "house_effect_score":  0.2,  "metodologia": "telefone",            "pais": "BR"},
-        {"instituto": "mda",               "house_effect_score":  0.1,  "metodologia": "presencial",          "pais": "BR"},
-        {"instituto": "modalmais",         "house_effect_score":  0.0,  "metodologia": "telefone",            "pais": "BR"},
-        {"instituto": "br_pesquisas",      "house_effect_score":  0.4,  "metodologia": "presencial",          "pais": "BR"},
-        {"instituto": "futura_inteligencia","house_effect_score": 0.6,  "metodologia": "presencial",          "pais": "BR"},
-        {"instituto": "idados",            "house_effect_score":  0.1,  "metodologia": "online",              "pais": "BR"},
-        {"instituto": "abreu_rodrigues",   "house_effect_score": -0.3,  "metodologia": "presencial",          "pais": "BR"},
+        {
+            "instituto": "datafolha",
+            "house_effect_score": 0.0,
+            "metodologia": "presencial/telefone",
+            "pais": "BR",
+        },
+        {
+            "instituto": "ibope",
+            "house_effect_score": -1.2,
+            "metodologia": "presencial",
+            "pais": "BR",
+        },
+        {"instituto": "ipsos", "house_effect_score": -1.2, "metodologia": "telefone", "pais": "BR"},
+        {"instituto": "quaest", "house_effect_score": 0.3, "metodologia": "telefone", "pais": "BR"},
+        {
+            "instituto": "genial_quaest",
+            "house_effect_score": 0.3,
+            "metodologia": "telefone",
+            "pais": "BR",
+        },
+        {"instituto": "atlas", "house_effect_score": -0.5, "metodologia": "online", "pais": "BR"},
+        {
+            "instituto": "atlas_politico",
+            "house_effect_score": -0.5,
+            "metodologia": "online",
+            "pais": "BR",
+        },
+        {
+            "instituto": "sensus",
+            "house_effect_score": 1.5,
+            "metodologia": "presencial",
+            "pais": "BR",
+        },
+        {
+            "instituto": "vox_populi",
+            "house_effect_score": 0.8,
+            "metodologia": "presencial",
+            "pais": "BR",
+        },
+        {
+            "instituto": "parana_pesquisas",
+            "house_effect_score": -0.7,
+            "metodologia": "presencial",
+            "pais": "BR",
+        },
+        {"instituto": "ipespe", "house_effect_score": 0.2, "metodologia": "telefone", "pais": "BR"},
+        {"instituto": "mda", "house_effect_score": 0.1, "metodologia": "presencial", "pais": "BR"},
+        {
+            "instituto": "modalmais",
+            "house_effect_score": 0.0,
+            "metodologia": "telefone",
+            "pais": "BR",
+        },
+        {
+            "instituto": "br_pesquisas",
+            "house_effect_score": 0.4,
+            "metodologia": "presencial",
+            "pais": "BR",
+        },
+        {
+            "instituto": "futura_inteligencia",
+            "house_effect_score": 0.6,
+            "metodologia": "presencial",
+            "pais": "BR",
+        },
+        {"instituto": "idados", "house_effect_score": 0.1, "metodologia": "online", "pais": "BR"},
+        {
+            "instituto": "abreu_rodrigues",
+            "house_effect_score": -0.3,
+            "metodologia": "presencial",
+            "pais": "BR",
+        },
     ]
     df = pd.DataFrame(records)
     df["updated_at"] = pd.Timestamp.utcnow()
@@ -525,4 +564,5 @@ def build_dim_instituto() -> pd.DataFrame:
 
 def _normalize_col(col: str) -> str:
     import re
+
     return re.sub(r"[^a-z0-9_]", "_", col.strip().lower())

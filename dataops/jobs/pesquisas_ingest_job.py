@@ -41,8 +41,7 @@ def main(year: int, cargos: list[int], enrich_pdf: bool, uf: str | None) -> None
 
     if uf and not df_pesqele.empty and "uf" in df_pesqele.columns:
         df_pesqele = df_pesqele[
-            df_pesqele["uf"].str.upper().isin([uf.upper(), "BR", ""])
-            | df_pesqele["uf"].isna()
+            df_pesqele["uf"].str.upper().isin([uf.upper(), "BR", ""]) | df_pesqele["uf"].isna()
         ]
 
     # ── 2. PDF enrichment (optional) ───────────────────────────────────────
@@ -73,7 +72,9 @@ def main(year: int, cargos: list[int], enrich_pdf: bool, uf: str | None) -> None
             "Bronze TSE PesqEle: %s (%d rows, score médio=%.2f)",
             path_tse,
             len(df_pesqele),
-            df_pesqele["record_confidence_score"].mean() if "record_confidence_score" in df_pesqele.columns else 0,
+            df_pesqele["record_confidence_score"].mean()
+            if "record_confidence_score" in df_pesqele.columns
+            else 0,
         )
     else:
         logger.warning("TSE PesqEle: nenhum dado para escrever no Bronze")
@@ -92,7 +93,9 @@ def main(year: int, cargos: list[int], enrich_pdf: bool, uf: str | None) -> None
             "Bronze Atlas: %s (%d rows, score médio=%.2f)",
             path_atlas,
             len(df_atlas),
-            df_atlas["record_confidence_score"].mean() if "record_confidence_score" in df_atlas.columns else 0,
+            df_atlas["record_confidence_score"].mean()
+            if "record_confidence_score" in df_atlas.columns
+            else 0,
         )
 
     # ── 5. dim_instituto seed ──────────────────────────────────────────────
