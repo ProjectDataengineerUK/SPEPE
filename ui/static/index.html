@@ -1,0 +1,925 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>SPEPE — Inteligência Eleitoral com IA</title>
+  <meta name="description" content="Plataforma de inteligência eleitoral brasileira. Perfis de eleitorado, previsão de resultados e monitoramento em tempo real com IA." />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet" />
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg:        #07090f;
+      --bg2:       #0d1117;
+      --bg3:       #111827;
+      --blue:      #3b82f6;
+      --blue-glow: rgba(59,130,246,.18);
+      --purple:    #8b5cf6;
+      --green:     #10b981;
+      --text:      #f1f5f9;
+      --muted:     #94a3b8;
+      --border:    rgba(255,255,255,.07);
+      --card-bg:   rgba(255,255,255,.035);
+      --radius:    16px;
+    }
+
+    html { scroll-behavior: smooth; }
+
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: 'Inter', sans-serif;
+      line-height: 1.65;
+      overflow-x: hidden;
+    }
+
+    /* ── Scrollbar ── */
+    ::-webkit-scrollbar { width: 6px; }
+    ::-webkit-scrollbar-track { background: var(--bg); }
+    ::-webkit-scrollbar-thumb { background: #1e293b; border-radius: 99px; }
+
+    /* ── Noise overlay ── */
+    body::before {
+      content: '';
+      position: fixed; inset: 0;
+      background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='.04'/%3E%3C/svg%3E");
+      pointer-events: none; z-index: 0; opacity: .5;
+    }
+
+    /* ── Grid bg ── */
+    .grid-bg {
+      position: absolute; inset: 0;
+      background-image:
+        linear-gradient(rgba(59,130,246,.06) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(59,130,246,.06) 1px, transparent 1px);
+      background-size: 60px 60px;
+      mask-image: radial-gradient(ellipse 80% 60% at 50% 0%, #000 50%, transparent 100%);
+    }
+
+    /* ── Glow blobs ── */
+    .blob {
+      position: absolute;
+      border-radius: 50%;
+      filter: blur(100px);
+      pointer-events: none;
+    }
+
+    /* ── Nav ── */
+    nav {
+      position: fixed; top: 0; left: 0; right: 0; z-index: 100;
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 0 5%;
+      height: 68px;
+      background: rgba(7,9,15,.8);
+      backdrop-filter: blur(20px);
+      border-bottom: 1px solid var(--border);
+    }
+
+    .nav-logo {
+      display: flex; align-items: center; gap: 10px;
+      font-weight: 800; font-size: 1.25rem; letter-spacing: -.02em;
+      text-decoration: none; color: var(--text);
+    }
+
+    .nav-logo .logo-icon {
+      width: 34px; height: 34px;
+      background: linear-gradient(135deg, var(--blue), var(--purple));
+      border-radius: 9px;
+      display: flex; align-items: center; justify-content: center;
+      font-size: .85rem; font-weight: 900;
+    }
+
+    .nav-links {
+      display: flex; align-items: center; gap: 32px;
+      list-style: none;
+    }
+
+    .nav-links a {
+      color: var(--muted); font-size: .9rem; font-weight: 500;
+      text-decoration: none; transition: color .2s;
+    }
+    .nav-links a:hover { color: var(--text); }
+
+    .nav-cta {
+      background: var(--blue);
+      color: #fff !important;
+      padding: 8px 20px !important;
+      border-radius: 8px;
+      font-weight: 600 !important;
+    }
+    .nav-cta:hover { background: #2563eb !important; color: #fff !important; }
+
+    @media (max-width: 768px) {
+      .nav-links { display: none; }
+    }
+
+    /* ── Sections ── */
+    section { position: relative; z-index: 1; }
+
+    .container {
+      max-width: 1160px;
+      margin: 0 auto;
+      padding: 0 24px;
+    }
+
+    /* ── Hero ── */
+    #hero {
+      min-height: 100vh;
+      display: flex; align-items: center; justify-content: center;
+      text-align: center;
+      padding: 120px 24px 80px;
+      overflow: hidden;
+    }
+
+    #hero .blob-1 {
+      width: 600px; height: 600px;
+      background: radial-gradient(circle, rgba(59,130,246,.25), transparent 70%);
+      top: -100px; left: 50%; transform: translateX(-50%);
+    }
+    #hero .blob-2 {
+      width: 400px; height: 400px;
+      background: radial-gradient(circle, rgba(139,92,246,.2), transparent 70%);
+      bottom: 0; right: -100px;
+    }
+
+    .hero-badge {
+      display: inline-flex; align-items: center; gap: 8px;
+      background: rgba(59,130,246,.12);
+      border: 1px solid rgba(59,130,246,.3);
+      color: #93c5fd;
+      padding: 6px 16px;
+      border-radius: 99px;
+      font-size: .8rem; font-weight: 600;
+      letter-spacing: .04em; text-transform: uppercase;
+      margin-bottom: 28px;
+    }
+
+    .hero-badge .dot {
+      width: 6px; height: 6px;
+      background: var(--blue);
+      border-radius: 50%;
+      animation: pulse 2s infinite;
+    }
+
+    @keyframes pulse {
+      0%, 100% { opacity: 1; transform: scale(1); }
+      50%       { opacity: .5; transform: scale(.8); }
+    }
+
+    h1 {
+      font-size: clamp(2.4rem, 6vw, 4.2rem);
+      font-weight: 900;
+      letter-spacing: -.04em;
+      line-height: 1.1;
+      margin-bottom: 24px;
+    }
+
+    .gradient-text {
+      background: linear-gradient(135deg, #60a5fa, #a78bfa, #34d399);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+    }
+
+    .hero-sub {
+      font-size: clamp(1rem, 2.5vw, 1.22rem);
+      color: var(--muted);
+      max-width: 640px;
+      margin: 0 auto 40px;
+      font-weight: 400;
+    }
+
+    .hero-actions {
+      display: flex; align-items: center; justify-content: center;
+      gap: 16px; flex-wrap: wrap;
+    }
+
+    .btn-primary {
+      display: inline-flex; align-items: center; gap: 8px;
+      background: var(--blue);
+      color: #fff;
+      padding: 14px 28px;
+      border-radius: 10px;
+      font-weight: 700; font-size: .95rem;
+      text-decoration: none;
+      transition: all .2s;
+      box-shadow: 0 0 30px rgba(59,130,246,.3);
+    }
+    .btn-primary:hover { background: #2563eb; transform: translateY(-2px); box-shadow: 0 0 50px rgba(59,130,246,.45); }
+
+    .btn-secondary {
+      display: inline-flex; align-items: center; gap: 8px;
+      background: transparent;
+      color: var(--text);
+      padding: 14px 28px;
+      border-radius: 10px;
+      border: 1px solid var(--border);
+      font-weight: 600; font-size: .95rem;
+      text-decoration: none;
+      transition: all .2s;
+    }
+    .btn-secondary:hover { border-color: rgba(255,255,255,.2); background: rgba(255,255,255,.05); }
+
+    /* ── Stats strip ── */
+    .stats-strip {
+      border-top: 1px solid var(--border);
+      border-bottom: 1px solid var(--border);
+      background: var(--card-bg);
+      padding: 32px 24px;
+    }
+
+    .stats-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+      gap: 24px;
+      max-width: 900px;
+      margin: 0 auto;
+      text-align: center;
+    }
+
+    .stat-num {
+      font-size: 2.2rem; font-weight: 900;
+      background: linear-gradient(135deg, var(--blue), var(--purple));
+      -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text;
+      line-height: 1;
+    }
+
+    .stat-label {
+      color: var(--muted); font-size: .82rem; margin-top: 6px; font-weight: 500;
+    }
+
+    /* ── Section titles ── */
+    .section-label {
+      display: inline-block;
+      color: #60a5fa;
+      font-size: .78rem; font-weight: 700;
+      letter-spacing: .1em; text-transform: uppercase;
+      margin-bottom: 12px;
+    }
+
+    h2 {
+      font-size: clamp(1.8rem, 4vw, 2.8rem);
+      font-weight: 800; letter-spacing: -.03em;
+      line-height: 1.15;
+      margin-bottom: 16px;
+    }
+
+    .section-sub {
+      color: var(--muted);
+      font-size: 1.05rem;
+      max-width: 560px;
+    }
+
+    /* ── Features ── */
+    #features {
+      padding: 100px 24px;
+    }
+
+    .features-header { margin-bottom: 60px; }
+
+    .features-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+      gap: 20px;
+    }
+
+    .feature-card {
+      background: var(--card-bg);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 32px;
+      transition: all .3s;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .feature-card::before {
+      content: '';
+      position: absolute; inset: 0;
+      background: linear-gradient(135deg, var(--blue-glow), transparent);
+      opacity: 0;
+      transition: opacity .3s;
+    }
+    .feature-card:hover { border-color: rgba(59,130,246,.35); transform: translateY(-4px); }
+    .feature-card:hover::before { opacity: 1; }
+
+    .feature-icon {
+      width: 48px; height: 48px;
+      border-radius: 12px;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 1.4rem;
+      margin-bottom: 20px;
+      position: relative;
+    }
+
+    .feature-card h3 {
+      font-size: 1.05rem; font-weight: 700;
+      margin-bottom: 10px;
+    }
+
+    .feature-card p {
+      color: var(--muted); font-size: .9rem; line-height: 1.7;
+    }
+
+    /* ── How it works ── */
+    #como-funciona {
+      padding: 100px 24px;
+      background: linear-gradient(180deg, transparent, rgba(13,17,23,.8), transparent);
+    }
+
+    .steps {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+      gap: 0;
+      position: relative;
+      margin-top: 60px;
+    }
+
+    .steps::before {
+      content: '';
+      position: absolute;
+      top: 28px; left: 12%; right: 12%;
+      height: 1px;
+      background: linear-gradient(90deg, transparent, var(--blue), transparent);
+    }
+
+    .step {
+      text-align: center;
+      padding: 0 20px;
+      position: relative;
+    }
+
+    .step-num {
+      width: 56px; height: 56px;
+      background: linear-gradient(135deg, var(--blue), var(--purple));
+      border-radius: 50%;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 1.3rem;
+      margin: 0 auto 24px;
+      position: relative;
+      z-index: 1;
+      box-shadow: 0 0 30px rgba(59,130,246,.3);
+    }
+
+    .step h3 { font-size: 1rem; font-weight: 700; margin-bottom: 10px; }
+    .step p { color: var(--muted); font-size: .88rem; line-height: 1.65; }
+
+    /* ── Para quem ── */
+    #para-quem {
+      padding: 100px 24px;
+    }
+
+    .audience-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+      gap: 20px;
+      margin-top: 56px;
+    }
+
+    .audience-card {
+      background: var(--card-bg);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 36px 28px;
+      transition: all .3s;
+    }
+    .audience-card:hover { border-color: rgba(139,92,246,.35); transform: translateY(-4px); }
+
+    .audience-emoji { font-size: 2.4rem; margin-bottom: 18px; display: block; }
+    .audience-card h3 { font-size: 1.05rem; font-weight: 700; margin-bottom: 10px; }
+    .audience-card p { color: var(--muted); font-size: .88rem; line-height: 1.65; }
+
+    /* ── Capabilities ── */
+    #capacidades {
+      padding: 100px 24px;
+      background: linear-gradient(180deg, transparent, rgba(13,17,23,.6));
+    }
+
+    .cap-layout {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 80px;
+      align-items: center;
+      margin-top: 60px;
+    }
+
+    @media (max-width: 768px) {
+      .cap-layout { grid-template-columns: 1fr; gap: 40px; }
+    }
+
+    .cap-list { list-style: none; display: flex; flex-direction: column; gap: 20px; }
+
+    .cap-item {
+      display: flex; gap: 16px; align-items: flex-start;
+    }
+
+    .cap-check {
+      width: 22px; height: 22px; flex-shrink: 0;
+      background: rgba(16,185,129,.15);
+      border: 1px solid rgba(16,185,129,.4);
+      border-radius: 6px;
+      display: flex; align-items: center; justify-content: center;
+      color: var(--green); font-size: .7rem; font-weight: 900;
+      margin-top: 2px;
+    }
+
+    .cap-item-text h4 { font-size: .95rem; font-weight: 700; margin-bottom: 4px; }
+    .cap-item-text p { color: var(--muted); font-size: .85rem; line-height: 1.6; }
+
+    /* ── Mock dashboard visual ── */
+    .mock-window {
+      background: var(--bg2);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      overflow: hidden;
+      box-shadow: 0 40px 100px rgba(0,0,0,.5);
+    }
+
+    .mock-topbar {
+      background: var(--bg3);
+      padding: 12px 16px;
+      display: flex; align-items: center; gap: 8px;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .mock-dot { width: 10px; height: 10px; border-radius: 50%; }
+
+    .mock-body { padding: 20px; }
+
+    .mock-row { display: flex; gap: 12px; margin-bottom: 12px; }
+
+    .mock-kpi {
+      flex: 1;
+      background: var(--card-bg);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 14px;
+    }
+
+    .mock-kpi-label { font-size: .65rem; color: var(--muted); text-transform: uppercase; letter-spacing: .06em; font-weight: 600; }
+    .mock-kpi-val { font-size: 1.4rem; font-weight: 800; margin-top: 4px; }
+
+    .mock-chart {
+      background: var(--card-bg);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 14px;
+      height: 100px;
+      display: flex; align-items: flex-end; gap: 6px;
+    }
+
+    .bar {
+      flex: 1; border-radius: 4px 4px 0 0;
+      background: linear-gradient(180deg, var(--blue), var(--purple));
+      opacity: .8;
+    }
+
+    .mock-map {
+      background: var(--card-bg);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 14px;
+      height: 110px;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .map-blob {
+      position: absolute;
+      border-radius: 50%;
+      filter: blur(20px);
+    }
+
+    /* ── CTA ── */
+    #cta {
+      padding: 120px 24px;
+      text-align: center;
+      position: relative;
+      overflow: hidden;
+    }
+
+    #cta .blob-cta {
+      width: 700px; height: 400px;
+      background: radial-gradient(ellipse, rgba(59,130,246,.15), transparent 70%);
+      top: 50%; left: 50%;
+      transform: translate(-50%, -50%);
+    }
+
+    #cta h2 { margin-bottom: 20px; }
+    #cta p { color: var(--muted); font-size: 1.05rem; margin-bottom: 40px; max-width: 520px; margin-left: auto; margin-right: auto; }
+
+    .cta-form {
+      display: flex; gap: 12px; justify-content: center; flex-wrap: wrap;
+      max-width: 480px; margin: 0 auto;
+    }
+
+    .cta-form input {
+      flex: 1; min-width: 220px;
+      background: rgba(255,255,255,.06);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 14px 18px;
+      color: var(--text);
+      font-family: 'Inter', sans-serif;
+      font-size: .95rem;
+      outline: none;
+      transition: border-color .2s;
+    }
+    .cta-form input::placeholder { color: var(--muted); }
+    .cta-form input:focus { border-color: var(--blue); }
+
+    /* ── Footer ── */
+    footer {
+      border-top: 1px solid var(--border);
+      padding: 40px 24px;
+      text-align: center;
+      color: var(--muted);
+      font-size: .85rem;
+    }
+
+    footer .footer-logo {
+      font-size: 1.1rem; font-weight: 800;
+      background: linear-gradient(135deg, var(--blue), var(--purple));
+      -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text;
+      margin-bottom: 12px;
+    }
+
+    /* ── Fade-in on scroll ── */
+    .fade-up {
+      opacity: 0;
+      transform: translateY(30px);
+      transition: opacity .6s ease, transform .6s ease;
+    }
+    .fade-up.visible {
+      opacity: 1;
+      transform: translateY(0);
+    }
+
+    /* ── Glow divider ── */
+    .glow-line {
+      height: 1px;
+      background: linear-gradient(90deg, transparent, var(--blue), var(--purple), transparent);
+      border: none;
+      margin: 0;
+      opacity: .4;
+    }
+  </style>
+</head>
+<body>
+
+<!-- ── Nav ──────────────────────────────────────────────── -->
+<nav>
+  <a href="#" class="nav-logo">
+    <div class="logo-icon">SP</div>
+    SPEPE
+  </a>
+  <ul class="nav-links">
+    <li><a href="#features">Funcionalidades</a></li>
+    <li><a href="#como-funciona">Como funciona</a></li>
+    <li><a href="#para-quem">Para quem</a></li>
+    <li><a href="#cta" class="nav-cta">Solicitar acesso</a></li>
+  </ul>
+</nav>
+
+<!-- ── Hero ─────────────────────────────────────────────── -->
+<section id="hero">
+  <div class="grid-bg"></div>
+  <div class="blob blob-1"></div>
+  <div class="blob blob-2"></div>
+
+  <div style="position:relative; z-index:2;">
+    <div class="hero-badge">
+      <span class="dot"></span>
+      Inteligência artificial para eleições 2026
+    </div>
+
+    <h1>
+      Entenda o eleitorado.<br />
+      <span class="gradient-text">Preveja resultados.</span><br />
+      Tome decisões certas.
+    </h1>
+
+    <p class="hero-sub">
+      SPEPE reúne dados públicos, pesquisas e redes sociais para entregar análises eleitorais
+      precisas e acessíveis — sem precisar de nenhum conhecimento técnico.
+    </p>
+
+    <div class="hero-actions">
+      <a href="#cta" class="btn-primary">
+        ✦ Solicitar demonstração
+      </a>
+      <a href="#como-funciona" class="btn-secondary">
+        Como funciona →
+      </a>
+    </div>
+  </div>
+</section>
+
+<!-- ── Stats ─────────────────────────────────────────────── -->
+<div class="stats-strip">
+  <div class="stats-grid">
+    <div class="fade-up">
+      <div class="stat-num">27</div>
+      <div class="stat-label">Estados cobertos</div>
+    </div>
+    <div class="fade-up">
+      <div class="stat-num">5.570</div>
+      <div class="stat-label">Municípios analisados</div>
+    </div>
+    <div class="fade-up">
+      <div class="stat-num">+50M</div>
+      <div class="stat-label">Registros eleitorais</div>
+    </div>
+    <div class="fade-up">
+      <div class="stat-num">7</div>
+      <div class="stat-label">Agentes de IA especializados</div>
+    </div>
+    <div class="fade-up">
+      <div class="stat-num">95%</div>
+      <div class="stat-label">Intervalo de confiança nas previsões</div>
+    </div>
+  </div>
+</div>
+
+<hr class="glow-line" />
+
+<!-- ── Features ──────────────────────────────────────────── -->
+<section id="features">
+  <div class="container">
+    <div class="features-header fade-up">
+      <span class="section-label">Funcionalidades</span>
+      <h2>Tudo que você precisa para<br /><span class="gradient-text">vencer uma eleição</span></h2>
+      <p class="section-sub">Uma plataforma completa que transforma dados complexos em respostas simples e decisões mais inteligentes.</p>
+    </div>
+
+    <div class="features-grid">
+
+      <div class="feature-card fade-up">
+        <div class="feature-icon" style="background: rgba(59,130,246,.15);">🗺️</div>
+        <h3>Mapa eleitoral ao vivo</h3>
+        <p>Veja como cada cidade e bairro vota — com cores, percentuais e histórico. Identifique onde você é forte e onde precisa crescer em segundos.</p>
+      </div>
+
+      <div class="feature-card fade-up">
+        <div class="feature-icon" style="background: rgba(139,92,246,.15);">🧠</div>
+        <h3>Perfis de eleitorado</h3>
+        <p>A IA agrupa automaticamente os eleitores por comportamento, faixa etária, renda e religião. Saiba exatamente com quem você está falando.</p>
+      </div>
+
+      <div class="feature-card fade-up">
+        <div class="feature-icon" style="background: rgba(16,185,129,.15);">📊</div>
+        <h3>Previsão probabilística</h3>
+        <p>Simule cenários de resultado com intervalo de confiança de 95%. Veja o que acontece com sua votação se o adversário crescer em determinadas regiões.</p>
+      </div>
+
+      <div class="feature-card fade-up">
+        <div class="feature-icon" style="background: rgba(245,158,11,.15);">📡</div>
+        <h3>Radar de redes sociais</h3>
+        <p>Monitore o que está sendo falado sobre os candidatos no Twitter/X, Facebook, YouTube e TikTok em tempo real — com análise de sentimento automática.</p>
+      </div>
+
+      <div class="feature-card fade-up">
+        <div class="feature-icon" style="background: rgba(236,72,153,.15);">📋</div>
+        <h3>Relatórios para humanos</h3>
+        <p>Relatórios escritos em linguagem simples, sem gráficos complicados. Compartilhe com qualquer membro da equipe sem precisar explicar nada.</p>
+      </div>
+
+      <div class="feature-card fade-up">
+        <div class="feature-icon" style="background: rgba(59,130,246,.15);">🔔</div>
+        <h3>Alertas de mudança</h3>
+        <p>Receba notificações automáticas quando o cenário mudar — uma pesquisa sai, uma narrativa viraliza ou o comportamento dos eleitores se altera.</p>
+      </div>
+
+    </div>
+  </div>
+</section>
+
+<hr class="glow-line" />
+
+<!-- ── Como funciona ─────────────────────────────────────── -->
+<section id="como-funciona">
+  <div class="container">
+    <div style="text-align:center;" class="fade-up">
+      <span class="section-label">Como funciona</span>
+      <h2>Simples como fazer<br /><span class="gradient-text">uma pergunta</span></h2>
+      <p class="section-sub" style="margin: 0 auto;">Você pergunta, a plataforma responde. Sem planilhas, sem relatórios de 50 páginas, sem esperar dias por uma análise.</p>
+    </div>
+
+    <div class="steps">
+      <div class="step fade-up">
+        <div class="step-num">💬</div>
+        <h3>Você pergunta</h3>
+        <p>Digite uma pergunta em português — "Como está minha votação em São Paulo?" ou "Quem são os eleitores indecisos no interior?" — exatamente como mandaria uma mensagem.</p>
+      </div>
+      <div class="step fade-up">
+        <div class="step-num">⚡</div>
+        <h3>A IA analisa tudo</h3>
+        <p>Sete agentes de inteligência artificial trabalham juntos: coletam dados, identificam padrões, cruzam pesquisas, analisam redes sociais e calculam previsões.</p>
+      </div>
+      <div class="step fade-up">
+        <div class="step-num">✅</div>
+        <h3>Você recebe a resposta</h3>
+        <p>Em segundos, recebe uma análise clara com mapas, gráficos e texto explicativo — pronta para ser usada em reuniões, na campanha ou com a equipe.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<hr class="glow-line" />
+
+<!-- ── Capacidades ────────────────────────────────────────── -->
+<section id="capacidades">
+  <div class="container">
+    <div class="cap-layout">
+
+      <div class="fade-up">
+        <span class="section-label">O que você consegue responder</span>
+        <h2>Perguntas que<br /><span class="gradient-text">antes levavam semanas</span></h2>
+        <p class="section-sub" style="margin-bottom: 36px;">Com SPEPE, qualquer membro da equipe consegue respostas em segundos — sem depender de analistas ou estatísticos.</p>
+
+        <ul class="cap-list">
+          <li class="cap-item">
+            <div class="cap-check">✓</div>
+            <div class="cap-item-text">
+              <h4>Onde estão meus eleitores fiéis?</h4>
+              <p>Identifique os municípios e bairros com maior concentração de votos garantidos — e priorize os esforços certos.</p>
+            </div>
+          </li>
+          <li class="cap-item">
+            <div class="cap-check">✓</div>
+            <div class="cap-item-text">
+              <h4>Qual mensagem funciona para cada público?</h4>
+              <p>Veja como diferentes perfis de eleitores reagem a temas como saúde, economia e segurança — e ajuste o discurso.</p>
+            </div>
+          </li>
+          <li class="cap-item">
+            <div class="cap-check">✓</div>
+            <div class="cap-item-text">
+              <h4>Qual é minha chance real de vencer?</h4>
+              <p>Simulações com base em dados históricos, pesquisas e comportamento social — com cenários otimista, base e pessimista.</p>
+            </div>
+          </li>
+          <li class="cap-item">
+            <div class="cap-check">✓</div>
+            <div class="cap-item-text">
+              <h4>O que está falando sobre mim nas redes?</h4>
+              <p>Monitoramento contínuo de menções, sentimento e temas emergentes — para reagir rápido antes que vire crise.</p>
+            </div>
+          </li>
+        </ul>
+      </div>
+
+      <!-- Mock dashboard -->
+      <div class="fade-up">
+        <div class="mock-window">
+          <div class="mock-topbar">
+            <div class="mock-dot" style="background:#ef4444;"></div>
+            <div class="mock-dot" style="background:#f59e0b;"></div>
+            <div class="mock-dot" style="background:#10b981;"></div>
+            <span style="margin-left:8px; font-size:.75rem; color:var(--muted);">SPEPE — Dashboard</span>
+          </div>
+          <div class="mock-body">
+            <div class="mock-row">
+              <div class="mock-kpi">
+                <div class="mock-kpi-label">Intenção de voto</div>
+                <div class="mock-kpi-val" style="color:var(--blue);">38.4%</div>
+              </div>
+              <div class="mock-kpi">
+                <div class="mock-kpi-label">Variação 7 dias</div>
+                <div class="mock-kpi-val" style="color:var(--green);">+2.1pp</div>
+              </div>
+              <div class="mock-kpi">
+                <div class="mock-kpi-label">Sentimento</div>
+                <div class="mock-kpi-val" style="color:#a78bfa;">Positivo</div>
+              </div>
+            </div>
+            <div class="mock-row">
+              <div class="mock-chart">
+                <div class="bar" style="height:40%;"></div>
+                <div class="bar" style="height:55%;"></div>
+                <div class="bar" style="height:45%;"></div>
+                <div class="bar" style="height:70%;"></div>
+                <div class="bar" style="height:65%;"></div>
+                <div class="bar" style="height:80%;"></div>
+                <div class="bar" style="height:90%;"></div>
+              </div>
+            </div>
+            <div class="mock-row">
+              <div class="mock-map">
+                <div class="map-blob" style="width:80px;height:80px;background:rgba(59,130,246,.4);top:-20px;left:20px;"></div>
+                <div class="map-blob" style="width:60px;height:60px;background:rgba(139,92,246,.35);top:10px;right:30px;"></div>
+                <div class="map-blob" style="width:40px;height:40px;background:rgba(16,185,129,.3);bottom:-10px;left:50%;"></div>
+                <div style="position:absolute;bottom:10px;left:14px;font-size:.65rem;color:var(--muted);font-weight:600;">MAPA ELEITORAL · SP</div>
+              </div>
+            </div>
+            <div style="background:rgba(59,130,246,.08);border:1px solid rgba(59,130,246,.2);border-radius:8px;padding:12px;margin-top:4px;">
+              <div style="font-size:.7rem;color:#60a5fa;font-weight:700;margin-bottom:6px;">💬 IA analisando...</div>
+              <div style="font-size:.78rem;color:var(--muted);line-height:1.6;">
+                "Crescimento de 2pp no interior paulista concentrado em municípios com alta taxa de evangélicos e renda entre 2–4 salários mínimos. Recomendo reforçar presença em Sorocaba e Campinas."
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+</section>
+
+<hr class="glow-line" />
+
+<!-- ── Para quem ──────────────────────────────────────────── -->
+<section id="para-quem">
+  <div class="container">
+    <div style="text-align:center;" class="fade-up">
+      <span class="section-label">Para quem é</span>
+      <h2>Feito para quem<br /><span class="gradient-text">toma decisões eleitorais</span></h2>
+    </div>
+
+    <div class="audience-grid">
+
+      <div class="audience-card fade-up">
+        <span class="audience-emoji">🏛️</span>
+        <h3>Candidatos e políticos</h3>
+        <p>Saiba exatamente onde investir tempo, dinheiro e esforço. Foque nos eleitores certos com a mensagem certa, e acompanhe o impacto das suas ações em tempo real.</p>
+      </div>
+
+      <div class="audience-card fade-up">
+        <span class="audience-emoji">📣</span>
+        <h3>Coordenadores de campanha</h3>
+        <p>Tome decisões táticas com base em dados — não em intuição. Distribua recursos, defina agenda e meça resultados com clareza e agilidade.</p>
+      </div>
+
+      <div class="audience-card fade-up">
+        <span class="audience-emoji">🏢</span>
+        <h3>Partidos políticos</h3>
+        <p>Tenha uma visão consolidada de todos os candidatos, regiões e cenários eleitorais. Identifique oportunidades e riscos com antecedência.</p>
+      </div>
+
+      <div class="audience-card fade-up">
+        <span class="audience-emoji">📰</span>
+        <h3>Jornalistas e institutos</h3>
+        <p>Acesse análises eleitorais detalhadas e confiáveis para embasar reportagens, pesquisas e publicações com dados atualizados e fontes oficiais.</p>
+      </div>
+
+    </div>
+  </div>
+</section>
+
+<hr class="glow-line" />
+
+<!-- ── CTA ───────────────────────────────────────────────── -->
+<section id="cta">
+  <div class="blob blob-cta"></div>
+  <div class="container" style="position:relative; z-index:1;">
+    <div class="fade-up">
+      <span class="section-label">Comece agora</span>
+      <h2>Pronto para ter<br /><span class="gradient-text">inteligência eleitoral real?</span></h2>
+      <p>Solicite uma demonstração gratuita. Nossa equipe entra em contato em até 24 horas para mostrar o SPEPE com dados da sua região.</p>
+
+      <div class="cta-form">
+        <input type="email" placeholder="Seu melhor e-mail" />
+        <a href="mailto:spepebr@gmail.com" class="btn-primary">Solicitar acesso →</a>
+      </div>
+
+      <p style="font-size:.8rem; color:var(--muted); margin-top:16px;">
+        Sem compromisso. Demonstração personalizada com dados reais da sua região.
+      </p>
+    </div>
+  </div>
+</section>
+
+<!-- ── Footer ─────────────────────────────────────────────── -->
+<footer>
+  <div class="footer-logo">SPEPE</div>
+  <p>Sistema de Perfilamento do Eleitorado e Previsão Eleitoral</p>
+  <p style="margin-top:8px;">Dados: TSE · IBGE · Redes Sociais &nbsp;·&nbsp; Privacidade garantida por LGPD &nbsp;·&nbsp; Servidores no Brasil</p>
+  <p style="margin-top:16px; font-size:.78rem;">© 2026 SPEPE · <a href="mailto:spepebr@gmail.com" style="color:var(--blue); text-decoration:none;">spepebr@gmail.com</a></p>
+</footer>
+
+<script>
+  // Fade-in on scroll
+  const obs = new IntersectionObserver((entries) => {
+    entries.forEach(e => {
+      if (e.isIntersecting) {
+        e.target.classList.add('visible');
+        obs.unobserve(e.target);
+      }
+    });
+  }, { threshold: 0.12, rootMargin: '0px 0px -40px 0px' });
+
+  document.querySelectorAll('.fade-up').forEach(el => obs.observe(el));
+
+  // Stagger children inside grids
+  document.querySelectorAll('.features-grid, .audience-grid, .stats-grid, .steps').forEach(grid => {
+    [...grid.querySelectorAll('.fade-up')].forEach((el, i) => {
+      el.style.transitionDelay = `${i * 0.08}s`;
+    });
+  });
+</script>
+
+</body>
+</html>

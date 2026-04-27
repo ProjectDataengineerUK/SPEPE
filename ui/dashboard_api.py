@@ -65,7 +65,13 @@ _HELP_TEXT = """\
 
 
 @app.get("/", include_in_schema=False)
-async def root() -> RedirectResponse:
+async def root() -> FileResponse:
+    from pathlib import Path
+    return FileResponse(str(Path(__file__).parent / "static" / "index.html"), media_type="text/html")
+
+
+@app.get("/entrar", include_in_schema=False)
+async def entrar() -> RedirectResponse:
     return RedirectResponse(url="/dash")
 
 
