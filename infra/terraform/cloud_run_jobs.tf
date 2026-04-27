@@ -10,6 +10,7 @@ locals {
     gold_build       = { timeout = "1800s", memory = "2Gi", cpu = "2", args = [] }
     digital_ingest   = { timeout = "900s",  memory = "1Gi",  cpu = "1", args = [] }
     social_ingest    = { timeout = "1800s", memory = "1Gi",  cpu = "1", args = [] }
+    pesquisas_ingest = { timeout = "1800s", memory = "1Gi",  cpu = "1", args = [] }
   }
 
   # Env vars adicionais por job (além das compartilhadas)
@@ -23,6 +24,11 @@ locals {
     silver_transform = { SOCIAL_YEAR = "2026" }
     gold_build       = {}
     digital_ingest   = {}
+    pesquisas_ingest = {
+      PESQUISAS_YEAR       = "2026"
+      PESQUISAS_CARGOS     = "1 3"
+      PESQUISAS_ENRICH_PDF = "false"
+    }
     social_ingest = {
       SOCIAL_CANDIDATOS = jsonencode([
         "Lula", "Lula da Silva",
@@ -50,6 +56,7 @@ locals {
     gold_build       = ["python", "-m", "dataops.jobs.gold_build_job"]
     digital_ingest   = ["python", "-m", "dataops.jobs.digital_ingest_job"]
     social_ingest    = ["python", "-m", "dataops.jobs.social_ingest_job"]
+    pesquisas_ingest = ["python", "-m", "dataops.jobs.pesquisas_ingest_job"]
   }
 }
 

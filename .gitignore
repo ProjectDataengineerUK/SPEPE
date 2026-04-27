@@ -1,4 +1,5 @@
 # Environment & Secrets
+dev.sh
 .env
 .env.*
 *.key
