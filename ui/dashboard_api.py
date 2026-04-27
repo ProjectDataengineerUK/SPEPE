@@ -348,10 +348,15 @@ async def get_kpi(
     ano: int = Query(2022),
 ) -> JSONResponse:
     """Métricas agregadas para os KPI cards do dashboard."""
+    if settings.gcp_project_id and os.environ.get("USE_BIGQUERY", "").lower() == "true":
+        try:
+            return JSONResponse(await _bq_kpi(cargo, uf, ano))
+        except Exception as exc:
+            logger.warning("BigQuery KPI falhou, usando mock: %s", exc)
+
     cands = _MOCK_CANDIDATOS.get(cargo, _MOCK_CANDIDATOS["Presidente"])
     if not cands:
         return JSONResponse({"error": "sem dados"}, status_code=404)
-
     c0, c1 = cands[0], cands[1] if len(cands) > 1 else cands[0]
     return JSONResponse(
         {
@@ -364,8 +369,70 @@ async def get_kpi(
             "total_votos": "32,5M" if uf == "SP" else "—",
             "municipios": 645 if uf == "SP" else 0,
             "dq_score": 98.5,
+            "fonte": "mock",
         }
     )
+
+
+async def _bq_kpi(cargo: str, uf: str, ano: int) -> dict:
+    from google.cloud import bigquery
+
+    client = bigquery.Client(project=settings.gcp_project_id)
+    cd_cargo = _CARGO_CD.get(cargo, 1)
+    gold = f"{settings.gcp_project_id}.{settings.bigquery_dataset_gold}"
+
+    query = f"""
+        WITH ranked AS (
+            SELECT
+                nm_candidato,
+                sg_partido,
+                SUM(qt_votos) AS total_cand,
+                SUM(SUM(qt_votos)) OVER () AS total_geral,
+                SUM(qt_votos_validos_municipio) AS total_validos,
+                COUNT(DISTINCT cd_municipio) AS municipios,
+                ROW_NUMBER() OVER (ORDER BY SUM(qt_votos) DESC) AS rn
+            FROM `{gold}.fact_municipio_eleicao`
+            WHERE sg_uf = @uf AND ano_eleicao = @ano
+              AND cd_cargo = @cd_cargo AND nr_turno = 1
+            GROUP BY nm_candidato, sg_partido
+        )
+        SELECT
+            MAX(IF(rn=1, nm_candidato, NULL))                        AS vencedor,
+            MAX(IF(rn=1, sg_partido, NULL))                          AS vencedor_partido,
+            ROUND(MAX(IF(rn=1, total_cand/total_geral*100, NULL)),1) AS vencedor_pct,
+            MAX(IF(rn=2, nm_candidato, NULL))                        AS segundo,
+            ROUND(MAX(IF(rn=2, total_cand/total_geral*100, NULL)),1) AS segundo_pct,
+            MAX(municipios)                                           AS municipios,
+            MAX(total_geral)                                          AS total_votos
+        FROM ranked
+        WHERE rn <= 2
+    """
+    job_config = bigquery.QueryJobConfig(
+        query_parameters=[
+            bigquery.ScalarQueryParameter("uf", "STRING", uf.upper()),
+            bigquery.ScalarQueryParameter("ano", "INT64", ano),
+            bigquery.ScalarQueryParameter("cd_cargo", "INT64", cd_cargo),
+        ]
+    )
+    rows = list(client.query(query, job_config=job_config).result())
+    if not rows:
+        raise ValueError("Sem dados no Gold para filtro aplicado")
+    r = dict(rows[0])
+    v_pct = r.get("vencedor_pct") or 0.0
+    s_pct = r.get("segundo_pct") or 0.0
+    total = r.get("total_votos") or 0
+    return {
+        "vencedor": r.get("vencedor", "—"),
+        "vencedor_partido": r.get("vencedor_partido", "—"),
+        "vencedor_pct": v_pct,
+        "segundo": r.get("segundo", "—"),
+        "segundo_pct": s_pct,
+        "margem_pp": round(abs(v_pct - s_pct), 1),
+        "total_votos": f"{total/1_000_000:.1f}M" if total >= 1_000_000 else str(total),
+        "municipios": r.get("municipios", 0),
+        "dq_score": 99.0,
+        "fonte": "bigquery",
+    }
 
 
 # ── Municípios ────────────────────────────────────────────────────────────
@@ -390,7 +457,74 @@ async def get_municipios(
     ano: int = Query(2022),
     limit: int = Query(20, ge=1, le=200),
 ) -> JSONResponse:
+    if settings.gcp_project_id and os.environ.get("USE_BIGQUERY", "").lower() == "true":
+        try:
+            return JSONResponse({"municipios": await _bq_municipios(cargo, uf, ano, limit)})
+        except Exception as exc:
+            logger.warning("BigQuery municipios falhou, usando mock: %s", exc)
     return JSONResponse({"municipios": _MOCK_MUNICIPIOS[:limit]})
+
+
+async def _bq_municipios(cargo: str, uf: str, ano: int, limit: int) -> list[dict]:
+    from google.cloud import bigquery
+
+    client = bigquery.Client(project=settings.gcp_project_id)
+    cd_cargo = _CARGO_CD.get(cargo, 1)
+    gold = f"{settings.gcp_project_id}.{settings.bigquery_dataset_gold}"
+
+    query = f"""
+        WITH pivot AS (
+            SELECT
+                nm_municipio,
+                nm_candidato,
+                sg_partido,
+                SUM(qt_votos) AS votos,
+                SUM(SUM(qt_votos)) OVER (PARTITION BY nm_municipio) AS total_mun,
+                ROW_NUMBER() OVER (PARTITION BY nm_municipio ORDER BY SUM(qt_votos) DESC) AS rk
+            FROM `{gold}.fact_municipio_eleicao`
+            WHERE sg_uf = @uf AND ano_eleicao = @ano
+              AND cd_cargo = @cd_cargo AND nr_turno = 1
+            GROUP BY nm_municipio, nm_candidato, sg_partido
+        )
+        SELECT
+            nm_municipio                                        AS nm,
+            MAX(total_mun)                                      AS total,
+            ROUND(MAX(IF(rk=1, votos/total_mun*100, NULL)),1)  AS c1,
+            ROUND(MAX(IF(rk=2, votos/total_mun*100, NULL)),1)  AS c2,
+            ROUND(MAX(IF(rk=3, votos/total_mun*100, NULL)),1)  AS c3,
+            MAX(IF(rk=1, nm_candidato, NULL))                  AS nm_c1,
+            MAX(IF(rk=2, nm_candidato, NULL))                  AS nm_c2,
+            MAX(IF(rk=1, sg_partido, NULL))                    AS partido_c1
+        FROM pivot
+        WHERE rk <= 3
+        GROUP BY nm_municipio
+        ORDER BY MAX(total_mun) DESC
+        LIMIT @lim
+    """
+    job_config = bigquery.QueryJobConfig(
+        query_parameters=[
+            bigquery.ScalarQueryParameter("uf", "STRING", uf.upper()),
+            bigquery.ScalarQueryParameter("ano", "INT64", ano),
+            bigquery.ScalarQueryParameter("cd_cargo", "INT64", cd_cargo),
+            bigquery.ScalarQueryParameter("lim", "INT64", limit),
+        ]
+    )
+    rows = list(client.query(query, job_config=job_config).result())
+    result = []
+    for r in rows:
+        total = r.get("total") or 0
+        votos_fmt = f"{total/1000:.0f}k" if total >= 1000 else str(total)
+        result.append({
+            "nm": r.get("nm", ""),
+            "votos": votos_fmt,
+            "c1": r.get("c1") or 0.0,
+            "c2": r.get("c2") or 0.0,
+            "c3": r.get("c3") or 0.0,
+            "nm_c1": r.get("nm_c1", ""),
+            "nm_c2": r.get("nm_c2", ""),
+            "partido_c1": r.get("partido_c1", ""),
+        })
+    return result
 
 
 # ── Google Trends ─────────────────────────────────────────────────────────
