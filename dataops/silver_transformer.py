@@ -187,6 +187,83 @@ def _write_bigquery(df: pd.DataFrame, table_name: str) -> str:
         return _write_local_silver(df, "BR", 2022)
 
 
+def transform_pesquisas_to_silver(
+    year: int,
+    use_bigquery: bool = False,
+) -> dict:
+    """Transform Bronze polls (TSE PesqEle + Atlas) to Silver fact_pesquisa.
+
+    Reads:  bronze/pesquisas/{year}/BR/pesquisas_tse_{year}.parquet
+            bronze/pesquisas/{year}/BR/pesquisas_atlas_{year}.parquet
+            bronze/pesquisas/{year}/BR/dim_instituto.parquet
+    Writes: Silver table `fact_pesquisa` (BigQuery) or local parquet.
+    """
+    LOCAL_SILVER_DIR.mkdir(parents=True, exist_ok=True)
+
+    bronze_dir = LOCAL_BRONZE_DIR / "pesquisas" / str(year) / "BR"
+    frames: list[pd.DataFrame] = []
+
+    for pattern in (f"pesquisas_tse_{year}.parquet", f"pesquisas_atlas_{year}.parquet"):
+        f = bronze_dir / pattern
+        if f.exists():
+            try:
+                df_part = pd.read_parquet(f)
+                frames.append(df_part)
+                logger.info("Pesquisas Bronze lido: %s (%d rows)", f.name, len(df_part))
+            except Exception as exc:
+                logger.warning("Falha ao ler %s: %s", f, exc)
+
+    if not frames:
+        return {"status": "error", "message": f"Bronze pesquisas vazio para {year}"}
+
+    df = pd.concat(frames, ignore_index=True)
+
+    # Load house_effect from dim_instituto seed
+    dim_path = bronze_dir / "dim_instituto.parquet"
+    house_map: dict[str, float] = {}
+    if dim_path.exists():
+        try:
+            df_dim = pd.read_parquet(dim_path)
+            house_map = dict(
+                zip(
+                    df_dim["instituto"].str.lower(),
+                    df_dim["house_effect_score"],
+                )
+            )
+        except Exception as exc:
+            logger.warning("Falha ao ler dim_instituto: %s", exc)
+
+    # Apply house_effect adjustment
+    if "instituto" in df.columns:
+        df["house_effect"] = (
+            df["instituto"]
+            .str.lower()
+            .map(lambda x: house_map.get(str(x).strip(), 0.0) if pd.notna(x) else 0.0)
+        )
+        if "intencao_pct" in df.columns:
+            df["intencao_pct_num"] = pd.to_numeric(df["intencao_pct"], errors="coerce")
+            df["intencao_ajustada"] = df["intencao_pct_num"] - df["house_effect"]
+    else:
+        df["house_effect"] = 0.0
+
+    # Ensure record_confidence_score present
+    if "record_confidence_score" not in df.columns:
+        df["record_confidence_score"] = 0.50
+
+    df["ano"] = year
+    df["ingested_at"] = pd.Timestamp.utcnow()
+
+    if use_bigquery:
+        path = _write_bigquery(df, "fact_pesquisa")
+    else:
+        path_local = LOCAL_SILVER_DIR / f"fact_pesquisa_{year}.parquet"
+        df.to_parquet(path_local, index=False, compression="zstd")
+        path = str(path_local)
+        logger.info("Pesquisas Silver local: %s (%d rows)", path, len(df))
+
+    return {"status": "ok", "path": path, "rows": len(df)}
+
+
 def transform_social_to_silver(
     year: int,
     use_bigquery: bool = False,
