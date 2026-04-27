@@ -21,13 +21,27 @@ logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name
 logger = logging.getLogger("spepe.jobs.social_ingest")
 
 _DEFAULT_CANDIDATOS = [
+    # ── Presidenciáveis 2026 ──────────────────────────────────────
     "Lula",
-    "Bolsonaro",
     "Lula da Silva",
+    "Tarcísio de Freitas",
+    "Tarcísio Freitas",
+    "Bolsonaro",
     "Jair Bolsonaro",
+    "Simone Tebet",
+    "Ciro Gomes",
+    "Alckmin",
+    "Geraldo Alckmin",
+    "Rodrigo Pacheco",
+    # ── SP Estado 2026 ────────────────────────────────────────────
+    "Fernando Haddad",
+    "Guilherme Boulos",
 ]
 
-_DEFAULT_FB_PAGES: list[str] = []  # Preencher com IDs de páginas quando disponível
+# IDs de páginas Facebook — configurar via env var SOCIAL_FB_PAGES
+# Formato: ID numérico da página (não @handle)
+# Obter em: https://developers.facebook.com/tools/explorer/
+_DEFAULT_FB_PAGES: list[str] = []
 
 
 def main(candidatos: list[str], fb_pages: list[str], dias: int, year: int) -> None:

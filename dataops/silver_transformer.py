@@ -187,6 +187,70 @@ def _write_bigquery(df: pd.DataFrame, table_name: str) -> str:
         return _write_local_silver(df, "BR", 2022)
 
 
+def transform_social_to_silver(
+    year: int,
+    use_bigquery: bool = False,
+) -> dict:
+    """Transform Bronze social data (Twitter/X + Facebook) to Silver layer.
+
+    Reads: raw/social/{year}/BR/twitter_mencoes_*.parquet
+    Writes: Silver table `social_mencoes_br` (BigQuery) or local parquet.
+    """
+    LOCAL_SILVER_DIR.mkdir(parents=True, exist_ok=True)
+
+    frames: list[pd.DataFrame] = []
+    bronze_social = LOCAL_BRONZE_DIR / "social" / str(year) / "BR"
+
+    patterns = [
+        "twitter_mencoes_*.parquet",
+        "facebook_posts_*.parquet",
+    ]
+    for pattern in patterns:
+        files = list(bronze_social.glob(pattern)) if bronze_social.exists() else []
+        for f in files:
+            try:
+                frames.append(pd.read_parquet(f))
+                logger.info("Social Bronze lido: %s (%d rows)", f.name, len(frames[-1]))
+            except Exception as exc:
+                logger.warning("Falha ao ler %s: %s", f, exc)
+
+    if not frames:
+        return {"status": "error", "message": f"Bronze social vazio para {year}"}
+
+    df = pd.concat(frames, ignore_index=True)
+
+    # Normaliza timestamp para UTC
+    for col in ("created_at", "created_time"):
+        if col in df.columns:
+            df[col] = pd.to_datetime(df[col], errors="coerce", utc=True)
+
+    # Garante coluna fonte
+    if "fonte" not in df.columns:
+        df["fonte"] = "desconhecido"
+
+    # Coluna canônica de texto
+    if "text" not in df.columns and "message" in df.columns:
+        df["text"] = df["message"]
+
+    # Métricas numéricas
+    for col in ("like_count", "retweet_count", "reply_count", "likes", "comments", "shares"):
+        if col in df.columns:
+            df[col] = pd.to_numeric(df[col], errors="coerce").fillna(0).astype(int)
+
+    df["ano"] = year
+    df["ingested_at"] = pd.Timestamp.utcnow()
+
+    if use_bigquery:
+        path = _write_bigquery(df, "social_mencoes_br")
+    else:
+        path_local = LOCAL_SILVER_DIR / f"social_mencoes_br_{year}.parquet"
+        df.to_parquet(path_local, index=False, compression="zstd")
+        path = str(path_local)
+        logger.info("Social Silver local: %s (%d rows)", path, len(df))
+
+    return {"status": "ok", "path": path, "rows": len(df)}
+
+
 def _dataframe_to_bq_schema(df: pd.DataFrame) -> list:
     from google.cloud import bigquery
 

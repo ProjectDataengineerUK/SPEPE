@@ -13,8 +13,8 @@ YEARS = [2014, 2018, 2022]
 DQ_THRESHOLD = float(os.environ.get("DQ_SCORE_THRESHOLD", "95.0"))
 
 
-def main(uf: str, years: list[int] | None = None) -> None:
-    from dataops.silver_transformer import transform_to_silver
+def main(uf: str, years: list[int] | None = None, include_social: bool = True) -> None:
+    from dataops.silver_transformer import transform_social_to_silver, transform_to_silver
 
     use_bq = bool(os.environ.get("GCP_PROJECT_ID"))
 
@@ -37,6 +37,15 @@ def main(uf: str, years: list[int] | None = None) -> None:
             all_ok = False
         else:
             logger.info(f"Silver OK {uf}/{year}: {result.get('rows')} rows, DQ={dq_score:.1f}%")
+
+    if include_social:
+        social_year = int(os.environ.get("SOCIAL_YEAR", "2026"))
+        logger.info("Silver social transform: ano=%d", social_year)
+        r = transform_social_to_silver(social_year, use_bigquery=use_bq)
+        if r.get("status") == "ok":
+            logger.info("Social Silver OK: %d rows", r.get("rows", 0))
+        else:
+            logger.warning("Social Silver: %s (pode ser vazio se social_ingest ainda não rodou)", r.get("message"))
 
     if not all_ok:
         sys.exit(1)

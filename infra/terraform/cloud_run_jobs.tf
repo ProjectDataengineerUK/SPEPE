@@ -1,6 +1,6 @@
 locals {
   jobs = {
-    tse_ingest       = { timeout = "3600s", memory = "2Gi", cpu = "2", args = ["--uf", "SP"] }
+    tse_ingest       = { timeout = "3600s", memory = "4Gi", cpu = "2", args = ["--uf", "SP"] }
     ibge_sync        = { timeout = "1800s", memory = "1Gi", cpu = "1", args = ["--uf", "SP"] }
     security_ingest  = { timeout = "1800s", memory = "1Gi", cpu = "1", args = ["--uf", "SP"] }
     datasus_ingest   = { timeout = "1800s", memory = "1Gi", cpu = "1", args = ["--uf", "SP"] }
@@ -10,6 +10,33 @@ locals {
     gold_build       = { timeout = "1800s", memory = "2Gi", cpu = "2", args = [] }
     digital_ingest   = { timeout = "900s",  memory = "1Gi",  cpu = "1", args = [] }
     social_ingest    = { timeout = "1800s", memory = "1Gi",  cpu = "1", args = [] }
+  }
+
+  # Env vars adicionais por job (além das compartilhadas)
+  job_extra_env = {
+    tse_ingest       = {}
+    ibge_sync        = {}
+    security_ingest  = {}
+    datasus_ingest   = {}
+    dieese_ingest    = {}
+    cetic_ingest     = {}
+    silver_transform = { SOCIAL_YEAR = "2026" }
+    gold_build       = {}
+    digital_ingest   = {}
+    social_ingest = {
+      SOCIAL_CANDIDATOS = jsonencode([
+        "Lula", "Lula da Silva",
+        "Tarcísio de Freitas", "Tarcísio Freitas",
+        "Bolsonaro", "Jair Bolsonaro",
+        "Simone Tebet", "Ciro Gomes",
+        "Alckmin", "Geraldo Alckmin",
+        "Rodrigo Pacheco",
+        "Fernando Haddad", "Guilherme Boulos",
+      ])
+      SOCIAL_DIAS = "7"
+      SOCIAL_YEAR = "2026"
+      # SOCIAL_FB_PAGES: configurar via Secret Manager quando page IDs estiverem disponíveis
+    }
   }
 
   job_entrypoints = {
@@ -91,6 +118,14 @@ resource "google_cloud_run_v2_job" "spepe_jobs" {
               secret  = google_secret_manager_secret.x_bearer_token.secret_id
               version = "latest"
             }
+          }
+        }
+
+        dynamic "env" {
+          for_each = local.job_extra_env[each.key]
+          content {
+            name  = env.key
+            value = env.value
           }
         }
       }
