@@ -49,7 +49,7 @@ jobs:
           BIGQUERY_DATASET_GOLD: spepe_gold
           GCS_BUCKET: ${{ vars.GCS_BUCKET }}
           SPEPE_ENVIRONMENT: ${{ github.event.inputs.environment || 'prod' }}
-        run: python mlops/vertex_pipeline.py
+        run: PYTHONPATH=. python mlops/vertex_pipeline.py
 
       - name: Notify on failure
         if: failure()

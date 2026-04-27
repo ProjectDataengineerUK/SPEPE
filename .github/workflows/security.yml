@@ -31,7 +31,7 @@ jobs:
 
       - name: Trivy image scan
         # Pinned to a specific version tag — avoids supply-chain risk from @master
-        uses: aquasecurity/trivy-action@0.28.0
+        uses: aquasecurity/trivy-action@0.30.0
         with:
           image-ref: spepe:scan
           format: sarif
@@ -56,7 +56,7 @@ jobs:
           cache: pip
       - run: pip install -r requirements.txt
       - name: Scan codebase for PII patterns
-        run: python scripts/dlp_scan.py
+        run: PYTHONPATH=. python scripts/dlp_scan.py
 
   dependency-audit:
     runs-on: ubuntu-latest
