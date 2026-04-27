@@ -3,11 +3,11 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>SPEPE — Inteligência Eleitoral com IA</title>
-  <meta name="description" content="Plataforma de inteligência eleitoral brasileira. Perfis de eleitorado, previsão de resultados e monitoramento em tempo real com IA." />
+  <title>SPEPE — Inteligência Eleitoral com IA para 2026</title>
+  <meta name="description" content="Plataforma de inteligência eleitoral brasileira. 5 motores de dados, 7 agentes de IA, previsão probabilística para as eleições de 2026." />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet" />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet" />
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
@@ -16,9 +16,13 @@
       --bg2:       #0d1117;
       --bg3:       #111827;
       --blue:      #3b82f6;
+      --blue-d:    #2563eb;
       --blue-glow: rgba(59,130,246,.18);
       --purple:    #8b5cf6;
       --green:     #10b981;
+      --amber:     #f59e0b;
+      --rose:      #f43f5e;
+      --cyan:      #06b6d4;
       --text:      #f1f5f9;
       --muted:     #94a3b8;
       --border:    rgba(255,255,255,.07);
@@ -27,7 +31,6 @@
     }
 
     html { scroll-behavior: smooth; }
-
     body {
       background: var(--bg);
       color: var(--text);
@@ -36,12 +39,10 @@
       overflow-x: hidden;
     }
 
-    /* ── Scrollbar ── */
-    ::-webkit-scrollbar { width: 6px; }
+    ::-webkit-scrollbar { width: 5px; }
     ::-webkit-scrollbar-track { background: var(--bg); }
     ::-webkit-scrollbar-thumb { background: #1e293b; border-radius: 99px; }
 
-    /* ── Noise overlay ── */
     body::before {
       content: '';
       position: fixed; inset: 0;
@@ -49,484 +50,560 @@
       pointer-events: none; z-index: 0; opacity: .5;
     }
 
-    /* ── Grid bg ── */
     .grid-bg {
       position: absolute; inset: 0;
       background-image:
-        linear-gradient(rgba(59,130,246,.06) 1px, transparent 1px),
-        linear-gradient(90deg, rgba(59,130,246,.06) 1px, transparent 1px);
+        linear-gradient(rgba(59,130,246,.05) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(59,130,246,.05) 1px, transparent 1px);
       background-size: 60px 60px;
-      mask-image: radial-gradient(ellipse 80% 60% at 50% 0%, #000 50%, transparent 100%);
+      mask-image: radial-gradient(ellipse 80% 60% at 50% 0%, #000 40%, transparent 100%);
     }
 
-    /* ── Glow blobs ── */
-    .blob {
-      position: absolute;
-      border-radius: 50%;
-      filter: blur(100px);
-      pointer-events: none;
-    }
+    .blob { position: absolute; border-radius: 50%; filter: blur(100px); pointer-events: none; }
 
     /* ── Nav ── */
     nav {
       position: fixed; top: 0; left: 0; right: 0; z-index: 100;
       display: flex; align-items: center; justify-content: space-between;
-      padding: 0 5%;
-      height: 68px;
-      background: rgba(7,9,15,.8);
+      padding: 0 5%; height: 68px;
+      background: rgba(7,9,15,.85);
       backdrop-filter: blur(20px);
       border-bottom: 1px solid var(--border);
     }
 
     .nav-logo {
       display: flex; align-items: center; gap: 10px;
-      font-weight: 800; font-size: 1.25rem; letter-spacing: -.02em;
+      font-weight: 800; font-size: 1.2rem; letter-spacing: -.02em;
       text-decoration: none; color: var(--text);
     }
 
-    .nav-logo .logo-icon {
+    .logo-icon {
       width: 34px; height: 34px;
       background: linear-gradient(135deg, var(--blue), var(--purple));
       border-radius: 9px;
       display: flex; align-items: center; justify-content: center;
-      font-size: .85rem; font-weight: 900;
+      font-size: .8rem; font-weight: 900;
     }
 
-    .nav-links {
-      display: flex; align-items: center; gap: 32px;
-      list-style: none;
-    }
-
+    .nav-links { display: flex; align-items: center; gap: 28px; list-style: none; }
     .nav-links a {
-      color: var(--muted); font-size: .9rem; font-weight: 500;
+      color: var(--muted); font-size: .88rem; font-weight: 500;
       text-decoration: none; transition: color .2s;
     }
     .nav-links a:hover { color: var(--text); }
-
     .nav-cta {
-      background: var(--blue);
+      background: var(--blue) !important;
       color: #fff !important;
-      padding: 8px 20px !important;
-      border-radius: 8px;
+      padding: 8px 18px !important; border-radius: 8px;
       font-weight: 600 !important;
     }
-    .nav-cta:hover { background: #2563eb !important; color: #fff !important; }
+    .nav-cta:hover { background: var(--blue-d) !important; color: #fff !important; }
 
-    @media (max-width: 768px) {
-      .nav-links { display: none; }
-    }
+    @media (max-width: 768px) { .nav-links { display: none; } }
 
-    /* ── Sections ── */
     section { position: relative; z-index: 1; }
-
-    .container {
-      max-width: 1160px;
-      margin: 0 auto;
-      padding: 0 24px;
-    }
+    .container { max-width: 1160px; margin: 0 auto; padding: 0 24px; }
 
     /* ── Hero ── */
     #hero {
       min-height: 100vh;
       display: flex; align-items: center; justify-content: center;
-      text-align: center;
       padding: 120px 24px 80px;
       overflow: hidden;
     }
 
     #hero .blob-1 {
-      width: 600px; height: 600px;
-      background: radial-gradient(circle, rgba(59,130,246,.25), transparent 70%);
-      top: -100px; left: 50%; transform: translateX(-50%);
+      width: 700px; height: 700px;
+      background: radial-gradient(circle, rgba(59,130,246,.2), transparent 70%);
+      top: -150px; left: 50%; transform: translateX(-50%);
     }
     #hero .blob-2 {
-      width: 400px; height: 400px;
-      background: radial-gradient(circle, rgba(139,92,246,.2), transparent 70%);
-      bottom: 0; right: -100px;
+      width: 350px; height: 350px;
+      background: radial-gradient(circle, rgba(139,92,246,.18), transparent 70%);
+      bottom: 60px; right: -60px;
+    }
+
+    .hero-inner {
+      position: relative; z-index: 2;
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 72px;
+      align-items: center;
+      max-width: 1100px;
+    }
+
+    @media (max-width: 900px) {
+      .hero-inner { grid-template-columns: 1fr; gap: 48px; text-align: center; }
+      .hero-left { order: 1; }
+      .hero-right { order: 2; }
     }
 
     .hero-badge {
       display: inline-flex; align-items: center; gap: 8px;
-      background: rgba(59,130,246,.12);
-      border: 1px solid rgba(59,130,246,.3);
+      background: rgba(59,130,246,.1);
+      border: 1px solid rgba(59,130,246,.28);
       color: #93c5fd;
-      padding: 6px 16px;
-      border-radius: 99px;
-      font-size: .8rem; font-weight: 600;
-      letter-spacing: .04em; text-transform: uppercase;
-      margin-bottom: 28px;
+      padding: 5px 14px; border-radius: 99px;
+      font-size: .75rem; font-weight: 700;
+      letter-spacing: .06em; text-transform: uppercase;
+      margin-bottom: 24px;
     }
-
-    .hero-badge .dot {
+    .dot-pulse {
       width: 6px; height: 6px;
-      background: var(--blue);
-      border-radius: 50%;
+      background: var(--blue); border-radius: 50%;
       animation: pulse 2s infinite;
     }
-
     @keyframes pulse {
       0%, 100% { opacity: 1; transform: scale(1); }
-      50%       { opacity: .5; transform: scale(.8); }
+      50% { opacity: .5; transform: scale(.8); }
     }
 
     h1 {
-      font-size: clamp(2.4rem, 6vw, 4.2rem);
-      font-weight: 900;
-      letter-spacing: -.04em;
-      line-height: 1.1;
-      margin-bottom: 24px;
+      font-size: clamp(2.2rem, 5vw, 3.8rem);
+      font-weight: 900; letter-spacing: -.04em;
+      line-height: 1.08; margin-bottom: 20px;
     }
 
     .gradient-text {
       background: linear-gradient(135deg, #60a5fa, #a78bfa, #34d399);
-      -webkit-background-clip: text;
-      -webkit-text-fill-color: transparent;
+      -webkit-background-clip: text; -webkit-text-fill-color: transparent;
       background-clip: text;
     }
 
-    .hero-sub {
-      font-size: clamp(1rem, 2.5vw, 1.22rem);
-      color: var(--muted);
-      max-width: 640px;
-      margin: 0 auto 40px;
-      font-weight: 400;
+    .hero-principle {
+      font-size: .85rem; font-weight: 600;
+      color: #60a5fa; letter-spacing: .02em;
+      padding: 10px 16px;
+      background: rgba(59,130,246,.08);
+      border-left: 3px solid var(--blue);
+      border-radius: 0 8px 8px 0;
+      margin-bottom: 24px;
+      font-family: 'JetBrains Mono', monospace;
     }
 
-    .hero-actions {
-      display: flex; align-items: center; justify-content: center;
-      gap: 16px; flex-wrap: wrap;
+    .hero-sub {
+      font-size: 1.05rem; color: var(--muted);
+      max-width: 520px; margin-bottom: 36px; font-weight: 400;
     }
+
+    @media (max-width: 900px) { .hero-sub { margin: 0 auto 36px; } }
+
+    .hero-actions { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; }
+    @media (max-width: 900px) { .hero-actions { justify-content: center; } }
 
     .btn-primary {
       display: inline-flex; align-items: center; gap: 8px;
-      background: var(--blue);
-      color: #fff;
-      padding: 14px 28px;
-      border-radius: 10px;
-      font-weight: 700; font-size: .95rem;
-      text-decoration: none;
-      transition: all .2s;
+      background: var(--blue); color: #fff;
+      padding: 13px 26px; border-radius: 10px;
+      font-weight: 700; font-size: .92rem;
+      text-decoration: none; transition: all .2s;
       box-shadow: 0 0 30px rgba(59,130,246,.3);
     }
-    .btn-primary:hover { background: #2563eb; transform: translateY(-2px); box-shadow: 0 0 50px rgba(59,130,246,.45); }
+    .btn-primary:hover { background: var(--blue-d); transform: translateY(-2px); box-shadow: 0 0 50px rgba(59,130,246,.45); }
 
     .btn-secondary {
       display: inline-flex; align-items: center; gap: 8px;
-      background: transparent;
-      color: var(--text);
-      padding: 14px 28px;
-      border-radius: 10px;
+      background: transparent; color: var(--text);
+      padding: 13px 26px; border-radius: 10px;
       border: 1px solid var(--border);
-      font-weight: 600; font-size: .95rem;
-      text-decoration: none;
-      transition: all .2s;
+      font-weight: 600; font-size: .92rem;
+      text-decoration: none; transition: all .2s;
     }
     .btn-secondary:hover { border-color: rgba(255,255,255,.2); background: rgba(255,255,255,.05); }
+
+    /* ── Chat mock (hero right) ── */
+    .chat-window {
+      background: var(--bg2);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      overflow: hidden;
+      box-shadow: 0 32px 80px rgba(0,0,0,.55);
+    }
+
+    .chat-topbar {
+      background: var(--bg3);
+      padding: 11px 16px;
+      display: flex; align-items: center; gap: 8px;
+      border-bottom: 1px solid var(--border);
+    }
+    .cdot { width: 10px; height: 10px; border-radius: 50%; }
+    .chat-title { margin-left: 8px; font-size: .75rem; color: var(--muted); font-weight: 600; }
+
+    .chat-body { padding: 18px 16px; display: flex; flex-direction: column; gap: 14px; }
+
+    .chat-msg {
+      display: flex; gap: 10px; align-items: flex-start;
+    }
+
+    .chat-avatar {
+      width: 28px; height: 28px; border-radius: 50%; flex-shrink: 0;
+      display: flex; align-items: center; justify-content: center;
+      font-size: .65rem; font-weight: 800;
+    }
+
+    .chat-bubble {
+      background: var(--card-bg);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 10px 14px;
+      font-size: .8rem; line-height: 1.6;
+      max-width: 88%;
+    }
+
+    .chat-bubble.user {
+      background: rgba(59,130,246,.1);
+      border-color: rgba(59,130,246,.2);
+    }
+
+    .cmd { font-family: 'JetBrains Mono', monospace; color: #60a5fa; font-weight: 600; }
+    .hl-green { color: var(--green); font-weight: 600; }
+    .hl-amber { color: var(--amber); font-weight: 600; }
+    .hl-purple { color: #a78bfa; font-weight: 600; }
+
+    .typing-indicator {
+      display: flex; gap: 4px; align-items: center;
+      padding: 10px 14px;
+      background: var(--card-bg);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      width: fit-content;
+    }
+    .typing-dot {
+      width: 5px; height: 5px; background: var(--muted);
+      border-radius: 50%;
+      animation: typing 1.4s infinite;
+    }
+    .typing-dot:nth-child(2) { animation-delay: .2s; }
+    .typing-dot:nth-child(3) { animation-delay: .4s; }
+    @keyframes typing {
+      0%, 60%, 100% { opacity: .3; transform: translateY(0); }
+      30% { opacity: 1; transform: translateY(-3px); }
+    }
 
     /* ── Stats strip ── */
     .stats-strip {
       border-top: 1px solid var(--border);
       border-bottom: 1px solid var(--border);
       background: var(--card-bg);
-      padding: 32px 24px;
+      padding: 28px 24px;
     }
 
     .stats-grid {
       display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
-      gap: 24px;
-      max-width: 900px;
-      margin: 0 auto;
-      text-align: center;
+      grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+      gap: 20px; max-width: 950px;
+      margin: 0 auto; text-align: center;
     }
 
     .stat-num {
-      font-size: 2.2rem; font-weight: 900;
+      font-size: 2rem; font-weight: 900;
       background: linear-gradient(135deg, var(--blue), var(--purple));
-      -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text;
-      line-height: 1;
+      -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+      background-clip: text; line-height: 1;
+    }
+    .stat-label { color: var(--muted); font-size: .78rem; margin-top: 5px; font-weight: 500; }
+
+    .glow-line {
+      height: 1px;
+      background: linear-gradient(90deg, transparent, var(--blue), var(--purple), transparent);
+      border: none; margin: 0; opacity: .35;
     }
 
-    .stat-label {
-      color: var(--muted); font-size: .82rem; margin-top: 6px; font-weight: 500;
-    }
-
-    /* ── Section titles ── */
+    /* ── Section meta ── */
     .section-label {
-      display: inline-block;
-      color: #60a5fa;
-      font-size: .78rem; font-weight: 700;
+      display: inline-block; color: #60a5fa;
+      font-size: .73rem; font-weight: 700;
       letter-spacing: .1em; text-transform: uppercase;
-      margin-bottom: 12px;
-    }
-
-    h2 {
-      font-size: clamp(1.8rem, 4vw, 2.8rem);
-      font-weight: 800; letter-spacing: -.03em;
-      line-height: 1.15;
-      margin-bottom: 16px;
-    }
-
-    .section-sub {
-      color: var(--muted);
-      font-size: 1.05rem;
-      max-width: 560px;
-    }
-
-    /* ── Features ── */
-    #features {
-      padding: 100px 24px;
-    }
-
-    .features-header { margin-bottom: 60px; }
-
-    .features-grid {
-      display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
-      gap: 20px;
-    }
-
-    .feature-card {
-      background: var(--card-bg);
-      border: 1px solid var(--border);
-      border-radius: var(--radius);
-      padding: 32px;
-      transition: all .3s;
-      position: relative;
-      overflow: hidden;
-    }
-
-    .feature-card::before {
-      content: '';
-      position: absolute; inset: 0;
-      background: linear-gradient(135deg, var(--blue-glow), transparent);
-      opacity: 0;
-      transition: opacity .3s;
-    }
-    .feature-card:hover { border-color: rgba(59,130,246,.35); transform: translateY(-4px); }
-    .feature-card:hover::before { opacity: 1; }
-
-    .feature-icon {
-      width: 48px; height: 48px;
-      border-radius: 12px;
-      display: flex; align-items: center; justify-content: center;
-      font-size: 1.4rem;
-      margin-bottom: 20px;
-      position: relative;
-    }
-
-    .feature-card h3 {
-      font-size: 1.05rem; font-weight: 700;
       margin-bottom: 10px;
     }
 
-    .feature-card p {
-      color: var(--muted); font-size: .9rem; line-height: 1.7;
+    h2 {
+      font-size: clamp(1.7rem, 3.5vw, 2.6rem);
+      font-weight: 800; letter-spacing: -.03em;
+      line-height: 1.15; margin-bottom: 14px;
     }
+    .section-sub { color: var(--muted); font-size: 1rem; max-width: 560px; }
 
-    /* ── How it works ── */
-    #como-funciona {
-      padding: 100px 24px;
-      background: linear-gradient(180deg, transparent, rgba(13,17,23,.8), transparent);
+    /* ── 5 Motores ── */
+    #motores { padding: 100px 24px; }
+
+    .motores-header { text-align: center; margin-bottom: 16px; }
+    .motores-principle {
+      text-align: center; margin-bottom: 56px;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: .88rem; color: var(--muted);
     }
+    .motores-principle strong { color: #60a5fa; }
 
-    .steps {
+    .motores-grid {
       display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
-      gap: 0;
-      position: relative;
-      margin-top: 60px;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: 16px;
     }
 
-    .steps::before {
-      content: '';
-      position: absolute;
-      top: 28px; left: 12%; right: 12%;
-      height: 1px;
-      background: linear-gradient(90deg, transparent, var(--blue), transparent);
-    }
-
-    .step {
-      text-align: center;
-      padding: 0 20px;
-      position: relative;
-    }
-
-    .step-num {
-      width: 56px; height: 56px;
-      background: linear-gradient(135deg, var(--blue), var(--purple));
-      border-radius: 50%;
-      display: flex; align-items: center; justify-content: center;
-      font-size: 1.3rem;
-      margin: 0 auto 24px;
-      position: relative;
-      z-index: 1;
-      box-shadow: 0 0 30px rgba(59,130,246,.3);
-    }
-
-    .step h3 { font-size: 1rem; font-weight: 700; margin-bottom: 10px; }
-    .step p { color: var(--muted); font-size: .88rem; line-height: 1.65; }
-
-    /* ── Para quem ── */
-    #para-quem {
-      padding: 100px 24px;
-    }
-
-    .audience-grid {
-      display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
-      gap: 20px;
-      margin-top: 56px;
-    }
-
-    .audience-card {
+    .motor-card {
       background: var(--card-bg);
       border: 1px solid var(--border);
       border-radius: var(--radius);
-      padding: 36px 28px;
+      padding: 28px 22px;
       transition: all .3s;
+      position: relative; overflow: hidden;
     }
-    .audience-card:hover { border-color: rgba(139,92,246,.35); transform: translateY(-4px); }
-
-    .audience-emoji { font-size: 2.4rem; margin-bottom: 18px; display: block; }
-    .audience-card h3 { font-size: 1.05rem; font-weight: 700; margin-bottom: 10px; }
-    .audience-card p { color: var(--muted); font-size: .88rem; line-height: 1.65; }
-
-    /* ── Capabilities ── */
-    #capacidades {
-      padding: 100px 24px;
-      background: linear-gradient(180deg, transparent, rgba(13,17,23,.6));
+    .motor-card::after {
+      content: '';
+      position: absolute; bottom: 0; left: 0; right: 0;
+      height: 2px;
+      opacity: 0; transition: opacity .3s;
     }
+    .motor-card:hover { transform: translateY(-4px); }
+    .motor-card:hover::after { opacity: 1; }
 
-    .cap-layout {
-      display: grid;
-      grid-template-columns: 1fr 1fr;
-      gap: 80px;
-      align-items: center;
-      margin-top: 60px;
+    .motor-card.social::after  { background: linear-gradient(90deg, #f43f5e, #fb923c); }
+    .motor-card.pesquisas::after { background: linear-gradient(90deg, #3b82f6, #8b5cf6); }
+    .motor-card.publicos::after { background: linear-gradient(90deg, #10b981, #06b6d4); }
+    .motor-card.eleicoes::after { background: linear-gradient(90deg, #f59e0b, #ef4444); }
+    .motor-card.mlops::after   { background: linear-gradient(90deg, #8b5cf6, #ec4899); }
+
+    .motor-card:hover.social  { border-color: rgba(244,63,94,.25); }
+    .motor-card:hover.pesquisas { border-color: rgba(59,130,246,.3); }
+    .motor-card:hover.publicos { border-color: rgba(16,185,129,.25); }
+    .motor-card:hover.eleicoes { border-color: rgba(245,158,11,.25); }
+    .motor-card:hover.mlops   { border-color: rgba(139,92,246,.3); }
+
+    .motor-num {
+      font-size: .68rem; font-weight: 700; letter-spacing: .08em;
+      text-transform: uppercase; margin-bottom: 12px;
+      font-family: 'JetBrains Mono', monospace;
     }
+    .motor-icon { font-size: 1.8rem; margin-bottom: 12px; display: block; }
+    .motor-card h3 { font-size: .95rem; font-weight: 700; margin-bottom: 8px; }
+    .motor-card p { color: var(--muted); font-size: .8rem; line-height: 1.6; margin-bottom: 14px; }
 
-    @media (max-width: 768px) {
-      .cap-layout { grid-template-columns: 1fr; gap: 40px; }
-    }
-
-    .cap-list { list-style: none; display: flex; flex-direction: column; gap: 20px; }
-
-    .cap-item {
-      display: flex; gap: 16px; align-items: flex-start;
-    }
-
-    .cap-check {
-      width: 22px; height: 22px; flex-shrink: 0;
-      background: rgba(16,185,129,.15);
-      border: 1px solid rgba(16,185,129,.4);
-      border-radius: 6px;
-      display: flex; align-items: center; justify-content: center;
-      color: var(--green); font-size: .7rem; font-weight: 900;
-      margin-top: 2px;
+    .motor-tags { display: flex; flex-wrap: wrap; gap: 6px; }
+    .motor-tag {
+      font-size: .68rem; font-weight: 600;
+      padding: 3px 9px; border-radius: 99px;
+      font-family: 'JetBrains Mono', monospace;
     }
 
-    .cap-item-text h4 { font-size: .95rem; font-weight: 700; margin-bottom: 4px; }
-    .cap-item-text p { color: var(--muted); font-size: .85rem; line-height: 1.6; }
+    .tag-rose   { background: rgba(244,63,94,.1); color: #fda4af; border: 1px solid rgba(244,63,94,.2); }
+    .tag-blue   { background: rgba(59,130,246,.1); color: #93c5fd; border: 1px solid rgba(59,130,246,.2); }
+    .tag-green  { background: rgba(16,185,129,.1); color: #6ee7b7; border: 1px solid rgba(16,185,129,.2); }
+    .tag-amber  { background: rgba(245,158,11,.1); color: #fcd34d; border: 1px solid rgba(245,158,11,.2); }
+    .tag-purple { background: rgba(139,92,246,.1); color: #c4b5fd; border: 1px solid rgba(139,92,246,.2); }
 
-    /* ── Mock dashboard visual ── */
-    .mock-window {
-      background: var(--bg2);
+    /* ── Agentes ── */
+    #agentes { padding: 100px 24px; background: linear-gradient(180deg, transparent, rgba(13,17,23,.7), transparent); }
+
+    .agentes-layout {
+      display: grid; grid-template-columns: 1fr 1fr;
+      gap: 72px; align-items: start; margin-top: 56px;
+    }
+    @media (max-width: 900px) { .agentes-layout { grid-template-columns: 1fr; gap: 40px; } }
+
+    .agent-list { display: flex; flex-direction: column; gap: 12px; }
+
+    .agent-item {
+      background: var(--card-bg);
       border: 1px solid var(--border);
-      border-radius: 16px;
-      overflow: hidden;
-      box-shadow: 0 40px 100px rgba(0,0,0,.5);
+      border-radius: 12px;
+      padding: 16px 18px;
+      display: flex; gap: 14px; align-items: flex-start;
+      transition: all .25s; cursor: default;
+    }
+    .agent-item:hover { border-color: rgba(59,130,246,.3); background: rgba(59,130,246,.05); }
+
+    .agent-model {
+      font-size: .63rem; font-weight: 700; letter-spacing: .06em;
+      text-transform: uppercase; color: var(--muted);
+      font-family: 'JetBrains Mono', monospace;
+      flex-shrink: 0; margin-top: 2px;
+      min-width: 80px;
     }
 
-    .mock-topbar {
+    .agent-info h4 { font-size: .9rem; font-weight: 700; margin-bottom: 4px; }
+    .agent-info p  { font-size: .78rem; color: var(--muted); line-height: 1.5; margin-bottom: 8px; }
+
+    .agent-cmds { display: flex; flex-wrap: wrap; gap: 6px; }
+    .agent-cmd {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: .7rem; font-weight: 600;
+      color: #60a5fa;
+      background: rgba(59,130,246,.1);
+      border: 1px solid rgba(59,130,246,.2);
+      padding: 2px 9px; border-radius: 6px;
+    }
+
+    /* terminal demo */
+    .terminal-window {
+      background: #090c12;
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      overflow: hidden;
+      box-shadow: 0 24px 60px rgba(0,0,0,.5);
+      position: sticky; top: 88px;
+    }
+    .terminal-bar {
       background: var(--bg3);
-      padding: 12px 16px;
+      padding: 11px 16px;
       display: flex; align-items: center; gap: 8px;
       border-bottom: 1px solid var(--border);
     }
+    .terminal-body { padding: 20px; font-family: 'JetBrains Mono', monospace; font-size: .78rem; line-height: 1.75; }
+    .t-prompt { color: #60a5fa; }
+    .t-cmd    { color: #f8fafc; }
+    .t-out    { color: var(--muted); }
+    .t-hl     { color: var(--green); }
+    .t-warn   { color: var(--amber); }
+    .t-val    { color: #a78bfa; }
+    .t-line   { margin-bottom: 2px; }
+    .t-sep    { border-top: 1px solid rgba(255,255,255,.06); margin: 14px 0; }
+    .t-cursor { display: inline-block; width: 8px; height: 14px; background: var(--blue); animation: blink 1.1s infinite; vertical-align: bottom; }
+    @keyframes blink { 0%,50% { opacity: 1; } 51%,100% { opacity: 0; } }
 
-    .mock-dot { width: 10px; height: 10px; border-radius: 50%; }
+    /* ── Fluxo (Medallion) ── */
+    #fluxo { padding: 100px 24px; }
 
-    .mock-body { padding: 20px; }
+    .fluxo-center { text-align: center; margin-bottom: 60px; }
+    .fluxo-center .section-sub { margin: 0 auto; }
 
-    .mock-row { display: flex; gap: 12px; margin-bottom: 12px; }
+    .medallion {
+      display: grid;
+      grid-template-columns: 1fr auto 1fr auto 1fr;
+      align-items: center; gap: 16px;
+      max-width: 920px; margin: 0 auto;
+    }
+    @media (max-width: 768px) {
+      .medallion { grid-template-columns: 1fr; gap: 0; }
+      .medal-arrow { transform: rotate(90deg); margin: 8px auto; display: block; width: fit-content; }
+    }
 
-    .mock-kpi {
-      flex: 1;
+    .medal-layer {
       background: var(--card-bg);
       border: 1px solid var(--border);
-      border-radius: 10px;
-      padding: 14px;
+      border-radius: 14px;
+      padding: 28px 22px;
+      text-align: center;
+      transition: all .3s;
+    }
+    .medal-layer:hover { transform: translateY(-4px); }
+
+    .medal-layer.bronze { border-color: rgba(180,120,60,.2); }
+    .medal-layer.bronze:hover { border-color: rgba(180,120,60,.45); background: rgba(180,120,60,.04); }
+    .medal-layer.silver { border-color: rgba(148,163,184,.2); }
+    .medal-layer.silver:hover { border-color: rgba(148,163,184,.45); background: rgba(148,163,184,.04); }
+    .medal-layer.gold   { border-color: rgba(245,158,11,.2); }
+    .medal-layer.gold:hover   { border-color: rgba(245,158,11,.45); background: rgba(245,158,11,.04); }
+
+    .medal-badge {
+      display: inline-block; padding: 4px 14px;
+      border-radius: 99px; font-size: .72rem;
+      font-weight: 800; letter-spacing: .08em;
+      text-transform: uppercase; margin-bottom: 14px;
+      font-family: 'JetBrains Mono', monospace;
+    }
+    .badge-bronze { background: rgba(180,120,60,.15); color: #cd9041; border: 1px solid rgba(180,120,60,.3); }
+    .badge-silver { background: rgba(148,163,184,.12); color: #94a3b8; border: 1px solid rgba(148,163,184,.25); }
+    .badge-gold   { background: rgba(245,158,11,.12); color: #fbbf24; border: 1px solid rgba(245,158,11,.25); }
+
+    .medal-icon { font-size: 1.8rem; margin-bottom: 10px; display: block; }
+    .medal-layer h3 { font-size: .95rem; font-weight: 700; margin-bottom: 8px; }
+    .medal-layer p  { color: var(--muted); font-size: .78rem; line-height: 1.6; }
+    .medal-arrow { color: var(--muted); font-size: 1.2rem; }
+
+    .fluxo-consumers {
+      display: flex; align-items: center; justify-content: center;
+      gap: 24px; margin-top: 40px; flex-wrap: wrap;
+    }
+    .fluxo-arrow-down {
+      text-align: center; color: var(--muted);
+      font-size: .85rem; margin: 24px 0 12px;
     }
 
-    .mock-kpi-label { font-size: .65rem; color: var(--muted); text-transform: uppercase; letter-spacing: .06em; font-weight: 600; }
-    .mock-kpi-val { font-size: 1.4rem; font-weight: 800; margin-top: 4px; }
+    .consumer-pill {
+      display: flex; align-items: center; gap: 8px;
+      background: var(--card-bg); border: 1px solid var(--border);
+      border-radius: 10px; padding: 10px 18px;
+      font-size: .82rem; font-weight: 600;
+    }
 
-    .mock-chart {
+    /* ── Exemplos de perguntas ── */
+    #perguntas { padding: 100px 24px; }
+
+    .perguntas-header { text-align: center; margin-bottom: 56px; }
+
+    .perguntas-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(310px, 1fr));
+      gap: 18px;
+    }
+
+    .pergunta-card {
       background: var(--card-bg);
       border: 1px solid var(--border);
-      border-radius: 10px;
-      padding: 14px;
-      height: 100px;
-      display: flex; align-items: flex-end; gap: 6px;
+      border-radius: 14px;
+      padding: 24px;
+      transition: all .3s;
+    }
+    .pergunta-card:hover { border-color: rgba(139,92,246,.3); transform: translateY(-3px); }
+
+    .pergunta-q {
+      font-size: .92rem; font-weight: 600;
+      margin-bottom: 12px; color: var(--text);
+    }
+    .pergunta-q::before { content: '"'; color: var(--purple); }
+    .pergunta-q::after  { content: '"'; color: var(--purple); }
+
+    .pergunta-resp {
+      font-size: .8rem; color: var(--muted); line-height: 1.65;
+      padding-top: 12px; border-top: 1px solid var(--border);
     }
 
-    .bar {
-      flex: 1; border-radius: 4px 4px 0 0;
-      background: linear-gradient(180deg, var(--blue), var(--purple));
-      opacity: .8;
+    .pergunta-agent {
+      display: inline-flex; align-items: center; gap: 5px;
+      font-size: .68rem; font-weight: 700;
+      color: #60a5fa;
+      font-family: 'JetBrains Mono', monospace;
+      margin-bottom: 6px;
     }
 
-    .mock-map {
-      background: var(--card-bg);
-      border: 1px solid var(--border);
-      border-radius: 10px;
-      padding: 14px;
-      height: 110px;
-      position: relative;
-      overflow: hidden;
-    }
+    /* ── Para quem ── */
+    #para-quem { padding: 100px 24px; background: linear-gradient(180deg, transparent, rgba(13,17,23,.5)); }
 
-    .map-blob {
-      position: absolute;
-      border-radius: 50%;
-      filter: blur(20px);
+    .audience-grid {
+      display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+      gap: 18px; margin-top: 56px;
     }
+    .audience-card {
+      background: var(--card-bg); border: 1px solid var(--border);
+      border-radius: var(--radius); padding: 32px 26px;
+      transition: all .3s;
+    }
+    .audience-card:hover { border-color: rgba(139,92,246,.3); transform: translateY(-4px); }
+    .audience-emoji { font-size: 2.2rem; margin-bottom: 16px; display: block; }
+    .audience-card h3 { font-size: .98rem; font-weight: 700; margin-bottom: 8px; }
+    .audience-card p  { color: var(--muted); font-size: .84rem; line-height: 1.65; }
 
     /* ── CTA ── */
     #cta {
-      padding: 120px 24px;
-      text-align: center;
-      position: relative;
-      overflow: hidden;
+      padding: 120px 24px; text-align: center;
+      position: relative; overflow: hidden;
     }
-
     #cta .blob-cta {
       width: 700px; height: 400px;
-      background: radial-gradient(ellipse, rgba(59,130,246,.15), transparent 70%);
-      top: 50%; left: 50%;
-      transform: translate(-50%, -50%);
+      background: radial-gradient(ellipse, rgba(59,130,246,.14), transparent 70%);
+      top: 50%; left: 50%; transform: translate(-50%, -50%);
     }
+    #cta h2 { margin-bottom: 18px; }
+    #cta .section-sub { margin: 0 auto 36px; }
 
-    #cta h2 { margin-bottom: 20px; }
-    #cta p { color: var(--muted); font-size: 1.05rem; margin-bottom: 40px; max-width: 520px; margin-left: auto; margin-right: auto; }
-
-    .cta-form {
-      display: flex; gap: 12px; justify-content: center; flex-wrap: wrap;
-      max-width: 480px; margin: 0 auto;
-    }
-
+    .cta-form { display: flex; gap: 12px; justify-content: center; flex-wrap: wrap; max-width: 460px; margin: 0 auto; }
     .cta-form input {
-      flex: 1; min-width: 220px;
-      background: rgba(255,255,255,.06);
-      border: 1px solid var(--border);
-      border-radius: 10px;
-      padding: 14px 18px;
-      color: var(--text);
-      font-family: 'Inter', sans-serif;
-      font-size: .95rem;
-      outline: none;
-      transition: border-color .2s;
+      flex: 1; min-width: 210px;
+      background: rgba(255,255,255,.06); border: 1px solid var(--border);
+      border-radius: 10px; padding: 13px 18px;
+      color: var(--text); font-family: 'Inter', sans-serif;
+      font-size: .92rem; outline: none; transition: border-color .2s;
     }
     .cta-form input::placeholder { color: var(--muted); }
     .cta-form input:focus { border-color: var(--blue); }
@@ -534,163 +611,246 @@
     /* ── Footer ── */
     footer {
       border-top: 1px solid var(--border);
-      padding: 40px 24px;
-      text-align: center;
-      color: var(--muted);
-      font-size: .85rem;
+      padding: 36px 24px; text-align: center;
+      color: var(--muted); font-size: .83rem;
     }
-
     footer .footer-logo {
-      font-size: 1.1rem; font-weight: 800;
+      font-size: 1rem; font-weight: 800;
       background: linear-gradient(135deg, var(--blue), var(--purple));
-      -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text;
-      margin-bottom: 12px;
+      -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+      background-clip: text; margin-bottom: 10px;
     }
 
-    /* ── Fade-in on scroll ── */
+    /* ── Fade animations ── */
     .fade-up {
-      opacity: 0;
-      transform: translateY(30px);
+      opacity: 0; transform: translateY(28px);
       transition: opacity .6s ease, transform .6s ease;
     }
-    .fade-up.visible {
-      opacity: 1;
-      transform: translateY(0);
-    }
-
-    /* ── Glow divider ── */
-    .glow-line {
-      height: 1px;
-      background: linear-gradient(90deg, transparent, var(--blue), var(--purple), transparent);
-      border: none;
-      margin: 0;
-      opacity: .4;
-    }
+    .fade-up.visible { opacity: 1; transform: translateY(0); }
   </style>
 </head>
 <body>
 
-<!-- ── Nav ──────────────────────────────────────────────── -->
+<!-- ── Nav ─────────────────────────────────────── -->
 <nav>
   <a href="#" class="nav-logo">
     <div class="logo-icon">SP</div>
     SPEPE
   </a>
   <ul class="nav-links">
-    <li><a href="#features">Funcionalidades</a></li>
-    <li><a href="#como-funciona">Como funciona</a></li>
+    <li><a href="#motores">5 Motores</a></li>
+    <li><a href="#agentes">Agentes IA</a></li>
+    <li><a href="#fluxo">Como funciona</a></li>
     <li><a href="#para-quem">Para quem</a></li>
     <li><a href="#cta" class="nav-cta">Solicitar acesso</a></li>
   </ul>
 </nav>
 
-<!-- ── Hero ─────────────────────────────────────────────── -->
+<!-- ── Hero ────────────────────────────────────── -->
 <section id="hero">
   <div class="grid-bg"></div>
   <div class="blob blob-1"></div>
   <div class="blob blob-2"></div>
 
-  <div style="position:relative; z-index:2;">
-    <div class="hero-badge">
-      <span class="dot"></span>
-      Inteligência artificial para eleições 2026
+  <div class="hero-inner">
+
+    <div class="hero-left">
+      <div class="hero-badge">
+        <span class="dot-pulse"></span>
+        Plataforma ativa · Eleições 2026
+      </div>
+
+      <h1>
+        Inteligência eleitoral<br />
+        <span class="gradient-text">que conversa com você</span>
+      </h1>
+
+      <div class="hero-principle">
+        Ingestão separada · dados padronizados · análise unificada
+      </div>
+
+      <p class="hero-sub">
+        SPEPE reúne 5 motores de dados independentes — redes sociais, pesquisas,
+        IBGE, DATASUS e histórico eleitoral — em uma única conversa de IA.
+        Pergunte em português, receba análises prontas para decidir.
+      </p>
+
+      <div class="hero-actions">
+        <a href="#cta" class="btn-primary">✦ Solicitar demonstração</a>
+        <a href="#agentes" class="btn-secondary">Ver agentes →</a>
+      </div>
     </div>
 
-    <h1>
-      Entenda o eleitorado.<br />
-      <span class="gradient-text">Preveja resultados.</span><br />
-      Tome decisões certas.
-    </h1>
+    <div class="hero-right">
+      <div class="chat-window">
+        <div class="chat-topbar">
+          <div class="cdot" style="background:#ef4444;"></div>
+          <div class="cdot" style="background:#f59e0b;"></div>
+          <div class="cdot" style="background:#10b981;"></div>
+          <span class="chat-title">SPEPE · Supervisor Claude Sonnet 4.6</span>
+        </div>
+        <div class="chat-body">
 
-    <p class="hero-sub">
-      SPEPE reúne dados públicos, pesquisas e redes sociais para entregar análises eleitorais
-      precisas e acessíveis — sem precisar de nenhum conhecimento técnico.
-    </p>
+          <div class="chat-msg">
+            <div class="chat-avatar" style="background:rgba(59,130,246,.15); color:#60a5fa;">VC</div>
+            <div class="chat-bubble user">
+              <span class="cmd">/prever</span> Lula SP 2026
+            </div>
+          </div>
 
-    <div class="hero-actions">
-      <a href="#cta" class="btn-primary">
-        ✦ Solicitar demonstração
-      </a>
-      <a href="#como-funciona" class="btn-secondary">
-        Como funciona →
-      </a>
+          <div class="chat-msg">
+            <div class="chat-avatar" style="background:rgba(139,92,246,.15); color:#a78bfa;">IA</div>
+            <div class="chat-bubble">
+              <div style="font-size:.7rem; color:#60a5fa; font-weight:700; margin-bottom:6px;">modelista_bayesiano · Gemini 2.5 Pro</div>
+              Projeção para <span class="hl-green">São Paulo 2026</span> — 1º turno:<br />
+              <span class="hl-purple">Lula: 41.2%</span> <span style="color:var(--muted); font-size:.75rem;">[IC 95%: 38.8–43.6%]</span><br />
+              <span class="hl-amber">Adversário A: 35.1%</span> <span style="color:var(--muted); font-size:.75rem;">[33.0–37.2%]</span><br /><br />
+              <span style="color:var(--muted);">Baseado em 18M votos históricos SP (2018/2022), 12 pesquisas recentes e sentimento Twitter/X dos últimos 7 dias.</span>
+            </div>
+          </div>
+
+          <div class="chat-msg">
+            <div class="chat-avatar" style="background:rgba(59,130,246,.15); color:#60a5fa;">VC</div>
+            <div class="chat-bubble user">
+              <span class="cmd">/arquétipos</span> SP
+            </div>
+          </div>
+
+          <div class="chat-msg">
+            <div class="chat-avatar" style="background:rgba(16,185,129,.15); color:#6ee7b7;">IA</div>
+            <div class="chat-bubble">
+              <div style="font-size:.7rem; color:#10b981; font-weight:700; margin-bottom:6px;">perfilador · Gemini 2.5 Flash</div>
+              <span class="hl-green">4 perfis identificados</span> em SP (HDBSCAN + IBGE):<br />
+              <span style="color:var(--muted);">· Interior evangélico (23%) — prioridade agenda econômica<br />
+              · Grande SP progressivo (31%) — sensível a pautas sociais<br />
+              · Interior conservador rural (19%)<br />
+              · ABC operário histórico (27%)</span>
+            </div>
+          </div>
+
+          <div class="chat-msg">
+            <div class="chat-avatar" style="background:rgba(59,130,246,.15); color:#60a5fa;">VC</div>
+            <div class="chat-bubble user">
+              <span class="cmd">/monitorar</span> drift
+              <span class="typing-indicator" style="display:inline-flex; margin-left:8px;">
+                <span class="typing-dot"></span>
+                <span class="typing-dot"></span>
+                <span class="typing-dot"></span>
+              </span>
+            </div>
+          </div>
+
+        </div>
+      </div>
     </div>
+
   </div>
 </section>
 
-<!-- ── Stats ─────────────────────────────────────────────── -->
+<!-- ── Stats ─────────────────────────────────── -->
 <div class="stats-strip">
   <div class="stats-grid">
     <div class="fade-up">
       <div class="stat-num">27</div>
-      <div class="stat-label">Estados cobertos</div>
+      <div class="stat-label">UFs cobertas</div>
     </div>
     <div class="fade-up">
       <div class="stat-num">5.570</div>
       <div class="stat-label">Municípios analisados</div>
     </div>
     <div class="fade-up">
-      <div class="stat-num">+50M</div>
-      <div class="stat-label">Registros eleitorais</div>
+      <div class="stat-num">5</div>
+      <div class="stat-label">Motores de dados</div>
     </div>
     <div class="fade-up">
       <div class="stat-num">7</div>
-      <div class="stat-label">Agentes de IA especializados</div>
+      <div class="stat-label">Agentes IA especializados</div>
     </div>
     <div class="fade-up">
       <div class="stat-num">95%</div>
-      <div class="stat-label">Intervalo de confiança nas previsões</div>
+      <div class="stat-label">IC nas previsões</div>
+    </div>
+    <div class="fade-up">
+      <div class="stat-num">+50M</div>
+      <div class="stat-label">Registros eleitorais</div>
     </div>
   </div>
 </div>
 
 <hr class="glow-line" />
 
-<!-- ── Features ──────────────────────────────────────────── -->
-<section id="features">
+<!-- ── 5 Motores ──────────────────────────────── -->
+<section id="motores">
   <div class="container">
-    <div class="features-header fade-up">
-      <span class="section-label">Funcionalidades</span>
-      <h2>Tudo que você precisa para<br /><span class="gradient-text">vencer uma eleição</span></h2>
-      <p class="section-sub">Uma plataforma completa que transforma dados complexos em respostas simples e decisões mais inteligentes.</p>
+    <div class="motores-header fade-up">
+      <span class="section-label">Arquitetura de dados</span>
+      <h2>5 motores independentes.<br /><span class="gradient-text">Uma análise unificada.</span></h2>
+    </div>
+    <div class="motores-principle fade-up">
+      <strong>Princípio:</strong> cada motor ingere, padroniza e entrega dados limpos para a mesma camada de análise
     </div>
 
-    <div class="features-grid">
+    <div class="motores-grid">
 
-      <div class="feature-card fade-up">
-        <div class="feature-icon" style="background: rgba(59,130,246,.15);">🗺️</div>
-        <h3>Mapa eleitoral ao vivo</h3>
-        <p>Veja como cada cidade e bairro vota — com cores, percentuais e histórico. Identifique onde você é forte e onde precisa crescer em segundos.</p>
+      <div class="motor-card social fade-up">
+        <div class="motor-num" style="color:#f87171;">Motor 01 · Social</div>
+        <span class="motor-icon">📡</span>
+        <h3>Radar de Narrativas</h3>
+        <p>Monitora o que está sendo falado sobre os candidatos em tempo real — sentimento, polarização e temas emergentes.</p>
+        <div class="motor-tags">
+          <span class="motor-tag tag-rose">Twitter/X</span>
+          <span class="motor-tag tag-rose">Facebook</span>
+          <span class="motor-tag tag-rose">YouTube</span>
+          <span class="motor-tag tag-rose">TikTok</span>
+        </div>
       </div>
 
-      <div class="feature-card fade-up">
-        <div class="feature-icon" style="background: rgba(139,92,246,.15);">🧠</div>
-        <h3>Perfis de eleitorado</h3>
-        <p>A IA agrupa automaticamente os eleitores por comportamento, faixa etária, renda e religião. Saiba exatamente com quem você está falando.</p>
+      <div class="motor-card pesquisas fade-up">
+        <div class="motor-num" style="color:#93c5fd;">Motor 02 · Pesquisas</div>
+        <span class="motor-icon">📊</span>
+        <h3>Intenção de Voto</h3>
+        <p>Agrega e calibra pesquisas eleitorais de múltiplos institutos, corrigindo vieses e ponderando por histórico.</p>
+        <div class="motor-tags">
+          <span class="motor-tag tag-blue">TSE</span>
+          <span class="motor-tag tag-blue">Atlas Político</span>
+          <span class="motor-tag tag-blue">Institutos</span>
+        </div>
       </div>
 
-      <div class="feature-card fade-up">
-        <div class="feature-icon" style="background: rgba(16,185,129,.15);">📊</div>
-        <h3>Previsão probabilística</h3>
-        <p>Simule cenários de resultado com intervalo de confiança de 95%. Veja o que acontece com sua votação se o adversário crescer em determinadas regiões.</p>
+      <div class="motor-card publicos fade-up">
+        <div class="motor-num" style="color:#6ee7b7;">Motor 03 · Dados Públicos</div>
+        <span class="motor-icon">🗄️</span>
+        <h3>Contexto Estrutural</h3>
+        <p>Indicadores socioeconômicos e de saúde por município — renda, escolaridade, cobertura de planos, mortalidade.</p>
+        <div class="motor-tags">
+          <span class="motor-tag tag-green">IBGE SIDRA</span>
+          <span class="motor-tag tag-green">DATASUS</span>
+          <span class="motor-tag tag-green">ANS</span>
+        </div>
       </div>
 
-      <div class="feature-card fade-up">
-        <div class="feature-icon" style="background: rgba(245,158,11,.15);">📡</div>
-        <h3>Radar de redes sociais</h3>
-        <p>Monitore o que está sendo falado sobre os candidatos no Twitter/X, Facebook, YouTube e TikTok em tempo real — com análise de sentimento automática.</p>
+      <div class="motor-card eleicoes fade-up">
+        <div class="motor-num" style="color:#fcd34d;">Motor 04 · Eleições</div>
+        <span class="motor-icon">🗳️</span>
+        <h3>Comportamento Histórico</h3>
+        <p>Série histórica completa de votação por seção eleitoral — 2018, 2022 e 2026 — normalizada e cruzada com IBGE.</p>
+        <div class="motor-tags">
+          <span class="motor-tag tag-amber">TSE 2018</span>
+          <span class="motor-tag tag-amber">TSE 2022</span>
+          <span class="motor-tag tag-amber">TSE 2026</span>
+        </div>
       </div>
 
-      <div class="feature-card fade-up">
-        <div class="feature-icon" style="background: rgba(236,72,153,.15);">📋</div>
-        <h3>Relatórios para humanos</h3>
-        <p>Relatórios escritos em linguagem simples, sem gráficos complicados. Compartilhe com qualquer membro da equipe sem precisar explicar nada.</p>
-      </div>
-
-      <div class="feature-card fade-up">
-        <div class="feature-icon" style="background: rgba(59,130,246,.15);">🔔</div>
-        <h3>Alertas de mudança</h3>
-        <p>Receba notificações automáticas quando o cenário mudar — uma pesquisa sai, uma narrativa viraliza ou o comportamento dos eleitores se altera.</p>
+      <div class="motor-card mlops fade-up">
+        <div class="motor-num" style="color:#c4b5fd;">Motor 05 · MLOps</div>
+        <span class="motor-icon">🧮</span>
+        <h3>Predição e Cenários</h3>
+        <p>Pipeline de machine learning com modelo Bayesiano PyMC + SHAP para explicar cada previsão em linguagem simples.</p>
+        <div class="motor-tags">
+          <span class="motor-tag tag-purple">Vertex AI</span>
+          <span class="motor-tag tag-purple">PyMC</span>
+          <span class="motor-tag tag-purple">SHAP</span>
+        </div>
       </div>
 
     </div>
@@ -699,128 +859,137 @@
 
 <hr class="glow-line" />
 
-<!-- ── Como funciona ─────────────────────────────────────── -->
-<section id="como-funciona">
+<!-- ── Agentes ────────────────────────────────── -->
+<section id="agentes">
   <div class="container">
-    <div style="text-align:center;" class="fade-up">
-      <span class="section-label">Como funciona</span>
-      <h2>Simples como fazer<br /><span class="gradient-text">uma pergunta</span></h2>
-      <p class="section-sub" style="margin: 0 auto;">Você pergunta, a plataforma responde. Sem planilhas, sem relatórios de 50 páginas, sem esperar dias por uma análise.</p>
+    <div class="fade-up">
+      <span class="section-label">Inteligência artificial</span>
+      <h2>7 agentes especializados.<br /><span class="gradient-text">Cada pergunta vai para o certo.</span></h2>
+      <p class="section-sub">Você digita um comando em português. O Supervisor Claude decide qual agente ativa — você não precisa saber qual é qual.</p>
     </div>
 
-    <div class="steps">
-      <div class="step fade-up">
-        <div class="step-num">💬</div>
-        <h3>Você pergunta</h3>
-        <p>Digite uma pergunta em português — "Como está minha votação em São Paulo?" ou "Quem são os eleitores indecisos no interior?" — exatamente como mandaria uma mensagem.</p>
-      </div>
-      <div class="step fade-up">
-        <div class="step-num">⚡</div>
-        <h3>A IA analisa tudo</h3>
-        <p>Sete agentes de inteligência artificial trabalham juntos: coletam dados, identificam padrões, cruzam pesquisas, analisam redes sociais e calculam previsões.</p>
-      </div>
-      <div class="step fade-up">
-        <div class="step-num">✅</div>
-        <h3>Você recebe a resposta</h3>
-        <p>Em segundos, recebe uma análise clara com mapas, gráficos e texto explicativo — pronta para ser usada em reuniões, na campanha ou com a equipe.</p>
-      </div>
-    </div>
-  </div>
-</section>
+    <div class="agentes-layout">
 
-<hr class="glow-line" />
+      <div class="agent-list">
 
-<!-- ── Capacidades ────────────────────────────────────────── -->
-<section id="capacidades">
-  <div class="container">
-    <div class="cap-layout">
-
-      <div class="fade-up">
-        <span class="section-label">O que você consegue responder</span>
-        <h2>Perguntas que<br /><span class="gradient-text">antes levavam semanas</span></h2>
-        <p class="section-sub" style="margin-bottom: 36px;">Com SPEPE, qualquer membro da equipe consegue respostas em segundos — sem depender de analistas ou estatísticos.</p>
-
-        <ul class="cap-list">
-          <li class="cap-item">
-            <div class="cap-check">✓</div>
-            <div class="cap-item-text">
-              <h4>Onde estão meus eleitores fiéis?</h4>
-              <p>Identifique os municípios e bairros com maior concentração de votos garantidos — e priorize os esforços certos.</p>
+        <div class="agent-item fade-up">
+          <div class="agent-model">Flash 2.5</div>
+          <div class="agent-info">
+            <h4>Coletor</h4>
+            <p>Resume resultado de ingestão de dados TSE e IBGE já executada.</p>
+            <div class="agent-cmds">
+              <span class="agent-cmd">/coletar SP 2022</span>
+              <span class="agent-cmd">/coletar RJ 2026</span>
             </div>
-          </li>
-          <li class="cap-item">
-            <div class="cap-check">✓</div>
-            <div class="cap-item-text">
-              <h4>Qual mensagem funciona para cada público?</h4>
-              <p>Veja como diferentes perfis de eleitores reagem a temas como saúde, economia e segurança — e ajuste o discurso.</p>
-            </div>
-          </li>
-          <li class="cap-item">
-            <div class="cap-check">✓</div>
-            <div class="cap-item-text">
-              <h4>Qual é minha chance real de vencer?</h4>
-              <p>Simulações com base em dados históricos, pesquisas e comportamento social — com cenários otimista, base e pessimista.</p>
-            </div>
-          </li>
-          <li class="cap-item">
-            <div class="cap-check">✓</div>
-            <div class="cap-item-text">
-              <h4>O que está falando sobre mim nas redes?</h4>
-              <p>Monitoramento contínuo de menções, sentimento e temas emergentes — para reagir rápido antes que vire crise.</p>
-            </div>
-          </li>
-        </ul>
-      </div>
-
-      <!-- Mock dashboard -->
-      <div class="fade-up">
-        <div class="mock-window">
-          <div class="mock-topbar">
-            <div class="mock-dot" style="background:#ef4444;"></div>
-            <div class="mock-dot" style="background:#f59e0b;"></div>
-            <div class="mock-dot" style="background:#10b981;"></div>
-            <span style="margin-left:8px; font-size:.75rem; color:var(--muted);">SPEPE — Dashboard</span>
           </div>
-          <div class="mock-body">
-            <div class="mock-row">
-              <div class="mock-kpi">
-                <div class="mock-kpi-label">Intenção de voto</div>
-                <div class="mock-kpi-val" style="color:var(--blue);">38.4%</div>
-              </div>
-              <div class="mock-kpi">
-                <div class="mock-kpi-label">Variação 7 dias</div>
-                <div class="mock-kpi-val" style="color:var(--green);">+2.1pp</div>
-              </div>
-              <div class="mock-kpi">
-                <div class="mock-kpi-label">Sentimento</div>
-                <div class="mock-kpi-val" style="color:#a78bfa;">Positivo</div>
-              </div>
+        </div>
+
+        <div class="agent-item fade-up">
+          <div class="agent-model">Pro 2.5</div>
+          <div class="agent-info">
+            <h4>Analista</h4>
+            <p>Cruza resultado eleitoral com dados socioeconômicos do IBGE por município.</p>
+            <div class="agent-cmds">
+              <span class="agent-cmd">/analisar SP</span>
+              <span class="agent-cmd">/perfil interior</span>
             </div>
-            <div class="mock-row">
-              <div class="mock-chart">
-                <div class="bar" style="height:40%;"></div>
-                <div class="bar" style="height:55%;"></div>
-                <div class="bar" style="height:45%;"></div>
-                <div class="bar" style="height:70%;"></div>
-                <div class="bar" style="height:65%;"></div>
-                <div class="bar" style="height:80%;"></div>
-                <div class="bar" style="height:90%;"></div>
-              </div>
+          </div>
+        </div>
+
+        <div class="agent-item fade-up">
+          <div class="agent-model">Flash 2.5</div>
+          <div class="agent-info">
+            <h4>Perfilador</h4>
+            <p>Identifica grupos de eleitores por comportamento, renda e perfil cultural — usando clustering HDBSCAN.</p>
+            <div class="agent-cmds">
+              <span class="agent-cmd">/arquétipos SP</span>
+              <span class="agent-cmd">/perfis BR</span>
             </div>
-            <div class="mock-row">
-              <div class="mock-map">
-                <div class="map-blob" style="width:80px;height:80px;background:rgba(59,130,246,.4);top:-20px;left:20px;"></div>
-                <div class="map-blob" style="width:60px;height:60px;background:rgba(139,92,246,.35);top:10px;right:30px;"></div>
-                <div class="map-blob" style="width:40px;height:40px;background:rgba(16,185,129,.3);bottom:-10px;left:50%;"></div>
-                <div style="position:absolute;bottom:10px;left:14px;font-size:.65rem;color:var(--muted);font-weight:600;">MAPA ELEITORAL · SP</div>
-              </div>
+          </div>
+        </div>
+
+        <div class="agent-item fade-up">
+          <div class="agent-model">Pro 2.5</div>
+          <div class="agent-info">
+            <h4>Modelista Bayesiano</h4>
+            <p>Previsão probabilística com intervalo de confiança de 95%. Simula cenários.</p>
+            <div class="agent-cmds">
+              <span class="agent-cmd">/prever Lula 2026</span>
+              <span class="agent-cmd">/simular 2T</span>
             </div>
-            <div style="background:rgba(59,130,246,.08);border:1px solid rgba(59,130,246,.2);border-radius:8px;padding:12px;margin-top:4px;">
-              <div style="font-size:.7rem;color:#60a5fa;font-weight:700;margin-bottom:6px;">💬 IA analisando...</div>
-              <div style="font-size:.78rem;color:var(--muted);line-height:1.6;">
-                "Crescimento de 2pp no interior paulista concentrado em municípios com alta taxa de evangélicos e renda entre 2–4 salários mínimos. Recomendo reforçar presença em Sorocaba e Campinas."
-              </div>
+          </div>
+        </div>
+
+        <div class="agent-item fade-up">
+          <div class="agent-model">Pro 2.5</div>
+          <div class="agent-info">
+            <h4>Explicador</h4>
+            <p>Traduz o modelo de IA em linguagem simples: "o que mais influenciou esse resultado?"</p>
+            <div class="agent-cmds">
+              <span class="agent-cmd">/explicar previsão</span>
+              <span class="agent-cmd">/shap SP</span>
             </div>
+          </div>
+        </div>
+
+        <div class="agent-item fade-up">
+          <div class="agent-model">Flash 2.0</div>
+          <div class="agent-info">
+            <h4>Narrador</h4>
+            <p>Cria relatórios em texto limpo, prontos para compartilhar com equipe não técnica.</p>
+            <div class="agent-cmds">
+              <span class="agent-cmd">/relatorio SP</span>
+              <span class="agent-cmd">/narrar 2026</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="agent-item fade-up">
+          <div class="agent-model">Flash 2.0</div>
+          <div class="agent-info">
+            <h4>Vigilante</h4>
+            <p>Monitora mudanças no cenário — detecta quando o comportamento do eleitorado está se alterando.</p>
+            <div class="agent-cmds">
+              <span class="agent-cmd">/monitorar drift</span>
+              <span class="agent-cmd">/alertas</span>
+            </div>
+          </div>
+        </div>
+
+      </div>
+
+      <!-- Terminal demo -->
+      <div class="fade-up">
+        <div class="terminal-window">
+          <div class="terminal-bar">
+            <div class="cdot" style="background:#ef4444;"></div>
+            <div class="cdot" style="background:#f59e0b;"></div>
+            <div class="cdot" style="background:#10b981;"></div>
+            <span class="chat-title">SPEPE Terminal · Supervisor → Agentes</span>
+          </div>
+          <div class="terminal-body">
+            <div class="t-line"><span class="t-prompt">user »</span> <span class="t-cmd">/coletar SP 2022</span></div>
+            <div class="t-line t-out">→ Supervisor roteia para <span class="t-hl">coletor</span></div>
+            <div class="t-line t-out">✓ TSE SP 2022: <span class="t-hl">18.4M votos</span> | 645 municípios</div>
+            <div class="t-line t-out">✓ IBGE SP 2022: <span class="t-hl">96 indicadores</span> carregados</div>
+            <div class="t-sep"></div>
+            <div class="t-line"><span class="t-prompt">user »</span> <span class="t-cmd">/analisar SP</span></div>
+            <div class="t-line t-out">→ Supervisor roteia para <span class="t-hl">analista</span></div>
+            <div class="t-line t-out">Correlação votos × alfabetização: <span class="t-val">r=0.67</span></div>
+            <div class="t-line t-out">Correlação votos × pct_evangélico: <span class="t-val">r=-0.41</span></div>
+            <div class="t-line t-out">Municípios de alto potencial: <span class="t-hl">Sorocaba, Ribeirão Preto</span></div>
+            <div class="t-sep"></div>
+            <div class="t-line"><span class="t-prompt">user »</span> <span class="t-cmd">/prever Lula SP 2026</span></div>
+            <div class="t-line t-out">→ Supervisor roteia para <span class="t-hl">modelista_bayesiano</span></div>
+            <div class="t-line t-out">Rodando PyMC (4000 amostras, 2 chains)...</div>
+            <div class="t-line t-out">Lula 1T SP: <span class="t-hl">41.2%</span> <span class="t-val">[38.8–43.6%]</span></div>
+            <div class="t-line t-warn">⚠ Variância alta no interior: incerteza ±4.2pp</div>
+            <div class="t-sep"></div>
+            <div class="t-line"><span class="t-prompt">user »</span> <span class="t-cmd">/relatorio SP</span></div>
+            <div class="t-line t-out">→ Supervisor roteia para <span class="t-hl">narrador</span></div>
+            <div class="t-line t-out">Gerando relatório executivo... <span class="t-hl">pronto</span></div>
+            <div class="t-sep"></div>
+            <div class="t-line"><span class="t-prompt">user »</span> <span class="t-cursor"></span></div>
           </div>
         </div>
       </div>
@@ -831,7 +1000,112 @@
 
 <hr class="glow-line" />
 
-<!-- ── Para quem ──────────────────────────────────────────── -->
+<!-- ── Fluxo / Medallion ──────────────────────── -->
+<section id="fluxo">
+  <div class="container">
+    <div class="fluxo-center fade-up">
+      <span class="section-label">Arquitetura Medallion</span>
+      <h2>Dados brutos entram.<br /><span class="gradient-text">Inteligência sai.</span></h2>
+      <p class="section-sub">Três camadas de processamento garantem que cada análise usa dados limpos, cruzados e prontos — independente da fonte.</p>
+    </div>
+
+    <div class="medallion fade-up">
+
+      <div class="medal-layer bronze">
+        <span class="medal-badge badge-bronze">Bronze · Bruto</span>
+        <span class="medal-icon">📥</span>
+        <h3>Coleta</h3>
+        <p>Dados originais de todas as fontes salvos sem modificação — TSE ZIP, IBGE API, tweets, posts. Imutável e rastreável.</p>
+      </div>
+
+      <div class="medal-arrow">→</div>
+
+      <div class="medal-layer silver">
+        <span class="medal-badge badge-silver">Silver · Limpo</span>
+        <span class="medal-icon">🔬</span>
+        <h3>Padronização</h3>
+        <p>Normalização de nomes, cruzamento TSE↔IBGE por município, validação de qualidade. Mesma linguagem para todas as fontes.</p>
+      </div>
+
+      <div class="medal-arrow">→</div>
+
+      <div class="medal-layer gold">
+        <span class="medal-badge badge-gold">Gold · Pronto</span>
+        <span class="medal-icon">✨</span>
+        <h3>Análise</h3>
+        <p>Fatos agregados por candidato, município e turno — particionados e otimizados para análise instantânea pelos 7 agentes.</p>
+      </div>
+
+    </div>
+
+    <div class="fluxo-arrow-down fade-up">↓ consumido por</div>
+
+    <div class="fluxo-consumers fade-up">
+      <div class="consumer-pill">💬 7 Agentes de IA</div>
+      <div class="consumer-pill">📊 Dashboard ao vivo</div>
+      <div class="consumer-pill">🧮 Modelos preditivos</div>
+      <div class="consumer-pill">📋 Relatórios automáticos</div>
+    </div>
+
+  </div>
+</section>
+
+<hr class="glow-line" />
+
+<!-- ── Perguntas que você pode fazer ─────────── -->
+<section id="perguntas">
+  <div class="container">
+    <div class="perguntas-header fade-up">
+      <span class="section-label">Na prática</span>
+      <h2>Perguntas que antes<br /><span class="gradient-text">levavam dias para responder</span></h2>
+      <p class="section-sub" style="margin: 0 auto;">Com SPEPE, qualquer membro da equipe recebe a resposta em segundos — sem depender de analistas ou planilhas.</p>
+    </div>
+
+    <div class="perguntas-grid">
+
+      <div class="pergunta-card fade-up">
+        <div class="pergunta-agent">⚡ analista</div>
+        <div class="pergunta-q">Onde estão os eleitores que posso virar no interior de SP?</div>
+        <div class="pergunta-resp">O analista cruza votação histórica com perfil socioeconômico IBGE e aponta os 20 municípios com maior potencial de conversão — com explicação de por quê.</div>
+      </div>
+
+      <div class="pergunta-card fade-up">
+        <div class="pergunta-agent">⚡ modelista_bayesiano</div>
+        <div class="pergunta-q">Qual é minha chance real de chegar ao segundo turno?</div>
+        <div class="pergunta-resp">Simulação bayesiana com 4.000 cenários, intervalo de confiança de 95% e três cenários: otimista, base e pessimista — baseados em dados reais.</div>
+      </div>
+
+      <div class="pergunta-card fade-up">
+        <div class="pergunta-agent">⚡ perfilador</div>
+        <div class="pergunta-q">Quem são os eleitores indecisos e o que eles valorizam?</div>
+        <div class="pergunta-resp">HDBSCAN agrupa eleitores por comportamento real (não por suposição) e o perfilador descreve cada grupo em linguagem simples com o que os move.</div>
+      </div>
+
+      <div class="pergunta-card fade-up">
+        <div class="pergunta-agent">⚡ vigilante</div>
+        <div class="pergunta-q">O cenário mudou desde a última pesquisa?</div>
+        <div class="pergunta-resp">Monitoramento contínuo detecta mudanças estatisticamente relevantes no comportamento do eleitorado e dispara alerta antes que a crise apareça nas pesquisas.</div>
+      </div>
+
+      <div class="pergunta-card fade-up">
+        <div class="pergunta-agent">⚡ explicador + narrador</div>
+        <div class="pergunta-q">Por que perdi no ABC e o que posso fazer diferente?</div>
+        <div class="pergunta-resp">O explicador usa SHAP para identificar os fatores que mais pesaram — e o narrador escreve um relatório em linguagem simples para compartilhar com a equipe.</div>
+      </div>
+
+      <div class="pergunta-card fade-up">
+        <div class="pergunta-agent">⚡ sentinela_social</div>
+        <div class="pergunta-q">O que estão falando de mim no Twitter agora?</div>
+        <div class="pergunta-resp">Análise de sentimento em tempo real — percentual positivo, negativo e neutro, temas mais mencionados e alertas de narrativa que está ganhando força.</div>
+      </div>
+
+    </div>
+  </div>
+</section>
+
+<hr class="glow-line" />
+
+<!-- ── Para quem ───────────────────────────────── -->
 <section id="para-quem">
   <div class="container">
     <div style="text-align:center;" class="fade-up">
@@ -844,25 +1118,25 @@
       <div class="audience-card fade-up">
         <span class="audience-emoji">🏛️</span>
         <h3>Candidatos e políticos</h3>
-        <p>Saiba exatamente onde investir tempo, dinheiro e esforço. Foque nos eleitores certos com a mensagem certa, e acompanhe o impacto das suas ações em tempo real.</p>
+        <p>Saiba exatamente onde investir tempo e recursos. Entenda o eleitorado pela ciência, não pela intuição — e acompanhe o impacto de cada ação em tempo real.</p>
       </div>
 
       <div class="audience-card fade-up">
         <span class="audience-emoji">📣</span>
         <h3>Coordenadores de campanha</h3>
-        <p>Tome decisões táticas com base em dados — não em intuição. Distribua recursos, defina agenda e meça resultados com clareza e agilidade.</p>
+        <p>Tome decisões táticas com base em dados — distribuição de esforço, agenda de campo, resposta a crises e medição de resultado com agilidade.</p>
       </div>
 
       <div class="audience-card fade-up">
         <span class="audience-emoji">🏢</span>
         <h3>Partidos políticos</h3>
-        <p>Tenha uma visão consolidada de todos os candidatos, regiões e cenários eleitorais. Identifique oportunidades e riscos com antecedência.</p>
+        <p>Visão consolidada de todos os candidatos, regiões e cenários. Identifique onde o partido cresce, onde perde força e quais municípios são estratégicos.</p>
       </div>
 
       <div class="audience-card fade-up">
         <span class="audience-emoji">📰</span>
-        <h3>Jornalistas e institutos</h3>
-        <p>Acesse análises eleitorais detalhadas e confiáveis para embasar reportagens, pesquisas e publicações com dados atualizados e fontes oficiais.</p>
+        <h3>Jornalistas e pesquisadores</h3>
+        <p>Análises eleitorais com fontes abertas e rastreáveis — TSE, IBGE, DATASUS. Dados confiáveis para embasar reportagens e publicações acadêmicas.</p>
       </div>
 
     </div>
@@ -871,52 +1145,53 @@
 
 <hr class="glow-line" />
 
-<!-- ── CTA ───────────────────────────────────────────────── -->
+<!-- ── CTA ────────────────────────────────────── -->
 <section id="cta">
   <div class="blob blob-cta"></div>
   <div class="container" style="position:relative; z-index:1;">
     <div class="fade-up">
       <span class="section-label">Comece agora</span>
       <h2>Pronto para ter<br /><span class="gradient-text">inteligência eleitoral real?</span></h2>
-      <p>Solicite uma demonstração gratuita. Nossa equipe entra em contato em até 24 horas para mostrar o SPEPE com dados da sua região.</p>
+      <p class="section-sub">Demonstração gratuita com dados da sua região. Nossa equipe entra em contato em até 24 horas.</p>
 
-      <div class="cta-form">
+      <div class="cta-form" style="margin-top:32px;">
         <input type="email" placeholder="Seu melhor e-mail" />
         <a href="mailto:spepebr@gmail.com" class="btn-primary">Solicitar acesso →</a>
       </div>
 
-      <p style="font-size:.8rem; color:var(--muted); margin-top:16px;">
-        Sem compromisso. Demonstração personalizada com dados reais da sua região.
+      <p style="font-size:.78rem; color:var(--muted); margin-top:14px;">
+        Sem compromisso · Demonstração personalizada · Dados reais da sua UF
       </p>
     </div>
   </div>
 </section>
 
-<!-- ── Footer ─────────────────────────────────────────────── -->
+<!-- ── Footer ──────────────────────────────────── -->
 <footer>
   <div class="footer-logo">SPEPE</div>
   <p>Sistema de Perfilamento do Eleitorado e Previsão Eleitoral</p>
-  <p style="margin-top:8px;">Dados: TSE · IBGE · Redes Sociais &nbsp;·&nbsp; Privacidade garantida por LGPD &nbsp;·&nbsp; Servidores no Brasil</p>
-  <p style="margin-top:16px; font-size:.78rem;">© 2026 SPEPE · <a href="mailto:spepebr@gmail.com" style="color:var(--blue); text-decoration:none;">spepebr@gmail.com</a></p>
+  <p style="margin-top:6px;">
+    Fontes: TSE · IBGE · DATASUS · Redes Sociais &nbsp;·&nbsp;
+    Privacidade: LGPD &nbsp;·&nbsp; Servidores: Brasil (southamerica-east1)
+  </p>
+  <p style="margin-top:14px; font-size:.76rem;">
+    © 2026 SPEPE ·
+    <a href="mailto:spepebr@gmail.com" style="color:var(--blue); text-decoration:none;">spepebr@gmail.com</a>
+  </p>
 </footer>
 
 <script>
-  // Fade-in on scroll
   const obs = new IntersectionObserver((entries) => {
     entries.forEach(e => {
-      if (e.isIntersecting) {
-        e.target.classList.add('visible');
-        obs.unobserve(e.target);
-      }
+      if (e.isIntersecting) { e.target.classList.add('visible'); obs.unobserve(e.target); }
     });
-  }, { threshold: 0.12, rootMargin: '0px 0px -40px 0px' });
+  }, { threshold: 0.1, rootMargin: '0px 0px -30px 0px' });
 
   document.querySelectorAll('.fade-up').forEach(el => obs.observe(el));
 
-  // Stagger children inside grids
-  document.querySelectorAll('.features-grid, .audience-grid, .stats-grid, .steps').forEach(grid => {
+  document.querySelectorAll('.motores-grid, .audience-grid, .stats-grid, .agent-list, .perguntas-grid').forEach(grid => {
     [...grid.querySelectorAll('.fade-up')].forEach((el, i) => {
-      el.style.transitionDelay = `${i * 0.08}s`;
+      el.style.transitionDelay = `${i * 0.07}s`;
     });
   });
 </script>
