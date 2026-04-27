@@ -45,7 +45,10 @@ def main(uf: str, years: list[int] | None = None, include_social: bool = True) -
         if r.get("status") == "ok":
             logger.info("Social Silver OK: %d rows", r.get("rows", 0))
         else:
-            logger.warning("Social Silver: %s (pode ser vazio se social_ingest ainda não rodou)", r.get("message"))
+            logger.warning(
+                "Social Silver: %s (pode ser vazio se social_ingest ainda não rodou)",
+                r.get("message"),
+            )
 
     if not all_ok:
         sys.exit(1)
