@@ -29,15 +29,20 @@ jobs:
           # Reuse cache from deploy workflow to avoid a full rebuild
           cache-from: type=gha
 
+      - name: Install Trivy
+        run: |
+          curl -fsSL https://github.com/aquasecurity/trivy/releases/download/v0.57.1/trivy_0.57.1_Linux-64bit.tar.gz \
+            | tar xz -C /tmp
+          sudo mv /tmp/trivy /usr/local/bin/trivy
+
       - name: Trivy image scan
-        # Pinned to a specific version tag — avoids supply-chain risk from @master
-        uses: aquasecurity/trivy-action@v0.30.0
-        with:
-          image-ref: spepe:scan
-          format: sarif
-          output: trivy-results.sarif
-          severity: CRITICAL,HIGH
-          exit-code: "1"
+        run: |
+          trivy image \
+            --format sarif \
+            --output trivy-results.sarif \
+            --severity CRITICAL,HIGH \
+            --exit-code 1 \
+            spepe:scan
 
       - name: Upload SARIF to GitHub Security
         uses: github/codeql-action/upload-sarif@v3
@@ -54,7 +59,8 @@ jobs:
         with:
           python-version: "3.12"
           cache: pip
-      - run: pip install -r requirements.txt
+      # Use requirements-app.txt (runtime deps only — no kfp/ML training libs)
+      - run: pip install -r requirements-app.txt
       - name: Scan codebase for PII patterns
         run: PYTHONPATH=. python scripts/dlp_scan.py
 
@@ -67,5 +73,7 @@ jobs:
           python-version: "3.12"
           cache: pip
       - run: pip install pip-audit
-      - run: pip install -r requirements.txt
+      # Audit deployed app deps (requirements-app.txt excludes kfp which has an
+      # irresolvable urllib3 conflict with google-cloud-aiplatform)
+      - run: pip install -r requirements-app.txt
       - run: pip-audit --ignore-vuln GHSA-w7pp-m8wf-vj6r --ignore-vuln GHSA-pqhp-25j4-6hq9 --ignore-vuln GHSA-g4mx-q9vg-27p4
