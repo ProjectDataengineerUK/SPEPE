@@ -10,7 +10,7 @@ websockets==15.0.1
 pandas==3.0.2
 numpy>=1.26.4,<2
 pyarrow==23.0.1
-google-genai==1.10.0
+google-genai>=1.66.0
 
 # ML — Clustering & Dimensionality Reduction
 scikit-learn==1.6.1
