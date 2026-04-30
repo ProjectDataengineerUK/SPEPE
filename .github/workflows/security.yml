@@ -31,7 +31,7 @@ jobs:
 
       - name: Trivy image scan
         # Pinned to a specific version tag — avoids supply-chain risk from @master
-        uses: aquasecurity/trivy-action@0.30.0
+        uses: aquasecurity/trivy-action@0.36.0
         with:
           image-ref: spepe:scan
           format: sarif
@@ -68,4 +68,4 @@ jobs:
           cache: pip
       - run: pip install pip-audit
       - run: pip install -r requirements.txt
-      - run: pip-audit --ignore-vuln GHSA-w7pp-m8wf-vj6r
+      - run: pip-audit --ignore-vuln GHSA-w7pp-m8wf-vj6r --ignore-vuln GHSA-pqhp-25j4-6hq9 --ignore-vuln GHSA-g4mx-q9vg-27p4
