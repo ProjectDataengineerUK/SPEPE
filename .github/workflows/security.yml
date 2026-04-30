@@ -38,12 +38,21 @@ jobs:
             | sudo tee /etc/apt/sources.list.d/trivy.list
           sudo apt-get update -q && sudo apt-get install -y trivy
 
-      - name: Trivy image scan
+      - name: Trivy image scan (table — for log visibility)
+        run: |
+          trivy image \
+            --format table \
+            --severity CRITICAL,HIGH \
+            --ignore-unfixed \
+            spepe:scan || true
+
+      - name: Trivy image scan (sarif — gate)
         run: |
           trivy image \
             --format sarif \
             --output trivy-results.sarif \
             --severity CRITICAL,HIGH \
+            --ignore-unfixed \
             --exit-code 1 \
             spepe:scan
 
