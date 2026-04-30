@@ -1,4 +1,5 @@
 """Tests for Sentinel multi-crew orchestrator."""
+
 from __future__ import annotations
 
 import pytest
@@ -101,12 +102,14 @@ class TestKnowledgeBase:
         assert "timestamp" in retrieved
 
     def test_upsert_and_find_pattern(self, kb: KnowledgeBase) -> None:
-        kb.upsert_pattern({
-            "trigger_signature": {"event_type": "dq_violation"},
-            "probable_cause": "schema_drift",
-            "recommended_action": "run_schema_evolver",
-            "confidence": 0.85,
-        })
+        kb.upsert_pattern(
+            {
+                "trigger_signature": {"event_type": "dq_violation"},
+                "probable_cause": "schema_drift",
+                "recommended_action": "run_schema_evolver",
+                "confidence": 0.85,
+            }
+        )
         results = kb.find_patterns({"event_type": "dq_violation"})
         assert len(results) >= 1
         assert results[0]["probable_cause"] == "schema_drift"
@@ -196,6 +199,7 @@ class TestActionExecutor:
 class TestObservadoresCrew:
     def test_drift_routes_to_mlops(self, drift_event: SentinelEvent) -> None:
         from sentinel.crews.observadores import ObservadoresCrew
+
         crew = ObservadoresCrew()
         bundle = crew.observe(drift_event)
         assert "mlops" in bundle["observations"]
@@ -203,12 +207,14 @@ class TestObservadoresCrew:
 
     def test_dq_routes_to_dataops(self, dq_event: SentinelEvent) -> None:
         from sentinel.crews.observadores import ObservadoresCrew
+
         crew = ObservadoresCrew()
         bundle = crew.observe(dq_event)
         assert "dataops" in bundle["observations"]
 
     def test_social_burst_routes_to_social(self) -> None:
         from sentinel.crews.observadores import ObservadoresCrew
+
         event = SentinelEvent(
             type=EventType.SOCIAL_BURST,
             source="social_watcher",
@@ -227,6 +233,7 @@ class TestAnalisadoresCrew:
     def test_analyze_returns_required_keys(self, drift_event: SentinelEvent) -> None:
         from sentinel.crews.analisadores import AnalisadoresCrew
         from sentinel.crews.observadores import ObservadoresCrew
+
         obs_bundle = ObservadoresCrew().observe(drift_event)
         analysis = AnalisadoresCrew(kb=KnowledgeBase()).analyze(obs_bundle)
         assert "patterns" in analysis
@@ -236,12 +243,15 @@ class TestAnalisadoresCrew:
     def test_known_pattern_is_matched(self, kb: KnowledgeBase, drift_event: SentinelEvent) -> None:
         from sentinel.crews.analisadores import AnalisadoresCrew
         from sentinel.crews.observadores import ObservadoresCrew
-        kb.upsert_pattern({
-            "trigger_signature": {"event_type": "drift_detected"},
-            "probable_cause": "feature_distribution_shift",
-            "recommended_action": "retrain",
-            "confidence": 0.9,
-        })
+
+        kb.upsert_pattern(
+            {
+                "trigger_signature": {"event_type": "drift_detected"},
+                "probable_cause": "feature_distribution_shift",
+                "recommended_action": "retrain",
+                "confidence": 0.9,
+            }
+        )
         obs_bundle = ObservadoresCrew().observe(drift_event)
         analysis = AnalisadoresCrew(kb=kb).analyze(obs_bundle)
         assert isinstance(analysis["patterns"], list)
@@ -256,6 +266,7 @@ class TestGenAIInterpreter:
     def test_fallback_no_patterns(self) -> None:
         from sentinel.genai_interpreter import GenAIInterpreter
         from sentinel.kb.context_builder import SentinelContext
+
         interp = GenAIInterpreter()
         interp._client = None
         ctx = SentinelContext(event={"severity": "P2"}, patterns=[], history=[])
@@ -266,14 +277,17 @@ class TestGenAIInterpreter:
     def test_fallback_uses_best_pattern(self) -> None:
         from sentinel.genai_interpreter import GenAIInterpreter
         from sentinel.kb.context_builder import SentinelContext
+
         interp = GenAIInterpreter()
         interp._client = None
-        patterns = [{
-            "probable_cause": "feature_shift",
-            "confidence": 0.88,
-            "recommended_action": "retrain",
-            "pattern_id": "p1",
-        }]
+        patterns = [
+            {
+                "probable_cause": "feature_shift",
+                "confidence": 0.88,
+                "recommended_action": "retrain",
+                "pattern_id": "p1",
+            }
+        ]
         ctx = SentinelContext(event={"severity": "P1"}, patterns=patterns, history=[])
         result = interp.interpret(ctx)
         assert result["causa_raiz"] == "feature_shift"
@@ -287,24 +301,32 @@ class TestGenAIInterpreter:
 
 
 class TestSentinelOrchestrator:
-    def test_handle_drift_event(self, orchestrator: SentinelOrchestrator, drift_event: SentinelEvent) -> None:
+    def test_handle_drift_event(
+        self, orchestrator: SentinelOrchestrator, drift_event: SentinelEvent
+    ) -> None:
         result = orchestrator.handle_event(drift_event)
         assert result["handled"] is True
         assert result["event_type"] == "drift_detected"
         assert "interpretation" in result
         assert "dispatch" in result
 
-    def test_handle_event_from_dict(self, orchestrator: SentinelOrchestrator, drift_event: SentinelEvent) -> None:
+    def test_handle_event_from_dict(
+        self, orchestrator: SentinelOrchestrator, drift_event: SentinelEvent
+    ) -> None:
         result = orchestrator.handle_event(drift_event.to_dict())
         assert result["handled"] is True
 
-    def test_unknown_event_type_returns_not_handled(self, orchestrator: SentinelOrchestrator) -> None:
+    def test_unknown_event_type_returns_not_handled(
+        self, orchestrator: SentinelOrchestrator
+    ) -> None:
         bad = {"type": "nonexistent_type", "source": "x", "payload": {}}
         result = orchestrator.handle_event(bad)
         assert result["handled"] is False
         assert result["reason"] == "unknown_event_type"
 
-    def test_handle_dq_event(self, orchestrator: SentinelOrchestrator, dq_event: SentinelEvent) -> None:
+    def test_handle_dq_event(
+        self, orchestrator: SentinelOrchestrator, dq_event: SentinelEvent
+    ) -> None:
         result = orchestrator.handle_event(dq_event)
         assert result["handled"] is True
         assert result["event_type"] == "dq_violation"

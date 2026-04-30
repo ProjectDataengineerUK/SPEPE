@@ -1,4 +1,5 @@
 """Sentinel Cloud Run entry point — receives Pub/Sub push events via FastAPI."""
+
 from __future__ import annotations
 
 import base64
