@@ -56,6 +56,6 @@ pydantic==2.13.2
 pydantic-settings==2.13.1
 tenacity==9.1.4
 requests==2.33.1
-urllib3>=1.26.14,<2.0.0
+urllib3>=2.6.3
 httpx==0.28.1
 aiohttp==3.13.5

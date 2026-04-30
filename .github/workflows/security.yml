@@ -31,7 +31,7 @@ jobs:
 
       - name: Trivy image scan
         # Pinned to a specific version tag — avoids supply-chain risk from @master
-        uses: aquasecurity/trivy-action@0.36.0
+        uses: aquasecurity/trivy-action@v0.30.0
         with:
           image-ref: spepe:scan
           format: sarif
