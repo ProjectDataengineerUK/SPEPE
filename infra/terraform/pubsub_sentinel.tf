@@ -38,7 +38,7 @@ resource "google_pubsub_subscription" "sentinel_events_sub" {
 
   dead_letter_policy {
     dead_letter_topic     = google_pubsub_topic.sentinel_dlq.id
-    max_delivery_attempts = 3
+    max_delivery_attempts = 5
   }
 
   push_config {
