@@ -31,9 +31,12 @@ jobs:
 
       - name: Install Trivy
         run: |
-          curl -fsSL https://github.com/aquasecurity/trivy/releases/download/v0.57.1/trivy_0.57.1_Linux-64bit.tar.gz \
-            | tar xz -C /tmp
-          sudo mv /tmp/trivy /usr/local/bin/trivy
+          sudo apt-get install -y wget gnupg
+          wget -qO - https://aquasecurity.github.io/trivy-repo/deb/public.key \
+            | gpg --dearmor | sudo tee /etc/apt/keyrings/trivy.gpg > /dev/null
+          echo "deb [signed-by=/etc/apt/keyrings/trivy.gpg] https://aquasecurity.github.io/trivy-repo/deb generic main" \
+            | sudo tee /etc/apt/sources.list.d/trivy.list
+          sudo apt-get update -q && sudo apt-get install -y trivy
 
       - name: Trivy image scan
         run: |
@@ -76,4 +79,5 @@ jobs:
       # Audit deployed app deps (requirements-app.txt excludes kfp which has an
       # irresolvable urllib3 conflict with google-cloud-aiplatform)
       - run: pip install -r requirements-app.txt
-      - run: pip-audit --ignore-vuln GHSA-w7pp-m8wf-vj6r --ignore-vuln GHSA-pqhp-25j4-6hq9 --ignore-vuln GHSA-g4mx-q9vg-27p4
+      # CVE-2026-3219 is pip itself (runner-managed, not our dep)
+      - run: pip-audit --ignore-vuln GHSA-w7pp-m8wf-vj6r --ignore-vuln GHSA-pqhp-25j4-6hq9 --ignore-vuln GHSA-g4mx-q9vg-27p4 --ignore-vuln CVE-2026-3219

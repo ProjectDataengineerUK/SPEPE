@@ -38,7 +38,7 @@ _ATLAS_CSV_PATH = "/api/pesquisas/csv?ano={year}"
 _PDF_FAIL_RATE_THRESHOLD = float(os.environ.get("PDF_FAIL_RATE_THRESHOLD", "0.30"))
 
 _SESSION = requests.Session()
-_SESSION.headers.update({"User-Agent": "SPEPE-DataOps/1.0 (contato: spepebr@gmail.com)"})
+_SESSION.headers.update({"User-Agent": "SPEPE-DataOps/1.0"})
 
 
 # ── TSE PesqEle ────────────────────────────────────────────────────────────────
