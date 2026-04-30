@@ -25,10 +25,14 @@ class SentinelOrchestrator:
         )
 
     def handle_event(self, event: dict | SentinelEvent) -> dict[str, Any]:
-        if isinstance(event, dict):
-            event_obj = SentinelEvent.from_dict(event)
-        else:
-            event_obj = event
+        try:
+            if isinstance(event, dict):
+                event_obj = SentinelEvent.from_dict(event)
+            else:
+                event_obj = event
+        except (ValueError, KeyError) as exc:
+            logger.warning("invalid_event_payload: %s", exc)
+            return {"handled": False, "reason": "unknown_event_type"}
         try:
             event_type = EventType(event_obj.type.value)
         except ValueError:

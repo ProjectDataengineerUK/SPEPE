@@ -10,7 +10,7 @@
 | **Date** | 2026-04-17 |
 | **Author** | define-agent |
 | **Updated** | 2026-04-25 (iterate-agent — v4.1: +4 módulos Group B: DataSUS/DIEESE/CETIC/Segurança; +IBGE expandido 10 domínios; +3 tabelas Gold; +3 Cloud Run Jobs; Source Inventory atualizado; Open Question 2 resolvida) |
-| **Status** | Ready for Build |
+| **Status** | ✅ Shipped — 2026-04-30 |
 | **Clarity Score** | 15/15 |
 
 ---

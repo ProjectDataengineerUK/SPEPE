@@ -23,7 +23,7 @@
 | **Date** | 2026-04-23 |
 | **Author** | design-agent |
 | **DEFINE** | [DEFINE_SPEPE.md](./DEFINE_SPEPE.md) |
-| **Status** | Ready for Build |
+| **Status** | ✅ Shipped — 2026-04-30 |
 | **Version** | 4.6 — 10 módulos completos: IBGE expandido (~240 features) + DataSUS + DIEESE + CETIC + Segurança; 8 agentes; 9 Cloud Run Jobs; 5 tabelas Gold de fatos |
 
 ---
