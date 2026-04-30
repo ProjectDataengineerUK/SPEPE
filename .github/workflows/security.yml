@@ -60,6 +60,7 @@ jobs:
         uses: github/codeql-action/upload-sarif@v3
         # Upload even when Trivy found vulnerabilities (exit-code 1 above)
         if: always()
+        continue-on-error: true
         with:
           sarif_file: trivy-results.sarif
 
