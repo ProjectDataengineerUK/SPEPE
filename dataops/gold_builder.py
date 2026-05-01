@@ -225,7 +225,11 @@ def _normalize_for_bq(df: pd.DataFrame) -> pd.DataFrame:
         dtype = df[col].dtype
         if hasattr(dtype, "numpy_dtype"):
             if pd.api.types.is_integer_dtype(dtype):
-                df[col] = df[col].astype("float64")
+                # Prefer int64 to match BQ INTEGER; fall back to float64 only if NaN present
+                if df[col].isna().any():
+                    df[col] = df[col].astype("float64")
+                else:
+                    df[col] = df[col].astype("int64")
             elif pd.api.types.is_float_dtype(dtype):
                 df[col] = df[col].astype("float64")
             elif pd.api.types.is_bool_dtype(dtype):
