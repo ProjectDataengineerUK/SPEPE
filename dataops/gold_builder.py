@@ -29,7 +29,9 @@ def _load_silver_from_bigquery() -> pd.DataFrame:
         frames = []
         for t in tse_tables:
             table_ref = f"{_GCP_PROJECT}.{_BQ_SILVER_DATASET}.{t.table_id}"
-            df = client.query(f"SELECT * FROM `{table_ref}`").to_dataframe()
+            df = client.query(f"SELECT * FROM `{table_ref}`").to_dataframe(
+                create_bqstorage_client=False
+            )
             frames.append(df)
         return pd.concat(frames, ignore_index=True) if frames else pd.DataFrame()
     except Exception as exc:
