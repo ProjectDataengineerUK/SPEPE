@@ -247,6 +247,8 @@ def _write_bigquery_gold(df: pd.DataFrame, table_name: str) -> str:
         partition_field = _GOLD_PARTITION_FIELD.get(table_name)
         cluster_fields = _GOLD_CLUSTER_FIELDS.get(table_name)
 
+        df = _normalize_for_bq(df)
+
         job_config = bigquery.LoadJobConfig(
             write_disposition="WRITE_APPEND",
             create_disposition="CREATE_IF_NEEDED",
@@ -259,8 +261,6 @@ def _write_bigquery_gold(df: pd.DataFrame, table_name: str) -> str:
             autodetect=False,
             schema=_dataframe_to_bq_schema(df),
         )
-
-        df = _normalize_for_bq(df)
 
         if "ingested_at" not in df.columns:
             df = df.copy()
@@ -281,9 +281,14 @@ def _dataframe_to_bq_schema(df: pd.DataFrame) -> list:
     _type_map = {
         "int64": "INT64",
         "int32": "INT64",
+        "Int64": "FLOAT64",
+        "Int32": "FLOAT64",
         "float64": "FLOAT64",
         "float32": "FLOAT64",
+        "Float64": "FLOAT64",
+        "Float32": "FLOAT64",
         "bool": "BOOL",
+        "boolean": "BOOL",
         "object": "STRING",
     }
     fields = []
