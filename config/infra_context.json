@@ -15,9 +15,9 @@
   },
 
   "cloud_run": {
-    "service_url": "https://spepe-dev-jf253xcuga-rj.a.run.app",
+    "service_url": "https://spepe-dev-334344543887.southamerica-east1.run.app",
     "service_name": "spepe-dev",
-    "health_endpoint": "https://spepe-dev-jf253xcuga-rj.a.run.app/healthz",
+    "health_endpoint": "https://spepe-dev-334344543887.southamerica-east1.run.app/healthz",
     "service_account": "spepe-cloud-run@spepe-dev.iam.gserviceaccount.com"
   },
 
