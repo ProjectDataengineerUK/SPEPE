@@ -190,6 +190,24 @@ def _write_local_silver(df: pd.DataFrame, uf: str, year: int) -> str:
     return str(path)
 
 
+def _normalize_for_bq(df: pd.DataFrame) -> pd.DataFrame:
+    """Convert pandas extension types (Int64, Float64, boolean) to numpy types for BQ upload."""
+    df = df.copy()
+    for col in df.columns:
+        dtype = df[col].dtype
+        if hasattr(dtype, "numpy_dtype"):
+            # pandas nullable integer/float/boolean — convert to numpy equivalent
+            if pd.api.types.is_integer_dtype(dtype):
+                df[col] = df[col].astype("float64")  # float64 handles NaN; BQ FLOAT64
+            elif pd.api.types.is_float_dtype(dtype):
+                df[col] = df[col].astype("float64")
+            elif pd.api.types.is_bool_dtype(dtype):
+                df[col] = df[col].astype("object")
+        elif hasattr(df[col], "cat"):
+            df[col] = df[col].astype("object")
+    return df
+
+
 def _write_bigquery(df: pd.DataFrame, table_name: str) -> str:
     project = os.environ.get("GCP_PROJECT_ID", "spepe-dev")
     dataset = os.environ.get("BIGQUERY_DATASET_SILVER", "spepe_silver")
@@ -198,6 +216,7 @@ def _write_bigquery(df: pd.DataFrame, table_name: str) -> str:
 
         client = bigquery.Client(project=project)
         table_id = f"{project}.{dataset}.{table_name}"
+        df = _normalize_for_bq(df)
 
         if "ingested_at" not in df.columns:
             df = df.copy()

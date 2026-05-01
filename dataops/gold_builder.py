@@ -216,6 +216,23 @@ _GOLD_CLUSTER_FIELDS = {
 }
 
 
+def _normalize_for_bq(df: pd.DataFrame) -> pd.DataFrame:
+    """Convert pandas extension types (Int64, Float64, boolean) to numpy types for BQ upload."""
+    df = df.copy()
+    for col in df.columns:
+        dtype = df[col].dtype
+        if hasattr(dtype, "numpy_dtype"):
+            if pd.api.types.is_integer_dtype(dtype):
+                df[col] = df[col].astype("float64")
+            elif pd.api.types.is_float_dtype(dtype):
+                df[col] = df[col].astype("float64")
+            elif pd.api.types.is_bool_dtype(dtype):
+                df[col] = df[col].astype("object")
+        elif hasattr(df[col], "cat"):
+            df[col] = df[col].astype("object")
+    return df
+
+
 def _write_bigquery_gold(df: pd.DataFrame, table_name: str) -> str:
     project = os.environ.get("GCP_PROJECT_ID", "spepe-dev")
     dataset = os.environ.get("BIGQUERY_DATASET_GOLD", "spepe_gold")
@@ -240,6 +257,8 @@ def _write_bigquery_gold(df: pd.DataFrame, table_name: str) -> str:
             autodetect=False,
             schema=_dataframe_to_bq_schema(df),
         )
+
+        df = _normalize_for_bq(df)
 
         if "ingested_at" not in df.columns:
             df = df.copy()

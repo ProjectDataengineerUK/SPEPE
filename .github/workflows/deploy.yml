@@ -125,6 +125,16 @@ jobs:
             --format "value(status.url)")
           echo "url=${URL}" >> $GITHUB_OUTPUT
 
+      - name: Update Cloud Run Jobs to new image
+        run: |
+          IMAGE="${{ needs.build-push.outputs.image_tag }}"
+          for JOB in spepe-tse-ingest spepe-ibge-sync spepe-digital-ingest spepe-silver-transform spepe-gold-build; do
+            gcloud run jobs update "${JOB}" \
+              --image "${IMAGE}" \
+              --region "${{ env.GCP_REGION }}" \
+              --project "${{ vars.GCP_PROJECT_ID }}" 2>&1 || echo "Warning: could not update ${JOB}"
+          done
+
       - name: Smoke test — staging health check
         run: |
           echo "Service deployed to: ${{ steps.deploy.outputs.url }}"
