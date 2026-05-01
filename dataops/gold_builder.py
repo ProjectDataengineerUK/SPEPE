@@ -249,12 +249,26 @@ def _write_bigquery_gold(df: pd.DataFrame, table_name: str) -> str:
 
         df = _normalize_for_bq(df)
 
+        # Determine partitioning strategy: integer fields need RangePartitioning
+        time_partitioning = None
+        range_partitioning = None
+        if partition_field and partition_field in df.columns:
+            dtype_str = str(df[partition_field].dtype)
+            if dtype_str in ("int64", "float64"):
+                # Convert to int64 (RangePartitioning requires INT64)
+                df[partition_field] = df[partition_field].fillna(0).astype("int64")
+                range_partitioning = bigquery.RangePartitioning(
+                    field=partition_field,
+                    range_=bigquery.PartitionRange(start=2010, end=2031, interval=1),
+                )
+            else:
+                time_partitioning = bigquery.TimePartitioning(field=partition_field)
+
         job_config = bigquery.LoadJobConfig(
             write_disposition="WRITE_APPEND",
             create_disposition="CREATE_IF_NEEDED",
-            time_partitioning=(
-                bigquery.TimePartitioning(field=partition_field) if partition_field else None
-            ),
+            time_partitioning=time_partitioning,
+            range_partitioning=range_partitioning,
             clustering_fields=(
                 [f for f in cluster_fields if f in df.columns] if cluster_fields else None
             ),
