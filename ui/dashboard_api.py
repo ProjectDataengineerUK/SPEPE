@@ -3495,11 +3495,31 @@ async def serve_admin() -> FileResponse:
     return FileResponse(str(html_path), media_type="text/html")
 
 
-_USER_STORE: list[dict] = []  # in-memory stub; replace with Firestore/Cloud SQL in prod
+_USER_STORE: list[dict] = []  # fallback when Firestore unavailable
+_ACCESS_MATRIX: dict = {}  # fallback when Firestore unavailable
+_FIRESTORE_PROJECT = os.environ.get("GCP_PROJECT_ID", "")
+
+
+def _fs_client():
+    """Return Firestore client or None if unavailable."""
+    try:
+        from google.cloud import firestore
+
+        return firestore.AsyncClient(project=_FIRESTORE_PROJECT) if _FIRESTORE_PROJECT else None
+    except Exception:
+        return None
 
 
 @app.get("/admin/api/users")
 async def admin_list_users() -> JSONResponse:
+    db = _fs_client()
+    if db:
+        try:
+            docs = db.collection("spepe_users").stream()
+            users = [doc.to_dict() async for doc in docs]
+            return JSONResponse({"users": users})
+        except Exception:
+            pass
     return JSONResponse({"users": _USER_STORE})
 
 
@@ -3510,6 +3530,13 @@ async def admin_create_user(request: Request) -> JSONResponse:
 
     body = await request.json()
     user = {**body, "id": str(uuid.uuid4()), "created_at": str(date.today())}
+    db = _fs_client()
+    if db:
+        try:
+            await db.collection("spepe_users").document(user["id"]).set(user)
+            return JSONResponse({"ok": True, "user": user})
+        except Exception:
+            pass
     _USER_STORE.append(user)
     return JSONResponse({"ok": True, "user": user})
 
@@ -3517,6 +3544,17 @@ async def admin_create_user(request: Request) -> JSONResponse:
 @app.put("/admin/api/users/{user_id}")
 async def admin_update_user(user_id: str, request: Request) -> JSONResponse:
     body = await request.json()
+    db = _fs_client()
+    if db:
+        try:
+            ref = db.collection("spepe_users").document(user_id)
+            doc = await ref.get()
+            if not doc.exists:
+                return JSONResponse({"ok": False, "error": "not found"}, status_code=404)
+            await ref.update({**body, "id": user_id})
+            return JSONResponse({"ok": True})
+        except Exception:
+            pass
     for i, u in enumerate(_USER_STORE):
         if u["id"] == user_id:
             _USER_STORE[i] = {**u, **body, "id": user_id}
@@ -3527,22 +3565,42 @@ async def admin_update_user(user_id: str, request: Request) -> JSONResponse:
 @app.delete("/admin/api/users/{user_id}")
 async def admin_delete_user(user_id: str) -> JSONResponse:
     global _USER_STORE
+    db = _fs_client()
+    if db:
+        try:
+            await db.collection("spepe_users").document(user_id).delete()
+            return JSONResponse({"ok": True})
+        except Exception:
+            pass
     _USER_STORE = [u for u in _USER_STORE if u["id"] != user_id]
     return JSONResponse({"ok": True})
 
 
-_ACCESS_MATRIX: dict = {}  # profile → {feature_id: bool}
-
-
 @app.get("/admin/api/access")
 async def admin_get_access() -> JSONResponse:
+    db = _fs_client()
+    if db:
+        try:
+            doc = await db.collection("spepe_admin").document("access_matrix").get()
+            if doc.exists:
+                return JSONResponse({"matrix": doc.to_dict().get("matrix", {})})
+        except Exception:
+            pass
     return JSONResponse({"matrix": _ACCESS_MATRIX})
 
 
 @app.post("/admin/api/access")
 async def admin_save_access(request: Request) -> JSONResponse:
     global _ACCESS_MATRIX
-    _ACCESS_MATRIX = await request.json()
+    data = await request.json()
+    db = _fs_client()
+    if db:
+        try:
+            await db.collection("spepe_admin").document("access_matrix").set({"matrix": data})
+            return JSONResponse({"ok": True})
+        except Exception:
+            pass
+    _ACCESS_MATRIX = data
     return JSONResponse({"ok": True})
 
 

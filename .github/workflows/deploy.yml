@@ -128,7 +128,8 @@ jobs:
       - name: Update Cloud Run Jobs to new image
         run: |
           IMAGE="${{ needs.build-push.outputs.image_tag }}"
-          for JOB in spepe-tse-ingest spepe-ibge-sync spepe-digital-ingest spepe-silver-transform spepe-gold-build; do
+          for JOB in spepe-tse-ingest spepe-ibge-sync spepe-digital-ingest spepe-silver-transform spepe-gold-build \
+                     spepe-social-ingest spepe-pesquisas-ingest spepe-security-ingest spepe-datasus-ingest spepe-dieese-ingest spepe-cetic-ingest; do
             gcloud run jobs update "${JOB}" \
               --image "${IMAGE}" \
               --region "${{ env.GCP_REGION }}" \

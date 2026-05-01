@@ -48,6 +48,10 @@ resource "google_cloud_run_v2_service" "spepe" {
         value = google_bigquery_dataset.spepe_gold.dataset_id
       }
       env {
+        name  = "USE_BIGQUERY"
+        value = "true"
+      }
+      env {
         name = "ANTHROPIC_API_KEY"
         value_source {
           secret_key_ref {

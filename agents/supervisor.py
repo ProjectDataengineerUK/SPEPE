@@ -39,6 +39,8 @@ Agentes disponíveis (via route_to_agent):
 - coletor: sumariza resultado de jobs de ingestão já executados
 - analista: cruzamento socioeconômico × resultados eleitorais — /analisar, /perfil
 - analista_seguranca: correlação violência/segurança × voto — /seguranca, /violencia, /correlacao_seguranca
+- sentinela_social: monitoramento redes sociais em tempo real — /social, /sentimento, /narrativas, /crise
+- contextualizador_saude: correlação saúde pública × voto — /saude, /vulnerabilidade, /datasus
 - perfilador: clustering e arquétipos — /arquétipos, /perfis
 - modelista_bayesiano: previsão probabilística com IC 95% — /prever, /simular
 - explicador: SHAP em linguagem natural — /explicar, /shap
