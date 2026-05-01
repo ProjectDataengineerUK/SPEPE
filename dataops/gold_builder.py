@@ -154,7 +154,9 @@ def _build_fact_candidato_dia(df: pd.DataFrame) -> pd.DataFrame:
         group_cols.append("sg_uf")
 
     agg_kwargs = {
-        "qt_votos_total": ("qt_votos", "sum") if "qt_votos" in df.columns else ("nm_candidato", "count"),
+        "qt_votos_total": ("qt_votos", "sum")
+        if "qt_votos" in df.columns
+        else ("nm_candidato", "count"),
     }
     cand_agg = df.groupby(group_cols).agg(**agg_kwargs).reset_index()
 
