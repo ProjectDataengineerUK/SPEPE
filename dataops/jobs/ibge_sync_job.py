@@ -52,7 +52,7 @@ DEFAULT_INDICADORES = [
     "pct_15_29",
     "pct_30_59",
     "pct_60_mais",
-    "pct_urbano",
+    # "pct_urbano" removido — tabela SIDRA 9714 N6 não disponível via API (Censo 2022 consolidando)
     "pct_catolico",
     "pct_sem_religiao",
 ]

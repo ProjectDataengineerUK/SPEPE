@@ -4,7 +4,7 @@ locals {
   uf_arg    = local.prod_mode ? "ALL" : "SP"
 
   jobs = {
-    tse_ingest       = { timeout = local.prod_mode ? "7200s" : "3600s", memory = "4Gi",   cpu = "2", args = ["--uf", local.uf_arg] }
+    tse_ingest       = { timeout = local.prod_mode ? "7200s" : "3600s", memory = "8Gi",   cpu = "2", args = ["--uf", local.uf_arg] }
     ibge_sync        = { timeout = local.prod_mode ? "3600s" : "1800s", memory = "1Gi",   cpu = "1", args = ["--uf", local.uf_arg] }
     security_ingest  = { timeout = local.prod_mode ? "3600s" : "1800s", memory = "1Gi",   cpu = "1", args = ["--uf", local.uf_arg] }
     datasus_ingest   = { timeout = local.prod_mode ? "3600s" : "1800s", memory = "1Gi",   cpu = "1", args = ["--uf", local.uf_arg] }
