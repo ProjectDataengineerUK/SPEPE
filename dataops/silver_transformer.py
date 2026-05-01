@@ -57,9 +57,14 @@ def transform_to_silver(
     """Transform Bronze TSE + IBGE data to Silver layer."""
     LOCAL_SILVER_DIR.mkdir(parents=True, exist_ok=True)
 
-    df_tse = _load_bronze_tse(uf, year)
     df_ibge = _load_bronze_ibge(uf)
 
+    # GCS+BQ path: stream parquet directly from GCS in 500k-row chunks to avoid OOM
+    if use_bigquery and GCS_BUCKET:
+        return _transform_streaming_to_bq(uf, year, df_ibge)
+
+    # Local path: load full DataFrame (small UFs only)
+    df_tse = _load_bronze_tse(uf, year)
     if df_tse.empty:
         return {
             "status": "error",
@@ -72,10 +77,7 @@ def transform_to_silver(
 
     dq_result = _run_dq_checks(df_clean, uf, year)
 
-    if use_bigquery:
-        path = _write_bigquery(df_clean, f"tse_{uf.lower()}_{year}")
-    else:
-        path = _write_local_silver(df_clean, uf, year)
+    path = _write_local_silver(df_clean, uf, year)
 
     return {
         "status": "ok",
@@ -83,7 +85,83 @@ def transform_to_silver(
         "rows": len(df_clean),
         "dq_score": dq_result["score"],
         "dq_warnings": dq_result["warnings"],
-        "match_pct": float(df_clean["cd_municipio_ibge"].notna().mean() * 100),
+        "match_pct": float(
+            df_clean.get("cd_municipio_ibge", pd.Series(dtype=object)).notna().mean() * 100
+        ),
+    }
+
+
+def _transform_streaming_to_bq(uf: str, year: int, df_ibge: pd.DataFrame) -> dict:
+    """Stream Bronze TSE from GCS in 500k-row chunks → normalize → BQ. Never loads full DF."""
+    import pyarrow.fs as pafs
+    import pyarrow.parquet as pq
+
+    from google.cloud import bigquery
+
+    gcs_path = f"{GCS_BUCKET}/raw/tse/{year}/{uf.upper()}/resultados_{uf.upper()}_{year}.parquet"
+    project = os.environ.get("GCP_PROJECT_ID", "spepe-dev")
+    dataset = os.environ.get("BIGQUERY_DATASET_SILVER", "spepe_silver")
+    table_id = f"{project}.{dataset}.tse_{uf.lower()}_{year}"
+
+    try:
+        gcs_fs = pafs.GcsFileSystem()
+        pf = pq.ParquetFile(gcs_path, filesystem=gcs_fs)
+    except Exception as exc:
+        return {"status": "error", "message": f"Bronze TSE GCS não encontrado: {exc}"}
+
+    bq_client = bigquery.Client(project=project)
+    total_rows = 0
+    dq_ok_rows = 0
+    dq_warnings: list[str] = []
+    first = True
+    bq_schema = None
+
+    for batch in pf.iter_batches(batch_size=500_000):
+        chunk = batch.to_pandas()
+        chunk = _normalize_tse(chunk, year)
+        chunk = join_tse_ibge(chunk, df_ibge)
+        _enforce_silver_schema_inplace(chunk, uf, year)
+        _normalize_for_bq_inplace(chunk)
+        chunk["ingested_at"] = pd.Timestamp.utcnow()
+
+        if bq_schema is None:
+            bq_schema = _dataframe_to_bq_schema(chunk)
+
+        job_config = bigquery.LoadJobConfig(
+            write_disposition="WRITE_TRUNCATE" if first else "WRITE_APPEND",
+            create_disposition="CREATE_IF_NEEDED",
+            autodetect=False,
+            schema=bq_schema,
+        )
+        job = bq_client.load_table_from_dataframe(chunk, table_id, job_config=job_config)
+        job.result()
+
+        if "qt_votos" in chunk.columns:
+            dq_ok_rows += int(chunk["qt_votos"].notna().sum())
+        else:
+            dq_ok_rows += len(chunk)
+        total_rows += len(chunk)
+        first = False
+        del chunk
+
+    if total_rows == 0:
+        return {"status": "error", "message": f"Bronze TSE vazio para {uf}/{year}"}
+
+    dq_score = dq_ok_rows / total_rows * 100
+    logger.info(
+        "Silver streaming BQ: %s → %s (%d rows, DQ=%.1f%%)",
+        gcs_path,
+        table_id,
+        total_rows,
+        dq_score,
+    )
+    return {
+        "status": "ok",
+        "path": table_id,
+        "rows": total_rows,
+        "dq_score": dq_score,
+        "dq_warnings": dq_warnings,
+        "match_pct": 0.0,
     }
 
 
@@ -132,13 +210,17 @@ def _normalize_tse(df: pd.DataFrame, year: int) -> pd.DataFrame:
 
 def _enforce_silver_schema(df: pd.DataFrame, uf: str, year: int) -> pd.DataFrame:
     df = df.copy()
+    _enforce_silver_schema_inplace(df, uf, year)
+    return df
+
+
+def _enforce_silver_schema_inplace(df: pd.DataFrame, uf: str, year: int) -> None:
     if "sg_uf" not in df.columns:
         df["sg_uf"] = uf.upper()
     if "ano_eleicao" not in df.columns:
         df["ano_eleicao"] = year
     if "qt_votos" in df.columns:
         df["qt_votos"] = pd.to_numeric(df["qt_votos"], errors="coerce").fillna(0).astype(int)
-    return df
 
 
 def _run_dq_checks(df: pd.DataFrame, uf: str, year: int) -> dict:
@@ -193,19 +275,22 @@ def _write_local_silver(df: pd.DataFrame, uf: str, year: int) -> str:
 def _normalize_for_bq(df: pd.DataFrame) -> pd.DataFrame:
     """Convert pandas extension types (Int64, Float64, boolean) to numpy types for BQ upload."""
     df = df.copy()
+    _normalize_for_bq_inplace(df)
+    return df
+
+
+def _normalize_for_bq_inplace(df: pd.DataFrame) -> None:
     for col in df.columns:
         dtype = df[col].dtype
         if hasattr(dtype, "numpy_dtype"):
-            # pandas nullable integer/float/boolean — convert to numpy equivalent
             if pd.api.types.is_integer_dtype(dtype):
-                df[col] = df[col].astype("float64")  # float64 handles NaN; BQ FLOAT64
+                df[col] = df[col].astype("float64")
             elif pd.api.types.is_float_dtype(dtype):
                 df[col] = df[col].astype("float64")
             elif pd.api.types.is_bool_dtype(dtype):
                 df[col] = df[col].astype("object")
         elif hasattr(df[col], "cat"):
             df[col] = df[col].astype("object")
-    return df
 
 
 def _write_bigquery(df: pd.DataFrame, table_name: str) -> str:

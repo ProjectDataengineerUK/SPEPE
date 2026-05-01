@@ -10,7 +10,7 @@ locals {
     datasus_ingest   = { timeout = local.prod_mode ? "3600s" : "1800s", memory = "1Gi",   cpu = "1", args = ["--uf", local.uf_arg] }
     dieese_ingest    = { timeout = local.prod_mode ? "1800s" : "900s",  memory = "512Mi", cpu = "1", args = ["--uf", local.uf_arg] }
     cetic_ingest     = { timeout = local.prod_mode ? "1800s" : "900s",  memory = "512Mi", cpu = "1", args = ["--uf", local.uf_arg] }
-    silver_transform = { timeout = local.prod_mode ? "7200s" : "1800s", memory = "2Gi",   cpu = "2", args = ["--uf", local.uf_arg] }
+    silver_transform = { timeout = local.prod_mode ? "7200s" : "1800s", memory = "4Gi",   cpu = "2", args = ["--uf", local.uf_arg] }
     gold_build       = { timeout = "1800s", memory = "2Gi", cpu = "2", args = [] }
     digital_ingest   = { timeout = "900s",  memory = "1Gi", cpu = "1", args = [] }
     social_ingest    = { timeout = "1800s", memory = "1Gi", cpu = "1", args = [] }
