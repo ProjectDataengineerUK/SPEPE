@@ -147,17 +147,19 @@ def _build_fact_candidato_dia(df: pd.DataFrame) -> pd.DataFrame:
     if "nm_candidato" not in df.columns:
         return pd.DataFrame()
 
-    cand_agg = (
-        df.groupby(
-            ["nm_candidato", "ano_eleicao"] if "ano_eleicao" in df.columns else ["nm_candidato"]
-        )
-        .agg(
-            qt_votos_total=(
-                ("qt_votos", "sum") if "qt_votos" in df.columns else ("nm_candidato", "count")
-            ),
-        )
-        .reset_index()
-    )
+    group_cols = ["nm_candidato"]
+    if "ano_eleicao" in df.columns:
+        group_cols.append("ano_eleicao")
+    if "sg_uf" in df.columns:
+        group_cols.append("sg_uf")
+
+    agg_kwargs = {
+        "qt_votos_total": ("qt_votos", "sum") if "qt_votos" in df.columns else ("nm_candidato", "count"),
+    }
+    cand_agg = df.groupby(group_cols).agg(**agg_kwargs).reset_index()
+
+    # Partition field required by the Terraform table schema
+    cand_agg["data"] = pd.Timestamp.utcnow().date()
 
     logger.info(f"fact_candidato_dia: {len(cand_agg)} candidatos")
     return cand_agg
