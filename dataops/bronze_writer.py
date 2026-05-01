@@ -87,8 +87,6 @@ def write_bronze_from_file(
 
     Used by TSE ingest (18M+ rows) to avoid the OOM caused by df.copy() in write_bronze.
     """
-    from datetime import datetime, timezone
-
     if use_gcs and GCS_BUCKET:
         try:
             from google.cloud import storage
