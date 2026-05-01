@@ -259,7 +259,6 @@ def _write_bigquery_gold(df: pd.DataFrame, table_name: str) -> str:
         if partition_field and partition_field in df.columns:
             dtype_str = str(df[partition_field].dtype)
             if dtype_str in ("int64", "float64"):
-                # Convert to int64 (RangePartitioning requires INT64)
                 df[partition_field] = df[partition_field].fillna(0).astype("int64")
                 range_partitioning = bigquery.RangePartitioning(
                     field=partition_field,
@@ -268,16 +267,26 @@ def _write_bigquery_gold(df: pd.DataFrame, table_name: str) -> str:
             else:
                 time_partitioning = bigquery.TimePartitioning(field=partition_field)
 
+        # When table already exists (e.g. Terraform-managed), don't supply schema —
+        # BQ validates against the existing definition and rejects mode mismatches.
+        try:
+            client.get_table(table_id)
+            table_exists = True
+        except Exception:
+            table_exists = False
+
         job_config = bigquery.LoadJobConfig(
             write_disposition="WRITE_APPEND",
             create_disposition="CREATE_IF_NEEDED",
-            time_partitioning=time_partitioning,
-            range_partitioning=range_partitioning,
+            time_partitioning=time_partitioning if not table_exists else None,
+            range_partitioning=range_partitioning if not table_exists else None,
             clustering_fields=(
-                [f for f in cluster_fields if f in df.columns] if cluster_fields else None
+                ([f for f in cluster_fields if f in df.columns] if cluster_fields else None)
+                if not table_exists
+                else None
             ),
-            autodetect=False,
-            schema=_dataframe_to_bq_schema(df),
+            autodetect=not table_exists,
+            schema=_dataframe_to_bq_schema(df) if not table_exists else None,
         )
 
         if "ingested_at" not in df.columns:
