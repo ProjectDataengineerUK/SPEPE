@@ -36,6 +36,12 @@ resource "google_project_iam_member" "cloud_run_pubsub" {
   member  = "serviceAccount:${google_service_account.cloud_run.email}"
 }
 
+resource "google_project_iam_member" "cloud_run_bq_job_user" {
+  project = var.project_id
+  role    = "roles/bigquery.jobUser"
+  member  = "serviceAccount:${google_service_account.cloud_run.email}"
+}
+
 # ── IAM — DataOps Jobs SA ─────────────────────────────────────────────────────
 
 resource "google_project_iam_member" "dataops_bigquery" {
@@ -47,6 +53,12 @@ resource "google_project_iam_member" "dataops_bigquery" {
 resource "google_project_iam_member" "dataops_gcs" {
   project = var.project_id
   role    = "roles/storage.objectAdmin"
+  member  = "serviceAccount:${google_service_account.dataops_jobs.email}"
+}
+
+resource "google_project_iam_member" "dataops_bq_job_user" {
+  project = var.project_id
+  role    = "roles/bigquery.jobUser"
   member  = "serviceAccount:${google_service_account.dataops_jobs.email}"
 }
 
