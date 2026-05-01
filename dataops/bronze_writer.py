@@ -75,6 +75,55 @@ def _write_local(
     return str(out_path)
 
 
+def write_bronze_from_file(
+    src_path: str,
+    source: str,
+    year: int,
+    uf: str,
+    filename: str,
+    use_gcs: bool = False,
+) -> str:
+    """Upload a pre-existing parquet file to Bronze without loading it into memory.
+
+    Used by TSE ingest (18M+ rows) to avoid the OOM caused by df.copy() in write_bronze.
+    """
+    from datetime import datetime, timezone
+
+    if use_gcs and GCS_BUCKET:
+        try:
+            from google.cloud import storage
+
+            client = storage.Client()
+            bucket = client.bucket(GCS_BUCKET)
+            gcs_path = _gcs_path(source, year, uf, filename)
+            blob = bucket.blob(gcs_path)
+            if blob.exists():
+                logger.info("Bronze GCS já existe (imutável): gs://%s/%s", GCS_BUCKET, gcs_path)
+                os.unlink(src_path)
+                return f"gs://{GCS_BUCKET}/{gcs_path}"
+            blob.upload_from_filename(src_path, content_type="application/octet-stream")
+            full_path = f"gs://{GCS_BUCKET}/{gcs_path}"
+            logger.info("Bronze GCS escrito: %s", full_path)
+            os.unlink(src_path)
+            return full_path
+        except ImportError:
+            logger.warning("google-cloud-storage não disponível. Usando local.")
+
+    base = LOCAL_BRONZE_DIR
+    out_dir = base / source / str(year) / uf.upper()
+    out_dir.mkdir(parents=True, exist_ok=True)
+    out_path = out_dir / filename
+    if out_path.exists():
+        logger.info("Bronze já existe (imutável): %s", out_path)
+        os.unlink(src_path)
+        return str(out_path)
+    import shutil
+    shutil.move(src_path, out_path)
+    size_mb = out_path.stat().st_size / 1_048_576
+    logger.info("Bronze escrito: %s (%.1f MB)", out_path, size_mb)
+    return str(out_path)
+
+
 def _write_gcs(df: pd.DataFrame, source: str, year: int, uf: str, filename: str) -> str:
     try:
         from google.cloud import storage

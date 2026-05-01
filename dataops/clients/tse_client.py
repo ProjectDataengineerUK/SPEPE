@@ -8,6 +8,8 @@ import tempfile
 import zipfile
 
 import pandas as pd
+import pyarrow as pa
+import pyarrow.parquet as pq
 import requests
 from tenacity import retry, stop_after_attempt, wait_exponential
 
@@ -64,28 +66,31 @@ _NUMERIC_COLS = (
 
 
 @retry(stop=stop_after_attempt(3), wait=wait_exponential(min=2, max=30))
-def download_tse_resultados(uf: str, year: int) -> pd.DataFrame:
-    """Download TSE votacao_secao ZIP and return concatenated DataFrame.
+def download_tse_resultados(uf: str, year: int) -> str:
+    """Download TSE votacao_secao ZIP, normalize per chunk, write to temp parquet.
 
-    Streams the ZIP to a temp file to avoid OOM on large states (SP ~1.5 GB).
-    Reads each CSV in 500k-row chunks for the same reason.
+    Returns path to the parquet file. Never loads the full DataFrame into memory —
+    each 500k-row chunk is normalized and written via pyarrow streaming, then freed.
+    Caller is responsible for deleting the returned file after use.
     """
     url = _CDN.format(year=year, uf=uf.upper())
     logger.info("Baixando TSE: %s", url)
 
-    tmp_fd, tmp_path = tempfile.mkstemp(suffix=".zip")
+    tmp_fd, tmp_zip = tempfile.mkstemp(suffix=".zip")
+    tmp_parquet = tmp_zip.replace(".zip", ".parquet")
     try:
         with requests.get(url, timeout=300, stream=True) as resp:
             resp.raise_for_status()
             with os.fdopen(tmp_fd, "wb") as fout:
-                for chunk in resp.iter_content(chunk_size=8 * 1024 * 1024):
-                    fout.write(chunk)
-        logger.info("ZIP baixado: %s (%.1f MB)", tmp_path, os.path.getsize(tmp_path) / 1e6)
+                for http_chunk in resp.iter_content(chunk_size=8 * 1024 * 1024):
+                    fout.write(http_chunk)
+        logger.info("ZIP baixado: %s (%.1f MB)", tmp_zip, os.path.getsize(tmp_zip) / 1e6)
 
         _KEEP_COLS = set(_COL_MAP.keys())
+        writer: pq.ParquetWriter | None = None
+        total_rows = 0
 
-        frames: list[pd.DataFrame] = []
-        with zipfile.ZipFile(tmp_path) as zf:
+        with zipfile.ZipFile(tmp_zip) as zf:
             csv_files = [n for n in zf.namelist() if n.lower().endswith(".csv")]
             if not csv_files:
                 raise ValueError(f"ZIP TSE vazio para {uf}/{year}: {zf.namelist()}")
@@ -93,7 +98,6 @@ def download_tse_resultados(uf: str, year: int) -> pd.DataFrame:
             for name in csv_files:
                 with zf.open(name) as f:
                     try:
-                        chunks = []
                         for chunk in pd.read_csv(
                             f,
                             sep=";",
@@ -101,25 +105,30 @@ def download_tse_resultados(uf: str, year: int) -> pd.DataFrame:
                             dtype=str,
                             chunksize=500_000,
                         ):
-                            # Filtra colunas irrelevantes em-chunk — reduz ~70% da memória
                             keep = [c for c in chunk.columns if c in _KEEP_COLS]
-                            chunks.append(chunk[keep])
-                        if chunks:
-                            df = pd.concat(chunks, ignore_index=True)
-                            frames.append(df)
-                            logger.info("Lido %s: %d linhas", name, len(df))
+                            chunk = chunk[keep]
+                            chunk = normalize_columns(chunk, year)
+                            table = pa.Table.from_pandas(chunk, preserve_index=False)
+                            if writer is None:
+                                writer = pq.ParquetWriter(tmp_parquet, table.schema, compression="zstd")
+                            writer.write_table(table)
+                            total_rows += len(chunk)
+                            del chunk, table
                     except Exception as exc:
                         logger.warning("Falha ao ler %s: %s", name, exc)
+
+        if writer:
+            writer.close()
+
+        if total_rows == 0:
+            raise ValueError(f"Nenhuma linha lida do ZIP TSE {uf}/{year}")
+
+        logger.info("TSE streaming: %d linhas → %s", total_rows, tmp_parquet)
+        return tmp_parquet
+
     finally:
-        if os.path.exists(tmp_path):
-            os.unlink(tmp_path)
-
-    if not frames:
-        raise ValueError(f"Nenhum CSV lido do ZIP TSE {uf}/{year}")
-
-    result = pd.concat(frames, ignore_index=True)
-    logger.info("TSE raw: %d linhas, colunas=%s", len(result), list(result.columns[:6]))
-    return result
+        if os.path.exists(tmp_zip):
+            os.unlink(tmp_zip)
 
 
 def normalize_columns(df: pd.DataFrame, year: int) -> pd.DataFrame:
