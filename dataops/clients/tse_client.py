@@ -110,7 +110,9 @@ def download_tse_resultados(uf: str, year: int) -> str:
                             chunk = normalize_columns(chunk, year)
                             table = pa.Table.from_pandas(chunk, preserve_index=False)
                             if writer is None:
-                                writer = pq.ParquetWriter(tmp_parquet, table.schema, compression="zstd")
+                                writer = pq.ParquetWriter(
+                                    tmp_parquet, table.schema, compression="zstd"
+                                )
                             writer.write_table(table)
                             total_rows += len(chunk)
                             del chunk, table

@@ -116,6 +116,7 @@ def write_bronze_from_file(
         os.unlink(src_path)
         return str(out_path)
     import shutil
+
     shutil.move(src_path, out_path)
     size_mb = out_path.stat().st_size / 1_048_576
     logger.info("Bronze escrito: %s (%.1f MB)", out_path, size_mb)
