@@ -16,8 +16,70 @@ _BQ_SILVER_DATASET = os.environ.get("BIGQUERY_DATASET_SILVER", "spepe_silver")
 _GCP_PROJECT = os.environ.get("GCP_PROJECT_ID", "")
 
 
+def _build_gold_via_bigquery_sql() -> dict:
+    """Build all Gold tables using BigQuery SQL — no data movement to Python."""
+    from google.cloud import bigquery
+
+    client = bigquery.Client(project=_GCP_PROJECT)
+    _BQ_GOLD_DATASET = os.environ.get("BIGQUERY_DATASET_GOLD", "spepe_gold")
+    silver = f"`{_GCP_PROJECT}.{_BQ_SILVER_DATASET}`"
+    gold = f"{_GCP_PROJECT}.{_BQ_GOLD_DATASET}"
+
+    sqls = {
+        "fact_municipio_eleicao": f"""
+            CREATE OR REPLACE TABLE `{gold}.fact_municipio_eleicao` AS
+            SELECT
+                sg_uf, cd_municipio, nm_municipio, cd_cargo, ds_cargo, nr_turno, ano_eleicao,
+                SUM(qt_votos) AS total_votos,
+                COUNT(DISTINCT nr_candidato) AS n_candidatos,
+                COUNT(DISTINCT CONCAT(CAST(nr_zona AS STRING), '-', CAST(nr_secao AS STRING))) AS n_secoes,
+                CURRENT_TIMESTAMP() AS ingested_at
+            FROM {silver}.tse_*
+            GROUP BY sg_uf, cd_municipio, nm_municipio, cd_cargo, ds_cargo, nr_turno, ano_eleicao
+        """,
+        "fact_secao_eleicao": f"""
+            CREATE OR REPLACE TABLE `{gold}.fact_secao_eleicao` AS
+            SELECT
+                sg_uf, cd_municipio, nr_zona, nr_secao, cd_cargo, nr_turno, ano_eleicao,
+                SUM(qt_votos) AS total_votos,
+                COUNT(DISTINCT nr_candidato) AS n_candidatos,
+                CURRENT_TIMESTAMP() AS ingested_at
+            FROM {silver}.tse_*
+            GROUP BY sg_uf, cd_municipio, nr_zona, nr_secao, cd_cargo, nr_turno, ano_eleicao
+        """,
+        "fact_candidato_eleicao": f"""
+            CREATE OR REPLACE TABLE `{gold}.fact_candidato_eleicao` AS
+            SELECT
+                sg_uf, nr_candidato, nm_candidato, sg_partido, cd_cargo, ds_cargo, nr_turno, ano_eleicao,
+                SUM(qt_votos) AS total_votos,
+                COUNT(DISTINCT cd_municipio) AS n_municipios,
+                CURRENT_TIMESTAMP() AS ingested_at
+            FROM {silver}.tse_*
+            GROUP BY sg_uf, nr_candidato, nm_candidato, sg_partido, cd_cargo, ds_cargo, nr_turno, ano_eleicao
+        """,
+    }
+
+    results = {}
+    for table_name, sql in sqls.items():
+        try:
+            job = client.query(sql)
+            job.result()
+            row_count = (
+                client.query(f"SELECT COUNT(*) FROM `{gold}.{table_name}`")
+                .to_dataframe()
+                .iloc[0, 0]
+            )
+            results[table_name] = {"path": f"{gold}.{table_name}", "rows": int(row_count)}
+            logger.info("Gold BQ SQL: %s (%d rows)", table_name, row_count)
+        except Exception as exc:
+            logger.error("Gold BQ SQL falhou para %s: %s", table_name, exc)
+            results[table_name] = {"status": "error", "message": str(exc)}
+
+    return {"status": "ok", "tables": results}
+
+
 def _load_silver_from_bigquery() -> pd.DataFrame:
-    """Read all tse_* tables from BigQuery Silver dataset."""
+    """Read all tse_* tables from BigQuery Silver dataset (local/small UFs only)."""
     try:
         from google.cloud import bigquery
 
@@ -43,13 +105,14 @@ ELECTION_YEARS = [2014, 2018, 2022]
 
 
 def build_gold(use_bigquery: bool = False) -> dict:
-    """Build all 3 Gold tables from Silver layer."""
+    """Build all Gold tables from Silver layer."""
     LOCAL_GOLD_DIR.mkdir(parents=True, exist_ok=True)
 
-    df_all = pd.DataFrame()
+    # BQ path: run aggregations as SQL — no data movement to Python
     if use_bigquery and _GCP_PROJECT:
-        df_all = _load_silver_from_bigquery()
+        return _build_gold_via_bigquery_sql()
 
+    df_all = pd.DataFrame()
     if df_all.empty:
         silver_files = list(LOCAL_SILVER_DIR.glob("tse_*.parquet"))
         if not silver_files:
