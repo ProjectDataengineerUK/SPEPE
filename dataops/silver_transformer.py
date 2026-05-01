@@ -106,7 +106,7 @@ def _load_bronze_tse(uf: str, year: int) -> pd.DataFrame:
 
 def _load_bronze_ibge(uf: str) -> pd.DataFrame:
     if GCS_BUCKET:
-        prefix = f"raw/ibge/"
+        prefix = "raw/ibge/"
         df = _read_gcs_parquet_glob(GCS_BUCKET, prefix)
         if not df.empty:
             df_uf = (
