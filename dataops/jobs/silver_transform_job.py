@@ -54,6 +54,12 @@ def main(uf: str, years: list[int] | None = None, include_social: bool = True) -
         sys.exit(1)
 
 
+_ALL_UFS = [
+    "AC", "AL", "AP", "AM", "BA", "CE", "DF", "ES", "GO", "MA",
+    "MT", "MS", "MG", "PA", "PB", "PR", "PE", "PI", "RJ", "RN",
+    "RS", "RO", "RR", "SC", "SP", "SE", "TO",
+]
+
 if __name__ == "__main__":
     import argparse
 
@@ -61,4 +67,6 @@ if __name__ == "__main__":
     parser.add_argument("--uf", default=os.environ.get("DEFAULT_UF", "SP"))
     parser.add_argument("--years", nargs="+", type=int, default=YEARS)
     args = parser.parse_args()
-    main(args.uf, args.years)
+    ufs = _ALL_UFS if args.uf.upper() == "ALL" else [args.uf.upper()]
+    for uf in ufs:
+        main(uf, args.years)

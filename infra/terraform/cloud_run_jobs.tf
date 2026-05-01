@@ -1,16 +1,20 @@
 locals {
+  # dev: SP only; prod: all 27 UFs (--uf ALL triggers internal loop in each job)
+  prod_mode = var.environment == "prod"
+  uf_arg    = local.prod_mode ? "ALL" : "SP"
+
   jobs = {
-    tse_ingest       = { timeout = "3600s", memory = "4Gi", cpu = "2", args = ["--uf", "SP"] }
-    ibge_sync        = { timeout = "1800s", memory = "1Gi", cpu = "1", args = ["--uf", "SP"] }
-    security_ingest  = { timeout = "1800s", memory = "1Gi", cpu = "1", args = ["--uf", "SP"] }
-    datasus_ingest   = { timeout = "1800s", memory = "1Gi", cpu = "1", args = ["--uf", "SP"] }
-    dieese_ingest    = { timeout = "900s",  memory = "512Mi", cpu = "1", args = ["--uf", "SP"] }
-    cetic_ingest     = { timeout = "900s",  memory = "512Mi", cpu = "1", args = ["--uf", "SP"] }
-    silver_transform = { timeout = "1800s", memory = "2Gi", cpu = "2", args = ["--uf", "SP"] }
+    tse_ingest       = { timeout = local.prod_mode ? "7200s" : "3600s", memory = "4Gi",   cpu = "2", args = ["--uf", local.uf_arg] }
+    ibge_sync        = { timeout = local.prod_mode ? "3600s" : "1800s", memory = "1Gi",   cpu = "1", args = ["--uf", local.uf_arg] }
+    security_ingest  = { timeout = local.prod_mode ? "3600s" : "1800s", memory = "1Gi",   cpu = "1", args = ["--uf", local.uf_arg] }
+    datasus_ingest   = { timeout = local.prod_mode ? "3600s" : "1800s", memory = "1Gi",   cpu = "1", args = ["--uf", local.uf_arg] }
+    dieese_ingest    = { timeout = local.prod_mode ? "1800s" : "900s",  memory = "512Mi", cpu = "1", args = ["--uf", local.uf_arg] }
+    cetic_ingest     = { timeout = local.prod_mode ? "1800s" : "900s",  memory = "512Mi", cpu = "1", args = ["--uf", local.uf_arg] }
+    silver_transform = { timeout = local.prod_mode ? "7200s" : "1800s", memory = "2Gi",   cpu = "2", args = ["--uf", local.uf_arg] }
     gold_build       = { timeout = "1800s", memory = "2Gi", cpu = "2", args = [] }
-    digital_ingest   = { timeout = "900s",  memory = "1Gi",  cpu = "1", args = [] }
-    social_ingest    = { timeout = "1800s", memory = "1Gi",  cpu = "1", args = [] }
-    pesquisas_ingest = { timeout = "1800s", memory = "1Gi",  cpu = "1", args = [] }
+    digital_ingest   = { timeout = "900s",  memory = "1Gi", cpu = "1", args = [] }
+    social_ingest    = { timeout = "1800s", memory = "1Gi", cpu = "1", args = [] }
+    pesquisas_ingest = { timeout = "1800s", memory = "1Gi", cpu = "1", args = [] }
   }
 
   # Env vars adicionais por job (além das compartilhadas)

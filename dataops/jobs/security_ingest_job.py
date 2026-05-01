@@ -60,9 +60,17 @@ def main(uf: str, year: int) -> None:
     logger.info("Security Bronze: %s (%d rows)", out_path, len(df))
 
 
+_ALL_UFS = [
+    "AC", "AL", "AP", "AM", "BA", "CE", "DF", "ES", "GO", "MA",
+    "MT", "MS", "MG", "PA", "PB", "PR", "PE", "PI", "RJ", "RN",
+    "RS", "RO", "RR", "SC", "SP", "SE", "TO",
+]
+
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="SPEPE Security Ingest Job")
     parser.add_argument("--uf", default=DEFAULT_UF)
     parser.add_argument("--year", type=int, default=DEFAULT_YEAR)
     args = parser.parse_args()
-    main(uf=args.uf, year=args.year)
+    ufs = _ALL_UFS if args.uf.upper() == "ALL" else [args.uf.upper()]
+    for uf in ufs:
+        main(uf=uf, year=args.year)

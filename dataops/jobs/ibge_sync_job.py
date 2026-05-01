@@ -98,4 +98,6 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--uf", default=os.environ.get("DEFAULT_UF", "SP"))
     args = parser.parse_args()
-    main(args.uf)
+    ufs = list(UF_CODES.keys()) if args.uf.upper() == "ALL" else [args.uf.upper()]
+    for uf in ufs:
+        main(uf)
