@@ -283,13 +283,16 @@ def _dataframe_to_bq_schema(df: pd.DataFrame) -> list:
         "float32": "FLOAT64",
         "bool": "BOOL",
         "object": "STRING",
-        "datetime64[ns]": "TIMESTAMP",
-        "datetime64[ns, UTC]": "TIMESTAMP",
-        "date": "DATE",
     }
     fields = []
     for col, dtype in df.dtypes.items():
-        bq_type = _type_map.get(str(dtype), "STRING")
+        dtype_str = str(dtype)
+        if dtype_str.startswith("datetime64"):
+            bq_type = "TIMESTAMP"
+        elif dtype_str == "date":
+            bq_type = "DATE"
+        else:
+            bq_type = _type_map.get(dtype_str, "STRING")
         fields.append(bigquery.SchemaField(col, bq_type, mode="NULLABLE"))
     return fields
 
