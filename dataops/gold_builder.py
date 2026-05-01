@@ -12,6 +12,30 @@ logger = logging.getLogger("spepe.dataops.gold")
 
 LOCAL_GOLD_DIR = Path(os.environ.get("DATA_DIR", "data")) / "gold"
 LOCAL_SILVER_DIR = Path(os.environ.get("DATA_DIR", "data")) / "silver"
+_BQ_SILVER_DATASET = os.environ.get("BIGQUERY_DATASET_SILVER", "spepe_silver")
+_GCP_PROJECT = os.environ.get("GCP_PROJECT_ID", "")
+
+
+def _load_silver_from_bigquery() -> pd.DataFrame:
+    """Read all tse_* tables from BigQuery Silver dataset."""
+    try:
+        from google.cloud import bigquery
+
+        client = bigquery.Client(project=_GCP_PROJECT)
+        tables = list(client.list_tables(f"{_GCP_PROJECT}.{_BQ_SILVER_DATASET}"))
+        tse_tables = [t for t in tables if t.table_id.startswith("tse_")]
+        if not tse_tables:
+            return pd.DataFrame()
+        frames = []
+        for t in tse_tables:
+            table_ref = f"{_GCP_PROJECT}.{_BQ_SILVER_DATASET}.{t.table_id}"
+            df = client.query(f"SELECT * FROM `{table_ref}`").to_dataframe()
+            frames.append(df)
+        return pd.concat(frames, ignore_index=True) if frames else pd.DataFrame()
+    except Exception as exc:
+        logger.warning("BigQuery Silver read failed: %s", exc)
+        return pd.DataFrame()
+
 
 ELECTION_YEARS = [2014, 2018, 2022]
 
@@ -20,15 +44,18 @@ def build_gold(use_bigquery: bool = False) -> dict:
     """Build all 3 Gold tables from Silver layer."""
     LOCAL_GOLD_DIR.mkdir(parents=True, exist_ok=True)
 
-    silver_files = list(LOCAL_SILVER_DIR.glob("tse_*.parquet"))
-    if not silver_files:
-        return {
-            "status": "error",
-            "message": "Nenhum arquivo Silver disponível. Execute silver_transform primeiro.",
-        }
+    df_all = pd.DataFrame()
+    if use_bigquery and _GCP_PROJECT:
+        df_all = _load_silver_from_bigquery()
 
-    dfs = {str(f): pd.read_parquet(f) for f in silver_files}
-    df_all = pd.concat(list(dfs.values()), ignore_index=True) if dfs else pd.DataFrame()
+    if df_all.empty:
+        silver_files = list(LOCAL_SILVER_DIR.glob("tse_*.parquet"))
+        if not silver_files:
+            return {
+                "status": "error",
+                "message": "Nenhum arquivo Silver disponível. Execute silver_transform primeiro.",
+            }
+        df_all = pd.concat([pd.read_parquet(f) for f in silver_files], ignore_index=True)
 
     result = {}
 

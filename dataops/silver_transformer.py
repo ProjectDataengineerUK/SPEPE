@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import io
 import logging
 import os
 from pathlib import Path
@@ -14,6 +15,24 @@ logger = logging.getLogger("spepe.dataops.silver")
 
 LOCAL_SILVER_DIR = Path(os.environ.get("DATA_DIR", "data")) / "silver"
 LOCAL_BRONZE_DIR = Path(os.environ.get("DATA_DIR", "data")) / "bronze"
+GCS_BUCKET = os.environ.get("GCS_BUCKET", "")
+
+
+def _read_gcs_parquet_glob(bucket_name: str, prefix: str) -> pd.DataFrame:
+    """Read all parquet files under a GCS prefix into a single DataFrame."""
+    from google.cloud import storage
+
+    client = storage.Client()
+    bucket = client.bucket(bucket_name)
+    blobs = [b for b in bucket.list_blobs(prefix=prefix) if b.name.endswith(".parquet")]
+    if not blobs:
+        return pd.DataFrame()
+    frames = []
+    for blob in blobs:
+        data = blob.download_as_bytes()
+        frames.append(pd.read_parquet(io.BytesIO(data)))
+    return pd.concat(frames, ignore_index=True)
+
 
 CANONICAL_TSE_COLS = [
     "sg_uf",
@@ -69,19 +88,35 @@ def transform_to_silver(
 
 
 def _load_bronze_tse(uf: str, year: int) -> pd.DataFrame:
+    if GCS_BUCKET:
+        prefix = f"raw/tse/{year}/{uf.upper()}/"
+        df = _read_gcs_parquet_glob(GCS_BUCKET, prefix)
+        if not df.empty:
+            return df
+
     bronze_path = LOCAL_BRONZE_DIR / "tse" / str(year) / uf.upper()
     files = list(bronze_path.glob("*.parquet")) if bronze_path.exists() else []
-
     if not files:
         legacy = Path(f"data/tse/resultados_{uf.upper()}_{year}.parquet")
         if legacy.exists():
             return pd.read_parquet(legacy)
         return pd.DataFrame()
-
     return pd.concat([pd.read_parquet(f) for f in files], ignore_index=True)
 
 
 def _load_bronze_ibge(uf: str) -> pd.DataFrame:
+    if GCS_BUCKET:
+        prefix = f"raw/ibge/"
+        df = _read_gcs_parquet_glob(GCS_BUCKET, prefix)
+        if not df.empty:
+            df_uf = (
+                df[df.get("sg_uf", pd.Series(dtype=str)).str.upper() == uf.upper()]
+                if "sg_uf" in df.columns
+                else df
+            )
+            if not df_uf.empty:
+                return df_uf
+
     ibge_dir = LOCAL_BRONZE_DIR / "ibge"
     files = list(ibge_dir.glob(f"*{uf.upper()}*.parquet")) if ibge_dir.exists() else []
     if not files:
