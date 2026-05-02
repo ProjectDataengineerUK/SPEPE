@@ -68,7 +68,7 @@ def _build_gold_via_bigquery_sql() -> dict:
             job.result()
             row_count = (
                 client.query(f"SELECT COUNT(*) FROM `{gold}.{table_name}`")
-                .to_dataframe()
+                .to_dataframe(create_bqstorage_client=False)
                 .iloc[0, 0]
             )
             results[table_name] = {"path": f"{gold}.{table_name}", "rows": int(row_count)}
