@@ -65,9 +65,10 @@ def fetch_perfil_eleitorado(uf: str, year: int) -> pd.DataFrame:
             if not name.lower().endswith(".csv"):
                 continue
             with zf.open(name) as f:
+                chunk: pd.DataFrame | None = None
                 for enc in ("utf-8-sig", "latin-1", "cp1252"):
                     try:
-                        df = pd.read_csv(
+                        chunk = pd.read_csv(
                             io.BytesIO(f.read()),
                             sep=";",
                             encoding=enc,
@@ -78,7 +79,8 @@ def fetch_perfil_eleitorado(uf: str, year: int) -> pd.DataFrame:
                     except UnicodeDecodeError:
                         f.seek(0)
                         continue
-                frames.append(df)
+                if chunk is not None:
+                    frames.append(chunk)
 
     if not frames:
         logger.warning("Nenhum CSV no zip: UF=%s ano=%d", uf, year)
