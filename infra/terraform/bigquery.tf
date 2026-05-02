@@ -355,42 +355,6 @@ resource "google_bigquery_table" "fact_saude_municipio" {
   ])
 }
 
-# Indicadores econômicos municipais — DIEESE (cesta básica) + PIB per capita IBGE
-resource "google_bigquery_table" "fact_economico_municipio" {
-  dataset_id               = google_bigquery_dataset.spepe_gold.dataset_id
-  table_id                 = "fact_economico_municipio"
-  description              = "Indicadores econômicos por município × ano — DIEESE cesta básica + PIB IBGE + desigualdade"
-  labels                   = local.labels
-  deletion_protection      = var.environment == "prod"
-  require_partition_filter = false # volume pequeno — 5570 municípios × anos
-
-  time_partitioning {
-    type  = "YEAR"
-    field = "data_referencia"
-  }
-
-  clustering = ["sg_uf", "cd_municipio_ibge"]
-
-  schema = jsonencode([
-    { name = "cd_municipio_ibge", type = "INT64", mode = "REQUIRED" },
-    { name = "sg_uf", type = "STRING", mode = "REQUIRED" },
-    { name = "data_referencia", type = "DATE", mode = "REQUIRED" },
-    # DIEESE — Cesta Básica (nível UF — capital)
-    { name = "cesta_basica_capital_brl", type = "FLOAT64", mode = "NULLABLE" },
-    { name = "variacao_cesta_mensal_pct", type = "FLOAT64", mode = "NULLABLE" },
-    { name = "horas_trabalho_cesta", type = "FLOAT64", mode = "NULLABLE" },
-    # IBGE — PIB e renda
-    { name = "pib_per_capita_brl", type = "FLOAT64", mode = "NULLABLE" },
-    { name = "pib_total_mil_brl", type = "FLOAT64", mode = "NULLABLE" },
-    # Desigualdade
-    { name = "gini_renda", type = "FLOAT64", mode = "NULLABLE" },
-    { name = "pct_extrema_pobreza", type = "FLOAT64", mode = "NULLABLE" },
-    { name = "pct_pobreza", type = "FLOAT64", mode = "NULLABLE" },
-    # Metadados
-    { name = "fontes", type = "STRING", mode = "NULLABLE" },
-    { name = "ingested_at", type = "TIMESTAMP", mode = "REQUIRED" },
-  ])
-}
 
 # ─── Silver: Social ───────────────────────────────────────────────────────────
 resource "google_bigquery_table" "silver_social_mencoes_br" {
@@ -500,10 +464,11 @@ resource "google_bigquery_table" "fact_ibge_municipio" {
   ])
 }
 
+# Gold: indicadores econômicos municipais — DIEESE + CETIC + PIB IBGE + desigualdade
 resource "google_bigquery_table" "fact_economico_municipio" {
   dataset_id          = google_bigquery_dataset.spepe_gold.dataset_id
   table_id            = "fact_economico_municipio"
-  description         = "Gold: indicadores econômicos municipais — DIEESE cesta básica + CETIC acesso digital"
+  description         = "Indicadores econômicos municipais — DIEESE cesta básica + CETIC + PIB IBGE"
   labels              = local.labels
   deletion_protection = var.environment == "prod"
 
@@ -519,18 +484,21 @@ resource "google_bigquery_table" "fact_economico_municipio" {
   clustering = ["sg_uf", "cd_municipio_ibge"]
 
   schema = jsonencode([
-    { name = "cd_municipio_ibge", type = "INT64", mode = "REQUIRED" },
-    { name = "sg_uf", type = "STRING", mode = "REQUIRED" },
-    { name = "ano", type = "INT64", mode = "REQUIRED" },
-    { name = "data_referencia", type = "DATE", mode = "NULLABLE" },
-    { name = "cesta_basica_capital_brl", type = "FLOAT64", mode = "NULLABLE" },
-    { name = "variacao_cesta_mensal_pct", type = "FLOAT64", mode = "NULLABLE" },
-    { name = "horas_trabalho_cesta", type = "FLOAT64", mode = "NULLABLE" },
-    { name = "pct_internet_domiciliar", type = "FLOAT64", mode = "NULLABLE" },
-    { name = "pct_computador_domiciliar", type = "FLOAT64", mode = "NULLABLE" },
-    { name = "pct_smartphone_domiciliar", type = "FLOAT64", mode = "NULLABLE" },
-    { name = "granularidade", type = "STRING", mode = "NULLABLE" },
-    { name = "fontes", type = "STRING", mode = "NULLABLE" },
-    { name = "ingested_at", type = "TIMESTAMP", mode = "REQUIRED" },
+    { name = "cd_municipio_ibge",          type = "INT64",   mode = "REQUIRED" },
+    { name = "sg_uf",                      type = "STRING",  mode = "REQUIRED" },
+    { name = "ano",                        type = "INT64",   mode = "REQUIRED" },
+    { name = "data_referencia",            type = "DATE",    mode = "NULLABLE" },
+    { name = "cesta_basica_capital_brl",   type = "FLOAT64", mode = "NULLABLE" },
+    { name = "variacao_cesta_mensal_pct",  type = "FLOAT64", mode = "NULLABLE" },
+    { name = "horas_trabalho_cesta",       type = "FLOAT64", mode = "NULLABLE" },
+    { name = "pct_internet_domiciliar",    type = "FLOAT64", mode = "NULLABLE" },
+    { name = "pct_computador_domiciliar",  type = "FLOAT64", mode = "NULLABLE" },
+    { name = "pct_smartphone_domiciliar",  type = "FLOAT64", mode = "NULLABLE" },
+    { name = "pib_per_capita_brl",         type = "FLOAT64", mode = "NULLABLE" },
+    { name = "gini_renda",                 type = "FLOAT64", mode = "NULLABLE" },
+    { name = "pct_extrema_pobreza",        type = "FLOAT64", mode = "NULLABLE" },
+    { name = "granularidade",              type = "STRING",  mode = "NULLABLE" },
+    { name = "fontes",                     type = "STRING",  mode = "NULLABLE" },
+    { name = "ingested_at",                type = "TIMESTAMP", mode = "REQUIRED" },
   ])
 }

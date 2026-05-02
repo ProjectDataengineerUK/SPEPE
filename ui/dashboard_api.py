@@ -602,6 +602,451 @@ async def get_meta(
     return JSONResponse({"candidatos": results})
 
 
+# ── Socioeconômico ─────────────────────────────────────────────────────────
+
+_MOCK_SOCIOECONOMICO = [
+    {"nm": "Santos",              "idhm": 0.840, "renda_per_capita": 2100, "gini": 0.54,
+     "pct_extrema_pobreza": 2.9, "taxa_analfabetismo": 1.8, "pct_urbano": 99.8,
+     "populacao": 432957},
+    {"nm": "São José dos Campos", "idhm": 0.807, "renda_per_capita": 1980, "gini": 0.57,
+     "pct_extrema_pobreza": 3.1, "taxa_analfabetismo": 2.0, "pct_urbano": 97.5,
+     "populacao": 729737},
+    {"nm": "São Paulo",           "idhm": 0.805, "renda_per_capita": 2200, "gini": 0.61,
+     "pct_extrema_pobreza": 4.2, "taxa_analfabetismo": 2.1, "pct_urbano": 99.1,
+     "populacao": 11451245},
+    {"nm": "Campinas",            "idhm": 0.805, "renda_per_capita": 1950, "gini": 0.58,
+     "pct_extrema_pobreza": 3.8, "taxa_analfabetismo": 2.5, "pct_urbano": 98.3,
+     "populacao": 1213792},
+    {"nm": "Ribeirão Preto",      "idhm": 0.800, "renda_per_capita": 1870, "gini": 0.55,
+     "pct_extrema_pobreza": 3.5, "taxa_analfabetismo": 2.3, "pct_urbano": 98.7,
+     "populacao": 694534},
+    {"nm": "Sorocaba",            "idhm": 0.798, "renda_per_capita": 1750, "gini": 0.56,
+     "pct_extrema_pobreza": 4.0, "taxa_analfabetismo": 2.4, "pct_urbano": 97.8,
+     "populacao": 687357},
+    {"nm": "Guarulhos",           "idhm": 0.763, "renda_per_capita": 1320, "gini": 0.59,
+     "pct_extrema_pobreza": 6.5, "taxa_analfabetismo": 3.8, "pct_urbano": 99.6,
+     "populacao": 1391512},
+    {"nm": "Mauá",                "idhm": 0.766, "renda_per_capita": 1180, "gini": 0.57,
+     "pct_extrema_pobreza": 7.2, "taxa_analfabetismo": 3.9, "pct_urbano": 99.8,
+     "populacao": 471961},
+    {"nm": "Carapicuíba",         "idhm": 0.749, "renda_per_capita": 1050, "gini": 0.55,
+     "pct_extrema_pobreza": 8.5, "taxa_analfabetismo": 4.0, "pct_urbano": 99.9,
+     "populacao": 390293},
+    {"nm": "Itaquaquecetuba",     "idhm": 0.735, "renda_per_capita": 980,  "gini": 0.53,
+     "pct_extrema_pobreza": 9.8, "taxa_analfabetismo": 4.2, "pct_urbano": 99.5,
+     "populacao": 376136},
+]
+
+
+@app.get("/api/socioeconomico")
+async def get_socioeconomico(
+    uf: str = Query("SP"),
+    ano: int = Query(2022),
+    limit: int = Query(20, ge=1, le=200),
+) -> JSONResponse:
+    if settings.gcp_project_id and os.environ.get("USE_BIGQUERY", "").lower() == "true":
+        try:
+            return JSONResponse({"municipios": await _bq_socioeconomico(uf, ano, limit)})
+        except Exception as exc:
+            logger.warning("BigQuery socioeconomico falhou: %s", exc)
+    return JSONResponse({"municipios": _MOCK_SOCIOECONOMICO[:limit]})
+
+
+async def _bq_socioeconomico(uf: str, ano: int, limit: int) -> list[dict]:
+    from google.cloud import bigquery
+
+    client = bigquery.Client(project=settings.gcp_project_id)
+    gold = f"{settings.gcp_project_id}.{settings.bigquery_dataset_gold}"
+    query = f"""
+        SELECT nm_municipio,
+               idhm, renda_per_capita, gini, pct_extrema_pobreza,
+               taxa_analfabetismo, pct_urbano, populacao_total
+        FROM `{gold}.fact_ibge_municipio`
+        WHERE sg_uf = @uf AND ano = @ano
+        ORDER BY idhm DESC NULLS LAST
+        LIMIT @lim
+    """
+    job_config = bigquery.QueryJobConfig(
+        query_parameters=[
+            bigquery.ScalarQueryParameter("uf", "STRING", uf.upper()),
+            bigquery.ScalarQueryParameter("ano", "INT64", ano),
+            bigquery.ScalarQueryParameter("lim", "INT64", limit),
+        ]
+    )
+    rows = list(client.query(query, job_config=job_config).result())
+    return [
+        {
+            "nm": r.get("nm_municipio", ""),
+            "idhm": round(r.get("idhm") or 0, 3),
+            "renda_per_capita": round(r.get("renda_per_capita") or 0, 0),
+            "gini": round(r.get("gini") or 0, 3),
+            "pct_extrema_pobreza": round((r.get("pct_extrema_pobreza") or 0) * 100, 1),
+            "taxa_analfabetismo": round((r.get("taxa_analfabetismo") or 0) * 100, 1),
+            "pct_urbano": round((r.get("pct_urbano") or 0) * 100, 1),
+            "populacao": r.get("populacao_total") or 0,
+        }
+        for r in rows
+    ]
+
+
+# ── Segurança Pública ──────────────────────────────────────────────────────
+
+_MOCK_SEGURANCA = [
+    {"nm": "São Paulo",          "taxa_homicidio": 8.2,  "ivs_total": 0.312,
+     "ivs_infra": 0.280, "ivs_capital_humano": 0.320, "ivs_renda": 0.335,
+     "taxa_roubo": 845.2, "qt_feminicidio": 42},
+    {"nm": "Guarulhos",          "taxa_homicidio": 12.4, "ivs_total": 0.380,
+     "ivs_infra": 0.352, "ivs_capital_humano": 0.398, "ivs_renda": 0.390,
+     "taxa_roubo": 620.5, "qt_feminicidio": 15},
+    {"nm": "Campinas",           "taxa_homicidio": 14.1, "ivs_total": 0.340,
+     "ivs_infra": 0.310, "ivs_capital_humano": 0.355, "ivs_renda": 0.355,
+     "taxa_roubo": 710.8, "qt_feminicidio": 12},
+    {"nm": "Ribeirão Preto",     "taxa_homicidio": 11.8, "ivs_total": 0.298,
+     "ivs_infra": 0.275, "ivs_capital_humano": 0.305, "ivs_renda": 0.314,
+     "taxa_roubo": 580.2, "qt_feminicidio": 8},
+    {"nm": "Santos",             "taxa_homicidio": 9.5,  "ivs_total": 0.270,
+     "ivs_infra": 0.245, "ivs_capital_humano": 0.281, "ivs_renda": 0.284,
+     "taxa_roubo": 490.3, "qt_feminicidio": 6},
+    {"nm": "Sorocaba",           "taxa_homicidio": 10.2, "ivs_total": 0.305,
+     "ivs_infra": 0.290, "ivs_capital_humano": 0.318, "ivs_renda": 0.307,
+     "taxa_roubo": 540.1, "qt_feminicidio": 7},
+    {"nm": "Mauá",               "taxa_homicidio": 16.8, "ivs_total": 0.402,
+     "ivs_infra": 0.378, "ivs_capital_humano": 0.425, "ivs_renda": 0.403,
+     "taxa_roubo": 635.7, "qt_feminicidio": 9},
+    {"nm": "Carapicuíba",        "taxa_homicidio": 18.5, "ivs_total": 0.435,
+     "ivs_infra": 0.410, "ivs_capital_humano": 0.450, "ivs_renda": 0.445,
+     "taxa_roubo": 580.9, "qt_feminicidio": 7},
+    {"nm": "Itaquaquecetuba",    "taxa_homicidio": 22.3, "ivs_total": 0.468,
+     "ivs_infra": 0.445, "ivs_capital_humano": 0.480, "ivs_renda": 0.479,
+     "taxa_roubo": 520.4, "qt_feminicidio": 6},
+    {"nm": "São José dos Campos","taxa_homicidio": 9.8,  "ivs_total": 0.288,
+     "ivs_infra": 0.265, "ivs_capital_humano": 0.295, "ivs_renda": 0.304,
+     "taxa_roubo": 502.3, "qt_feminicidio": 8},
+]
+
+
+@app.get("/api/seguranca")
+async def get_seguranca(
+    uf: str = Query("SP"),
+    ano: int = Query(2022),
+    limit: int = Query(15, ge=1, le=100),
+) -> JSONResponse:
+    if settings.gcp_project_id and os.environ.get("USE_BIGQUERY", "").lower() == "true":
+        try:
+            return JSONResponse({"municipios": await _bq_seguranca(uf, ano, limit)})
+        except Exception as exc:
+            logger.warning("BigQuery seguranca falhou: %s", exc)
+    return JSONResponse({"municipios": _MOCK_SEGURANCA[:limit]})
+
+
+async def _bq_seguranca(uf: str, ano: int, limit: int) -> list[dict]:
+    from google.cloud import bigquery
+
+    client = bigquery.Client(project=settings.gcp_project_id)
+    gold = f"{settings.gcp_project_id}.{settings.bigquery_dataset_gold}"
+    query = f"""
+        SELECT s.cd_municipio_ibge,
+               i.nm_municipio,
+               s.taxa_homicidio_100k,
+               s.ivs_total, s.ivs_infraestrutura,
+               s.ivs_capital_humano, s.ivs_renda_trabalho,
+               s.taxa_roubo_100k, s.qt_feminicidio
+        FROM `{gold}.fact_seguranca_municipio` s
+        LEFT JOIN (
+            SELECT DISTINCT cd_municipio_ibge, nm_municipio
+            FROM `{gold}.fact_ibge_municipio`
+        ) i USING (cd_municipio_ibge)
+        WHERE s.sg_uf = @uf AND s.ano = @ano
+        ORDER BY s.taxa_homicidio_100k DESC NULLS LAST
+        LIMIT @lim
+    """
+    job_config = bigquery.QueryJobConfig(
+        query_parameters=[
+            bigquery.ScalarQueryParameter("uf", "STRING", uf.upper()),
+            bigquery.ScalarQueryParameter("ano", "INT64", ano),
+            bigquery.ScalarQueryParameter("lim", "INT64", limit),
+        ]
+    )
+    rows = list(client.query(query, job_config=job_config).result())
+    return [
+        {
+            "nm": r.get("nm_municipio") or str(r.get("cd_municipio_ibge", "")),
+            "taxa_homicidio": round(r.get("taxa_homicidio_100k") or 0, 1),
+            "ivs_total": round(r.get("ivs_total") or 0, 3),
+            "ivs_infra": round(r.get("ivs_infraestrutura") or 0, 3),
+            "ivs_capital_humano": round(r.get("ivs_capital_humano") or 0, 3),
+            "ivs_renda": round(r.get("ivs_renda_trabalho") or 0, 3),
+            "taxa_roubo": round(r.get("taxa_roubo_100k") or 0, 1),
+            "qt_feminicidio": r.get("qt_feminicidio") or 0,
+        }
+        for r in rows
+    ]
+
+
+# ── Saúde Pública ──────────────────────────────────────────────────────────
+
+_MOCK_SAUDE = [
+    {"nm": "Santos",              "tx_mortalidade_infantil": 7.2,
+     "tx_mortalidade_materna": 32.1, "pct_cobertura_plano": 62.4, "idsus": 0.72},
+    {"nm": "São Paulo",           "tx_mortalidade_infantil": 9.8,
+     "tx_mortalidade_materna": 38.5, "pct_cobertura_plano": 55.2, "idsus": 0.70},
+    {"nm": "Campinas",            "tx_mortalidade_infantil": 8.5,
+     "tx_mortalidade_materna": 34.2, "pct_cobertura_plano": 58.1, "idsus": 0.71},
+    {"nm": "São José dos Campos", "tx_mortalidade_infantil": 8.1,
+     "tx_mortalidade_materna": 31.5, "pct_cobertura_plano": 56.8, "idsus": 0.73},
+    {"nm": "Ribeirão Preto",      "tx_mortalidade_infantil": 8.8,
+     "tx_mortalidade_materna": 35.0, "pct_cobertura_plano": 54.5, "idsus": 0.69},
+    {"nm": "Sorocaba",            "tx_mortalidade_infantil": 10.2,
+     "tx_mortalidade_materna": 40.1, "pct_cobertura_plano": 48.3, "idsus": 0.67},
+    {"nm": "Guarulhos",           "tx_mortalidade_infantil": 12.5,
+     "tx_mortalidade_materna": 46.2, "pct_cobertura_plano": 40.1, "idsus": 0.64},
+    {"nm": "Mauá",                "tx_mortalidade_infantil": 13.8,
+     "tx_mortalidade_materna": 50.3, "pct_cobertura_plano": 38.5, "idsus": 0.62},
+    {"nm": "Carapicuíba",         "tx_mortalidade_infantil": 14.2,
+     "tx_mortalidade_materna": 52.5, "pct_cobertura_plano": 35.2, "idsus": 0.60},
+    {"nm": "Itaquaquecetuba",     "tx_mortalidade_infantil": 16.1,
+     "tx_mortalidade_materna": 58.2, "pct_cobertura_plano": 28.4, "idsus": 0.57},
+]
+
+
+@app.get("/api/saude")
+async def get_saude(
+    uf: str = Query("SP"),
+    ano: int = Query(2022),
+    limit: int = Query(15, ge=1, le=100),
+) -> JSONResponse:
+    if settings.gcp_project_id and os.environ.get("USE_BIGQUERY", "").lower() == "true":
+        try:
+            return JSONResponse({"municipios": await _bq_saude(uf, ano, limit)})
+        except Exception as exc:
+            logger.warning("BigQuery saude falhou: %s", exc)
+    return JSONResponse({"municipios": _MOCK_SAUDE[:limit]})
+
+
+async def _bq_saude(uf: str, ano: int, limit: int) -> list[dict]:
+    from google.cloud import bigquery
+
+    client = bigquery.Client(project=settings.gcp_project_id)
+    gold = f"{settings.gcp_project_id}.{settings.bigquery_dataset_gold}"
+    query = f"""
+        SELECT s.cd_municipio_ibge,
+               i.nm_municipio,
+               s.taxa_mortalidade_infantil_1000,
+               s.taxa_mortalidade_materna_100k,
+               s.pct_cobertura_plano_saude,
+               s.idsus_score
+        FROM `{gold}.fact_saude_municipio` s
+        LEFT JOIN (
+            SELECT DISTINCT cd_municipio_ibge, nm_municipio
+            FROM `{gold}.fact_ibge_municipio`
+        ) i USING (cd_municipio_ibge)
+        WHERE s.sg_uf = @uf AND s.ano = @ano
+        ORDER BY s.taxa_mortalidade_infantil_1000 ASC NULLS LAST
+        LIMIT @lim
+    """
+    job_config = bigquery.QueryJobConfig(
+        query_parameters=[
+            bigquery.ScalarQueryParameter("uf", "STRING", uf.upper()),
+            bigquery.ScalarQueryParameter("ano", "INT64", ano),
+            bigquery.ScalarQueryParameter("lim", "INT64", limit),
+        ]
+    )
+    rows = list(client.query(query, job_config=job_config).result())
+    return [
+        {
+            "nm": r.get("nm_municipio") or str(r.get("cd_municipio_ibge", "")),
+            "tx_mortalidade_infantil": round(r.get("taxa_mortalidade_infantil_1000") or 0, 1),
+            "tx_mortalidade_materna": round(r.get("taxa_mortalidade_materna_100k") or 0, 1),
+            "pct_cobertura_plano": round((r.get("pct_cobertura_plano_saude") or 0) * 100, 1),
+            "idsus": round(r.get("idsus_score") or 0, 3),
+        }
+        for r in rows
+    ]
+
+
+# ── Pesquisas Eleitorais ───────────────────────────────────────────────────
+
+_MOCK_PESQUISAS = {
+    "series": [
+        {
+            "candidato": "Lula",
+            "partido": "PT",
+            "pontos": [
+                {"data": "2022-01", "instituto": "Datafolha", "intencao": 41.0, "ajustada": 41.0},
+                {"data": "2022-03", "instituto": "Datafolha", "intencao": 42.5, "ajustada": 42.5},
+                {"data": "2022-05", "instituto": "Ipespe",    "intencao": 43.0, "ajustada": 42.2},
+                {"data": "2022-07", "instituto": "Quaest",    "intencao": 44.2, "ajustada": 43.8},
+                {"data": "2022-09", "instituto": "Datafolha", "intencao": 45.0, "ajustada": 45.0},
+                {"data": "2022-10", "instituto": "TSE Real",  "intencao": 43.8, "ajustada": 43.8},
+            ],
+        },
+        {
+            "candidato": "Bolsonaro",
+            "partido": "PL",
+            "pontos": [
+                {"data": "2022-01", "instituto": "Datafolha", "intencao": 37.0, "ajustada": 37.0},
+                {"data": "2022-03", "instituto": "Datafolha", "intencao": 38.5, "ajustada": 38.5},
+                {"data": "2022-05", "instituto": "Ipespe",    "intencao": 40.0, "ajustada": 40.8},
+                {"data": "2022-07", "instituto": "Quaest",    "intencao": 41.5, "ajustada": 42.5},
+                {"data": "2022-09", "instituto": "Datafolha", "intencao": 40.0, "ajustada": 40.0},
+                {"data": "2022-10", "instituto": "TSE Real",  "intencao": 43.0, "ajustada": 43.0},
+            ],
+        },
+        {
+            "candidato": "Tebet",
+            "partido": "MDB",
+            "pontos": [
+                {"data": "2022-05", "instituto": "Datafolha", "intencao": 5.0, "ajustada": 5.0},
+                {"data": "2022-07", "instituto": "Quaest",    "intencao": 6.5, "ajustada": 6.5},
+                {"data": "2022-09", "instituto": "Datafolha", "intencao": 7.0, "ajustada": 7.0},
+                {"data": "2022-10", "instituto": "TSE Real",  "intencao": 7.4, "ajustada": 7.4},
+            ],
+        },
+    ],
+    "house_effects": [
+        {"instituto": "Datafolha", "house_effect": 0.0},
+        {"instituto": "Ipespe",    "house_effect": -0.8},
+        {"instituto": "Quaest",    "house_effect": 1.2},
+        {"instituto": "XP",        "house_effect": 0.5},
+        {"instituto": "Atlas",     "house_effect": 1.8},
+        {"instituto": "PoderData", "house_effect": -0.3},
+    ],
+}
+
+
+@app.get("/api/pesquisas")
+async def get_pesquisas(
+    cargo: str = Query("Presidente"),
+    sg_uf: str = Query("BR"),
+    ano: int = Query(2022),
+) -> JSONResponse:
+    if settings.gcp_project_id and os.environ.get("USE_BIGQUERY", "").lower() == "true":
+        try:
+            return JSONResponse(await _bq_pesquisas(cargo, sg_uf, ano))
+        except Exception as exc:
+            logger.warning("BigQuery pesquisas falhou: %s", exc)
+    return JSONResponse(_MOCK_PESQUISAS)
+
+
+async def _bq_pesquisas(cargo: str, sg_uf: str, ano: int) -> dict:
+    from google.cloud import bigquery
+
+    client = bigquery.Client(project=settings.gcp_project_id)
+    gold = f"{settings.gcp_project_id}.{settings.bigquery_dataset_gold}"
+    query = f"""
+        SELECT data_pesquisa, instituto, candidato,
+               intencao_pct, intencao_ajustada, house_effect, margem_erro
+        FROM `{gold}.fact_pesquisa`
+        WHERE cargo = @cargo
+          AND (sg_uf = @sg_uf OR sg_uf IS NULL OR @sg_uf = 'BR')
+          AND EXTRACT(YEAR FROM data_pesquisa) = @ano
+        ORDER BY candidato, data_pesquisa
+    """
+    job_config = bigquery.QueryJobConfig(
+        query_parameters=[
+            bigquery.ScalarQueryParameter("cargo", "STRING", cargo),
+            bigquery.ScalarQueryParameter("sg_uf", "STRING", sg_uf.upper()),
+            bigquery.ScalarQueryParameter("ano", "INT64", ano),
+        ]
+    )
+    rows = list(client.query(query, job_config=job_config).result())
+    by_candidato: dict[str, list] = {}
+    institutes: dict[str, float] = {}
+    for r in rows:
+        cand = r.get("candidato", "")
+        by_candidato.setdefault(cand, []).append({
+            "data": str(r.get("data_pesquisa", ""))[:7],
+            "instituto": r.get("instituto", ""),
+            "intencao": round(r.get("intencao_pct") or 0, 1),
+            "ajustada": round(r.get("intencao_ajustada") or r.get("intencao_pct") or 0, 1),
+        })
+        inst = r.get("instituto", "")
+        if inst and inst not in institutes:
+            institutes[inst] = round(r.get("house_effect") or 0, 2)
+    series = [{"candidato": c, "pontos": pts} for c, pts in by_candidato.items()]
+    house_effects = [{"instituto": k, "house_effect": v} for k, v in institutes.items()]
+    return {"series": series, "house_effects": house_effects}
+
+
+# ── Perfis Eleitorais ──────────────────────────────────────────────────────
+
+_MOCK_PERFIS = {
+    "genero": [
+        {"label": "Feminino", "qt_eleitores": 8420543},
+        {"label": "Masculino", "qt_eleitores": 7654321},
+        {"label": "Não informado", "qt_eleitores": 12450},
+    ],
+    "faixa_etaria": [
+        {"label": "16 a 17 anos", "qt_eleitores": 312540},
+        {"label": "18 a 20 anos", "qt_eleitores": 890234},
+        {"label": "21 a 24 anos", "qt_eleitores": 1243890},
+        {"label": "25 a 34 anos", "qt_eleitores": 3120450},
+        {"label": "35 a 44 anos", "qt_eleitores": 2980340},
+        {"label": "45 a 59 anos", "qt_eleitores": 3450120},
+        {"label": "60 a 69 anos", "qt_eleitores": 1820450},
+        {"label": "70 anos ou mais", "qt_eleitores": 1180340},
+    ],
+    "escolaridade": [
+        {"label": "Analfabeto", "qt_eleitores": 415230},
+        {"label": "Lê e Escreve", "qt_eleitores": 892340},
+        {"label": "Fundamental Incompleto", "qt_eleitores": 3245670},
+        {"label": "Fundamental Completo", "qt_eleitores": 1987540},
+        {"label": "Médio Incompleto", "qt_eleitores": 1543210},
+        {"label": "Médio Completo", "qt_eleitores": 5234560},
+        {"label": "Superior Incompleto", "qt_eleitores": 985430},
+        {"label": "Superior Completo", "qt_eleitores": 1783450},
+    ],
+}
+
+
+@app.get("/api/perfis")
+async def get_perfis(
+    uf: str = Query("SP"),
+    ano: int = Query(2022),
+) -> JSONResponse:
+    if settings.gcp_project_id and os.environ.get("USE_BIGQUERY", "").lower() == "true":
+        try:
+            return JSONResponse(await _bq_perfis(uf, ano))
+        except Exception as exc:
+            logger.warning("BigQuery perfis falhou: %s", exc)
+    return JSONResponse(_MOCK_PERFIS)
+
+
+async def _bq_perfis(uf: str, ano: int) -> dict:
+    from google.cloud import bigquery
+
+    client = bigquery.Client(project=settings.gcp_project_id)
+    silver = f"{settings.gcp_project_id}.spepe_silver"
+    query = f"""
+        SELECT ds_genero, ds_faixa_etaria, ds_grau_escolaridade,
+               SUM(qt_eleitores) AS qt_eleitores
+        FROM `{silver}.perfil_eleitorado_{uf.lower()}_{ano}`
+        GROUP BY 1, 2, 3
+        ORDER BY 1, 2, 3
+    """
+    job_config = bigquery.QueryJobConfig()
+    rows = list(client.query(query, job_config=job_config).result())
+    genero: dict[str, int] = {}
+    faixa: dict[str, int] = {}
+    escolaridade: dict[str, int] = {}
+    for r in rows:
+        g = r.get("ds_genero", "Não informado") or "Não informado"
+        f = r.get("ds_faixa_etaria", "Não informado") or "Não informado"
+        e = r.get("ds_grau_escolaridade", "Não informado") or "Não informado"
+        qt = r.get("qt_eleitores") or 0
+        genero[g] = genero.get(g, 0) + qt
+        faixa[f] = faixa.get(f, 0) + qt
+        escolaridade[e] = escolaridade.get(e, 0) + qt
+    return {
+        "genero": [{"label": k, "qt_eleitores": v} for k, v in genero.items()],
+        "faixa_etaria": sorted(
+            [{"label": k, "qt_eleitores": v} for k, v in faixa.items()],
+            key=lambda x: x["label"],
+        ),
+        "escolaridade": [{"label": k, "qt_eleitores": v} for k, v in escolaridade.items()],
+    }
+
+
 # ── Mapa eleitoral — dados por nível geográfico ───────────────────────────
 
 

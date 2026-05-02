@@ -17,13 +17,19 @@ logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name
 logger = logging.getLogger("spepe.jobs.reddit_ingest")
 
 _DEFAULT_CANDIDATOS = [
-    "Lula", "Lula da Silva",
-    "Tarcísio de Freitas", "Tarcísio Freitas",
-    "Bolsonaro", "Jair Bolsonaro",
-    "Simone Tebet", "Ciro Gomes",
-    "Alckmin", "Geraldo Alckmin",
+    "Lula",
+    "Lula da Silva",
+    "Tarcísio de Freitas",
+    "Tarcísio Freitas",
+    "Bolsonaro",
+    "Jair Bolsonaro",
+    "Simone Tebet",
+    "Ciro Gomes",
+    "Alckmin",
+    "Geraldo Alckmin",
     "Rodrigo Pacheco",
-    "Fernando Haddad", "Guilherme Boulos",
+    "Fernando Haddad",
+    "Guilherme Boulos",
 ]
 
 _DEFAULT_SUBREDDITS = ["brasil", "politica", "brasilivre"]

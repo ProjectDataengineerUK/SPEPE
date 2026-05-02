@@ -578,25 +578,129 @@ tr.rhl td{background:rgba(0,200,83,.07)!important}
 
     <!-- SOCIOECONÔMICO TAB -->
     <div id="tab-socioeconomico" class="tab-content" style="display:none;flex:1;overflow-y:auto;padding:16px;flex-direction:column;gap:12px">
-      <div style="color:var(--text2);font-size:.84rem;padding:20px 0">
-        <div style="font-size:1rem;font-weight:700;margin-bottom:8px">Perfil Socioeconômico</div>
-        <div style="color:var(--text3)">Cruza indicadores IBGE (renda, escolaridade, urbanização, religião) com resultados eleitorais TSE por município e UF. <em>Disponível após ingestão IBGE completa.</em></div>
+      <div style="display:flex;gap:8px;align-items:center;margin-bottom:4px">
+        <span style="font-size:1rem;font-weight:700">Perfil Socioeconômico — IBGE</span>
+        <span id="socio-uf-badge" style="font-size:.75rem;background:var(--accent2);color:#fff;padding:2px 8px;border-radius:4px">SP 2022</span>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+        <div class="card" style="padding:12px">
+          <div style="font-size:.8rem;color:var(--text3);margin-bottom:8px">IDHM por Município (Top 10)</div>
+          <canvas id="chart-idhm" height="200"></canvas>
+        </div>
+        <div class="card" style="padding:12px">
+          <div style="font-size:.8rem;color:var(--text3);margin-bottom:8px">Renda per Capita (R$)</div>
+          <canvas id="chart-renda" height="200"></canvas>
+        </div>
+      </div>
+      <div class="card" style="padding:12px;overflow-x:auto">
+        <div style="font-size:.8rem;color:var(--text3);margin-bottom:8px">Indicadores Municipais — IBGE</div>
+        <table style="width:100%;border-collapse:collapse;font-size:.78rem" id="tbl-socio">
+          <thead><tr style="border-bottom:1px solid var(--border)">
+            <th style="text-align:left;padding:4px 8px;color:var(--text3)">Município</th>
+            <th style="text-align:right;padding:4px 8px;color:var(--text3)">IDHM</th>
+            <th style="text-align:right;padding:4px 8px;color:var(--text3)">Renda/cap</th>
+            <th style="text-align:right;padding:4px 8px;color:var(--text3)">Gini</th>
+            <th style="text-align:right;padding:4px 8px;color:var(--text3)">Ext.Pobreza%</th>
+            <th style="text-align:right;padding:4px 8px;color:var(--text3)">Analfab.%</th>
+            <th style="text-align:right;padding:4px 8px;color:var(--text3)">Urbano%</th>
+          </tr></thead>
+          <tbody id="tbody-socio"></tbody>
+        </table>
       </div>
     </div>
 
     <!-- SEGURANÇA TAB -->
     <div id="tab-seguranca" class="tab-content" style="display:none;flex:1;overflow-y:auto;padding:16px;flex-direction:column;gap:12px">
-      <div style="color:var(--text2);font-size:.84rem;padding:20px 0">
-        <div style="font-size:1rem;font-weight:700;margin-bottom:8px">Segurança Pública</div>
-        <div style="color:var(--text3)">Correlação violência/segurança (IVS, Atlas da Violência, SINESP) × comportamento eleitoral. <em>Disponível após ingestão Security completa.</em></div>
+      <div style="display:flex;gap:8px;align-items:center;margin-bottom:4px">
+        <span style="font-size:1rem;font-weight:700">Segurança Pública — IVS + Atlas da Violência</span>
+        <span id="seg-uf-badge" style="font-size:.75rem;background:#ef4444;color:#fff;padding:2px 8px;border-radius:4px">SP 2022</span>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+        <div class="card" style="padding:12px">
+          <div style="font-size:.8rem;color:var(--text3);margin-bottom:8px">Taxa Homicídio (por 100k hab.)</div>
+          <canvas id="chart-homicidio" height="200"></canvas>
+        </div>
+        <div class="card" style="padding:12px">
+          <div style="font-size:.8rem;color:var(--text3);margin-bottom:8px">IVS — Índice Vulnerabilidade Social</div>
+          <canvas id="chart-ivs" height="200"></canvas>
+        </div>
+      </div>
+      <div class="card" style="padding:12px;overflow-x:auto">
+        <div style="font-size:.8rem;color:var(--text3);margin-bottom:8px">Indicadores de Segurança por Município</div>
+        <table style="width:100%;border-collapse:collapse;font-size:.78rem" id="tbl-seg">
+          <thead><tr style="border-bottom:1px solid var(--border)">
+            <th style="text-align:left;padding:4px 8px;color:var(--text3)">Município</th>
+            <th style="text-align:right;padding:4px 8px;color:var(--text3)">Homicídio/100k</th>
+            <th style="text-align:right;padding:4px 8px;color:var(--text3)">IVS Total</th>
+            <th style="text-align:right;padding:4px 8px;color:var(--text3)">IVS Infra</th>
+            <th style="text-align:right;padding:4px 8px;color:var(--text3)">IVS Cap.Humano</th>
+            <th style="text-align:right;padding:4px 8px;color:var(--text3)">Roubo/100k</th>
+            <th style="text-align:right;padding:4px 8px;color:var(--text3)">Feminicídio</th>
+          </tr></thead>
+          <tbody id="tbody-seg"></tbody>
+        </table>
       </div>
     </div>
 
     <!-- SAÚDE TAB -->
     <div id="tab-saude" class="tab-content" style="display:none;flex:1;overflow-y:auto;padding:16px;flex-direction:column;gap:12px">
-      <div style="color:var(--text2);font-size:.84rem;padding:20px 0">
-        <div style="font-size:1rem;font-weight:700;margin-bottom:8px">Saúde &amp; Economia</div>
-        <div style="color:var(--text3)">Mortalidade infantil (DATASUS), cobertura ANS, cesta básica DIEESE e acesso digital CETIC por UF. <em>Disponível após ingestão DataSUS/DIEESE/CETIC.</em></div>
+      <div style="display:flex;gap:8px;align-items:center;margin-bottom:4px">
+        <span style="font-size:1rem;font-weight:700">Saúde Pública — DataSUS + ANS</span>
+        <span id="saude-uf-badge" style="font-size:.75rem;background:#22c55e;color:#fff;padding:2px 8px;border-radius:4px">SP 2022</span>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+        <div class="card" style="padding:12px">
+          <div style="font-size:.8rem;color:var(--text3);margin-bottom:8px">Mortalidade Infantil (por 1000 nascidos vivos)</div>
+          <canvas id="chart-mortalidade" height="200"></canvas>
+        </div>
+        <div class="card" style="padding:12px">
+          <div style="font-size:.8rem;color:var(--text3);margin-bottom:8px">Cobertura Plano de Saúde (%)</div>
+          <canvas id="chart-plano" height="200"></canvas>
+        </div>
+      </div>
+      <div class="card" style="padding:12px;overflow-x:auto">
+        <div style="font-size:.8rem;color:var(--text3);margin-bottom:8px">Indicadores de Saúde por Município</div>
+        <table style="width:100%;border-collapse:collapse;font-size:.78rem" id="tbl-saude">
+          <thead><tr style="border-bottom:1px solid var(--border)">
+            <th style="text-align:left;padding:4px 8px;color:var(--text3)">Município</th>
+            <th style="text-align:right;padding:4px 8px;color:var(--text3)">Mort.Infantil/1k</th>
+            <th style="text-align:right;padding:4px 8px;color:var(--text3)">Mort.Materna/100k</th>
+            <th style="text-align:right;padding:4px 8px;color:var(--text3)">Cobertura Plano%</th>
+            <th style="text-align:right;padding:4px 8px;color:var(--text3)">IDSUS</th>
+          </tr></thead>
+          <tbody id="tbody-saude"></tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- PESQUISAS TAB -->
+    <div id="tab-pesquisas" class="tab-content" style="display:none;flex:1;overflow-y:auto;padding:16px;flex-direction:column;gap:12px">
+      <div style="display:flex;gap:8px;align-items:center;margin-bottom:4px">
+        <span style="font-size:1rem;font-weight:700">Pesquisas Eleitorais — Tracking + House Effect</span>
+        <span id="pesq-cargo-badge" style="font-size:.75rem;background:var(--accent);color:#fff;padding:2px 8px;border-radius:4px">Presidente 2022</span>
+      </div>
+      <div style="display:grid;grid-template-columns:2fr 1fr;gap:12px">
+        <div class="card" style="padding:12px">
+          <div style="font-size:.8rem;color:var(--text3);margin-bottom:8px">Intenção de Voto ao Longo do Tempo (%)</div>
+          <canvas id="chart-polls-tracking" height="220"></canvas>
+        </div>
+        <div class="card" style="padding:12px">
+          <div style="font-size:.8rem;color:var(--text3);margin-bottom:8px">House Effect por Instituto (pp vs Datafolha)</div>
+          <canvas id="chart-house-effect" height="220"></canvas>
+        </div>
+      </div>
+      <div class="card" style="padding:12px;overflow-x:auto">
+        <div style="font-size:.8rem;color:var(--text3);margin-bottom:8px">Últimas Pesquisas Registradas</div>
+        <table style="width:100%;border-collapse:collapse;font-size:.78rem" id="tbl-pesq">
+          <thead><tr style="border-bottom:1px solid var(--border)">
+            <th style="text-align:left;padding:4px 8px;color:var(--text3)">Data</th>
+            <th style="text-align:left;padding:4px 8px;color:var(--text3)">Instituto</th>
+            <th style="text-align:left;padding:4px 8px;color:var(--text3)">Candidato</th>
+            <th style="text-align:right;padding:4px 8px;color:var(--text3)">Intenção%</th>
+            <th style="text-align:right;padding:4px 8px;color:var(--text3)">Ajustada%</th>
+          </tr></thead>
+          <tbody id="tbody-pesq"></tbody>
+        </table>
       </div>
     </div>
 
@@ -605,6 +709,30 @@ tr.rhl td{background:rgba(0,200,83,.07)!important}
       <div style="color:var(--text2);font-size:.84rem;padding:20px 0">
         <div style="font-size:1rem;font-weight:700;margin-bottom:8px">Predição Bayesiana 2026</div>
         <div style="color:var(--text3)">Modelo PyMC com IC 95% para probabilidade de vitória por candidato × cargo × UF. SHAP explicabilidade por feature. <em>Requer perfil Consultor ou superior.</em></div>
+      </div>
+    </div>
+
+    <!-- PERFIS ELEITORAIS TAB -->
+    <div id="tab-perfis" class="tab-content" style="display:none;flex:1;overflow-y:auto;padding:16px;flex-direction:column;gap:12px">
+      <div style="display:flex;gap:8px;align-items:center;margin-bottom:4px">
+        <span style="font-size:1rem;font-weight:700">Perfis do Eleitorado — TSE Perfil Eleitorado</span>
+        <span id="perfis-uf-badge" style="font-size:.75rem;background:#7c3aed;color:#fff;padding:2px 8px;border-radius:4px">SP 2022</span>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+        <div class="card" style="padding:12px">
+          <div style="font-size:.8rem;color:var(--text3);margin-bottom:8px">Distribuição por Faixa Etária</div>
+          <canvas id="chart-faixa-etaria" height="220"></canvas>
+        </div>
+        <div class="card" style="padding:12px">
+          <div style="font-size:.8rem;color:var(--text3);margin-bottom:8px">Escolaridade do Eleitorado</div>
+          <canvas id="chart-escolaridade" height="220"></canvas>
+        </div>
+      </div>
+      <div class="card" style="padding:12px">
+        <div style="font-size:.8rem;color:var(--text3);margin-bottom:8px">Gênero do Eleitorado</div>
+        <div style="display:flex;justify-content:center">
+          <canvas id="chart-genero" width="300" height="160"></canvas>
+        </div>
       </div>
     </div>
 
@@ -788,36 +916,231 @@ function doLogout(){
 // ══════════════════════════════════════════════════════
 const TAB_IDS = {
   'Dashboard':'dash', 'Mapa':'tab-mapa', 'Socioeconômico':'tab-socioeconomico',
-  'Segurança':'tab-seguranca', 'Saúde':'tab-saude', 'Pesquisas':'dash',
-  'Predição':'tab-predicao', 'Perfis Eleitorais':'dash', 'Relatórios':'dash',
+  'Segurança':'tab-seguranca', 'Saúde':'tab-saude', 'Pesquisas':'tab-pesquisas',
+  'Predição':'tab-predicao', 'Perfis Eleitorais':'tab-perfis', 'Relatórios':'dash',
+};
+const _ALT_PANELS = [
+  'tab-mapa','tab-socioeconomico','tab-seguranca','tab-saude',
+  'tab-pesquisas','tab-predicao','tab-perfis',
+];
+const _TAB_PANEL_MAP = {
+  'Socioeconômico':'socioeconomico','Segurança':'seguranca','Saúde':'saude',
+  'Pesquisas':'pesquisas','Predição':'predicao','Perfis Eleitorais':'perfis',
 };
 function switchTab(el,nm){
   document.querySelectorAll('.main-tab').forEach(t=>t.classList.remove('active'));
   el.classList.add('active');
   document.getElementById('bc').innerHTML=`<strong>${nm}</strong> · São Paulo · 2022`;
   const dash=document.getElementById('dash');
-  const mapa=document.getElementById('tab-mapa');
-  // Hide all alternate panels
-  ['tab-mapa','tab-socioeconomico','tab-seguranca','tab-saude','tab-predicao'].forEach(id=>{
-    const el=document.getElementById(id);
-    if(el){ el.classList.remove('active'); el.style.display='none'; }
+  _ALT_PANELS.forEach(id=>{
+    const p=document.getElementById(id);
+    if(p){ p.classList.remove('active'); p.style.display='none'; }
   });
   if(nm==='Mapa'){
     if(dash) dash.style.display='none';
+    const mapa=document.getElementById('tab-mapa');
     if(mapa){ mapa.style.display='flex'; mapa.classList.add('active'); }
     setTimeout(initMap,50);
-  } else if(['Socioeconômico','Segurança','Saúde','Predição'].includes(nm)){
+  } else if(_TAB_PANEL_MAP[nm]){
     if(dash) dash.style.display='none';
-    const panelId='tab-'+{
-      'Socioeconômico':'socioeconomico','Segurança':'seguranca',
-      'Saúde':'saude','Predição':'predicao'
-    }[nm];
+    const panelId='tab-'+_TAB_PANEL_MAP[nm];
     const panel=document.getElementById(panelId);
-    if(panel) panel.style.display='flex';
+    if(panel){ panel.style.display='flex'; }
+    _loadTabData(nm);
   } else {
     if(dash) dash.style.display='';
   }
   toast(`Carregando: ${nm}`);
+}
+
+// ══════════════════════════════════════════════════════
+// TAB DATA LOADERS
+// ══════════════════════════════════════════════════════
+const _tabLoaded = {};
+function _loadTabData(nm){
+  if(_tabLoaded[nm]) return;
+  _tabLoaded[nm] = true;
+  const uf = document.getElementById('f-uf')?.value || 'SP';
+  const ano = document.getElementById('f-ano')?.value || '2022';
+  if(nm==='Socioeconômico') _loadSocio(uf, ano);
+  else if(nm==='Segurança')  _loadSeguranca(uf, ano);
+  else if(nm==='Saúde')      _loadSaude(uf, ano);
+  else if(nm==='Pesquisas')  _loadPesquisas(ano);
+  else if(nm==='Perfis Eleitorais') _loadPerfis(uf, ano);
+}
+
+function _mkChart(id, type, labels, datasets, opts={}){
+  const ctx = document.getElementById(id);
+  if(!ctx) return null;
+  if(ctx._chart) ctx._chart.destroy();
+  ctx._chart = new Chart(ctx, {
+    type, data:{labels, datasets},
+    options:{
+      responsive:true, maintainAspectRatio:false,
+      plugins:{legend:{labels:{color:'#c9d1d9',font:{size:11}}}},
+      scales: type==='bar'||type==='horizontalBar' ? {
+        x:{ticks:{color:'#8b949e',font:{size:10}}},
+        y:{ticks:{color:'#8b949e',font:{size:10}}},
+      } : {},
+      ...opts,
+    },
+  });
+  return ctx._chart;
+}
+
+async function _loadSocio(uf, ano){
+  const badge = document.getElementById('socio-uf-badge');
+  if(badge) badge.textContent = `${uf} ${ano}`;
+  const data = await fetch(`/api/socioeconomico?uf=${uf}&ano=${ano}&limit=10`).then(r=>r.json()).catch(()=>({municipios:[]}));
+  const muns = data.municipios || [];
+  const labels = muns.map(m=>m.nm);
+  _mkChart('chart-idhm','bar',labels,[{
+    label:'IDHM',
+    data: muns.map(m=>m.idhm),
+    backgroundColor:'rgba(88,166,255,.8)',
+  }]);
+  _mkChart('chart-renda','bar',labels,[{
+    label:'Renda per Capita (R$)',
+    data: muns.map(m=>m.renda_per_capita),
+    backgroundColor:'rgba(245,158,11,.8)',
+  }]);
+  const tbody = document.getElementById('tbody-socio');
+  if(tbody) tbody.innerHTML = muns.map(m=>`
+    <tr style="border-bottom:1px solid var(--border)">
+      <td style="padding:4px 8px">${m.nm}</td>
+      <td style="text-align:right;padding:4px 8px">${m.idhm.toFixed(3)}</td>
+      <td style="text-align:right;padding:4px 8px">R$ ${Number(m.renda_per_capita).toLocaleString('pt-BR')}</td>
+      <td style="text-align:right;padding:4px 8px">${m.gini}</td>
+      <td style="text-align:right;padding:4px 8px">${m.pct_extrema_pobreza}%</td>
+      <td style="text-align:right;padding:4px 8px">${m.taxa_analfabetismo}%</td>
+      <td style="text-align:right;padding:4px 8px">${m.pct_urbano}%</td>
+    </tr>`).join('');
+}
+
+async function _loadSeguranca(uf, ano){
+  const badge = document.getElementById('seg-uf-badge');
+  if(badge) badge.textContent = `${uf} ${ano}`;
+  const data = await fetch(`/api/seguranca?uf=${uf}&ano=${ano}&limit=10`).then(r=>r.json()).catch(()=>({municipios:[]}));
+  const muns = (data.municipios || []).slice().sort((a,b)=>b.taxa_homicidio-a.taxa_homicidio);
+  const labels = muns.map(m=>m.nm);
+  _mkChart('chart-homicidio','bar',labels,[{
+    label:'Homicídios/100k',
+    data: muns.map(m=>m.taxa_homicidio),
+    backgroundColor: muns.map(m=>m.taxa_homicidio>15?'rgba(239,68,68,.85)':m.taxa_homicidio>10?'rgba(249,115,22,.8)':'rgba(34,197,94,.7)'),
+  }]);
+  _mkChart('chart-ivs','bar',labels,[
+    {label:'IVS Total',data:muns.map(m=>m.ivs_total),backgroundColor:'rgba(124,58,237,.8)'},
+    {label:'IVS Infra',data:muns.map(m=>m.ivs_infra),backgroundColor:'rgba(236,72,153,.6)'},
+    {label:'IVS Cap.Humano',data:muns.map(m=>m.ivs_capital_humano),backgroundColor:'rgba(14,165,233,.6)'},
+  ]);
+  const tbody = document.getElementById('tbody-seg');
+  if(tbody) tbody.innerHTML = muns.map(m=>`
+    <tr style="border-bottom:1px solid var(--border)">
+      <td style="padding:4px 8px">${m.nm}</td>
+      <td style="text-align:right;padding:4px 8px;color:${m.taxa_homicidio>15?'#ef4444':m.taxa_homicidio>10?'#f97316':'#22c55e'}">${m.taxa_homicidio}</td>
+      <td style="text-align:right;padding:4px 8px">${m.ivs_total}</td>
+      <td style="text-align:right;padding:4px 8px">${m.ivs_infra}</td>
+      <td style="text-align:right;padding:4px 8px">${m.ivs_capital_humano}</td>
+      <td style="text-align:right;padding:4px 8px">${m.taxa_roubo}</td>
+      <td style="text-align:right;padding:4px 8px">${m.qt_feminicidio}</td>
+    </tr>`).join('');
+}
+
+async function _loadSaude(uf, ano){
+  const badge = document.getElementById('saude-uf-badge');
+  if(badge) badge.textContent = `${uf} ${ano}`;
+  const data = await fetch(`/api/saude?uf=${uf}&ano=${ano}&limit=10`).then(r=>r.json()).catch(()=>({municipios:[]}));
+  const muns = data.municipios || [];
+  const labels = muns.map(m=>m.nm);
+  _mkChart('chart-mortalidade','bar',labels,[{
+    label:'Mortalidade Infantil/1k',
+    data: muns.map(m=>m.tx_mortalidade_infantil),
+    backgroundColor: muns.map(m=>m.tx_mortalidade_infantil>14?'rgba(239,68,68,.85)':m.tx_mortalidade_infantil>10?'rgba(249,115,22,.8)':'rgba(34,197,94,.7)'),
+  }]);
+  _mkChart('chart-plano','bar',labels,[{
+    label:'Cobertura Plano Saúde (%)',
+    data: muns.map(m=>m.pct_cobertura_plano),
+    backgroundColor:'rgba(16,185,129,.8)',
+  }]);
+  const tbody = document.getElementById('tbody-saude');
+  if(tbody) tbody.innerHTML = muns.map(m=>`
+    <tr style="border-bottom:1px solid var(--border)">
+      <td style="padding:4px 8px">${m.nm}</td>
+      <td style="text-align:right;padding:4px 8px;color:${m.tx_mortalidade_infantil>14?'#ef4444':m.tx_mortalidade_infantil>10?'#f97316':'#22c55e'}">${m.tx_mortalidade_infantil}</td>
+      <td style="text-align:right;padding:4px 8px">${m.tx_mortalidade_materna}</td>
+      <td style="text-align:right;padding:4px 8px">${m.pct_cobertura_plano}%</td>
+      <td style="text-align:right;padding:4px 8px">${m.idsus}</td>
+    </tr>`).join('');
+}
+
+const CAND_COLORS_POLL = {
+  'Lula':'rgba(220,38,38,.9)','Bolsonaro':'rgba(25,118,210,.9)',
+  'Tebet':'rgba(245,158,11,.9)','Ciro Gomes':'rgba(124,58,237,.9)',
+};
+async function _loadPesquisas(ano){
+  const badge = document.getElementById('pesq-cargo-badge');
+  if(badge) badge.textContent = `Presidente ${ano}`;
+  const data = await fetch(`/api/pesquisas?cargo=Presidente&sg_uf=BR&ano=${ano}`).then(r=>r.json()).catch(()=>({series:[],house_effects:[]}));
+  const series = data.series || [];
+  const allDates = [...new Set(series.flatMap(s=>s.pontos.map(p=>p.data)))].sort();
+  const pollDatasets = series.map(s=>({
+    label: s.candidato,
+    data: allDates.map(d=>{ const p=s.pontos.find(x=>x.data===d); return p?p.ajustada:null; }),
+    borderColor: CAND_COLORS_POLL[s.candidato]||'rgba(150,150,150,.9)',
+    backgroundColor: 'transparent',
+    tension: 0.3, spanGaps: true,
+  }));
+  _mkChart('chart-polls-tracking','line',allDates,pollDatasets,{
+    scales:{
+      x:{ticks:{color:'#8b949e',font:{size:10}}},
+      y:{min:0,max:55,ticks:{color:'#8b949e',font:{size:10},callback:v=>v+'%'}},
+    },
+  });
+  const heData = data.house_effects || [];
+  _mkChart('chart-house-effect','bar',
+    heData.map(h=>h.instituto),
+    [{
+      label:'House Effect (pp)',
+      data: heData.map(h=>h.house_effect),
+      backgroundColor: heData.map(h=>h.house_effect>0?'rgba(34,197,94,.8)':'rgba(239,68,68,.8)'),
+    }],
+  );
+  const tbody = document.getElementById('tbody-pesq');
+  if(tbody){
+    const rows = series.flatMap(s=>s.pontos.map(p=>({...p,candidato:s.candidato})));
+    rows.sort((a,b)=>b.data.localeCompare(a.data));
+    tbody.innerHTML = rows.slice(0,20).map(r=>`
+      <tr style="border-bottom:1px solid var(--border)">
+        <td style="padding:4px 8px">${r.data}</td>
+        <td style="padding:4px 8px">${r.instituto}</td>
+        <td style="padding:4px 8px">${r.candidato}</td>
+        <td style="text-align:right;padding:4px 8px">${r.intencao}%</td>
+        <td style="text-align:right;padding:4px 8px">${r.ajustada}%</td>
+      </tr>`).join('');
+  }
+}
+
+async function _loadPerfis(uf, ano){
+  const badge = document.getElementById('perfis-uf-badge');
+  if(badge) badge.textContent = `${uf} ${ano}`;
+  const data = await fetch(`/api/perfis?uf=${uf}&ano=${ano}`).then(r=>r.json()).catch(()=>({genero:[],faixa_etaria:[],escolaridade:[]}));
+  const fa = data.faixa_etaria || [];
+  _mkChart('chart-faixa-etaria','bar',fa.map(x=>x.label),[{
+    label:'Eleitores',
+    data: fa.map(x=>x.qt_eleitores),
+    backgroundColor:'rgba(88,166,255,.8)',
+  }]);
+  const esc = data.escolaridade || [];
+  _mkChart('chart-escolaridade','bar',esc.map(x=>x.label),[{
+    label:'Eleitores',
+    data: esc.map(x=>x.qt_eleitores),
+    backgroundColor:'rgba(124,58,237,.8)',
+  }]);
+  const gen = data.genero || [];
+  _mkChart('chart-genero','doughnut',gen.map(x=>x.label),[{
+    data: gen.map(x=>x.qt_eleitores),
+    backgroundColor:['rgba(236,72,153,.85)','rgba(59,130,246,.85)','rgba(156,163,175,.7)'],
+  }],{plugins:{legend:{position:'right',labels:{color:'#c9d1d9',font:{size:12}}}}});
 }
 function applyFilters(){
   const uf=document.getElementById('f-uf').value;

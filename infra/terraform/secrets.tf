@@ -106,13 +106,17 @@ resource "google_secret_manager_secret_iam_member" "dataops_x_bearer" {
 
 resource "google_secret_manager_secret" "reddit_client_id" {
   secret_id = "REDDIT_CLIENT_ID"
-  replication { auto {} }
+  replication {
+    auto {}
+  }
   labels = local.labels
 }
 
 resource "google_secret_manager_secret" "reddit_client_secret" {
   secret_id = "REDDIT_CLIENT_SECRET"
-  replication { auto {} }
+  replication {
+    auto {}
+  }
   labels = local.labels
 }
 

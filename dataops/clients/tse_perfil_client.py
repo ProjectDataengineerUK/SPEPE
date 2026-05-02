@@ -108,8 +108,17 @@ def build_perfil_municipio(uf: str, year: int) -> pd.DataFrame:
         return pd.DataFrame()
 
     group_cols = [
-        c for c in ("cd_municipio", "nm_municipio", "sg_uf", "ds_genero",
-                    "ds_faixa_etaria", "ds_grau_escolaridade", "ds_estado_civil", "ano")
+        c
+        for c in (
+            "cd_municipio",
+            "nm_municipio",
+            "sg_uf",
+            "ds_genero",
+            "ds_faixa_etaria",
+            "ds_grau_escolaridade",
+            "ds_estado_civil",
+            "ano",
+        )
         if c in df.columns
     ]
     agg = df.groupby(group_cols, as_index=False)["qt_eleitores"].sum()

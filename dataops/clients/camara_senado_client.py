@@ -77,14 +77,16 @@ def fetch_deputados(legislature: int = 57) -> pd.DataFrame:
 
     rows = []
     for dep in items:
-        rows.append({
-            "id_deputado": dep.get("id"),
-            "nome": dep.get("nome", ""),
-            "sg_partido": dep.get("siglaPartido", ""),
-            "sg_uf": dep.get("siglaUf", ""),
-            "legislatura": legislature,
-            "uri": dep.get("uri", ""),
-        })
+        rows.append(
+            {
+                "id_deputado": dep.get("id"),
+                "nome": dep.get("nome", ""),
+                "sg_partido": dep.get("siglaPartido", ""),
+                "sg_uf": dep.get("siglaUf", ""),
+                "legislatura": legislature,
+                "uri": dep.get("uri", ""),
+            }
+        )
     df = pd.DataFrame(rows)
     logger.info("Câmara deputados: %d encontrados (leg=%d)", len(df), legislature)
     return df
@@ -103,17 +105,19 @@ def fetch_votacoes_camara(year: int, cargo_sigla: str = "dep") -> pd.DataFrame:
 
     rows = []
     for v in items:
-        rows.append({
-            "id_votacao": v.get("id"),
-            "data": v.get("data", "")[:10],
-            "titulo": v.get("titulo", "")[:200],
-            "descricao": v.get("descricao", "")[:500],
-            "placar_sim": v.get("aprovacao", 0),
-            "placar_nao": v.get("reprovacao", 0),
-            "placar_abstencao": v.get("abstencao", 0),
-            "ano": year,
-            "casa": "camara",
-        })
+        rows.append(
+            {
+                "id_votacao": v.get("id"),
+                "data": v.get("data", "")[:10],
+                "titulo": v.get("titulo", "")[:200],
+                "descricao": v.get("descricao", "")[:500],
+                "placar_sim": v.get("aprovacao", 0),
+                "placar_nao": v.get("reprovacao", 0),
+                "placar_abstencao": v.get("abstencao", 0),
+                "ano": year,
+                "casa": "camara",
+            }
+        )
     df = pd.DataFrame(rows)
     if "data" in df.columns:
         df["data"] = pd.to_datetime(df["data"], errors="coerce")
@@ -134,14 +138,16 @@ def fetch_votos_deputado(id_votacao: str) -> pd.DataFrame:
     rows = []
     for voto in items:
         dep = voto.get("deputado_", {})
-        rows.append({
-            "id_votacao": id_votacao,
-            "id_deputado": dep.get("id"),
-            "nome": dep.get("nome", ""),
-            "sg_partido": dep.get("siglaPartido", ""),
-            "sg_uf": dep.get("siglaUf", ""),
-            "voto": voto.get("tipoVoto", ""),
-        })
+        rows.append(
+            {
+                "id_votacao": id_votacao,
+                "id_deputado": dep.get("id"),
+                "nome": dep.get("nome", ""),
+                "sg_partido": dep.get("siglaPartido", ""),
+                "sg_uf": dep.get("siglaUf", ""),
+                "voto": voto.get("tipoVoto", ""),
+            }
+        )
     return pd.DataFrame(rows)
 
 
@@ -173,17 +179,19 @@ def fetch_gastos_gabinete_camara(year: int, id_deputado: int | None = None) -> p
 
     rows = []
     for d in items:
-        rows.append({
-            "id_deputado": d.get("id_deputado") or id_deputado,
-            "mes": d.get("mes"),
-            "tipo_despesa": d.get("tipoDespesa", ""),
-            "fornecedor": d.get("nomeFornecedor", ""),
-            "cnpj_cpf_fornecedor": d.get("cnpjCpfFornecedor", ""),
-            "vr_documento": float(d.get("valorDocumento", 0) or 0),
-            "vr_liquido": float(d.get("valorLiquido", 0) or 0),
-            "ano": year,
-            "casa": "camara",
-        })
+        rows.append(
+            {
+                "id_deputado": d.get("id_deputado") or id_deputado,
+                "mes": d.get("mes"),
+                "tipo_despesa": d.get("tipoDespesa", ""),
+                "fornecedor": d.get("nomeFornecedor", ""),
+                "cnpj_cpf_fornecedor": d.get("cnpjCpfFornecedor", ""),
+                "vr_documento": float(d.get("valorDocumento", 0) or 0),
+                "vr_liquido": float(d.get("valorLiquido", 0) or 0),
+                "ano": year,
+                "casa": "camara",
+            }
+        )
     df = pd.DataFrame(rows)
     logger.info("Câmara CEAP: %d despesas ano=%d", len(df), year)
     return df
@@ -199,8 +207,8 @@ def fetch_senadores(legislature: int = 57) -> pd.DataFrame:
         data = _get(url)
         senadores = (
             data.get("ListaParlamentarEmExercicio", {})
-                .get("Parlamentares", {})
-                .get("Parlamentar", [])
+            .get("Parlamentares", {})
+            .get("Parlamentar", [])
         )
     except Exception as exc:
         logger.warning("Senado lista: %s", exc)
@@ -209,14 +217,16 @@ def fetch_senadores(legislature: int = 57) -> pd.DataFrame:
     rows = []
     for s in senadores:
         p = s.get("IdentificacaoParlamentar", {})
-        rows.append({
-            "codigo_senador": p.get("CodigoParlamentar"),
-            "nome": p.get("NomeParlamentar", ""),
-            "sg_partido": p.get("SiglaPartidoParlamentar", ""),
-            "sg_uf": p.get("UfParlamentar", ""),
-            "sexo": p.get("SexoParlamentar", ""),
-            "foto_url": p.get("UrlFotoParlamentar", ""),
-        })
+        rows.append(
+            {
+                "codigo_senador": p.get("CodigoParlamentar"),
+                "nome": p.get("NomeParlamentar", ""),
+                "sg_partido": p.get("SiglaPartidoParlamentar", ""),
+                "sg_uf": p.get("UfParlamentar", ""),
+                "sexo": p.get("SexoParlamentar", ""),
+                "foto_url": p.get("UrlFotoParlamentar", ""),
+            }
+        )
     df = pd.DataFrame(rows)
     logger.info("Senado: %d senadores", len(df))
     return df
@@ -227,11 +237,7 @@ def fetch_votacoes_senado(year: int) -> pd.DataFrame:
     url = f"{_SENADO_BASE}/plenario/lista/votacao/{year}"
     try:
         data = _get(url)
-        items = (
-            data.get("ListaVotacoes", {})
-                .get("Votacoes", {})
-                .get("Votacao", [])
-        )
+        items = data.get("ListaVotacoes", {}).get("Votacoes", {}).get("Votacao", [])
     except Exception as exc:
         logger.warning("Senado votações %d: %s", year, exc)
         return pd.DataFrame()
@@ -241,14 +247,16 @@ def fetch_votacoes_senado(year: int) -> pd.DataFrame:
 
     rows = []
     for v in items:
-        rows.append({
-            "codigo_sessao": v.get("CodigoSessao"),
-            "data": str(v.get("DataSessao", ""))[:10],
-            "tipo_votacao": v.get("DescricaoVotacao", "")[:200],
-            "resultado": v.get("DescricaoResultado", ""),
-            "ano": year,
-            "casa": "senado",
-        })
+        rows.append(
+            {
+                "codigo_sessao": v.get("CodigoSessao"),
+                "data": str(v.get("DataSessao", ""))[:10],
+                "tipo_votacao": v.get("DescricaoVotacao", "")[:200],
+                "resultado": v.get("DescricaoResultado", ""),
+                "ano": year,
+                "casa": "senado",
+            }
+        )
     df = pd.DataFrame(rows)
     if "data" in df.columns:
         df["data"] = pd.to_datetime(df["data"], errors="coerce")
