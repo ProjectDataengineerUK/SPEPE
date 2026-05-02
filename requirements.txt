@@ -60,3 +60,4 @@ requests==2.33.1
 urllib3>=2.6.3
 httpx==0.28.1
 aiohttp==3.13.5
+pysus>=0.3.1
