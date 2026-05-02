@@ -29,39 +29,41 @@ def _build_gold_via_bigquery_sql() -> dict:
         "fact_municipio_eleicao": f"""
             CREATE OR REPLACE TABLE `{gold}.fact_municipio_eleicao` AS
             SELECT
-                sg_uf, cd_municipio, nm_municipio, cd_cargo, ds_cargo, nr_turno, ano_eleicao,
+                sg_uf, cd_municipio, nm_municipio_x AS nm_municipio, cd_cargo, ds_cargo,
+                ano_eleicao,
                 SUM(qt_votos) AS total_votos,
                 COUNT(DISTINCT nr_candidato) AS n_candidatos,
                 COUNT(DISTINCT CONCAT(CAST(nr_zona AS STRING), '-', CAST(nr_secao AS STRING))) AS n_secoes,
                 CURRENT_TIMESTAMP() AS ingested_at
             FROM {silver_wc}
-            GROUP BY sg_uf, cd_municipio, nm_municipio, cd_cargo, ds_cargo, nr_turno, ano_eleicao
+            GROUP BY sg_uf, cd_municipio, nm_municipio_x, cd_cargo, ds_cargo, ano_eleicao
         """,
         "fact_secao_eleicao": f"""
             CREATE OR REPLACE TABLE `{gold}.fact_secao_eleicao` AS
             SELECT
-                sg_uf, cd_municipio, nr_zona, nr_secao, cd_cargo, nr_turno, ano_eleicao,
+                sg_uf, cd_municipio, nr_zona, nr_secao, cd_cargo, ano_eleicao,
                 SUM(qt_votos) AS total_votos,
                 COUNT(DISTINCT nr_candidato) AS n_candidatos,
                 CURRENT_TIMESTAMP() AS ingested_at
             FROM {silver_wc}
-            GROUP BY sg_uf, cd_municipio, nr_zona, nr_secao, cd_cargo, nr_turno, ano_eleicao
+            GROUP BY sg_uf, cd_municipio, nr_zona, nr_secao, cd_cargo, ano_eleicao
         """,
         "fact_candidato_eleicao": f"""
             CREATE OR REPLACE TABLE `{gold}.fact_candidato_eleicao` AS
             SELECT
-                sg_uf, nr_candidato, nm_candidato, sg_partido, cd_cargo, ds_cargo, nr_turno, ano_eleicao,
+                sg_uf, nr_candidato, nm_candidato, cd_cargo, ds_cargo, ano_eleicao,
                 SUM(qt_votos) AS total_votos,
                 COUNT(DISTINCT cd_municipio) AS n_municipios,
                 CURRENT_TIMESTAMP() AS ingested_at
             FROM {silver_wc}
-            GROUP BY sg_uf, nr_candidato, nm_candidato, sg_partido, cd_cargo, ds_cargo, nr_turno, ano_eleicao
+            GROUP BY sg_uf, nr_candidato, nm_candidato, cd_cargo, ds_cargo, ano_eleicao
         """,
     }
 
     results = {}
     for table_name, sql in sqls.items():
         try:
+            client.query(f"DROP TABLE IF EXISTS `{gold}.{table_name}`").result()
             job = client.query(sql)
             job.result()
             row_count = (
