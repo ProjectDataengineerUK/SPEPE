@@ -54,6 +54,7 @@ class TestPipelineE2EMock:
                 "cd_municipio_tse": [35001, 35002],
                 "cd_municipio_ibge": ["3500105", "3500204"],
                 "nm_municipio": ["São Paulo", "Campinas"],
+                "nm_norm": ["SAO PAULO", "CAMPINAS"],
                 "sg_uf": ["SP", "SP"],
             }
         )
