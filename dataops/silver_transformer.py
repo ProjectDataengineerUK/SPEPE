@@ -420,6 +420,7 @@ def transform_social_to_silver(
     patterns = [
         "twitter_mencoes_*.parquet",
         "facebook_posts_*.parquet",
+        "youtube_videos_*.parquet",
     ]
     for pattern in patterns:
         files = list(bronze_social.glob(pattern)) if bronze_social.exists() else []
@@ -579,6 +580,95 @@ def transform_saude_to_silver(
         df.to_parquet(path_local, index=False, compression="zstd")
         path = str(path_local)
         logger.info("Saúde Silver local: %s (%d rows)", path, len(df))
+
+    return {"status": "ok", "path": path, "rows": len(df)}
+
+
+def transform_economia_to_silver(
+    uf: str,
+    year: int,
+    use_bigquery: bool = False,
+) -> dict:
+    """Transform Bronze economia data (DIEESE + CETIC) to Silver.
+
+    Reads:  bronze/economia/{year}/{UF}/economia_{UF}_{year}.parquet
+            OR builds from DIEESE/CETIC clients if Bronze not found.
+    Writes: Silver table `economia_municipal` (BigQuery) or local parquet.
+    """
+    LOCAL_SILVER_DIR.mkdir(parents=True, exist_ok=True)
+
+    bronze_path = LOCAL_BRONZE_DIR / "economia" / str(year) / uf.upper()
+    files = (
+        list(bronze_path.glob(f"economia_{uf.upper()}_{year}.parquet"))
+        if bronze_path.exists()
+        else []
+    )
+
+    if not files and GCS_BUCKET:
+        prefix = f"raw/economia/{year}/{uf.upper()}/"
+        df = _read_gcs_parquet_glob(GCS_BUCKET, prefix)
+    elif files:
+        df = pd.concat([pd.read_parquet(f) for f in files], ignore_index=True)
+    else:
+        # Build from DIEESE + CETIC APIs directly (no pre-ingested Bronze)
+        from dataops.clients.cetic_client import build_digital_access_dataframe
+        from dataops.clients.dieese_client import build_cesta_basica_dataframe
+        from dataops.clients.ibge_client import load_municipios
+
+        municipios = load_municipios(uf)
+        municipios_ibge = municipios["cd_municipio_ibge"].dropna().astype(int).tolist()
+
+        df_dieese = build_cesta_basica_dataframe(uf, year, municipios_ibge)
+        df_cetic = build_digital_access_dataframe(uf, year, municipios_ibge)
+
+        frames = [f for f in [df_dieese, df_cetic] if not f.empty]
+        if not frames:
+            return {"status": "error", "message": f"Sem dados economia para {uf}/{year}"}
+
+        if len(frames) == 2:
+            df = frames[0].merge(
+                frames[1].drop(columns=["sg_uf", "fontes"], errors="ignore"),
+                on="cd_municipio_ibge",
+                how="outer",
+            )
+        else:
+            df = frames[0]
+
+    if df.empty:
+        return {"status": "error", "message": f"Bronze economia vazio para {uf}/{year}"}
+
+    df = df.copy()
+    if "sg_uf" not in df.columns:
+        df["sg_uf"] = uf.upper()
+    if "ano" not in df.columns:
+        df["ano"] = year
+
+    for col in (
+        "cesta_basica_capital_brl",
+        "variacao_cesta_mensal_pct",
+        "horas_trabalho_cesta",
+        "pct_internet_domiciliar",
+        "pct_computador_domiciliar",
+        "pct_smartphone_domiciliar",
+    ):
+        if col in df.columns:
+            df[col] = pd.to_numeric(df[col], errors="coerce")
+
+    if "cd_municipio_ibge" in df.columns:
+        df["cd_municipio_ibge"] = pd.to_numeric(
+            df["cd_municipio_ibge"], errors="coerce"
+        ).astype("Int64")
+
+    df["ingested_at"] = pd.Timestamp.utcnow()
+
+    table_name = f"economia_municipal_{uf.lower()}_{year}"
+    if use_bigquery:
+        path = _write_bigquery(df, "economia_municipal")
+    else:
+        path_local = LOCAL_SILVER_DIR / f"{table_name}.parquet"
+        df.to_parquet(path_local, index=False, compression="zstd")
+        path = str(path_local)
+        logger.info("Economia Silver local: %s (%d rows)", path, len(df))
 
     return {"status": "ok", "path": path, "rows": len(df)}
 

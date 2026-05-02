@@ -13,8 +13,10 @@ import pandas as pd
 from dataops.bronze_writer import write_bronze
 from dataops.clients.social_client import (
     aggregate_x_sentiment,
+    enrich_sentiment_vertex,
     fetch_fb_page_posts,
     fetch_x_mentions,
+    fetch_youtube_videos,
 )
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s %(message)s")
@@ -95,6 +97,40 @@ def main(candidatos: list[str], fb_pages: list[str], dias: int, year: int) -> No
             logger.info("Facebook Bronze: %d posts", len(df_fb))
     else:
         logger.info("Facebook: nenhuma página configurada — pulando")
+
+    # ── YouTube Data API v3 ────────────────────────────────────────────────
+    yt_records = fetch_youtube_videos(candidatos, year=year, max_por_candidato=200)
+    if yt_records:
+        gcp_project = os.environ.get("GCP_PROJECT_ID", "")
+        yt_records = enrich_sentiment_vertex(yt_records, text_field="title", project=gcp_project)
+        df_yt = pd.DataFrame(yt_records)
+        write_bronze(
+            df=df_yt,
+            source="social",
+            year=year,
+            uf="BR",
+            filename=f"youtube_videos_{year}.parquet",
+            use_gcs=use_gcs,
+        )
+        logger.info("YouTube Bronze: %d vídeos", len(df_yt))
+    else:
+        logger.info("YouTube: nenhum vídeo coletado (chave ausente ou API vazia)")
+
+    # ── Vertex NLP enrichment for Twitter/X (if GCP available) ───────────
+    if mentions:
+        gcp_project = os.environ.get("GCP_PROJECT_ID", "")
+        if gcp_project:
+            mentions = enrich_sentiment_vertex(mentions, text_field="text", project=gcp_project)
+            df_x_enriched = pd.DataFrame(mentions)
+            write_bronze(
+                df=df_x_enriched,
+                source="social",
+                year=year,
+                uf="BR",
+                filename=f"twitter_mencoes_enriched_{year}.parquet",
+                use_gcs=use_gcs,
+            )
+            logger.info("Twitter/X Vertex NLP: %d registros enriquecidos", len(mentions))
 
     logger.info("Social ingest concluído")
 

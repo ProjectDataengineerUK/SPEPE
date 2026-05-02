@@ -159,6 +159,12 @@ def build_gold(use_bigquery: bool = False) -> dict:
         fact_social, "fact_social_municipio", use_bigquery
     )
 
+    # ── Economia (DIEESE + CETIC) ─────────────────────────────────────────────
+    fact_eco = _build_fact_economico()
+    result["fact_economico_municipio"] = _write_gold(
+        fact_eco, "fact_economico_municipio", use_bigquery
+    )
+
     return {"status": "ok", "tables": result}
 
 
@@ -389,6 +395,18 @@ def _build_fact_social() -> pd.DataFrame:
     fact["ingested_at"] = pd.Timestamp.utcnow()
     logger.info("fact_social_municipio: %d rows", len(fact))
     return fact
+
+
+def _build_fact_economico() -> pd.DataFrame:
+    """Aggregate Silver economia_municipal files into Gold fact_economico_municipio."""
+    files = list(LOCAL_SILVER_DIR.glob("economia_municipal_*.parquet"))
+    if not files:
+        logger.info("fact_economico_municipio: nenhum Silver de economia disponível")
+        return pd.DataFrame()
+    df = pd.concat([pd.read_parquet(f) for f in files], ignore_index=True)
+    df["ingested_at"] = pd.Timestamp.utcnow()
+    logger.info("fact_economico_municipio: %d rows de %d arquivos Silver", len(df), len(files))
+    return df
 
 
 def _write_gold(df: pd.DataFrame, table_name: str, use_bigquery: bool) -> str:

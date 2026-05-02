@@ -499,3 +499,38 @@ resource "google_bigquery_table" "fact_ibge_municipio" {
     { name = "ingested_at", type = "TIMESTAMP", mode = "REQUIRED" },
   ])
 }
+
+resource "google_bigquery_table" "fact_economico_municipio" {
+  dataset_id          = google_bigquery_dataset.spepe_gold.dataset_id
+  table_id            = "fact_economico_municipio"
+  description         = "Gold: indicadores econômicos municipais — DIEESE cesta básica + CETIC acesso digital"
+  labels              = local.labels
+  deletion_protection = var.environment == "prod"
+
+  range_partitioning {
+    field = "ano"
+    range {
+      start    = 2000
+      end      = 2031
+      interval = 1
+    }
+  }
+
+  clustering = ["sg_uf", "cd_municipio_ibge"]
+
+  schema = jsonencode([
+    { name = "cd_municipio_ibge", type = "INT64", mode = "REQUIRED" },
+    { name = "sg_uf", type = "STRING", mode = "REQUIRED" },
+    { name = "ano", type = "INT64", mode = "REQUIRED" },
+    { name = "data_referencia", type = "DATE", mode = "NULLABLE" },
+    { name = "cesta_basica_capital_brl", type = "FLOAT64", mode = "NULLABLE" },
+    { name = "variacao_cesta_mensal_pct", type = "FLOAT64", mode = "NULLABLE" },
+    { name = "horas_trabalho_cesta", type = "FLOAT64", mode = "NULLABLE" },
+    { name = "pct_internet_domiciliar", type = "FLOAT64", mode = "NULLABLE" },
+    { name = "pct_computador_domiciliar", type = "FLOAT64", mode = "NULLABLE" },
+    { name = "pct_smartphone_domiciliar", type = "FLOAT64", mode = "NULLABLE" },
+    { name = "granularidade", type = "STRING", mode = "NULLABLE" },
+    { name = "fontes", type = "STRING", mode = "NULLABLE" },
+    { name = "ingested_at", type = "TIMESTAMP", mode = "REQUIRED" },
+  ])
+}

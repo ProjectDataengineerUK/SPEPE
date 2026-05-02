@@ -15,6 +15,7 @@ DQ_THRESHOLD = float(os.environ.get("DQ_SCORE_THRESHOLD", "95.0"))
 
 def main(uf: str, years: list[int] | None = None, include_social: bool = True) -> None:
     from dataops.silver_transformer import (
+        transform_economia_to_silver,
         transform_pesquisas_to_silver,
         transform_saude_to_silver,
         transform_seguranca_to_silver,
@@ -80,7 +81,16 @@ def main(uf: str, years: list[int] | None = None, include_social: bool = True) -
         else:
             logger.warning("Saúde Silver %s/%d: %s", uf, year, r.get("message"))
 
-    # ── Social (Twitter/Facebook — BR) ──────────────────────────────────────
+    # ── Economia (DIEESE + CETIC — por UF × ano) ───────────────────────────
+    for year in target_years:
+        logger.info("Silver economia: %s/%d", uf, year)
+        r = transform_economia_to_silver(uf, year, use_bigquery=use_bq)
+        if r.get("status") == "ok":
+            logger.info("Economia Silver OK %s/%d: %d rows", uf, year, r.get("rows", 0))
+        else:
+            logger.warning("Economia Silver %s/%d: %s", uf, year, r.get("message"))
+
+    # ── Social (Twitter/Facebook/YouTube — BR) ──────────────────────────────
     if include_social:
         social_year = int(os.environ.get("SOCIAL_YEAR", "2026"))
         logger.info("Silver social: ano=%d", social_year)
