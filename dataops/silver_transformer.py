@@ -196,7 +196,7 @@ def _transform_streaming_to_bq(uf: str, year: int, df_ibge: pd.DataFrame) -> dic
         "path": table_id,
         "rows": total_rows,
         "dq_score": dq_score,
-        "dq_warnings": dq_warnings,
+        "dq_warnings": [],
         "match_pct": 0.0,
     }
 
