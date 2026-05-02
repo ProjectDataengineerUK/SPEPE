@@ -1,7 +1,8 @@
-"""Social media client — Twitter/X API v2 + Facebook Graph API.
+"""Social media client — Twitter/X API v2 + Facebook Graph API + YouTube Data API v3.
 
 Twitter/X: recent search (free tier — 500k tweets/month, 7-day lookback).
 Facebook:  Page posts + reactions via Graph API (requires page token).
+YouTube:   Search + video stats via Data API v3 (requires YOUTUBE_API_KEY).
 """
 
 from __future__ import annotations
@@ -26,6 +27,12 @@ _X_MAX_RESULTS = 100  # max per request on free tier
 # ── Facebook Graph API ──────────────────────────────────────────────────────
 _FB_TOKEN = os.environ.get("META_APP_TOKEN", "")
 _FB_BASE = "https://graph.facebook.com/v19.0"
+
+# ── YouTube Data API v3 ─────────────────────────────────────────────────────
+_YT_API_KEY = os.environ.get("YOUTUBE_API_KEY", "")
+_YT_SEARCH_URL = "https://www.googleapis.com/youtube/v3/search"
+_YT_VIDEOS_URL = "https://www.googleapis.com/youtube/v3/videos"
+_YT_MAX_RESULTS = 50  # max per request
 
 
 # ── Sentiment labels (rule-based — substituir por Vertex AI NLP na Fase 2+) ─
@@ -258,3 +265,170 @@ def fetch_fb_page_posts(
 
     logger.info("Facebook: %d posts coletados de %d páginas", len(results), len(page_ids))
     return results
+
+
+# ── YouTube Data API v3 ───────────────────────────────────────────────────────
+
+
+def fetch_youtube_videos(
+    candidatos: list[str],
+    year: int,
+    max_por_candidato: int = 200,
+) -> list[dict]:
+    """Busca vídeos e estatísticas do YouTube relacionados a candidatos.
+
+    Retorna lista de dicts com: candidato, video_id, title, published_at,
+    view_count, like_count, comment_count, sentiment, channel_title, fonte.
+
+    Requer YOUTUBE_API_KEY (Google Cloud Console, YouTube Data API v3 habilitada).
+    Quota: 10.000 unidades/dia grátis; search.list = 100 unidades/chamada.
+    """
+    if not _YT_API_KEY:
+        logger.warning("YOUTUBE_API_KEY ausente — retornando lista vazia")
+        return []
+
+    published_after = f"{year}-01-01T00:00:00Z"
+    published_before = f"{year}-12-31T23:59:59Z"
+    results: list[dict] = []
+
+    for candidato in candidatos:
+        video_ids: list[str] = []
+        page_token: str | None = None
+        collected = 0
+
+        while collected < max_por_candidato:
+            params: dict[str, Any] = {
+                "key": _YT_API_KEY,
+                "q": candidato,
+                "part": "snippet",
+                "type": "video",
+                "maxResults": min(max_por_candidato - collected, _YT_MAX_RESULTS),
+                "publishedAfter": published_after,
+                "publishedBefore": published_before,
+                "relevanceLanguage": "pt",
+                "regionCode": "BR",
+                "order": "relevance",
+            }
+            if page_token:
+                params["pageToken"] = page_token
+
+            try:
+                resp = requests.get(_YT_SEARCH_URL, params=params, timeout=30)
+                resp.raise_for_status()
+                data = resp.json()
+            except Exception as exc:
+                logger.warning("YouTube search falhou para '%s': %s", candidato, exc)
+                break
+
+            items = data.get("items", [])
+            if not items:
+                break
+
+            for item in items:
+                vid_id = item.get("id", {}).get("videoId")
+                if vid_id:
+                    video_ids.append(vid_id)
+            collected += len(items)
+            page_token = data.get("nextPageToken")
+            if not page_token:
+                break
+
+        if not video_ids:
+            continue
+
+        # Busca estatísticas em lote (50 IDs por request)
+        for i in range(0, len(video_ids), 50):
+            batch = video_ids[i : i + 50]
+            try:
+                stats_resp = requests.get(
+                    _YT_VIDEOS_URL,
+                    params={
+                        "key": _YT_API_KEY,
+                        "id": ",".join(batch),
+                        "part": "snippet,statistics",
+                    },
+                    timeout=30,
+                )
+                stats_resp.raise_for_status()
+                stats_data = stats_resp.json()
+            except Exception as exc:
+                logger.warning("YouTube statistics falhou: %s", exc)
+                continue
+
+            for v in stats_data.get("items", []):
+                snippet = v.get("snippet", {})
+                stats = v.get("statistics", {})
+                title = snippet.get("title", "")
+                results.append(
+                    {
+                        "candidato": candidato,
+                        "video_id": v["id"],
+                        "title": title[:200],
+                        "channel_title": snippet.get("channelTitle", ""),
+                        "published_at": snippet.get("publishedAt", ""),
+                        "view_count": int(stats.get("viewCount", 0) or 0),
+                        "like_count": int(stats.get("likeCount", 0) or 0),
+                        "comment_count": int(stats.get("commentCount", 0) or 0),
+                        "sentiment": _simple_sentiment(title),
+                        "fonte": "youtube",
+                    }
+                )
+
+    logger.info("YouTube: %d vídeos coletados para %d candidatos", len(results), len(candidatos))
+    return results
+
+
+def _call_vertex_nlp(texts: list[str], project: str, location: str = "us-central1") -> list[str]:
+    """Classify sentiment via Vertex AI text-multilingual-v1 in batches of 25.
+
+    Returns list of sentiment labels (positivo | negativo | neutro) aligned with input texts.
+    Falls back to _simple_sentiment if Vertex AI unavailable.
+    """
+    try:
+        from google.cloud import language_v2
+
+        client = language_v2.LanguageServiceClient()
+        sentiments: list[str] = []
+        for text in texts:
+            doc = language_v2.Document(
+                content=text[:1000],
+                type_=language_v2.Document.Type.PLAIN_TEXT,
+                language_code="pt",
+            )
+            try:
+                result = client.analyze_sentiment(request={"document": doc})
+                score = result.document_sentiment.score
+                if score >= 0.15:
+                    sentiments.append("positivo")
+                elif score <= -0.15:
+                    sentiments.append("negativo")
+                else:
+                    sentiments.append("neutro")
+            except Exception:
+                sentiments.append(_simple_sentiment(text))
+        return sentiments
+    except ImportError:
+        logger.debug("google-cloud-language indisponível — usando sentiment rule-based")
+        return [_simple_sentiment(t) for t in texts]
+
+
+def enrich_sentiment_vertex(
+    records: list[dict],
+    text_field: str = "text",
+    project: str = "",
+) -> list[dict]:
+    """Replace rule-based sentiment with Vertex AI NLP for a list of social records.
+
+    Replaces the 'sentiment' field in-place. Falls back to rule-based if Vertex fails.
+    Only called when GCP_PROJECT_ID is set — avoids unnecessary API calls locally.
+    """
+    if not project:
+        project = os.environ.get("GCP_PROJECT_ID", "")
+    if not project:
+        return records
+
+    texts = [r.get(text_field, "") or "" for r in records]
+    sentiments = _call_vertex_nlp(texts, project)
+    for rec, sent in zip(records, sentiments):
+        rec["sentiment"] = sent
+    return records

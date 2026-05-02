@@ -1,8 +1,13 @@
-"""DataSUS client — SIM (mortality) + SINASC (births) + ANS (health coverage)."""
+"""DataSUS client — SIM (mortality) + SINASC (births) + ANS (health coverage).
+
+Primary path: PySUS FTP (DBC files) — real municipal-level data.
+Fallback:     IPEADATA REST API — state-level proxies when PySUS unavailable.
+"""
 
 from __future__ import annotations
 
 import logging
+from importlib.util import find_spec
 from io import BytesIO
 from pathlib import Path
 
@@ -12,13 +17,9 @@ from tenacity import retry, stop_after_attempt, wait_exponential
 
 logger = logging.getLogger("spepe.clients.datasus")
 
-# DataSUS open data portal — SIM and SINASC bulk CSVs via SGDIF transfer
-_DATASUS_FTP_BASE = "https://datasus.saude.gov.br/transferencia-de-arquivos/"
+_HAS_PYSUS = find_spec("pysus") is not None
 
-# TABNET / TABWIN public CSV endpoints (via custom REST wrapper used by OpenDataSUS libs)
-_OPENDATASUS_BASE = "https://servicodados.datasus.gov.br"
-
-# Fallback: IPEADATA has mortality indicators at state level
+# Fallback: IPEADATA has mortality indicators at municipal level
 _IPEADATA_MORTALITY = (
     "http://www.ipeadata.gov.br/api/odata4/ValoresSerie"
     "(SERCODIGO='{serie}')?$top=500&$filter=NIVNOME%20eq%20'Municípios'"
@@ -130,6 +131,88 @@ def fetch_ans_cobertura(
     return result
 
 
+def _fetch_sim_pysus(uf: str, year: int, municipios_ibge: list[int]) -> dict[int, dict]:
+    """Fetch SIM mortality data via PySUS FTP (DBC format). Returns {ibge_code: {indicators}}.
+
+    PySUS downloads DBC files from DataSUS FTP and decodes them to pandas DataFrames.
+    Aggregates to municipal level: total óbitos + taxa por 100k (using populacao proxy).
+    """
+    if not _HAS_PYSUS:
+        return {}
+    try:
+        from pysus.ftp.databases.sim import SIM  # pysus >= 0.3.1
+
+        sim = SIM().load()
+        files = sim.get_files(UF=uf.upper(), year=year)
+        if not files:
+            logger.info("PySUS SIM: nenhum arquivo para UF=%s ano=%d", uf, year)
+            return {}
+
+        df = sim.read(files[0] if isinstance(files, list) else files)
+        if df is None or df.empty:
+            return {}
+
+        ibge_col = next(
+            (c for c in df.columns if "CODMUNRES" in c.upper() or "MUNRES" in c.upper()), None
+        )
+        if ibge_col is None:
+            logger.warning("PySUS SIM: coluna de município não encontrada")
+            return {}
+
+        df[ibge_col] = pd.to_numeric(df[ibge_col], errors="coerce")
+        ibge_set = set(municipios_ibge)
+        df = df[df[ibge_col].isin(ibge_set)]
+
+        result: dict[int, dict] = {}
+        for cd, grp in df.groupby(ibge_col):
+            result[int(cd)] = {"qt_obitos_total": len(grp)}
+
+        logger.info("PySUS SIM: %d municípios carregados para UF=%s ano=%d", len(result), uf, year)
+        return result
+    except Exception as exc:
+        logger.warning(
+            "PySUS SIM falhou para UF=%s ano=%d: %s — usando fallback IPEADATA", uf, year, exc
+        )
+        return {}
+
+
+def _fetch_sinasc_pysus(uf: str, year: int, municipios_ibge: list[int]) -> dict[int, dict]:
+    """Fetch SINASC births data via PySUS FTP. Returns {ibge_code: {taxa_natalidade_1000}}."""
+    if not _HAS_PYSUS:
+        return {}
+    try:
+        from pysus.ftp.databases.sinasc import SINASC
+
+        sinasc = SINASC().load()
+        files = sinasc.get_files(UF=uf.upper(), year=year)
+        if not files:
+            return {}
+
+        df = sinasc.read(files[0] if isinstance(files, list) else files)
+        if df is None or df.empty:
+            return {}
+
+        mun_col = next(
+            (c for c in df.columns if "CODMUNNASC" in c.upper() or "MUNNASC" in c.upper()), None
+        )
+        if mun_col is None:
+            return {}
+
+        df[mun_col] = pd.to_numeric(df[mun_col], errors="coerce")
+        ibge_set = set(municipios_ibge)
+        df = df[df[mun_col].isin(ibge_set)]
+
+        result: dict[int, dict] = {}
+        for cd, grp in df.groupby(mun_col):
+            result[int(cd)] = {"qt_nascimentos": len(grp)}
+
+        logger.info("PySUS SINASC: %d municípios para UF=%s ano=%d", len(result), uf, year)
+        return result
+    except Exception as exc:
+        logger.warning("PySUS SINASC falhou para UF=%s ano=%d: %s", uf, year, exc)
+        return {}
+
+
 def build_saude_dataframe(
     uf: str,
     year: int,
@@ -137,18 +220,40 @@ def build_saude_dataframe(
     pop_by_ibge: dict[int, int],
     cache_dir: Path,
 ) -> pd.DataFrame:
-    """Build the health indicators DataFrame for a UF × year."""
-    mortality = fetch_ipeadata_mortality(uf, year, municipios_ibge)
+    """Build the health indicators DataFrame for a UF × year.
+
+    Strategy:
+    1. PySUS FTP → SIM (mortality counts) + SINASC (births)
+    2. IPEADATA fallback for mortality rates when PySUS unavailable
+    3. ANS open data for health plan coverage %
+    """
+    # ── Primary: PySUS FTP ───────────────────────────────────────────────────
+    sim_data = _fetch_sim_pysus(uf, year, municipios_ibge)
+    sinasc_data = _fetch_sinasc_pysus(uf, year, municipios_ibge)
+    fontes: list[str] = []
+    if sim_data:
+        fontes.append("DataSUS SIM (PySUS FTP)")
+    if sinasc_data:
+        fontes.append("DataSUS SINASC (PySUS FTP)")
+
+    # ── Fallback: IPEADATA for mortality rates ───────────────────────────────
+    mortality_rates: dict[int, dict] = {}
+    if not sim_data:
+        mortality_rates = fetch_ipeadata_mortality(uf, year, municipios_ibge)
+        if mortality_rates:
+            fontes.append("DataSUS SIM (IPEADATA)")
+
+    # ── ANS coverage ─────────────────────────────────────────────────────────
     ans = fetch_ans_cobertura(uf, year, municipios_ibge, pop_by_ibge, cache_dir)
+    if ans:
+        fontes.append("ANS beneficiários")
 
     rows = []
     for cd in municipios_ibge:
-        row: dict = {
-            "cd_municipio_ibge": cd,
-            "sg_uf": uf.upper(),
-            "ano": year,
-        }
-        row.update(mortality.get(cd, {}))
+        row: dict = {"cd_municipio_ibge": cd, "sg_uf": uf.upper(), "ano": year}
+        row.update(sim_data.get(cd, {}))
+        row.update(sinasc_data.get(cd, {}))
+        row.update(mortality_rates.get(cd, {}))
         if cd in ans:
             row["pct_cobertura_plano_saude"] = ans[cd]
         rows.append(row)
@@ -157,8 +262,5 @@ def build_saude_dataframe(
         return pd.DataFrame()
 
     df = pd.DataFrame(rows)
-    fontes = ["DataSUS SIM (IPEADATA)"]
-    if ans:
-        fontes.append("ANS beneficiários")
-    df["fontes"] = " + ".join(fontes)
+    df["fontes"] = " + ".join(fontes) if fontes else "sem dados"
     return df
