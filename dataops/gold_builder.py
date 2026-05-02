@@ -22,7 +22,7 @@ def _build_gold_via_bigquery_sql() -> dict:
 
     client = bigquery.Client(project=_GCP_PROJECT)
     _BQ_GOLD_DATASET = os.environ.get("BIGQUERY_DATASET_GOLD", "spepe_gold")
-    silver = f"`{_GCP_PROJECT}.{_BQ_SILVER_DATASET}`"
+    silver_wc = f"`{_GCP_PROJECT}.{_BQ_SILVER_DATASET}.tse_*`"
     gold = f"{_GCP_PROJECT}.{_BQ_GOLD_DATASET}"
 
     sqls = {
@@ -34,7 +34,7 @@ def _build_gold_via_bigquery_sql() -> dict:
                 COUNT(DISTINCT nr_candidato) AS n_candidatos,
                 COUNT(DISTINCT CONCAT(CAST(nr_zona AS STRING), '-', CAST(nr_secao AS STRING))) AS n_secoes,
                 CURRENT_TIMESTAMP() AS ingested_at
-            FROM {silver}.tse_*
+            FROM {silver_wc}
             GROUP BY sg_uf, cd_municipio, nm_municipio, cd_cargo, ds_cargo, nr_turno, ano_eleicao
         """,
         "fact_secao_eleicao": f"""
@@ -44,7 +44,7 @@ def _build_gold_via_bigquery_sql() -> dict:
                 SUM(qt_votos) AS total_votos,
                 COUNT(DISTINCT nr_candidato) AS n_candidatos,
                 CURRENT_TIMESTAMP() AS ingested_at
-            FROM {silver}.tse_*
+            FROM {silver_wc}
             GROUP BY sg_uf, cd_municipio, nr_zona, nr_secao, cd_cargo, nr_turno, ano_eleicao
         """,
         "fact_candidato_eleicao": f"""
@@ -54,7 +54,7 @@ def _build_gold_via_bigquery_sql() -> dict:
                 SUM(qt_votos) AS total_votos,
                 COUNT(DISTINCT cd_municipio) AS n_municipios,
                 CURRENT_TIMESTAMP() AS ingested_at
-            FROM {silver}.tse_*
+            FROM {silver_wc}
             GROUP BY sg_uf, nr_candidato, nm_candidato, sg_partido, cd_cargo, ds_cargo, nr_turno, ano_eleicao
         """,
     }
