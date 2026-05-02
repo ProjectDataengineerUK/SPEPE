@@ -391,3 +391,111 @@ resource "google_bigquery_table" "fact_economico_municipio" {
     { name = "ingested_at", type = "TIMESTAMP", mode = "REQUIRED" },
   ])
 }
+
+# ─── Silver: Social ───────────────────────────────────────────────────────────
+resource "google_bigquery_table" "silver_social_mencoes_br" {
+  dataset_id          = google_bigquery_dataset.spepe_silver.dataset_id
+  table_id            = "social_mencoes_br"
+  description         = "Menções sociais brutas por post/tweet — Silver layer (Twitter/X + Facebook)"
+  labels              = local.labels
+  deletion_protection = false
+
+  time_partitioning {
+    type  = "DAY"
+    field = "created_at"
+  }
+
+  clustering = ["fonte", "sg_uf"]
+
+  schema = jsonencode([
+    { name = "id_post", type = "STRING", mode = "NULLABLE" },
+    { name = "fonte", type = "STRING", mode = "REQUIRED" },
+    { name = "created_at", type = "TIMESTAMP", mode = "NULLABLE" },
+    { name = "text", type = "STRING", mode = "NULLABLE" },
+    { name = "sg_uf", type = "STRING", mode = "NULLABLE" },
+    { name = "like_count", type = "INT64", mode = "NULLABLE" },
+    { name = "retweet_count", type = "INT64", mode = "NULLABLE" },
+    { name = "reply_count", type = "INT64", mode = "NULLABLE" },
+    { name = "likes", type = "INT64", mode = "NULLABLE" },
+    { name = "comments", type = "INT64", mode = "NULLABLE" },
+    { name = "shares", type = "INT64", mode = "NULLABLE" },
+    { name = "ano", type = "INT64", mode = "NULLABLE" },
+    { name = "ingested_at", type = "TIMESTAMP", mode = "REQUIRED" },
+  ])
+}
+
+# ─── Gold: Social agregado ────────────────────────────────────────────────────
+resource "google_bigquery_table" "fact_social_municipio" {
+  dataset_id               = google_bigquery_dataset.spepe_gold.dataset_id
+  table_id                 = "fact_social_municipio"
+  description              = "Engajamento social agregado por UF × dia × fonte — Gold layer"
+  labels                   = local.labels
+  deletion_protection      = var.environment == "prod"
+  require_partition_filter = false
+
+  time_partitioning {
+    type  = "DAY"
+    field = "data_referencia"
+  }
+
+  clustering = ["sg_uf", "fonte"]
+
+  schema = jsonencode([
+    { name = "sg_uf", type = "STRING", mode = "REQUIRED" },
+    { name = "fonte", type = "STRING", mode = "REQUIRED" },
+    { name = "data_referencia", type = "DATE", mode = "REQUIRED" },
+    { name = "ano", type = "INT64", mode = "NULLABLE" },
+    { name = "qt_posts", type = "INT64", mode = "NULLABLE" },
+    { name = "total_likes", type = "INT64", mode = "NULLABLE" },
+    { name = "total_shares", type = "INT64", mode = "NULLABLE" },
+    { name = "total_comments", type = "INT64", mode = "NULLABLE" },
+    { name = "total_retweets", type = "INT64", mode = "NULLABLE" },
+    { name = "total_engajamento", type = "INT64", mode = "NULLABLE" },
+    { name = "ingested_at", type = "TIMESTAMP", mode = "REQUIRED" },
+  ])
+}
+
+# ─── Gold: IBGE indicadores municipais ───────────────────────────────────────
+resource "google_bigquery_table" "fact_ibge_municipio" {
+  dataset_id               = google_bigquery_dataset.spepe_gold.dataset_id
+  table_id                 = "fact_ibge_municipio"
+  description              = "Indicadores socioeconômicos IBGE por município — Gold layer"
+  labels                   = local.labels
+  deletion_protection      = var.environment == "prod"
+  require_partition_filter = false
+
+  range_partitioning {
+    field = "ano"
+    range {
+      start    = 2000
+      end      = 2031
+      interval = 1
+    }
+  }
+
+  clustering = ["sg_uf", "cd_municipio_ibge"]
+
+  schema = jsonencode([
+    { name = "cd_municipio_ibge", type = "INT64", mode = "REQUIRED" },
+    { name = "nm_municipio", type = "STRING", mode = "NULLABLE" },
+    { name = "sg_uf", type = "STRING", mode = "REQUIRED" },
+    { name = "sg_regiao", type = "STRING", mode = "NULLABLE" },
+    { name = "ano", type = "INT64", mode = "REQUIRED" },
+    { name = "idhm", type = "FLOAT64", mode = "NULLABLE" },
+    { name = "idhm_educacao", type = "FLOAT64", mode = "NULLABLE" },
+    { name = "idhm_longevidade", type = "FLOAT64", mode = "NULLABLE" },
+    { name = "idhm_renda", type = "FLOAT64", mode = "NULLABLE" },
+    { name = "renda_per_capita", type = "FLOAT64", mode = "NULLABLE" },
+    { name = "gini", type = "FLOAT64", mode = "NULLABLE" },
+    { name = "pct_extrema_pobreza", type = "FLOAT64", mode = "NULLABLE" },
+    { name = "taxa_analfabetismo", type = "FLOAT64", mode = "NULLABLE" },
+    { name = "anos_estudo_medio", type = "FLOAT64", mode = "NULLABLE" },
+    { name = "pct_domicilios_agua", type = "FLOAT64", mode = "NULLABLE" },
+    { name = "pct_domicilios_esgoto", type = "FLOAT64", mode = "NULLABLE" },
+    { name = "pct_domicilios_energia", type = "FLOAT64", mode = "NULLABLE" },
+    { name = "populacao_total", type = "INT64", mode = "NULLABLE" },
+    { name = "densidade_demografica", type = "FLOAT64", mode = "NULLABLE" },
+    { name = "pct_urbano", type = "FLOAT64", mode = "NULLABLE" },
+    { name = "ingested_at", type = "TIMESTAMP", mode = "REQUIRED" },
+  ])
+}

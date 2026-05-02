@@ -124,6 +124,7 @@ def build_gold(use_bigquery: bool = False) -> dict:
 
     result = {}
 
+    # ── Eleitoral (TSE) ───────────────────────────────────────────────────────
     fact_mun = _build_fact_municipio_eleicao(df_all)
     result["fact_municipio_eleicao"] = _write_gold(fact_mun, "fact_municipio_eleicao", use_bigquery)
 
@@ -133,9 +134,30 @@ def build_gold(use_bigquery: bool = False) -> dict:
     fact_cand = _build_fact_candidato_dia(df_all)
     result["fact_candidato_dia"] = _write_gold(fact_cand, "fact_candidato_dia", use_bigquery)
 
+    # ── Pesquisas ─────────────────────────────────────────────────────────────
     ibge_data = _load_ibge_silver()
     fact_pesq = _build_fact_pesquisa(ibge_data)
     result["fact_pesquisa"] = _write_gold(fact_pesq, "fact_pesquisa", use_bigquery)
+
+    # ── IBGE indicadores municipais ───────────────────────────────────────────
+    fact_ibge = _build_fact_ibge_municipio(ibge_data)
+    result["fact_ibge_municipio"] = _write_gold(fact_ibge, "fact_ibge_municipio", use_bigquery)
+
+    # ── Segurança pública ─────────────────────────────────────────────────────
+    fact_seg = _build_fact_seguranca()
+    result["fact_seguranca_municipio"] = _write_gold(
+        fact_seg, "fact_seguranca_municipio", use_bigquery
+    )
+
+    # ── Saúde / DataSUS ───────────────────────────────────────────────────────
+    fact_saude = _build_fact_saude()
+    result["fact_saude_municipio"] = _write_gold(fact_saude, "fact_saude_municipio", use_bigquery)
+
+    # ── Social ────────────────────────────────────────────────────────────────
+    fact_social = _build_fact_social()
+    result["fact_social_municipio"] = _write_gold(
+        fact_social, "fact_social_municipio", use_bigquery
+    )
 
     return {"status": "ok", "tables": result}
 
@@ -254,6 +276,119 @@ def _build_fact_pesquisa(df_ibge: pd.DataFrame) -> pd.DataFrame:
 
     dfs = [pd.read_parquet(f) for f in pesquisa_files]
     return pd.concat(dfs, ignore_index=True)
+
+
+def _build_fact_ibge_municipio(df_ibge: pd.DataFrame) -> pd.DataFrame:
+    """Promote IBGE Silver indicators to Gold fact_ibge_municipio."""
+    if df_ibge.empty:
+        return pd.DataFrame()
+
+    ibge_cols = [
+        "cd_municipio_ibge",
+        "nm_municipio",
+        "sg_uf",
+        "ano",
+        "idhm",
+        "idhm_educacao",
+        "idhm_longevidade",
+        "idhm_renda",
+        "renda_per_capita",
+        "gini",
+        "pct_extrema_pobreza",
+        "taxa_analfabetismo",
+        "anos_estudo_medio",
+        "pct_domicilios_agua",
+        "pct_domicilios_esgoto",
+        "pct_domicilios_energia",
+        "populacao_total",
+        "densidade_demografica",
+        "pct_urbano",
+    ]
+    cols = [c for c in ibge_cols if c in df_ibge.columns]
+    if "cd_municipio_ibge" not in cols:
+        logger.warning("fact_ibge_municipio: cd_municipio_ibge ausente no Silver IBGE")
+        return pd.DataFrame()
+
+    df = df_ibge[cols].copy()
+    if "sg_uf" in df.columns:
+        df["sg_regiao"] = df["sg_uf"].map(UF_REGIAO).fillna("Desconhecida")
+    if "ano" not in df.columns:
+        df["ano"] = 0
+    df["cd_municipio_ibge"] = pd.to_numeric(df["cd_municipio_ibge"], errors="coerce").astype(
+        "Int64"
+    )
+    df["ingested_at"] = pd.Timestamp.utcnow()
+    logger.info("fact_ibge_municipio: %d rows", len(df))
+    return df
+
+
+def _build_fact_seguranca() -> pd.DataFrame:
+    """Aggregate Silver seguranca_municipal files into Gold fact_seguranca_municipio."""
+    files = list(LOCAL_SILVER_DIR.glob("seguranca_municipal_*.parquet"))
+    if not files:
+        logger.info("fact_seguranca_municipio: nenhum Silver de segurança disponível")
+        return pd.DataFrame()
+    df = pd.concat([pd.read_parquet(f) for f in files], ignore_index=True)
+    df["ingested_at"] = pd.Timestamp.utcnow()
+    logger.info("fact_seguranca_municipio: %d rows de %d arquivos Silver", len(df), len(files))
+    return df
+
+
+def _build_fact_saude() -> pd.DataFrame:
+    """Aggregate Silver saude_municipal files into Gold fact_saude_municipio."""
+    files = list(LOCAL_SILVER_DIR.glob("saude_municipal_*.parquet"))
+    if not files:
+        logger.info("fact_saude_municipio: nenhum Silver de saúde disponível")
+        return pd.DataFrame()
+    df = pd.concat([pd.read_parquet(f) for f in files], ignore_index=True)
+    df["ingested_at"] = pd.Timestamp.utcnow()
+    logger.info("fact_saude_municipio: %d rows de %d arquivos Silver", len(df), len(files))
+    return df
+
+
+def _build_fact_social() -> pd.DataFrame:
+    """Aggregate Silver social_mencoes_br files into Gold fact_social_municipio."""
+    files = list(LOCAL_SILVER_DIR.glob("social_mencoes_br_*.parquet"))
+    if not files:
+        logger.info("fact_social_municipio: nenhum Silver social disponível")
+        return pd.DataFrame()
+
+    frames = [pd.read_parquet(f) for f in files]
+    df = pd.concat(frames, ignore_index=True)
+
+    group_cols = ["sg_uf", "fonte"]
+    if "created_at" in df.columns:
+        df["data_referencia"] = pd.to_datetime(df["created_at"], errors="coerce").dt.date
+        group_cols.append("data_referencia")
+    else:
+        df["data_referencia"] = pd.Timestamp.utcnow().date()
+        group_cols.append("data_referencia")
+
+    if "ano" in df.columns:
+        group_cols.append("ano")
+
+    agg: dict[str, object] = {"qt_posts": ("fonte", "count")}
+    for col, alias in [
+        ("like_count", "total_likes"),
+        ("likes", "total_likes"),
+        ("retweet_count", "total_retweets"),
+        ("reply_count", "total_comments"),
+        ("comments", "total_comments"),
+        ("shares", "total_shares"),
+    ]:
+        if col in df.columns and alias not in agg:
+            agg[alias] = (col, "sum")
+
+    avail_group = [c for c in group_cols if c in df.columns or c == "data_referencia"]
+    fact = df.groupby([c for c in avail_group if c in df.columns], as_index=False).agg(**agg)
+    fact["total_engajamento"] = sum(
+        fact.get(c, 0)
+        for c in ("total_likes", "total_retweets", "total_comments", "total_shares")
+        if c in fact.columns
+    )
+    fact["ingested_at"] = pd.Timestamp.utcnow()
+    logger.info("fact_social_municipio: %d rows", len(fact))
+    return fact
 
 
 def _write_gold(df: pd.DataFrame, table_name: str, use_bigquery: bool) -> str:
