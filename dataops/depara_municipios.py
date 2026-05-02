@@ -21,6 +21,8 @@ IBGE_MUNICIPIOS_API = "https://servicodados.ibge.gov.br/api/v1/localidades/munic
 _GCS_BUCKET = os.environ.get("GCS_BUCKET", "")
 _GCS_DEPARA = "reference/depara_municipios.parquet"
 
+_DEPARA_CACHE: pd.DataFrame | None = None
+
 
 def _normalize_name(s: str) -> str:
     """Uppercase, strip accents, remove non-alpha."""
@@ -64,13 +66,19 @@ def _save_to_gcs(df: pd.DataFrame) -> None:
 
 
 def load_depara() -> pd.DataFrame:
-    """Load or build TSE ↔ IBGE municipality mapping. GCS cache → local → rebuild."""
+    """Load or build TSE ↔ IBGE municipality mapping. In-memory cache → GCS → local → rebuild."""
+    global _DEPARA_CACHE
+    if _DEPARA_CACHE is not None and not _DEPARA_CACHE.empty:
+        return _DEPARA_CACHE
     df = _load_from_gcs()
     if df is not None and not df.empty:
-        return df
+        _DEPARA_CACHE = df
+        return _DEPARA_CACHE
     if DEPARA_LOCAL.exists():
-        return pd.read_parquet(DEPARA_LOCAL)
-    return _build_depara()
+        _DEPARA_CACHE = pd.read_parquet(DEPARA_LOCAL)
+        return _DEPARA_CACHE
+    _DEPARA_CACHE = _build_depara()
+    return _DEPARA_CACHE
 
 
 def _build_depara() -> pd.DataFrame:

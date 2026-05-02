@@ -92,11 +92,18 @@ def transform_to_silver(
 
 
 def _transform_streaming_to_bq(uf: str, year: int, df_ibge: pd.DataFrame) -> dict:
-    """Stream Bronze TSE from GCS in 500k-row chunks → normalize → BQ. Never loads full DF."""
+    """Stream Bronze TSE from GCS in chunks → normalize → GCS temp parquet → BQ load.
+
+    Uses GCS as staging to avoid load_table_from_dataframe memory spikes.
+    """
+    import gc
+    import io
+    import uuid
+
     import pyarrow.fs as pafs
     import pyarrow.parquet as pq
 
-    from google.cloud import bigquery
+    from google.cloud import bigquery, storage
 
     gcs_path = f"{GCS_BUCKET}/raw/tse/{year}/{uf.upper()}/resultados_{uf.upper()}_{year}.parquet"
     project = os.environ.get("GCP_PROJECT_ID", "spepe-dev")
@@ -109,15 +116,20 @@ def _transform_streaming_to_bq(uf: str, year: int, df_ibge: pd.DataFrame) -> dic
     except Exception as exc:
         return {"status": "error", "message": f"Bronze TSE GCS não encontrado: {exc}"}
 
-    bq_client = bigquery.Client(project=project)
+    # Stage normalized batches as parquet on GCS → single BQ load_table_from_uri
+    run_id = uuid.uuid4().hex[:8]
+    staging_prefix = f"tmp/silver/{uf.lower()}_{year}_{run_id}"
+    gcs_client = storage.Client()
+    bucket_obj = gcs_client.bucket(GCS_BUCKET)
+
     total_rows = 0
     dq_ok_rows = 0
-    dq_warnings: list[str] = []
-    first = True
     bq_schema = None
+    staged_uris: list[str] = []
 
-    for batch in pf.iter_batches(batch_size=500_000):
+    for i, batch in enumerate(pf.iter_batches(batch_size=100_000)):
         chunk = batch.to_pandas()
+        del batch
         chunk = _normalize_tse(chunk, year)
         chunk = join_tse_ibge(chunk, df_ibge)
         _enforce_silver_schema_inplace(chunk, uf, year)
@@ -127,22 +139,46 @@ def _transform_streaming_to_bq(uf: str, year: int, df_ibge: pd.DataFrame) -> dic
         if bq_schema is None:
             bq_schema = _dataframe_to_bq_schema(chunk)
 
-        job_config = bigquery.LoadJobConfig(
-            write_disposition="WRITE_TRUNCATE" if first else "WRITE_APPEND",
-            create_disposition="CREATE_IF_NEEDED",
-            autodetect=False,
-            schema=bq_schema,
-        )
-        job = bq_client.load_table_from_dataframe(chunk, table_id, job_config=job_config)
-        job.result()
-
         if "qt_votos" in chunk.columns:
             dq_ok_rows += int(chunk["qt_votos"].notna().sum())
         else:
             dq_ok_rows += len(chunk)
         total_rows += len(chunk)
-        first = False
-        del chunk
+
+        # Write chunk to GCS staging (avoids load_table_from_dataframe peak memory)
+        buf = io.BytesIO()
+        chunk.to_parquet(buf, index=False, compression="zstd")
+        buf.seek(0)
+        blob_name = f"{staging_prefix}/part_{i:04d}.parquet"
+        bucket_obj.blob(blob_name).upload_from_file(buf)
+        staged_uris.append(f"gs://{GCS_BUCKET}/{blob_name}")
+        del chunk, buf
+        gc.collect()
+        logger.debug("Staged batch %d (%d cumulative rows)", i, total_rows)
+
+    if total_rows == 0:
+        return {"status": "error", "message": f"Bronze TSE vazio para {uf}/{year}"}
+
+    # Single BQ load from GCS (memory-efficient)
+    bq_client = bigquery.Client(project=project)
+    job_config = bigquery.LoadJobConfig(
+        write_disposition="WRITE_TRUNCATE",
+        create_disposition="CREATE_IF_NEEDED",
+        source_format=bigquery.SourceFormat.PARQUET,
+        schema=bq_schema,
+    )
+    uri_pattern = f"gs://{GCS_BUCKET}/{staging_prefix}/part_*.parquet"
+    job = bq_client.load_table_from_uri(uri_pattern, table_id, job_config=job_config)
+    job.result()
+    logger.info("BQ load from URI: %s → %s (%d rows)", uri_pattern, table_id, total_rows)
+
+    # Clean up staging files
+    for uri in staged_uris:
+        blob_name = uri.removeprefix(f"gs://{GCS_BUCKET}/")
+        try:
+            bucket_obj.blob(blob_name).delete()
+        except Exception:
+            pass
 
     if total_rows == 0:
         return {"status": "error", "message": f"Bronze TSE vazio para {uf}/{year}"}
