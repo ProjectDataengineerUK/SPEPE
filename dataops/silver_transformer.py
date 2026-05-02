@@ -467,6 +467,122 @@ def transform_social_to_silver(
     return {"status": "ok", "path": path, "rows": len(df)}
 
 
+def transform_seguranca_to_silver(
+    uf: str,
+    year: int,
+    use_bigquery: bool = False,
+) -> dict:
+    """Transform Bronze security data (IVS, Atlas da Violência, SINESP) to Silver.
+
+    Reads:  bronze/security/{year}/{UF}/seguranca_{UF}_{year}.parquet
+    Writes: Silver table `seguranca_municipal` (BigQuery) or local parquet.
+    """
+    LOCAL_SILVER_DIR.mkdir(parents=True, exist_ok=True)
+
+    bronze_path = LOCAL_BRONZE_DIR / "security" / str(year) / uf.upper()
+    files = (
+        list(bronze_path.glob(f"seguranca_{uf.upper()}_{year}.parquet"))
+        if bronze_path.exists()
+        else []
+    )
+
+    if not files and GCS_BUCKET:
+        prefix = f"raw/security/{year}/{uf.upper()}/"
+        df = _read_gcs_parquet_glob(GCS_BUCKET, prefix)
+    elif files:
+        df = pd.concat([pd.read_parquet(f) for f in files], ignore_index=True)
+    else:
+        return {"status": "error", "message": f"Bronze segurança vazio para {uf}/{year}"}
+
+    if df.empty:
+        return {"status": "error", "message": f"Bronze segurança vazio para {uf}/{year}"}
+
+    df = df.copy()
+    if "sg_uf" not in df.columns:
+        df["sg_uf"] = uf.upper()
+    if "ano" not in df.columns:
+        df["ano"] = year
+
+    for col in ("taxa_homicidio", "ivs_valor", "n_ocorrencias"):
+        if col in df.columns:
+            df[col] = pd.to_numeric(df[col], errors="coerce")
+
+    if "cd_municipio_ibge" in df.columns:
+        df["cd_municipio_ibge"] = pd.to_numeric(df["cd_municipio_ibge"], errors="coerce").astype(
+            "Int64"
+        )
+
+    df["ingested_at"] = pd.Timestamp.utcnow()
+
+    table_name = f"seguranca_municipal_{uf.lower()}_{year}"
+    if use_bigquery:
+        path = _write_bigquery(df, "seguranca_municipal")
+    else:
+        path_local = LOCAL_SILVER_DIR / f"{table_name}.parquet"
+        df.to_parquet(path_local, index=False, compression="zstd")
+        path = str(path_local)
+        logger.info("Segurança Silver local: %s (%d rows)", path, len(df))
+
+    return {"status": "ok", "path": path, "rows": len(df)}
+
+
+def transform_saude_to_silver(
+    uf: str,
+    year: int,
+    use_bigquery: bool = False,
+) -> dict:
+    """Transform Bronze DataSUS health data to Silver.
+
+    Reads:  bronze/datasus/{year}/{UF}/saude_{UF}_{year}.parquet
+    Writes: Silver table `saude_municipal` (BigQuery) or local parquet.
+    """
+    LOCAL_SILVER_DIR.mkdir(parents=True, exist_ok=True)
+
+    bronze_path = LOCAL_BRONZE_DIR / "datasus" / str(year) / uf.upper()
+    files = (
+        list(bronze_path.glob(f"saude_{uf.upper()}_{year}.parquet")) if bronze_path.exists() else []
+    )
+
+    if not files and GCS_BUCKET:
+        prefix = f"raw/datasus/{year}/{uf.upper()}/"
+        df = _read_gcs_parquet_glob(GCS_BUCKET, prefix)
+    elif files:
+        df = pd.concat([pd.read_parquet(f) for f in files], ignore_index=True)
+    else:
+        return {"status": "error", "message": f"Bronze DataSUS vazio para {uf}/{year}"}
+
+    if df.empty:
+        return {"status": "error", "message": f"Bronze DataSUS vazio para {uf}/{year}"}
+
+    df = df.copy()
+    if "sg_uf" not in df.columns:
+        df["sg_uf"] = uf.upper()
+    if "ano" not in df.columns:
+        df["ano"] = year
+
+    for col in ("tx_mortalidade_infantil", "cobertura_esf_pct", "leitos_per_1000"):
+        if col in df.columns:
+            df[col] = pd.to_numeric(df[col], errors="coerce")
+
+    if "cd_municipio_ibge" in df.columns:
+        df["cd_municipio_ibge"] = pd.to_numeric(df["cd_municipio_ibge"], errors="coerce").astype(
+            "Int64"
+        )
+
+    df["ingested_at"] = pd.Timestamp.utcnow()
+
+    table_name = f"saude_municipal_{uf.lower()}_{year}"
+    if use_bigquery:
+        path = _write_bigquery(df, "saude_municipal")
+    else:
+        path_local = LOCAL_SILVER_DIR / f"{table_name}.parquet"
+        df.to_parquet(path_local, index=False, compression="zstd")
+        path = str(path_local)
+        logger.info("Saúde Silver local: %s (%d rows)", path, len(df))
+
+    return {"status": "ok", "path": path, "rows": len(df)}
+
+
 def _dataframe_to_bq_schema(df: pd.DataFrame) -> list:
     from google.cloud import bigquery
 

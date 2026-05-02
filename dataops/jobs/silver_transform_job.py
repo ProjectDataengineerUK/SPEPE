@@ -14,40 +14,82 @@ DQ_THRESHOLD = float(os.environ.get("DQ_SCORE_THRESHOLD", "95.0"))
 
 
 def main(uf: str, years: list[int] | None = None, include_social: bool = True) -> None:
-    from dataops.silver_transformer import transform_social_to_silver, transform_to_silver
+    from dataops.silver_transformer import (
+        transform_pesquisas_to_silver,
+        transform_saude_to_silver,
+        transform_seguranca_to_silver,
+        transform_social_to_silver,
+        transform_to_silver,
+    )
 
     use_bq = bool(os.environ.get("GCP_PROJECT_ID"))
 
     target_years = years or YEARS
     all_ok = True
 
+    # ── TSE + IBGE (core eleitoral) ─────────────────────────────────────────
     for year in target_years:
-        logger.info(f"Silver transform: {uf}/{year}")
+        logger.info("Silver TSE+IBGE: %s/%d", uf, year)
         result = transform_to_silver(uf, year, use_bigquery=use_bq)
 
         if result.get("status") == "error":
-            logger.warning(f"Skipped {uf}/{year}: {result.get('message')}")
+            logger.warning("Skipped %s/%d: %s", uf, year, result.get("message"))
             continue
 
         dq_score = result.get("dq_score", 0.0)
         if dq_score < DQ_THRESHOLD:
             logger.error(
-                f"DQ FALHOU {uf}/{year}: score={dq_score:.1f}% < {DQ_THRESHOLD}%. Bloqueando Gold build."
+                "DQ FALHOU %s/%d: score=%.1f%% < %.1f%%. Bloqueando Gold build.",
+                uf,
+                year,
+                dq_score,
+                DQ_THRESHOLD,
             )
             all_ok = False
         else:
-            logger.info(f"Silver OK {uf}/{year}: {result.get('rows')} rows, DQ={dq_score:.1f}%")
+            logger.info(
+                "Silver TSE OK %s/%d: %d rows, DQ=%.1f%%", uf, year, result.get("rows", 0), dq_score
+            )
 
+    # ── Pesquisas eleitorais (nacional — BR) ────────────────────────────────
+    pesquisa_year = int(os.environ.get("PESQUISA_YEAR", target_years[-1]))
+    logger.info("Silver pesquisas: ano=%d", pesquisa_year)
+    r = transform_pesquisas_to_silver(pesquisa_year, use_bigquery=use_bq)
+    if r.get("status") == "ok":
+        logger.info("Pesquisas Silver OK: %d rows", r.get("rows", 0))
+    else:
+        logger.warning(
+            "Pesquisas Silver: %s (pode ser vazio se pesquisas_ingest não rodou)", r.get("message")
+        )
+
+    # ── Segurança pública (por UF × ano) ────────────────────────────────────
+    for year in target_years:
+        logger.info("Silver segurança: %s/%d", uf, year)
+        r = transform_seguranca_to_silver(uf, year, use_bigquery=use_bq)
+        if r.get("status") == "ok":
+            logger.info("Segurança Silver OK %s/%d: %d rows", uf, year, r.get("rows", 0))
+        else:
+            logger.warning("Segurança Silver %s/%d: %s", uf, year, r.get("message"))
+
+    # ── Saúde / DataSUS (por UF × ano) ─────────────────────────────────────
+    for year in target_years:
+        logger.info("Silver saúde: %s/%d", uf, year)
+        r = transform_saude_to_silver(uf, year, use_bigquery=use_bq)
+        if r.get("status") == "ok":
+            logger.info("Saúde Silver OK %s/%d: %d rows", uf, year, r.get("rows", 0))
+        else:
+            logger.warning("Saúde Silver %s/%d: %s", uf, year, r.get("message"))
+
+    # ── Social (Twitter/Facebook — BR) ──────────────────────────────────────
     if include_social:
         social_year = int(os.environ.get("SOCIAL_YEAR", "2026"))
-        logger.info("Silver social transform: ano=%d", social_year)
+        logger.info("Silver social: ano=%d", social_year)
         r = transform_social_to_silver(social_year, use_bigquery=use_bq)
         if r.get("status") == "ok":
             logger.info("Social Silver OK: %d rows", r.get("rows", 0))
         else:
             logger.warning(
-                "Social Silver: %s (pode ser vazio se social_ingest ainda não rodou)",
-                r.get("message"),
+                "Social Silver: %s (pode ser vazio se social_ingest não rodou)", r.get("message")
             )
 
     if not all_ok:
