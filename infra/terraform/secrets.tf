@@ -103,3 +103,39 @@ resource "google_secret_manager_secret_iam_member" "dataops_x_bearer" {
   role      = "roles/secretmanager.secretAccessor"
   member    = "serviceAccount:${google_service_account.dataops_jobs.email}"
 }
+
+resource "google_secret_manager_secret" "reddit_client_id" {
+  secret_id = "REDDIT_CLIENT_ID"
+  replication { auto {} }
+  labels = local.labels
+}
+
+resource "google_secret_manager_secret" "reddit_client_secret" {
+  secret_id = "REDDIT_CLIENT_SECRET"
+  replication { auto {} }
+  labels = local.labels
+}
+
+resource "google_secret_manager_secret_version" "reddit_client_id_placeholder" {
+  secret      = google_secret_manager_secret.reddit_client_id.id
+  secret_data = "placeholder"
+  lifecycle { ignore_changes = [secret_data] }
+}
+
+resource "google_secret_manager_secret_version" "reddit_client_secret_placeholder" {
+  secret      = google_secret_manager_secret.reddit_client_secret.id
+  secret_data = "placeholder"
+  lifecycle { ignore_changes = [secret_data] }
+}
+
+resource "google_secret_manager_secret_iam_member" "dataops_reddit_id" {
+  secret_id = google_secret_manager_secret.reddit_client_id.id
+  role      = "roles/secretmanager.secretAccessor"
+  member    = "serviceAccount:${google_service_account.dataops_jobs.email}"
+}
+
+resource "google_secret_manager_secret_iam_member" "dataops_reddit_secret" {
+  secret_id = google_secret_manager_secret.reddit_client_secret.id
+  role      = "roles/secretmanager.secretAccessor"
+  member    = "serviceAccount:${google_service_account.dataops_jobs.email}"
+}

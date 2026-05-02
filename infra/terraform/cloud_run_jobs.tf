@@ -13,8 +13,12 @@ locals {
     silver_transform = { timeout = local.prod_mode ? "7200s" : "1800s", memory = "4Gi",   cpu = "2", args = ["--uf", local.uf_arg] }
     gold_build       = { timeout = "1800s", memory = "2Gi", cpu = "2", args = [] }
     digital_ingest   = { timeout = "900s",  memory = "1Gi", cpu = "1", args = [] }
-    social_ingest    = { timeout = "1800s", memory = "1Gi", cpu = "1", args = [] }
-    pesquisas_ingest = { timeout = "1800s", memory = "1Gi", cpu = "1", args = [] }
+    social_ingest         = { timeout = "1800s", memory = "1Gi",   cpu = "1", args = [] }
+    pesquisas_ingest      = { timeout = "1800s", memory = "1Gi",   cpu = "1", args = [] }
+    tse_perfil_ingest     = { timeout = local.prod_mode ? "3600s" : "1800s", memory = "2Gi", cpu = "1", args = ["--uf", local.uf_arg] }
+    tse_candidaturas_ingest = { timeout = local.prod_mode ? "3600s" : "1800s", memory = "1Gi", cpu = "1", args = ["--uf", local.uf_arg] }
+    reddit_ingest         = { timeout = "1800s", memory = "512Mi", cpu = "1", args = [] }
+    camara_senado_ingest  = { timeout = "3600s", memory = "1Gi",   cpu = "1", args = [] }
   }
 
   # Env vars adicionais por job (além das compartilhadas)
@@ -45,8 +49,14 @@ locals {
       ])
       SOCIAL_DIAS = "7"
       SOCIAL_YEAR = "2026"
-      # SOCIAL_FB_PAGES: configurar via Secret Manager quando page IDs estiverem disponíveis
     }
+    tse_perfil_ingest     = {}
+    tse_candidaturas_ingest = {}
+    reddit_ingest = {
+      REDDIT_SUBREDDITS = jsonencode(["brasil", "politica", "brasilivre"])
+      REDDIT_DIAS       = "30"
+    }
+    camara_senado_ingest = { LEGISLATURE = "57" }
   }
 
   job_entrypoints = {
@@ -59,8 +69,12 @@ locals {
     silver_transform = ["python", "-m", "dataops.jobs.silver_transform_job"]
     gold_build       = ["python", "-m", "dataops.jobs.gold_build_job"]
     digital_ingest   = ["python", "-m", "dataops.jobs.digital_ingest_job"]
-    social_ingest    = ["python", "-m", "dataops.jobs.social_ingest_job"]
-    pesquisas_ingest = ["python", "-m", "dataops.jobs.pesquisas_ingest_job"]
+    social_ingest           = ["python", "-m", "dataops.jobs.social_ingest_job"]
+    pesquisas_ingest        = ["python", "-m", "dataops.jobs.pesquisas_ingest_job"]
+    tse_perfil_ingest       = ["python", "-m", "dataops.jobs.tse_perfil_ingest_job"]
+    tse_candidaturas_ingest = ["python", "-m", "dataops.jobs.tse_candidaturas_ingest_job"]
+    reddit_ingest           = ["python", "-m", "dataops.jobs.reddit_ingest_job"]
+    camara_senado_ingest    = ["python", "-m", "dataops.jobs.camara_senado_ingest_job"]
   }
 }
 
