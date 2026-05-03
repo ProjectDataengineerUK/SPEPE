@@ -29,14 +29,14 @@ def _build_gold_via_bigquery_sql() -> dict:
         "fact_municipio_eleicao": f"""
             CREATE OR REPLACE TABLE `{gold}.fact_municipio_eleicao` AS
             SELECT
-                sg_uf, cd_municipio, nm_municipio_x AS nm_municipio, cd_cargo, ds_cargo,
+                sg_uf, cd_municipio, nm_municipio, cd_cargo, ds_cargo,
                 ano_eleicao,
                 SUM(qt_votos) AS total_votos,
                 COUNT(DISTINCT nr_candidato) AS n_candidatos,
                 COUNT(DISTINCT CONCAT(CAST(nr_zona AS STRING), '-', CAST(nr_secao AS STRING))) AS n_secoes,
                 CURRENT_TIMESTAMP() AS ingested_at
             FROM {silver_wc}
-            GROUP BY sg_uf, cd_municipio, nm_municipio_x, cd_cargo, ds_cargo, ano_eleicao
+            GROUP BY sg_uf, cd_municipio, nm_municipio, cd_cargo, ds_cargo, ano_eleicao
         """,
         "fact_secao_eleicao": f"""
             CREATE OR REPLACE TABLE `{gold}.fact_secao_eleicao` AS
