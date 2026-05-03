@@ -2,9 +2,10 @@
 
 from __future__ import annotations
 
-import io
 import logging
+import tempfile
 import zipfile
+from pathlib import Path
 
 import pandas as pd
 import requests
@@ -34,22 +35,27 @@ _COL_MAP = {
 
 
 @retry(stop=stop_after_attempt(3), wait=wait_exponential(min=2, max=30))
-def _download_zip(url: str) -> bytes:
-    resp = requests.get(url, timeout=120, stream=True)
-    resp.raise_for_status()
-    return resp.content
+def _stream_zip_to_file(url: str) -> Path:
+    """Stream ZIP from URL to a temp file. Never loads full file into RAM."""
+    with requests.get(url, timeout=300, stream=True) as resp:
+        resp.raise_for_status()
+        with tempfile.NamedTemporaryFile(suffix=".zip", delete=False) as tmp:
+            for chunk in resp.iter_content(chunk_size=1024 * 1024):  # 1 MB chunks
+                tmp.write(chunk)
+            return Path(tmp.name)
 
 
-def fetch_perfil_raw_zip(year: int) -> bytes | None:
-    """Download national perfil ZIP once. Returns raw bytes or None on 404.
+def fetch_perfil_raw_zip(year: int) -> Path | None:
+    """Download national perfil ZIP to a temp file. Returns Path or None on 404.
 
-    Use this + parse_perfil_from_zip when ingesting multiple UFs to avoid
-    re-downloading the 800MB+ file once per UF.
+    Caller is responsible for deleting the temp file (path.unlink()).
+    Use parse_perfil_from_zip(path, uf, year) to process per UF without
+    loading the full 800MB+ ZIP into memory.
     """
     url = _CDN_PERFIL.format(year=year)
     logger.info("TSE Perfil Eleitorado: baixando nacional %s", url)
     try:
-        return _download_zip(url)
+        return _stream_zip_to_file(url)
     except requests.HTTPError as exc:
         if exc.response is not None and exc.response.status_code == 404:
             logger.warning("Perfil eleitorado não disponível: ano=%d", year)
@@ -57,14 +63,17 @@ def fetch_perfil_raw_zip(year: int) -> bytes | None:
         raise
 
 
-def parse_perfil_from_zip(raw: bytes, uf: str, year: int) -> pd.DataFrame:
-    """Filter and normalize a single UF from pre-downloaded perfil ZIP bytes.
+def parse_perfil_from_zip(zip_path: Path, uf: str, year: int) -> pd.DataFrame:
+    """Filter and normalize a single UF from a perfil ZIP file on disk.
 
-    Streams in 50k-row chunks to avoid OOM on 800MB+ CSVs.
+    Reads the ZipFile directly from disk — no in-memory copy of the ZIP bytes.
+    Streams in 50k-row chunks so even the decompressed CSV never fully lands in RAM.
     """
+    import io
+
     frames: list[pd.DataFrame] = []
     uf_upper = uf.upper()
-    with zipfile.ZipFile(io.BytesIO(raw)) as zf:
+    with zipfile.ZipFile(zip_path) as zf:
         for name in zf.namelist():
             if not name.lower().endswith(".csv"):
                 continue
@@ -108,10 +117,13 @@ def fetch_perfil_eleitorado(uf: str, year: int) -> pd.DataFrame:
 
     For multi-UF ingestion prefer fetch_perfil_raw_zip + parse_perfil_from_zip.
     """
-    raw = fetch_perfil_raw_zip(year)
-    if raw is None:
+    zip_path = fetch_perfil_raw_zip(year)
+    if zip_path is None:
         return pd.DataFrame()
-    return parse_perfil_from_zip(raw, uf, year)
+    try:
+        return parse_perfil_from_zip(zip_path, uf, year)
+    finally:
+        zip_path.unlink(missing_ok=True)
 
 
 def build_perfil_municipio(uf: str, year: int) -> pd.DataFrame:

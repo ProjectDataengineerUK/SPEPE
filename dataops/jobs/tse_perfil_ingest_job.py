@@ -5,6 +5,7 @@ from __future__ import annotations
 import logging
 import os
 import sys
+from pathlib import Path
 
 import pandas as pd
 
@@ -82,9 +83,9 @@ def main(uf: str, years: list[int]) -> None:
         sys.exit(1)
 
 
-def _build_agg_from_raw(raw: bytes, uf: str, year: int) -> pd.DataFrame:
-    """Build municipality-level aggregate from pre-downloaded ZIP bytes."""
-    df = parse_perfil_from_zip(raw, uf, year)
+def _build_agg_from_zip(zip_path: Path, uf: str, year: int) -> pd.DataFrame:
+    """Build municipality-level aggregate from a perfil ZIP file on disk."""
+    df = parse_perfil_from_zip(zip_path, uf, year)
     if df.empty:
         return pd.DataFrame()
 
@@ -119,35 +120,38 @@ if __name__ == "__main__":
     use_gcs = bool(os.environ.get("GCS_BUCKET"))
 
     if len(ufs) > 1:
-        # Batch mode: download each year's national ZIP once, parse all UFs from it
+        # Batch mode: stream each year's ZIP to disk once, parse all UFs from the file
         ok = fail = 0
         for year in args.years:
-            raw = fetch_perfil_raw_zip(year)
-            if raw is None:
+            zip_path = fetch_perfil_raw_zip(year)
+            if zip_path is None:
                 logger.warning("Perfil não disponível: ano=%d — pulando", year)
                 fail += len(ufs)
                 continue
-            for uf in ufs:
-                logger.info("TSE Perfil Eleitorado: %s/%d", uf, year)
-                try:
-                    df = _build_agg_from_raw(raw, uf, year)
-                    if df.empty:
-                        logger.warning("Perfil vazio: %s/%d", uf, year)
+            try:
+                for uf in ufs:
+                    logger.info("TSE Perfil Eleitorado: %s/%d", uf, year)
+                    try:
+                        df = _build_agg_from_zip(zip_path, uf, year)
+                        if df.empty:
+                            logger.warning("Perfil vazio: %s/%d", uf, year)
+                            fail += 1
+                            continue
+                        write_bronze(
+                            df=df,
+                            source="tse_perfil",
+                            year=year,
+                            uf=uf.upper(),
+                            filename=f"perfil_eleitorado_{uf.upper()}_{year}.parquet",
+                            use_gcs=use_gcs,
+                        )
+                        logger.info("Perfil Bronze OK: %s/%d — %d linhas", uf, year, len(df))
+                        ok += 1
+                    except Exception as exc:
+                        logger.error("Perfil falhou %s/%d: %s", uf, year, exc)
                         fail += 1
-                        continue
-                    write_bronze(
-                        df=df,
-                        source="tse_perfil",
-                        year=year,
-                        uf=uf.upper(),
-                        filename=f"perfil_eleitorado_{uf.upper()}_{year}.parquet",
-                        use_gcs=use_gcs,
-                    )
-                    logger.info("Perfil Bronze OK: %s/%d — %d linhas", uf, year, len(df))
-                    ok += 1
-                except Exception as exc:
-                    logger.error("Perfil falhou %s/%d: %s", uf, year, exc)
-                    fail += 1
+            finally:
+                zip_path.unlink(missing_ok=True)
         logger.info("TSE Perfil ingest ALL concluído: %d ok / %d falhas", ok, fail)
         if fail > 0 and ok == 0:
             sys.exit(1)
