@@ -1652,57 +1652,6 @@ function toast(msg){
 // MAPA ELEITORAL — Leaflet + IBGE GeoJSON + Drill-down
 // ═══════════════════════════════════════════════════════════
 
-function _getMockData(level, cargo, uf) {
-  const UF_RES = {
-    '11':{id:'11',label:'Rondônia',   lider:'Bolsonaro',segundo:'Lula',partido:'PL',pct:61.2,pct2:33.1,total_votos:780000},
-    '12':{id:'12',label:'Acre',       lider:'Lula',     segundo:'Bolsonaro',partido:'PT',pct:64.8,pct2:31.2,total_votos:390000},
-    '13':{id:'13',label:'Amazonas',   lider:'Lula',     segundo:'Bolsonaro',partido:'PT',pct:45.4,pct2:43.2,total_votos:1580000},
-    '14':{id:'14',label:'Roraima',    lider:'Bolsonaro',segundo:'Lula',partido:'PL',pct:54.1,pct2:41.8,total_votos:230000},
-    '15':{id:'15',label:'Pará',       lider:'Lula',     segundo:'Bolsonaro',partido:'PT',pct:52.3,pct2:43.1,total_votos:3480000},
-    '16':{id:'16',label:'Amapá',      lider:'Bolsonaro',segundo:'Lula',partido:'PL',pct:49.2,pct2:45.8,total_votos:360000},
-    '17':{id:'17',label:'Tocantins',  lider:'Bolsonaro',segundo:'Lula',partido:'PL',pct:53.1,pct2:41.8,total_votos:760000},
-    '21':{id:'21',label:'Maranhão',   lider:'Lula',     segundo:'Bolsonaro',partido:'PT',pct:67.9,pct2:27.4,total_votos:3000000},
-    '22':{id:'22',label:'Piauí',      lider:'Lula',     segundo:'Bolsonaro',partido:'PT',pct:70.2,pct2:26.6,total_votos:1480000},
-    '23':{id:'23',label:'Ceará',      lider:'Lula',     segundo:'Bolsonaro',partido:'PT',pct:69.1,pct2:27.3,total_votos:4200000},
-    '24':{id:'24',label:'Rio G. Norte',lider:'Lula',    segundo:'Bolsonaro',partido:'PT',pct:62.8,pct2:33.2,total_votos:1680000},
-    '25':{id:'25',label:'Paraíba',    lider:'Lula',     segundo:'Bolsonaro',partido:'PT',pct:60.1,pct2:35.4,total_votos:2020000},
-    '26':{id:'26',label:'Pernambuco', lider:'Lula',     segundo:'Bolsonaro',partido:'PT',pct:64.3,pct2:30.9,total_votos:4800000},
-    '27':{id:'27',label:'Alagoas',    lider:'Lula',     segundo:'Bolsonaro',partido:'PT',pct:62.7,pct2:32.8,total_votos:1460000},
-    '28':{id:'28',label:'Sergipe',    lider:'Lula',     segundo:'Bolsonaro',partido:'PT',pct:64.1,pct2:31.4,total_votos:1150000},
-    '29':{id:'29',label:'Bahia',      lider:'Lula',     segundo:'Bolsonaro',partido:'PT',pct:72.9,pct2:23.6,total_votos:8100000},
-    '31':{id:'31',label:'Minas Gerais',lider:'Lula',   segundo:'Bolsonaro',partido:'PT',pct:48.3,pct2:41.2,total_votos:11200000},
-    '32':{id:'32',label:'Espírito Santo',lider:'Bolsonaro',segundo:'Lula',partido:'PL',pct:48.9,pct2:41.3,total_votos:1850000},
-    '33':{id:'33',label:'Rio de Janeiro',lider:'Bolsonaro',segundo:'Lula',partido:'PL',pct:46.8,pct2:43.2,total_votos:8400000},
-    '35':{id:'35',label:'São Paulo',  lider:'Bolsonaro',segundo:'Lula',partido:'PL',pct:49.5,pct2:40.4,total_votos:26000000},
-    '41':{id:'41',label:'Paraná',     lider:'Bolsonaro',segundo:'Lula',partido:'PL',pct:52.4,pct2:37.5,total_votos:6200000},
-    '42':{id:'42',label:'Santa Catarina',lider:'Bolsonaro',segundo:'Lula',partido:'PL',pct:63.2,pct2:28.9,total_votos:3800000},
-    '43':{id:'43',label:'Rio G. do Sul',lider:'Bolsonaro',segundo:'Lula',partido:'PL',pct:51.3,pct2:38.2,total_votos:6600000},
-    '50':{id:'50',label:'Mato G. do Sul',lider:'Bolsonaro',segundo:'Lula',partido:'PL',pct:54.8,pct2:37.1,total_votos:1320000},
-    '51':{id:'51',label:'Mato Grosso',lider:'Bolsonaro',segundo:'Lula',partido:'PL',pct:61.4,pct2:32.8,total_votos:1680000},
-    '52':{id:'52',label:'Goiás',      lider:'Bolsonaro',segundo:'Lula',partido:'PL',pct:55.1,pct2:35.6,total_votos:3100000},
-    '53':{id:'53',label:'Dist. Federal',lider:'Bolsonaro',segundo:'Lula',partido:'PL',pct:52.8,pct2:36.9,total_votos:1350000},
-  };
-  const SP_MUN = [
-    {ibge_code:'3550308',id:'3550308',label:'São Paulo',         lider:'Lula',     segundo:'Bolsonaro',partido:'PT',pct:44.1,pct2:43.2,total_votos:6842000},
-    {ibge_code:'3518800',id:'3518800',label:'Guarulhos',          lider:'Lula',     segundo:'Bolsonaro',partido:'PT',pct:52.3,pct2:37.4,total_votos:984000},
-    {ibge_code:'3509502',id:'3509502',label:'Campinas',           lider:'Bolsonaro',segundo:'Lula',partido:'PL',pct:47.2,pct2:40.8,total_votos:733000},
-    {ibge_code:'3548708',id:'3548708',label:'S. Bernardo do Campo',lider:'Lula',   segundo:'Bolsonaro',partido:'PT',pct:55.1,pct2:34.6,total_votos:541000},
-    {ibge_code:'3547809',id:'3547809',label:'Santo André',        lider:'Lula',     segundo:'Bolsonaro',partido:'PT',pct:53.8,pct2:35.9,total_votos:482000},
-    {ibge_code:'3543402',id:'3543402',label:'Ribeirão Preto',     lider:'Bolsonaro',segundo:'Lula',partido:'PL',pct:49.8,pct2:38.2,total_votos:422000},
-    {ibge_code:'3534401',id:'3534401',label:'Osasco',             lider:'Lula',     segundo:'Bolsonaro',partido:'PT',pct:58.2,pct2:30.8,total_votos:375000},
-    {ibge_code:'3552205',id:'3552205',label:'Sorocaba',           lider:'Bolsonaro',segundo:'Lula',partido:'PL',pct:45.9,pct2:41.5,total_votos:389000},
-    {ibge_code:'3549904',id:'3549904',label:'S. José dos Campos', lider:'Bolsonaro',segundo:'Lula',partido:'PL',pct:51.3,pct2:38.4,total_votos:358000},
-    {ibge_code:'3525904',id:'3525904',label:'Jundiaí',            lider:'Bolsonaro',segundo:'Lula',partido:'PL',pct:52.1,pct2:37.8,total_votos:248000},
-    {ibge_code:'3505708',id:'3505708',label:'Barueri',            lider:'Lula',     segundo:'Bolsonaro',partido:'PT',pct:47.5,pct2:42.8,total_votos:180000},
-    {ibge_code:'3529401',id:'3529401',label:'Mauá',               lider:'Lula',     segundo:'Bolsonaro',partido:'PT',pct:54.2,pct2:35.8,total_votos:192000},
-    {ibge_code:'3530607',id:'3530607',label:'Mogi das Cruzes',    lider:'Bolsonaro',segundo:'Lula',partido:'PL',pct:48.9,pct2:40.5,total_votos:220000},
-    {ibge_code:'3538709',id:'3538709',label:'Piracicaba',          lider:'Bolsonaro',segundo:'Lula',partido:'PL',pct:49.2,pct2:41.1,total_votos:195000},
-    {ibge_code:'3510609',id:'3510609',label:'Bauru',               lider:'Bolsonaro',segundo:'Lula',partido:'PL',pct:52.1,pct2:37.3,total_votos:210000},
-  ];
-  if(level === 'municipio') return {features: SP_MUN};
-  return {features: Object.values(UF_RES)};
-}
-
 let _map = null;
 let _mapLevel = 'uf';
 let _mapCtx = {}; // {uf:'SP', cd_municipio:'71072', nr_zona:'1'}
@@ -1770,7 +1719,7 @@ async function reloadMap(){
   if(_mapCtx.nr_zona) url += `&nr_zona=${_mapCtx.nr_zona}`;
 
   const [apiRes, geoRes] = await Promise.all([
-    fetch(url).then(r=>r.json()).catch(()=>_getMockData(_mapLevel, cargo, _mapCtx.uf||'SP')),
+    fetch(url).then(r=>r.json()).catch(()=>({features:[],fonte:'indisponivel'})),
     _loadGeoJSON(_mapLevel),
   ]);
 
