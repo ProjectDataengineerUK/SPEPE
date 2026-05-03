@@ -95,19 +95,25 @@ def load_municipios(uf: str) -> pd.DataFrame:
 
     rows = []
     for m in data:
-        rows.append(
-            {
-                "cd_municipio_ibge": int(m["id"]),
-                "cd_municipio_tse": int(m["id"]) // 10,
-                "nm_municipio": m["nome"],
-                "sg_uf": m["microrregiao"]["mesorregiao"]["UF"]["sigla"],
-                "nm_uf": m["microrregiao"]["mesorregiao"]["UF"]["nome"],
-                "cd_mesorregiao": m["microrregiao"]["mesorregiao"]["id"],
-                "nm_mesorregiao": m["microrregiao"]["mesorregiao"]["nome"],
-                "cd_microrregiao": m["microrregiao"]["id"],
-                "nm_microrregiao": m["microrregiao"]["nome"],
-            }
-        )
+        try:
+            micro = m.get("microrregiao") or {}
+            meso = micro.get("mesorregiao") or {}
+            uf_obj = meso.get("UF") or {}
+            rows.append(
+                {
+                    "cd_municipio_ibge": int(m["id"]),
+                    "cd_municipio_tse": int(m["id"]) // 10,
+                    "nm_municipio": m.get("nome", ""),
+                    "sg_uf": uf_obj.get("sigla", ""),
+                    "nm_uf": uf_obj.get("nome", ""),
+                    "cd_mesorregiao": meso.get("id"),
+                    "nm_mesorregiao": meso.get("nome", ""),
+                    "cd_microrregiao": micro.get("id"),
+                    "nm_microrregiao": micro.get("nome", ""),
+                }
+            )
+        except (KeyError, TypeError, ValueError):
+            continue
 
     df = pd.DataFrame(rows)
     logger.info("Municípios IBGE carregados: %d para UF=%s", len(df), uf)

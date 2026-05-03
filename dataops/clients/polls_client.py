@@ -24,11 +24,11 @@ from tenacity import retry, stop_after_attempt, wait_exponential
 
 logger = logging.getLogger("spepe.clients.polls")
 
-# TSE PesqEle — bulk CSV of registered polls
-# Endpoint documented at pesquisaeleitorais.tse.jus.br
-_PESQELE_BASE = os.environ.get("PESQELE_BASE_URL", "https://pesquisaeleitorais.tse.jus.br")
-_PESQELE_CSV_PATH = "/media/arquivos/planilhas/pesquisas_registradas_{year}.csv"
-_PESQELE_PDF_PATH = "/media/arquivos/{poll_id}/formulario.pdf"
+# TSE CDN — pesquisa_eleitoral ZIP (national, contains CSV inside)
+_PESQELE_CDN = (
+    "https://cdn.tse.jus.br/estatistica/sead/odsele/pesquisa_eleitoral/"
+    "pesquisa_eleitoral_{year}.zip"
+)
 
 # Atlas Político secondary source
 _ATLAS_BASE = os.environ.get("ATLAS_BASE_URL", "https://www.atlasdopoder.com.br")
@@ -45,30 +45,31 @@ _SESSION.headers.update({"User-Agent": "SPEPE-DataOps/1.0"})
 
 
 @retry(stop=stop_after_attempt(3), wait=wait_exponential(min=2, max=30))
+def _download_pesqele_zip(year: int) -> bytes | None:
+    import zipfile as _zf
+
+    url = _PESQELE_CDN.format(year=year)
+    logger.info("Baixando TSE PesqEle ZIP: %s", url)
+    resp = _SESSION.get(url, timeout=120)
+    if resp.status_code == 404:
+        logger.warning("TSE PesqEle ZIP não encontrado para %d", year)
+        return None
+    resp.raise_for_status()
+    # Extract first CSV from ZIP and return its bytes
+    with _zf.ZipFile(io.BytesIO(resp.content)) as zf:
+        csv_names = [n for n in zf.namelist() if n.lower().endswith(".csv")]
+        if not csv_names:
+            return None
+        return zf.read(csv_names[0])
+
+
 def fetch_pesqele_csv(year: int, cargo: int | None = None) -> pd.DataFrame:
-    """Download registered polls CSV from TSE PesqEle for a given year.
+    """Download registered polls CSV from TSE CDN ZIP for a given year."""
+    raw = _download_pesqele_zip(year)
+    if raw is None:
+        return pd.DataFrame()
 
-    Args:
-        year: Election year (e.g. 2022, 2026)
-        cargo: Optional TSE cargo code filter (1=Presidente, 3=Governador, etc.)
-
-    Returns DataFrame with columns: poll_id, data_registro, instituto, cargo,
-    uf, n_entrevistados, data_pesquisa_inicio, data_pesquisa_fim, candidato,
-    intencao_pct, margem_erro, record_confidence_score
-    """
-    url = _PESQELE_BASE + _PESQELE_CSV_PATH.format(year=year)
-    logger.info("Baixando TSE PesqEle CSV: %s", url)
-
-    try:
-        resp = _SESSION.get(url, timeout=60)
-        resp.raise_for_status()
-    except requests.HTTPError as exc:
-        if exc.response is not None and exc.response.status_code == 404:
-            logger.warning("TSE PesqEle CSV não encontrado para %d: %s", year, url)
-            return pd.DataFrame()
-        raise
-
-    df = _parse_pesqele_csv(resp.content, year)
+    df = _parse_pesqele_csv(raw, year)
 
     if cargo is not None:
         cd_cargo_col = next((c for c in df.columns if "cargo" in c.lower()), None)
@@ -205,7 +206,11 @@ def _download_and_parse_pdf(poll_id: str) -> dict | None:
         logger.warning("pdfplumber não instalado — PDF pipeline desabilitado")
         return None
 
-    url = _PESQELE_BASE + _PESQELE_PDF_PATH.format(poll_id=poll_id.replace("/", "-"))
+    url = (
+        "https://cdn.tse.jus.br/estatistica/sead/odsele/pesquisa_eleitoral/"
+        + poll_id.replace("/", "-")
+        + ".pdf"
+    )
     resp = _SESSION.get(url, timeout=30)
     if resp.status_code == 404:
         return None
@@ -346,7 +351,11 @@ def _get_pdf_text(poll_id: str) -> str | None:
     try:
         import pdfplumber
 
-        url = _PESQELE_BASE + _PESQELE_PDF_PATH.format(poll_id=poll_id.replace("/", "-"))
+        url = (
+            "https://cdn.tse.jus.br/estatistica/sead/odsele/pesquisa_eleitoral/"
+            + poll_id.replace("/", "-")
+            + ".pdf"
+        )
         resp = _SESSION.get(url, timeout=30)
         if not resp.ok:
             return None

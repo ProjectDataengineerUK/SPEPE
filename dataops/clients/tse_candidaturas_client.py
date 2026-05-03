@@ -19,10 +19,11 @@ from tenacity import retry, stop_after_attempt, wait_exponential
 logger = logging.getLogger("spepe.clients.tse_candidaturas")
 
 _CDN_BASE = "https://cdn.tse.jus.br/estatistica/sead/odsele"
+# National files (no UF suffix) — filter by sg_uf after download
 _ENDPOINTS = {
-    "candidatos": "{base}/consulta_cand/consulta_cand_{year}_{uf}.zip",
-    "bens": "{base}/bem_candidato/bem_candidato_{year}_{uf}.zip",
-    "receitas": "{base}/prestacao_contas/receitas_candidatos_{year}_{uf}.zip",
+    "candidatos": "{base}/consulta_cand/consulta_cand_{year}.zip",
+    "bens": "{base}/bem_candidato/bem_candidato_{year}.zip",
+    "receitas": "{base}/prestacao_contas/receitas_candidatos_{year}.zip",
 }
 
 _COL_MAP_CAND = {
@@ -111,12 +112,14 @@ def _read_zip_csvs(raw: bytes, col_map: dict[str, str]) -> pd.DataFrame:
 
 def fetch_candidatos(uf: str, year: int) -> pd.DataFrame:
     """Baixa dados cadastrais de candidatos (consulta_cand)."""
-    url = _ENDPOINTS["candidatos"].format(base=_CDN_BASE, year=year, uf=uf.upper())
+    url = _ENDPOINTS["candidatos"].format(base=_CDN_BASE, year=year)
     raw = _download_zip(url)
     if raw is None:
         logger.warning("TSE candidatos não disponível: UF=%s ano=%d", uf, year)
         return pd.DataFrame()
     df = _read_zip_csvs(raw, _COL_MAP_CAND)
+    if "sg_uf" in df.columns:
+        df = df[df["sg_uf"].str.upper() == uf.upper()].copy()
     df["ano"] = year
     logger.info("TSE candidatos: %d linhas UF=%s ano=%d", len(df), uf, year)
     return df
@@ -124,7 +127,7 @@ def fetch_candidatos(uf: str, year: int) -> pd.DataFrame:
 
 def fetch_bens_candidatos(uf: str, year: int) -> pd.DataFrame:
     """Baixa bens declarados por candidato. Agrega vr_bem_total por sq_candidato."""
-    url = _ENDPOINTS["bens"].format(base=_CDN_BASE, year=year, uf=uf.upper())
+    url = _ENDPOINTS["bens"].format(base=_CDN_BASE, year=year)
     raw = _download_zip(url)
     if raw is None:
         logger.warning("TSE bens não disponível: UF=%s ano=%d", uf, year)
@@ -143,7 +146,7 @@ def fetch_bens_candidatos(uf: str, year: int) -> pd.DataFrame:
 
 def fetch_receitas_candidatos(uf: str, year: int) -> pd.DataFrame:
     """Baixa receitas (financiamento) por candidato. Agrega por origem."""
-    url = _ENDPOINTS["receitas"].format(base=_CDN_BASE, year=year, uf=uf.upper())
+    url = _ENDPOINTS["receitas"].format(base=_CDN_BASE, year=year)
     raw = _download_zip(url)
     if raw is None:
         logger.warning("TSE receitas não disponível: UF=%s ano=%d", uf, year)

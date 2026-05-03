@@ -12,10 +12,9 @@ from tenacity import retry, stop_after_attempt, wait_exponential
 
 logger = logging.getLogger("spepe.clients.tse_perfil")
 
-# TSE CDN — perfil_eleitorado_{year}_{uf}.zip
+# TSE CDN — national file (no UF suffix); sg_uf column inside filters by UF
 _CDN_PERFIL = (
-    "https://cdn.tse.jus.br/estatistica/sead/odsele/perfil_eleitorado/"
-    "perfil_eleitorado_{year}_{uf}.zip"
+    "https://cdn.tse.jus.br/estatistica/sead/odsele/perfil_eleitorado/perfil_eleitorado_{year}.zip"
 )
 
 # Canon map: TSE raw column → canonical name
@@ -41,21 +40,22 @@ def _download_zip(url: str) -> bytes:
     return resp.content
 
 
-def fetch_perfil_eleitorado(uf: str, year: int) -> pd.DataFrame:
-    """Download and parse TSE Perfil do Eleitorado for a UF × year.
+_NATIONAL_CACHE: dict[int, pd.DataFrame] = {}
 
-    Returns DataFrame with columns: sg_uf, cd_municipio, nm_municipio, nr_zona,
-    ds_genero, ds_faixa_etaria, ds_grau_escolaridade, ds_estado_civil,
-    qt_eleitores, ano.
-    """
-    url = _CDN_PERFIL.format(year=year, uf=uf.upper())
-    logger.info("TSE Perfil Eleitorado: baixando %s", url)
+
+def _fetch_national(year: int) -> pd.DataFrame:
+    """Download national perfil file (all UFs) for a year, with in-process cache."""
+    if year in _NATIONAL_CACHE:
+        return _NATIONAL_CACHE[year]
+
+    url = _CDN_PERFIL.format(year=year)
+    logger.info("TSE Perfil Eleitorado: baixando nacional %s", url)
 
     try:
         raw = _download_zip(url)
     except requests.HTTPError as exc:
         if exc.response is not None and exc.response.status_code == 404:
-            logger.warning("Perfil eleitorado não disponível: UF=%s ano=%d", uf, year)
+            logger.warning("Perfil eleitorado nacional não disponível: ano=%d", year)
             return pd.DataFrame()
         raise
 
@@ -83,7 +83,7 @@ def fetch_perfil_eleitorado(uf: str, year: int) -> pd.DataFrame:
                     frames.append(chunk)
 
     if not frames:
-        logger.warning("Nenhum CSV no zip: UF=%s ano=%d", uf, year)
+        logger.warning("Nenhum CSV no zip nacional: ano=%d", year)
         return pd.DataFrame()
 
     df = pd.concat(frames, ignore_index=True)
@@ -93,6 +93,25 @@ def fetch_perfil_eleitorado(uf: str, year: int) -> pd.DataFrame:
         df["qt_eleitores"] = (
             pd.to_numeric(df["qt_eleitores"], errors="coerce").fillna(0).astype(int)
         )
+
+    _NATIONAL_CACHE[year] = df
+    logger.info("TSE Perfil Eleitorado nacional: %d linhas ano=%d", len(df), year)
+    return df
+
+
+def fetch_perfil_eleitorado(uf: str, year: int) -> pd.DataFrame:
+    """Download and parse TSE Perfil do Eleitorado for a UF × year.
+
+    Returns DataFrame with columns: sg_uf, cd_municipio, nm_municipio, nr_zona,
+    ds_genero, ds_faixa_etaria, ds_grau_escolaridade, ds_estado_civil,
+    qt_eleitores, ano.
+    """
+    df = _fetch_national(year)
+    if df.empty:
+        return pd.DataFrame()
+
+    if "sg_uf" in df.columns:
+        df = df[df["sg_uf"].str.upper() == uf.upper()].copy()
 
     df["ano"] = year
     logger.info("TSE Perfil Eleitorado: %d linhas UF=%s ano=%d", len(df), uf, year)
