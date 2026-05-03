@@ -46,8 +46,6 @@ _SESSION.headers.update({"User-Agent": "SPEPE-DataOps/1.0"})
 
 @retry(stop=stop_after_attempt(3), wait=wait_exponential(min=2, max=30))
 def _download_pesqele_zip(year: int) -> bytes | None:
-    import zipfile as _zf
-
     url = _PESQELE_CDN.format(year=year)
     logger.info("Baixando TSE PesqEle ZIP: %s", url)
     resp = _SESSION.get(url, timeout=120)
@@ -55,26 +53,44 @@ def _download_pesqele_zip(year: int) -> bytes | None:
         logger.warning("TSE PesqEle ZIP não encontrado para %d", year)
         return None
     resp.raise_for_status()
-    # Extract first CSV from ZIP and return its bytes
-    with _zf.ZipFile(io.BytesIO(resp.content)) as zf:
-        csv_names = [n for n in zf.namelist() if n.lower().endswith(".csv")]
-        if not csv_names:
-            return None
-        return zf.read(csv_names[0])
+    return resp.content  # full ZIP bytes; caller extracts all per-UF CSVs
 
 
-def fetch_pesqele_csv(year: int, cargo: int | None = None) -> pd.DataFrame:
-    """Download registered polls CSV from TSE CDN ZIP for a given year."""
-    raw = _download_pesqele_zip(year)
-    if raw is None:
+def fetch_pesqele_csv(year: int, cargo: int | str | None = None) -> pd.DataFrame:
+    """Download registered polls from TSE CDN ZIP for a given year.
+
+    The ZIP contains one CSV per UF (e.g. pesquisa_eleitoral_2026_SP.csv).
+    All CSVs are read and concatenated.
+    cargo: optional filter — int matches cd_cargo, str matches ds_cargo text.
+    """
+    import zipfile as _zf
+
+    raw_zip = _download_pesqele_zip(year)
+    if raw_zip is None:
         return pd.DataFrame()
 
-    df = _parse_pesqele_csv(raw, year)
+    frames: list[pd.DataFrame] = []
+    with _zf.ZipFile(io.BytesIO(raw_zip)) as zf:
+        csv_names = [n for n in zf.namelist() if n.lower().endswith(".csv")]
+        if not csv_names:
+            logger.warning("TSE PesqEle ZIP vazio para %d", year)
+            return pd.DataFrame()
+        for csv_name in csv_names:
+            raw = zf.read(csv_name)
+            df_part = _parse_pesqele_csv(raw, year)
+            if not df_part.empty:
+                frames.append(df_part)
+
+    if not frames:
+        return pd.DataFrame()
+
+    df = pd.concat(frames, ignore_index=True)
 
     if cargo is not None:
-        cd_cargo_col = next((c for c in df.columns if "cargo" in c.lower()), None)
-        if cd_cargo_col:
-            df = df[df[cd_cargo_col] == cargo]
+        if isinstance(cargo, int) and "cd_cargo" in df.columns:
+            df = df[df["cd_cargo"] == str(cargo)]
+        elif isinstance(cargo, str) and "ds_cargo" in df.columns:
+            df = df[df["ds_cargo"].str.upper() == cargo.upper()]
 
     df["record_confidence_score"] = 1.00
     df["fonte"] = "tse_pesqele"
@@ -103,12 +119,19 @@ def _parse_pesqele_csv(raw: bytes, year: int) -> pd.DataFrame:
     df.columns = [_normalize_col(c) for c in df.columns]
 
     _rename = {
+        # TSE CDN 2024+ column names
+        "nr_protocolo_registro": "poll_id",
+        "nm_empresa_fantasia": "instituto",
+        "nm_empresa": "instituto",
+        "qt_entrevistado": "n_entrevistados",
+        "dt_inicio_pesquisa": "data_pesquisa_inicio",
+        "dt_fim_pesquisa": "data_pesquisa_fim",
+        "sg_uf": "uf",
+        # Legacy column names (pre-2024)
         "nr_registro": "poll_id",
         "sq_pesquisa": "poll_id",
         "dt_registro": "data_registro",
         "nm_instituto": "instituto",
-        "cd_cargo": "cd_cargo",
-        "sg_uf": "uf",
         "qt_entrevistados": "n_entrevistados",
         "dt_inicio": "data_pesquisa_inicio",
         "dt_fim": "data_pesquisa_fim",
