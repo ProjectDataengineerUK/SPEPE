@@ -40,24 +40,28 @@ def _download_zip(url: str) -> bytes:
     return resp.content
 
 
-def fetch_perfil_eleitorado(uf: str, year: int) -> pd.DataFrame:
-    """Stream national perfil ZIP, filter by UF in chunks — avoids loading 800MB into RAM.
+def fetch_perfil_raw_zip(year: int) -> bytes | None:
+    """Download national perfil ZIP once. Returns raw bytes or None on 404.
 
-    Returns DataFrame with columns: sg_uf, cd_municipio, nm_municipio, nr_zona,
-    ds_genero, ds_faixa_etaria, ds_grau_escolaridade, ds_estado_civil,
-    qt_eleitores, ano.
+    Use this + parse_perfil_from_zip when ingesting multiple UFs to avoid
+    re-downloading the 800MB+ file once per UF.
     """
     url = _CDN_PERFIL.format(year=year)
     logger.info("TSE Perfil Eleitorado: baixando nacional %s", url)
-
     try:
-        raw = _download_zip(url)
+        return _download_zip(url)
     except requests.HTTPError as exc:
         if exc.response is not None and exc.response.status_code == 404:
             logger.warning("Perfil eleitorado não disponível: ano=%d", year)
-            return pd.DataFrame()
+            return None
         raise
 
+
+def parse_perfil_from_zip(raw: bytes, uf: str, year: int) -> pd.DataFrame:
+    """Filter and normalize a single UF from pre-downloaded perfil ZIP bytes.
+
+    Streams in 50k-row chunks to avoid OOM on 800MB+ CSVs.
+    """
     frames: list[pd.DataFrame] = []
     uf_upper = uf.upper()
     with zipfile.ZipFile(io.BytesIO(raw)) as zf:
@@ -74,7 +78,6 @@ def fetch_perfil_eleitorado(uf: str, year: int) -> pd.DataFrame:
                     except (UnicodeDecodeError, Exception):
                         continue
                 f.seek(0)
-                # Read 50k rows at a time, keep only target UF
                 for chunk in pd.read_csv(
                     f, sep=";", encoding=enc_used, dtype=str, on_bad_lines="warn", chunksize=50_000
                 ):
@@ -98,6 +101,17 @@ def fetch_perfil_eleitorado(uf: str, year: int) -> pd.DataFrame:
     df["ano"] = year
     logger.info("TSE Perfil Eleitorado: %d linhas UF=%s ano=%d", len(df), uf, year)
     return df
+
+
+def fetch_perfil_eleitorado(uf: str, year: int) -> pd.DataFrame:
+    """Download national perfil ZIP and return filtered DataFrame for one UF.
+
+    For multi-UF ingestion prefer fetch_perfil_raw_zip + parse_perfil_from_zip.
+    """
+    raw = fetch_perfil_raw_zip(year)
+    if raw is None:
+        return pd.DataFrame()
+    return parse_perfil_from_zip(raw, uf, year)
 
 
 def build_perfil_municipio(uf: str, year: int) -> pd.DataFrame:
