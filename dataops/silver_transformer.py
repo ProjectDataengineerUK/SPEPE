@@ -319,12 +319,14 @@ def _normalize_for_bq_inplace(df: pd.DataFrame) -> None:
     for col in df.columns:
         dtype = df[col].dtype
         if hasattr(dtype, "numpy_dtype"):
-            if pd.api.types.is_integer_dtype(dtype):
-                df[col] = df[col].astype("float64")
-            elif pd.api.types.is_float_dtype(dtype):
+            # pandas extension types (Int64, Float64, boolean)
+            if pd.api.types.is_integer_dtype(dtype) or pd.api.types.is_float_dtype(dtype):
                 df[col] = df[col].astype("float64")
             elif pd.api.types.is_bool_dtype(dtype):
                 df[col] = df[col].astype("object")
+        elif dtype.kind in ("i", "u"):
+            # numpy signed/unsigned int — convert to float64 for BQ FLOAT64 schema
+            df[col] = df[col].astype("float64")
         elif hasattr(df[col], "cat"):
             df[col] = df[col].astype("object")
 
@@ -545,9 +547,9 @@ def transform_seguranca_to_silver(
             df[col] = pd.to_numeric(df[col], errors="coerce")
 
     if "cd_municipio_ibge" in df.columns:
-        df["cd_municipio_ibge"] = pd.to_numeric(df["cd_municipio_ibge"], errors="coerce").astype(
-            "Int64"
-        )
+        df["cd_municipio_ibge"] = pd.to_numeric(
+            df["cd_municipio_ibge"], errors="coerce"
+        ).astype("float64")
 
     df["ingested_at"] = pd.Timestamp.utcnow()
 
@@ -602,9 +604,9 @@ def transform_saude_to_silver(
             df[col] = pd.to_numeric(df[col], errors="coerce")
 
     if "cd_municipio_ibge" in df.columns:
-        df["cd_municipio_ibge"] = pd.to_numeric(df["cd_municipio_ibge"], errors="coerce").astype(
-            "Int64"
-        )
+        df["cd_municipio_ibge"] = pd.to_numeric(
+            df["cd_municipio_ibge"], errors="coerce"
+        ).astype("float64")
 
     df["ingested_at"] = pd.Timestamp.utcnow()
 
@@ -691,9 +693,9 @@ def transform_economia_to_silver(
             df[col] = pd.to_numeric(df[col], errors="coerce")
 
     if "cd_municipio_ibge" in df.columns:
-        df["cd_municipio_ibge"] = pd.to_numeric(df["cd_municipio_ibge"], errors="coerce").astype(
-            "Int64"
-        )
+        df["cd_municipio_ibge"] = pd.to_numeric(
+            df["cd_municipio_ibge"], errors="coerce"
+        ).astype("float64")
 
     df["ingested_at"] = pd.Timestamp.utcnow()
 
