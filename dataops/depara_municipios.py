@@ -178,9 +178,9 @@ def join_tse_ibge(
         return df_tse
 
     df_ibge_clean = df_ibge.copy()
-    df_ibge_clean[ibge_key] = pd.to_numeric(
-        df_ibge_clean[ibge_key], errors="coerce"
-    ).astype("float64")
+    df_ibge_clean[ibge_key] = pd.to_numeric(df_ibge_clean[ibge_key], errors="coerce").astype(
+        "float64"
+    )
     df_tse["cd_municipio_ibge"] = pd.to_numeric(
         df_tse["cd_municipio_ibge"], errors="coerce"
     ).astype("float64")

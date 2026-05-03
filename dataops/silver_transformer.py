@@ -547,9 +547,9 @@ def transform_seguranca_to_silver(
             df[col] = pd.to_numeric(df[col], errors="coerce")
 
     if "cd_municipio_ibge" in df.columns:
-        df["cd_municipio_ibge"] = pd.to_numeric(
-            df["cd_municipio_ibge"], errors="coerce"
-        ).astype("float64")
+        df["cd_municipio_ibge"] = pd.to_numeric(df["cd_municipio_ibge"], errors="coerce").astype(
+            "float64"
+        )
 
     df["ingested_at"] = pd.Timestamp.utcnow()
 
@@ -604,9 +604,9 @@ def transform_saude_to_silver(
             df[col] = pd.to_numeric(df[col], errors="coerce")
 
     if "cd_municipio_ibge" in df.columns:
-        df["cd_municipio_ibge"] = pd.to_numeric(
-            df["cd_municipio_ibge"], errors="coerce"
-        ).astype("float64")
+        df["cd_municipio_ibge"] = pd.to_numeric(df["cd_municipio_ibge"], errors="coerce").astype(
+            "float64"
+        )
 
     df["ingested_at"] = pd.Timestamp.utcnow()
 
@@ -693,9 +693,9 @@ def transform_economia_to_silver(
             df[col] = pd.to_numeric(df[col], errors="coerce")
 
     if "cd_municipio_ibge" in df.columns:
-        df["cd_municipio_ibge"] = pd.to_numeric(
-            df["cd_municipio_ibge"], errors="coerce"
-        ).astype("float64")
+        df["cd_municipio_ibge"] = pd.to_numeric(df["cd_municipio_ibge"], errors="coerce").astype(
+            "float64"
+        )
 
     df["ingested_at"] = pd.Timestamp.utcnow()
 
