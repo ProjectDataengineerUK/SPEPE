@@ -121,8 +121,7 @@ def _parse_pesqele_csv(raw: bytes, year: int) -> pd.DataFrame:
     _rename = {
         # TSE CDN 2024+ column names
         "nr_protocolo_registro": "poll_id",
-        "nm_empresa_fantasia": "instituto",
-        "nm_empresa": "instituto",
+        "nm_empresa_fantasia": "instituto",  # nm_empresa kept as-is to avoid dup
         "qt_entrevistado": "n_entrevistados",
         "dt_inicio_pesquisa": "data_pesquisa_inicio",
         "dt_fim_pesquisa": "data_pesquisa_fim",
@@ -142,13 +141,9 @@ def _parse_pesqele_csv(raw: bytes, year: int) -> pd.DataFrame:
     df.rename(columns={k: v for k, v in _rename.items() if k in df.columns}, inplace=True)
 
     if "data_pesquisa_inicio" in df.columns:
-        df["data_pesquisa_inicio"] = pd.to_datetime(
-            df["data_pesquisa_inicio"], dayfirst=True, errors="coerce"
-        )
+        df["data_pesquisa_inicio"] = pd.to_datetime(df["data_pesquisa_inicio"], errors="coerce")
     if "data_pesquisa_fim" in df.columns:
-        df["data_pesquisa_fim"] = pd.to_datetime(
-            df["data_pesquisa_fim"], dayfirst=True, errors="coerce"
-        )
+        df["data_pesquisa_fim"] = pd.to_datetime(df["data_pesquisa_fim"], errors="coerce")
     if "intencao_pct" in df.columns:
         df["intencao_pct"] = pd.to_numeric(
             df["intencao_pct"].str.replace(",", "."), errors="coerce"
