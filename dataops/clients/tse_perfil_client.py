@@ -78,7 +78,9 @@ def fetch_perfil_eleitorado(uf: str, year: int) -> pd.DataFrame:
                 for chunk in pd.read_csv(
                     f, sep=";", encoding=enc_used, dtype=str, on_bad_lines="warn", chunksize=50_000
                 ):
-                    chunk.columns = [_COL_MAP.get(c.strip(), c.strip().lower()) for c in chunk.columns]
+                    chunk.columns = [
+                        _COL_MAP.get(c.strip(), c.strip().lower()) for c in chunk.columns
+                    ]
                     if "sg_uf" in chunk.columns:
                         chunk = chunk[chunk["sg_uf"].str.upper() == uf_upper]
                     if not chunk.empty:
@@ -90,7 +92,9 @@ def fetch_perfil_eleitorado(uf: str, year: int) -> pd.DataFrame:
 
     df = pd.concat(frames, ignore_index=True)
     if "qt_eleitores" in df.columns:
-        df["qt_eleitores"] = pd.to_numeric(df["qt_eleitores"], errors="coerce").fillna(0).astype(int)
+        df["qt_eleitores"] = (
+            pd.to_numeric(df["qt_eleitores"], errors="coerce").fillna(0).astype(int)
+        )
     df["ano"] = year
     logger.info("TSE Perfil Eleitorado: %d linhas UF=%s ano=%d", len(df), uf, year)
     return df
