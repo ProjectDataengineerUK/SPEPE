@@ -84,36 +84,41 @@ def _build_gold_via_bigquery_sql() -> dict:
         "fact_ibge_municipio": f"""
             CREATE OR REPLACE TABLE `{gold}.fact_ibge_municipio` AS
             SELECT
-                cd_municipio_ibge,
+                SAFE_CAST(cd_municipio_ibge AS INT64)          AS cd_municipio_ibge,
                 sg_uf,
-                ANY_VALUE(nm_municipio_y) AS nm_municipio,
-                MAX(ano_eleicao) AS ano,
-                MAX(CASE WHEN indicador = 'populacao'         THEN SAFE_CAST(valor AS FLOAT64) END) AS populacao_total,
-                MAX(CASE WHEN indicador = 'pct_analfabetos'   THEN SAFE_CAST(valor AS FLOAT64) END) AS taxa_analfabetismo,
-                MAX(CASE WHEN indicador = 'taxa_alfabetizacao' THEN SAFE_CAST(valor AS FLOAT64) END) AS taxa_alfabetizacao,
-                CAST(NULL AS FLOAT64) AS idhm,
-                CAST(NULL AS FLOAT64) AS renda_per_capita,
-                CAST(NULL AS FLOAT64) AS gini,
-                CAST(NULL AS FLOAT64) AS pct_extrema_pobreza,
-                CAST(NULL AS FLOAT64) AS pct_urbano,
+                ANY_VALUE(nm_municipio)                         AS nm_municipio,
+                MAX(SAFE_CAST(ano AS INT64))                    AS ano,
+                MAX(SAFE_CAST(idhm AS FLOAT64))                 AS idhm,
+                MAX(SAFE_CAST(renda_per_capita AS FLOAT64))     AS renda_per_capita,
+                MAX(SAFE_CAST(gini AS FLOAT64))                 AS gini,
+                MAX(SAFE_CAST(pct_extrema_pobreza AS FLOAT64))  AS pct_extrema_pobreza,
+                MAX(SAFE_CAST(taxa_analfabetismo AS FLOAT64))   AS taxa_analfabetismo,
+                MAX(SAFE_CAST(pct_urbano AS FLOAT64))           AS pct_urbano,
+                MAX(SAFE_CAST(populacao_total AS FLOAT64))      AS populacao_total,
                 CURRENT_TIMESTAMP() AS ingested_at
-            FROM {silver_wc}
-            WHERE cd_municipio_ibge IS NOT NULL AND ano_eleicao = 2022
+            FROM `{silver}.ibge_*`
+            WHERE cd_municipio_ibge IS NOT NULL
             GROUP BY cd_municipio_ibge, sg_uf
         """,
         "fact_seguranca_municipio": f"""
             CREATE OR REPLACE TABLE `{gold}.fact_seguranca_municipio` AS
             SELECT
-                CAST(cd_municipio_ibge AS INT64) AS cd_municipio_ibge,
+                CAST(cd_municipio_ibge AS INT64)                    AS cd_municipio_ibge,
                 sg_uf,
-                COALESCE(CAST(SAFE_CAST(ano AS INT64) AS INT64), 2022) AS ano,
-                SAFE_CAST(ivs_total AS FLOAT64) AS ivs_total,
-                SAFE_CAST(ivs_infraestrutura AS FLOAT64) AS ivs_infraestrutura,
-                SAFE_CAST(ivs_capital_humano AS FLOAT64) AS ivs_capital_humano,
-                SAFE_CAST(ivs_renda_trabalho AS FLOAT64) AS ivs_renda_trabalho,
-                CAST(NULL AS FLOAT64) AS taxa_homicidio_100k,
-                CAST(NULL AS FLOAT64) AS taxa_roubo_100k,
-                CAST(NULL AS INT64)   AS qt_feminicidio,
+                COALESCE(SAFE_CAST(ano AS INT64), 2022)             AS ano,
+                COALESCE(
+                    SAFE_CAST(ivs_total AS FLOAT64),
+                    SAFE_CAST(ivs_valor AS FLOAT64)
+                )                                                   AS ivs_total,
+                SAFE_CAST(ivs_infraestrutura AS FLOAT64)            AS ivs_infraestrutura,
+                SAFE_CAST(ivs_capital_humano AS FLOAT64)            AS ivs_capital_humano,
+                SAFE_CAST(ivs_renda_trabalho AS FLOAT64)            AS ivs_renda_trabalho,
+                COALESCE(
+                    SAFE_CAST(taxa_homicidio_100k AS FLOAT64),
+                    SAFE_CAST(taxa_homicidio AS FLOAT64)
+                )                                                   AS taxa_homicidio_100k,
+                SAFE_CAST(taxa_roubo_100k AS FLOAT64)               AS taxa_roubo_100k,
+                SAFE_CAST(qt_feminicidio AS INT64)                  AS qt_feminicidio,
                 CURRENT_TIMESTAMP() AS ingested_at
             FROM `{silver}.seguranca_municipal`
             WHERE cd_municipio_ibge IS NOT NULL
@@ -121,13 +126,19 @@ def _build_gold_via_bigquery_sql() -> dict:
         "fact_saude_municipio": f"""
             CREATE OR REPLACE TABLE `{gold}.fact_saude_municipio` AS
             SELECT
-                CAST(cd_municipio_ibge AS INT64) AS cd_municipio_ibge,
+                CAST(cd_municipio_ibge AS INT64)             AS cd_municipio_ibge,
                 sg_uf,
-                COALESCE(CAST(SAFE_CAST(ano AS INT64) AS INT64), 2022) AS ano,
-                CAST(NULL AS FLOAT64) AS taxa_mortalidade_infantil_1000,
-                CAST(NULL AS FLOAT64) AS taxa_mortalidade_materna_100k,
-                CAST(NULL AS FLOAT64) AS pct_cobertura_plano_saude,
-                CAST(NULL AS FLOAT64) AS idsus_score,
+                COALESCE(SAFE_CAST(ano AS INT64), 2022)      AS ano,
+                COALESCE(
+                    SAFE_CAST(taxa_mortalidade_infantil_1000 AS FLOAT64),
+                    SAFE_CAST(tx_mortalidade_infantil AS FLOAT64)
+                )                                            AS taxa_mortalidade_infantil_1000,
+                SAFE_CAST(taxa_mortalidade_materna_100k AS FLOAT64) AS taxa_mortalidade_materna_100k,
+                COALESCE(
+                    SAFE_CAST(pct_cobertura_plano_saude AS FLOAT64),
+                    SAFE_CAST(cobertura_esf_pct AS FLOAT64)
+                )                                            AS pct_cobertura_plano_saude,
+                SAFE_CAST(idsus_score AS FLOAT64)            AS idsus_score,
                 CURRENT_TIMESTAMP() AS ingested_at
             FROM `{silver}.saude_municipal`
             WHERE cd_municipio_ibge IS NOT NULL

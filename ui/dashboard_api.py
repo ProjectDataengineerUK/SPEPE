@@ -179,9 +179,9 @@ async def _bq_candidatos(cargo: str, uf: str, ano: int) -> list[dict]:
         SELECT
             nm_candidato   AS nm,
             sg_partido     AS partido,
-            ROUND(SUM(qt_votos) / SUM(SUM(qt_votos)) OVER () * 100, 1) AS pct_t1,
-            CAST(SUM(qt_votos) AS STRING) AS votos
-        FROM `{settings.gcp_project_id}.{settings.bigquery_dataset_gold}.fact_municipio_eleicao`
+            ROUND(SUM(total_votos) / SUM(SUM(total_votos)) OVER () * 100, 1) AS pct_t1,
+            CAST(SUM(total_votos) AS STRING) AS votos
+        FROM `{settings.gcp_project_id}.{settings.bigquery_dataset_gold}.fact_municipio_candidato_eleicao`
         WHERE sg_uf = @uf
           AND ano_eleicao = @ano
           AND cd_cargo = @cd_cargo
@@ -245,12 +245,11 @@ async def _bq_kpi(cargo: str, uf: str, ano: int) -> dict:
             SELECT
                 nm_candidato,
                 sg_partido,
-                SUM(qt_votos) AS total_cand,
-                SUM(SUM(qt_votos)) OVER () AS total_geral,
-                SUM(qt_votos_validos_municipio) AS total_validos,
+                SUM(total_votos) AS total_cand,
+                SUM(SUM(total_votos)) OVER () AS total_geral,
                 COUNT(DISTINCT cd_municipio) AS municipios,
-                ROW_NUMBER() OVER (ORDER BY SUM(qt_votos) DESC) AS rn
-            FROM `{gold}.fact_municipio_eleicao`
+                ROW_NUMBER() OVER (ORDER BY SUM(total_votos) DESC) AS rn
+            FROM `{gold}.fact_municipio_candidato_eleicao`
             WHERE sg_uf = @uf AND ano_eleicao = @ano
               AND cd_cargo = @cd_cargo AND nr_turno = 1
             GROUP BY nm_candidato, sg_partido
@@ -325,10 +324,10 @@ async def _bq_municipios(cargo: str, uf: str, ano: int, limit: int) -> list[dict
                 nm_municipio,
                 nm_candidato,
                 sg_partido,
-                SUM(qt_votos) AS votos,
-                SUM(SUM(qt_votos)) OVER (PARTITION BY nm_municipio) AS total_mun,
-                ROW_NUMBER() OVER (PARTITION BY nm_municipio ORDER BY SUM(qt_votos) DESC) AS rk
-            FROM `{gold}.fact_municipio_eleicao`
+                SUM(total_votos) AS votos,
+                SUM(SUM(total_votos)) OVER (PARTITION BY nm_municipio) AS total_mun,
+                ROW_NUMBER() OVER (PARTITION BY nm_municipio ORDER BY SUM(total_votos) DESC) AS rk
+            FROM `{gold}.fact_municipio_candidato_eleicao`
             WHERE sg_uf = @uf AND ano_eleicao = @ano
               AND cd_cargo = @cd_cargo AND nr_turno = 1
             GROUP BY nm_municipio, nm_candidato, sg_partido

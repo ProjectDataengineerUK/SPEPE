@@ -1503,6 +1503,14 @@ function _onChatMsg(e){
   let data;
   try{ data=JSON.parse(e.data); }catch{ return; }
 
+  if(data.type==='welcome'){
+    const m=document.getElementById('msgs');
+    const d=document.createElement('div');d.className='msg ai';
+    d.innerHTML=`<div class="mav ai">AI</div><div><div class="mb">${(data.text||'').replace(/\n/g,'<br>').replace(/\*\*([^*]+)\*\*/g,'<strong>$1</strong>')}</div></div>`;
+    m.appendChild(d);m.scrollTop=m.scrollHeight;
+    return;
+  }
+
   if(data.type==='chunk'){
     _aiBuffer+=data.text;
     if(_aiMsgEl) _aiMsgEl.innerHTML=_aiBuffer.replace(/\n/g,'<br>');
@@ -1626,17 +1634,28 @@ function deliver(q){
   ti.innerHTML=`<div class="mav ai">AI</div><div class="typing"><span class="td"></span><span class="td"></span><span class="td"></span></div>`;
   m.appendChild(ti); m.scrollTop=m.scrollHeight;
 
-  // Try real WebSocket; on failure fall back to local demo
+  // Try real WebSocket; queue message until OPEN, fall back to demo if it never connects
   _ensureChatWs();
-  if(_chatWs && _chatWs.readyState===1){
+  const _doSend=()=>{
     ti.remove();
-    addMsg('','ai'); // creates _aiMsgEl
-    _chatWs.send(JSON.stringify({type:'chat',text:q}));
+    addMsg('','ai');
+    _chatWs.send(JSON.stringify({type:'message',text:q}));
+  };
+  if(_chatWs && _chatWs.readyState===1){
+    _doSend();
+  } else if(_chatWs && _chatWs.readyState===0){
+    // CONNECTING — wait for open event
+    const _onOpen=()=>{ _chatWs.removeEventListener('open',_onOpen); _doSend(); };
+    const _onFail=()=>{ _chatWs.removeEventListener('error',_onFail); _runDemo(); };
+    _chatWs.addEventListener('open',_onOpen);
+    _chatWs.addEventListener('error',_onFail);
   } else {
-    // Demo fallback
+    _runDemo();
+  }
+  function _runDemo(){
     setTimeout(()=>{
       ti.remove();
-      const aiEl=addMsg(AI_RESP[q]||DEF[Math.floor(Math.random()*DEF.length)],'ai');
+      addMsg(AI_RESP[q]||DEF[Math.floor(Math.random()*DEF.length)],'ai');
       syncBar();
       setTimeout(()=>_fallbackIntent(q),250);
       busy=false; document.getElementById('bsend').disabled=false;
@@ -1961,6 +1980,9 @@ function _drillFromCard(id, nr_zona, nr_secao, level){
     reloadMap();
   }
 }
+
+// Pre-connect WS on page load so it's OPEN when user sends first message
+window.addEventListener('load', _ensureChatWs);
 </script>
 </body>
 </html>

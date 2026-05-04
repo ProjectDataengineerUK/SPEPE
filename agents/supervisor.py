@@ -65,6 +65,7 @@ M — Budget: ${budget:.2f}/sessão, usado: ${used:.4f}
 A — Para cadeias (/prever requer análise→modelagem→explicação→narração): chame um agente por vez; o próximo hop decide o seguinte
 
 Após cada route_to_agent, SEMPRE chame emit_dashboard_intent com as ações de UI adequadas ao conteúdo da resposta.
+Use done=true em emit_dashboard_intent para encerrar o loop quando a tarefa estiver completa — elimina um hop desnecessário.
 Responda APENAS via ferramentas — nunca com texto livre.
 """
 
@@ -95,7 +96,8 @@ _EMIT_INTENT_TOOL: dict = {
     "name": "emit_dashboard_intent",
     "description": (
         "Emite ações estruturadas para o dashboard atualizar a UI. "
-        "Chamar APÓS route_to_agent com as mudanças de estado adequadas."
+        "Chamar APÓS route_to_agent com as mudanças de estado adequadas. "
+        "Use done=true quando a tarefa estiver completamente concluída — encerra o loop."
     ),
     "input_schema": {
         "type": "object",
@@ -140,6 +142,11 @@ _EMIT_INTENT_TOOL: dict = {
             "narration": {
                 "type": "string",
                 "description": "Texto de acompanhamento exibido ao usuário.",
+            },
+            "done": {
+                "type": "boolean",
+                "description": "True se a tarefa está completa — encerra o loop sem chamar outra ferramenta.",
+                "default": False,
             },
         },
         "required": ["actions"],
@@ -203,6 +210,8 @@ class Supervisor:
             if tool_use.name == "emit_dashboard_intent":
                 if _intent_sink is not None:
                     _intent_sink.append(tool_use.input)
+                if tool_use.input.get("done", False):
+                    return
                 current_input = None
                 continue
 

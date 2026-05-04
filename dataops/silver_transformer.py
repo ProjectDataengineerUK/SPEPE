@@ -232,7 +232,10 @@ def _load_bronze_ibge(uf: str) -> pd.DataFrame:
                 return df_uf
 
     ibge_dir = LOCAL_BRONZE_DIR / "ibge"
-    files = list(ibge_dir.glob(f"*{uf.upper()}*.parquet")) if ibge_dir.exists() else []
+    # Load only the wide-format municipios file (not tall-format indicadores)
+    files = (
+        list(ibge_dir.rglob(f"municipios_{uf.upper()}.parquet")) if ibge_dir.exists() else []
+    )
     if not files:
         return pd.DataFrame()
     return pd.concat([pd.read_parquet(f) for f in files], ignore_index=True)
