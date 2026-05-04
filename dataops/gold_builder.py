@@ -25,6 +25,7 @@ def _build_gold_via_bigquery_sql() -> dict:
     silver_wc = f"`{_GCP_PROJECT}.{_BQ_SILVER_DATASET}.tse_*`"
     gold = f"{_GCP_PROJECT}.{_BQ_GOLD_DATASET}"
 
+    silver = f"{_GCP_PROJECT}.{_BQ_SILVER_DATASET}"
     sqls = {
         "fact_municipio_eleicao": f"""
             CREATE OR REPLACE TABLE `{gold}.fact_municipio_eleicao` AS
@@ -57,6 +58,73 @@ def _build_gold_via_bigquery_sql() -> dict:
                 CURRENT_TIMESTAMP() AS ingested_at
             FROM {silver_wc}
             GROUP BY sg_uf, nr_candidato, nm_candidato, cd_cargo, ds_cargo, ano_eleicao
+        """,
+        "fact_ibge_municipio": f"""
+            CREATE OR REPLACE TABLE `{gold}.fact_ibge_municipio` AS
+            SELECT
+                cd_municipio_ibge,
+                sg_uf,
+                ANY_VALUE(nm_municipio_y) AS nm_municipio,
+                MAX(ano_eleicao) AS ano,
+                MAX(CASE WHEN indicador = 'populacao'         THEN SAFE_CAST(valor AS FLOAT64) END) AS populacao_total,
+                MAX(CASE WHEN indicador = 'pct_analfabetos'   THEN SAFE_CAST(valor AS FLOAT64) END) AS taxa_analfabetismo,
+                MAX(CASE WHEN indicador = 'taxa_alfabetizacao' THEN SAFE_CAST(valor AS FLOAT64) END) AS taxa_alfabetizacao,
+                CAST(NULL AS FLOAT64) AS idhm,
+                CAST(NULL AS FLOAT64) AS renda_per_capita,
+                CAST(NULL AS FLOAT64) AS gini,
+                CAST(NULL AS FLOAT64) AS pct_extrema_pobreza,
+                CAST(NULL AS FLOAT64) AS pct_urbano,
+                CURRENT_TIMESTAMP() AS ingested_at
+            FROM {silver_wc}
+            WHERE cd_municipio_ibge IS NOT NULL AND ano_eleicao = 2022
+            GROUP BY cd_municipio_ibge, sg_uf
+        """,
+        "fact_seguranca_municipio": f"""
+            CREATE OR REPLACE TABLE `{gold}.fact_seguranca_municipio` AS
+            SELECT
+                CAST(cd_municipio_ibge AS INT64) AS cd_municipio_ibge,
+                sg_uf,
+                COALESCE(CAST(SAFE_CAST(ano AS INT64) AS INT64), 2022) AS ano,
+                SAFE_CAST(ivs_total AS FLOAT64) AS ivs_total,
+                SAFE_CAST(ivs_infraestrutura AS FLOAT64) AS ivs_infraestrutura,
+                SAFE_CAST(ivs_capital_humano AS FLOAT64) AS ivs_capital_humano,
+                SAFE_CAST(ivs_renda_trabalho AS FLOAT64) AS ivs_renda_trabalho,
+                CAST(NULL AS FLOAT64) AS taxa_homicidio_100k,
+                CAST(NULL AS FLOAT64) AS taxa_roubo_100k,
+                CAST(NULL AS INT64)   AS qt_feminicidio,
+                CURRENT_TIMESTAMP() AS ingested_at
+            FROM `{silver}.seguranca_municipal`
+            WHERE cd_municipio_ibge IS NOT NULL
+        """,
+        "fact_saude_municipio": f"""
+            CREATE OR REPLACE TABLE `{gold}.fact_saude_municipio` AS
+            SELECT
+                CAST(cd_municipio_ibge AS INT64) AS cd_municipio_ibge,
+                sg_uf,
+                COALESCE(CAST(SAFE_CAST(ano AS INT64) AS INT64), 2022) AS ano,
+                CAST(NULL AS FLOAT64) AS taxa_mortalidade_infantil_1000,
+                CAST(NULL AS FLOAT64) AS taxa_mortalidade_materna_100k,
+                CAST(NULL AS FLOAT64) AS pct_cobertura_plano_saude,
+                CAST(NULL AS FLOAT64) AS idsus_score,
+                CURRENT_TIMESTAMP() AS ingested_at
+            FROM `{silver}.saude_municipal`
+            WHERE cd_municipio_ibge IS NOT NULL
+        """,
+        "fact_social_municipio": f"""
+            CREATE OR REPLACE TABLE `{gold}.fact_social_municipio` AS
+            SELECT
+                sg_uf,
+                fonte,
+                DATE(created_at) AS data_referencia,
+                COUNT(*) AS qt_posts,
+                COALESCE(SUM(like_count), 0)    AS total_likes,
+                COALESCE(SUM(retweet_count), 0) AS total_retweets,
+                COALESCE(SUM(reply_count), 0)   AS total_comments,
+                COALESCE(SUM(like_count), 0) + COALESCE(SUM(retweet_count), 0)
+                    + COALESCE(SUM(reply_count), 0) AS total_engajamento,
+                CURRENT_TIMESTAMP() AS ingested_at
+            FROM `{silver}.social_mencoes_br`
+            GROUP BY sg_uf, fonte, DATE(created_at)
         """,
     }
 
