@@ -148,7 +148,16 @@ def _build_gold_via_bigquery_sql() -> dict:
             FROM `{silver}.social_mencoes_br`
             GROUP BY sg_uf, fonte, DATE(created_at)
         """,
+        # fact_pesquisa: promote Silver fact_pesquisa (multi-ano) → Gold
+        # Skipped silently if Silver table does not exist yet
+        "fact_pesquisa": f"""
+            CREATE OR REPLACE TABLE `{gold}.fact_pesquisa` AS
+            SELECT * FROM `{silver}.fact_pesquisa`
+        """,
     }
+
+    # Tables that may have no Silver source yet — skip without failing the job
+    _OPTIONAL = {"fact_pesquisa", "fact_social_municipio", "fact_economico_municipio"}
 
     results = {}
     for table_name, sql in sqls.items():
@@ -164,8 +173,12 @@ def _build_gold_via_bigquery_sql() -> dict:
             results[table_name] = {"path": f"{gold}.{table_name}", "rows": int(row_count)}
             logger.info("Gold BQ SQL: %s (%d rows)", table_name, row_count)
         except Exception as exc:
-            logger.error("Gold BQ SQL falhou para %s: %s", table_name, exc)
-            results[table_name] = {"status": "error", "message": str(exc)}
+            if table_name in _OPTIONAL:
+                logger.warning("Gold BQ SQL skipped %s (Silver ainda vazio): %s", table_name, exc)
+                results[table_name] = {"status": "skipped", "message": str(exc)}
+            else:
+                logger.error("Gold BQ SQL falhou para %s: %s", table_name, exc)
+                results[table_name] = {"status": "error", "message": str(exc)}
 
     return {"status": "ok", "tables": results}
 

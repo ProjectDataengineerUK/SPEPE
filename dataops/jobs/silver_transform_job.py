@@ -52,16 +52,21 @@ def main(uf: str, years: list[int] | None = None, include_social: bool = True) -
                 "Silver TSE OK %s/%d: %d rows, DQ=%.1f%%", uf, year, result.get("rows", 0), dq_score
             )
 
-    # ── Pesquisas eleitorais (nacional — BR) ────────────────────────────────
-    pesquisa_year = int(os.environ.get("PESQUISA_YEAR", target_years[-1]))
-    logger.info("Silver pesquisas: ano=%d", pesquisa_year)
-    r = transform_pesquisas_to_silver(pesquisa_year, use_bigquery=use_bq)
-    if r.get("status") == "ok":
-        logger.info("Pesquisas Silver OK: %d rows", r.get("rows", 0))
-    else:
-        logger.warning(
-            "Pesquisas Silver: %s (pode ser vazio se pesquisas_ingest não rodou)", r.get("message")
-        )
+    # ── Pesquisas eleitorais (nacional — BR, multi-ano) ─────────────────────
+    # PESQUISA_YEARS: lista separada por vírgula; default = 2018,2022,2026
+    _py_env = os.environ.get("PESQUISA_YEARS", os.environ.get("PESQUISA_YEAR", "2018,2022,2026"))
+    pesquisa_years = [int(y.strip()) for y in _py_env.split(",") if y.strip()]
+    for pesquisa_year in pesquisa_years:
+        logger.info("Silver pesquisas: ano=%d", pesquisa_year)
+        r = transform_pesquisas_to_silver(pesquisa_year, use_bigquery=use_bq)
+        if r.get("status") == "ok":
+            logger.info("Pesquisas Silver OK ano=%d: %d rows", pesquisa_year, r.get("rows", 0))
+        else:
+            logger.warning(
+                "Pesquisas Silver ano=%d: %s (Bronze pode estar vazio)",
+                pesquisa_year,
+                r.get("message"),
+            )
 
     # ── Segurança pública (por UF × ano) ────────────────────────────────────
     for year in target_years:

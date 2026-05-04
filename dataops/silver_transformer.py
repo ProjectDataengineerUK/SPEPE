@@ -364,6 +364,38 @@ def _write_bigquery(df: pd.DataFrame, table_name: str) -> str:
         return _write_local_silver(df, "BR", 2022)
 
 
+def _write_bigquery_pesquisas(df: pd.DataFrame, year: int) -> str:
+    """WRITE_APPEND com pre-delete por ano — preserva dados de outros anos."""
+    project = os.environ.get("GCP_PROJECT_ID", "spepe-dev")
+    dataset = os.environ.get("BIGQUERY_DATASET_SILVER", "spepe_silver")
+    table_id = f"{project}.{dataset}.fact_pesquisa"
+
+    from google.cloud import bigquery
+
+    client = bigquery.Client(project=project)
+    df = _normalize_for_bq(df)
+    if "ingested_at" not in df.columns:
+        df = df.copy()
+        df["ingested_at"] = pd.Timestamp.utcnow()
+
+    # Remove rows for this year before appending to avoid duplicates on re-run
+    try:
+        client.query(f"DELETE FROM `{table_id}` WHERE ano = {year}").result()
+        logger.info("Pre-delete fact_pesquisa ano=%d OK", year)
+    except Exception:
+        pass  # Table may not exist yet — CREATE_IF_NEEDED handles it
+
+    job_config = bigquery.LoadJobConfig(
+        write_disposition="WRITE_APPEND",
+        create_disposition="CREATE_IF_NEEDED",
+        autodetect=True,
+    )
+    job = client.load_table_from_dataframe(df, table_id, job_config=job_config)
+    job.result()
+    logger.info("Pesquisas Silver BQ: %s ano=%d (%d rows)", table_id, year, len(df))
+    return table_id
+
+
 def transform_pesquisas_to_silver(
     year: int,
     use_bigquery: bool = False,
@@ -442,7 +474,7 @@ def transform_pesquisas_to_silver(
     df["ingested_at"] = pd.Timestamp.utcnow()
 
     if use_bigquery:
-        path = _write_bigquery(df, "fact_pesquisa")
+        path = _write_bigquery_pesquisas(df, year)
     else:
         path_local = LOCAL_SILVER_DIR / f"fact_pesquisa_{year}.parquet"
         df.to_parquet(path_local, index=False, compression="zstd")
