@@ -380,15 +380,26 @@ def transform_pesquisas_to_silver(
     bronze_dir = LOCAL_BRONZE_DIR / "pesquisas" / str(year) / "BR"
     frames: list[pd.DataFrame] = []
 
-    for pattern in (f"pesquisas_tse_{year}.parquet", f"pesquisas_atlas_{year}.parquet"):
-        f = bronze_dir / pattern
-        if f.exists():
-            try:
-                df_part = pd.read_parquet(f)
-                frames.append(df_part)
-                logger.info("Pesquisas Bronze lido: %s (%d rows)", f.name, len(df_part))
-            except Exception as exc:
-                logger.warning("Falha ao ler %s: %s", f, exc)
+    gcs_prefix = f"raw/pesquisas/{year}/BR"
+    if GCS_BUCKET:
+        try:
+            df_gcs = _read_gcs_parquet_glob(GCS_BUCKET, gcs_prefix)
+            if not df_gcs.empty:
+                frames.append(df_gcs)
+                logger.info("Pesquisas Bronze GCS: %d rows (prefix=%s)", len(df_gcs), gcs_prefix)
+        except Exception as exc:
+            logger.warning("Falha ao ler pesquisas do GCS: %s", exc)
+
+    if not frames:
+        for pattern in (f"pesquisas_tse_{year}.parquet", f"pesquisas_atlas_{year}.parquet"):
+            f = bronze_dir / pattern
+            if f.exists():
+                try:
+                    df_part = pd.read_parquet(f)
+                    frames.append(df_part)
+                    logger.info("Pesquisas Bronze local: %s (%d rows)", f.name, len(df_part))
+                except Exception as exc:
+                    logger.warning("Falha ao ler %s: %s", f, exc)
 
     if not frames:
         return {"status": "error", "message": f"Bronze pesquisas vazio para {year}"}
