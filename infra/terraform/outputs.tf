@@ -29,12 +29,6 @@ output "dataops_sa" {
 }
 
 output "domain_mapping_records" {
-  description = "DNS records to add at your registrar (only when var.domain is set)"
-  value = var.domain != "" ? [
-    for r in google_cloud_run_domain_mapping.spepe[0].status[0].resource_records : {
-      type  = r.type
-      name  = r.name
-      value = r.rrdata
-    }
-  ] : []
+  description = "LB IP to point your domain A record to (when use_iap=true)"
+  value       = []
 }

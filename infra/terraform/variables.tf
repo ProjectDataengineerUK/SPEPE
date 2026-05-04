@@ -64,3 +64,9 @@ variable "research_group_email" {
   type        = string
   default     = ""
 }
+
+variable "use_iap" {
+  description = "Enable IAP + HTTPS LB. Requires project under Google Workspace org. Set false for personal GCP projects."
+  type        = bool
+  default     = false
+}

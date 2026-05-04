@@ -16,6 +16,9 @@ class SPEPESettings(BaseSettings):
     bigquery_dataset_gold: str = "spepe_gold"
     bigquery_dataset_mlops: str = "spepe_mlops"
     vertex_location: str = "us-central1"
+    # Claude via Vertex AI — uses ADC/WIF, no API key required
+    use_vertex_claude: bool = False
+    vertex_claude_location: str = "us-east5"
     firestore_collection: str = "spepe_sessions"
 
     log_level: str = "INFO"
@@ -44,7 +47,9 @@ class SPEPESettings(BaseSettings):
             self.gcp_project_id,
             self.default_model,
         )
-        if not self.anthropic_api_key:
+        if self.use_vertex_claude:
+            logger.info("Claude via Vertex AI (us-east5) — sem API key Anthropic")
+        elif not self.anthropic_api_key:
             logger.warning("ANTHROPIC_API_KEY não configurada")
 
 

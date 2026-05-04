@@ -1,14 +1,2 @@
-resource "google_cloud_run_domain_mapping" "spepe" {
-  count    = var.domain != "" ? 1 : 0
-  name     = var.domain
-  location = var.region
-
-  metadata {
-    namespace = var.project_id
-    labels    = local.labels
-  }
-
-  spec {
-    route_name = google_cloud_run_v2_service.spepe.name
-  }
-}
+# google_cloud_run_domain_mapping is NOT supported in southamerica-east1.
+# Use the HTTPS LB in iap.tf (when use_iap=true) for custom domain routing.

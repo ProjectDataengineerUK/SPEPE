@@ -1,7 +1,7 @@
 locals {
   # IAP and the HTTPS Load Balancer are only provisioned in staging/prod.
   # In dev, Cloud Run uses allUsers + INGRESS_TRAFFIC_ALL for fast iteration.
-  iap_enabled = var.environment != "dev"
+  iap_enabled = var.environment != "dev" && var.use_iap
 }
 
 # ── IAP Brand + OAuth Client ──────────────────────────────────────────────────

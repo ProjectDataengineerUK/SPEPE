@@ -27,10 +27,24 @@ def _get_registry() -> dict:
 
 logger = logging.getLogger("spepe.agents.supervisor")
 
-_MODEL = "claude-sonnet-4-6"
+# Vertex AI uses different model IDs than the direct Anthropic API.
+# claude-sonnet-4-6 (direct) → claude-sonnet-4-5@20251001 (Vertex)
+_MODEL_DIRECT = "claude-sonnet-4-6"
+_MODEL_VERTEX = "claude-sonnet-4-5@20251001"
+_MODEL = _MODEL_VERTEX if settings.use_vertex_claude else _MODEL_DIRECT
+
 _MAX_HOPS = 5
 _CLAUDE_INPUT_RATE = 3.0 / 1_000_000
 _CLAUDE_OUTPUT_RATE = 15.0 / 1_000_000
+
+
+def _build_anthropic_client() -> anthropic.Anthropic | anthropic.AnthropicVertex:
+    if settings.use_vertex_claude:
+        return anthropic.AnthropicVertex(
+            project_id=settings.gcp_project_id or "spepe-prod",
+            region=settings.vertex_claude_location,
+        )
+    return anthropic.Anthropic(api_key=settings.anthropic_api_key)
 
 _SYSTEM = """\
 Você é o Supervisor do SPEPE. Use as ferramentas disponíveis para rotear e executar tarefas.
@@ -158,7 +172,7 @@ _ALL_TOOLS = [_build_routing_tool(), RUN_JOB_TOOL_SCHEMA, _EMIT_INTENT_TOOL]
 
 class Supervisor:
     def __init__(self) -> None:
-        self._client = anthropic.Anthropic(api_key=settings.anthropic_api_key)
+        self._client = _build_anthropic_client()
         self._agents = _get_registry()
         # Rebuild routing tool with live enum (catches new agents added to registry)
         self._tools = [_build_routing_tool(), RUN_JOB_TOOL_SCHEMA, _EMIT_INTENT_TOOL]

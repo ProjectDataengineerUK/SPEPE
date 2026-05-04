@@ -3,9 +3,8 @@ resource "google_cloud_run_v2_service" "spepe" {
   location = var.region
   labels   = local.labels
 
-  # dev: allow direct public access for fast iteration (no LB required)
-  # staging/prod: restrict to HTTPS Load Balancer (IAP sits in front)
-  ingress = var.environment == "dev" ? "INGRESS_TRAFFIC_ALL" : "INGRESS_TRAFFIC_INTERNAL_LOAD_BALANCER"
+  # Restrict to LB only when IAP is enabled; otherwise allow all (direct URL)
+  ingress = (var.environment != "dev" && var.use_iap) ? "INGRESS_TRAFFIC_INTERNAL_LOAD_BALANCER" : "INGRESS_TRAFFIC_ALL"
 
   template {
     service_account = google_service_account.cloud_run.email
@@ -50,6 +49,14 @@ resource "google_cloud_run_v2_service" "spepe" {
       env {
         name  = "USE_BIGQUERY"
         value = "true"
+      }
+      env {
+        name  = "USE_VERTEX_CLAUDE"
+        value = (var.environment == "prod" || var.environment == "staging") ? "true" : "false"
+      }
+      env {
+        name  = "VERTEX_CLAUDE_LOCATION"
+        value = "us-east5"
       }
       env {
         name = "ANTHROPIC_API_KEY"
