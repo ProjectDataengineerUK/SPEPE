@@ -550,8 +550,11 @@ Chaves-mestras: `cod_municipio_ibge`, `uf`, `ano_eleitoral`, `data_referencia`
 ### 🟠 **Valida Funcionalidade (Fase 1)**
 - [ ] Pipeline end-to-end: ingerir **todas 27 UFs** 2022 (TSE + IBGE) — requer GCP
 - [x] Validar coluna `cd_cargo` em Gold — test_schema_gold_cd_cargo.py passando
-- [x] Testes passando: 82 pytest + eval_runner (0.995 score) + security scan
+- [x] Testes passando: 172 pytest + eval_runner (0.995 score) + security scan (2026-05-04)
 - [x] Compilar Vertex AI pipeline KFP 2.x — output/ml_pipeline.yaml gerado (2026-04-26)
+- [x] Semantic layer completo: 8/8 views BigQuery (vw_pesquisa_vs_social, vw_narrativa_por_tema_uf, vw_cenario_2018_2022_2026, vw_mapa_prioridade_campanha) (2026-05-04)
+- [x] Dashboard API: column bugs corrigidos + local Silver fallbacks para 4 tabs (2026-05-04)
+- [x] gold_builder._build_fact_pesquisa() lê Silver correto (não Bronze) (2026-05-04)
 
 ### 🟡 **Produção Segura**
 - [ ] Secrets em Secret Manager (ANTHROPIC_API_KEY, META_APP_TOKEN, YOUTUBE_API_KEY) — requer GCP
