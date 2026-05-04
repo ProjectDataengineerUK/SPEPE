@@ -95,6 +95,184 @@ _VIEWS: dict[str, str] = {
             )                                                               AS pct_uf
         FROM `{_PROJECT}.{_GOLD}.fact_candidato_eleicao`
     """,
+    # ── Pesquisa vs sinal digital: intenção × engajamento por UF × semana ──
+    # fact_pesquisa usa colunas: uf, candidato, data_pesquisa_inicio, intencao_ajustada
+    # social_mencoes_br usa: sg_uf, created_at, like_count, retweet_count, reply_count
+    "vw_pesquisa_vs_social": f"""
+        WITH pesquisa_semanal AS (
+            SELECT
+                uf                                                              AS sg_uf,
+                candidato                                                       AS nm_candidato,
+                cd_cargo,
+                DATE_TRUNC(data_pesquisa_inicio, WEEK(MONDAY))                 AS semana,
+                ROUND(AVG(intencao_ajustada), 1)                               AS intencao_media_pct,
+                COUNT(*)                                                        AS qt_pesquisas,
+                ROUND(AVG(margem_erro), 1)                                      AS margem_media_pp
+            FROM `{_PROJECT}.{_GOLD}.fact_pesquisa`
+            WHERE record_confidence_score >= 0.80
+              AND data_pesquisa_inicio IS NOT NULL
+            GROUP BY uf, candidato, cd_cargo,
+                     DATE_TRUNC(data_pesquisa_inicio, WEEK(MONDAY))
+        ),
+        social_semanal AS (
+            SELECT
+                sg_uf,
+                DATE_TRUNC(DATE(created_at), WEEK(MONDAY))                     AS semana,
+                COUNT(*)                                                        AS total_mencoes,
+                COALESCE(SUM(like_count), 0)
+                    + COALESCE(SUM(retweet_count), 0)
+                    + COALESCE(SUM(reply_count), 0)                            AS total_engajamento
+            FROM `{_PROJECT}.{_SILVER}.social_mencoes_br`
+            GROUP BY sg_uf, DATE_TRUNC(DATE(created_at), WEEK(MONDAY))
+        )
+        SELECT
+            p.sg_uf,
+            p.nm_candidato,
+            p.cd_cargo,
+            p.semana,
+            p.intencao_media_pct,
+            p.qt_pesquisas,
+            p.margem_media_pp,
+            COALESCE(s.total_mencoes, 0)                                        AS total_mencoes,
+            COALESCE(s.total_engajamento, 0)                                    AS total_engajamento,
+            ROUND(
+                p.intencao_media_pct - LAG(p.intencao_media_pct) OVER (
+                    PARTITION BY p.sg_uf, p.nm_candidato, p.cd_cargo
+                    ORDER BY p.semana
+                ), 1
+            )                                                                   AS delta_intencao_pp
+        FROM pesquisa_semanal p
+        LEFT JOIN social_semanal s
+            ON p.sg_uf = s.sg_uf AND p.semana = s.semana
+    """,
+    # ── Narrativa por plataforma × UF × semana ────────────────────────────
+    # Fase 1: 'fonte' (plataforma) como proxy de tema.
+    # Fase 2: substituir por coluna 'tema' gerada por NLP Vertex AI.
+    "vw_narrativa_por_tema_uf": f"""
+        SELECT
+            fonte                                                               AS plataforma,
+            sg_uf,
+            DATE_TRUNC(DATE(created_at), WEEK(MONDAY))                         AS semana,
+            COUNT(*)                                                            AS volume_mencoes,
+            COALESCE(SUM(like_count), 0)
+                + COALESCE(SUM(retweet_count), 0)
+                + COALESCE(SUM(reply_count), 0)                                AS engajamento_total,
+            ROUND(
+                (COALESCE(SUM(like_count), 0)
+                    + COALESCE(SUM(retweet_count), 0)
+                    + COALESCE(SUM(reply_count), 0))
+                / NULLIF(COUNT(*), 0), 1
+            )                                                                   AS engajamento_por_mencao,
+            ROUND(
+                COUNT(*) / NULLIF(SUM(COUNT(*)) OVER (
+                    PARTITION BY sg_uf, DATE_TRUNC(DATE(created_at), WEEK(MONDAY))
+                ), 0) * 100, 1
+            )                                                                   AS share_plataforma_pct
+        FROM `{_PROJECT}.{_SILVER}.social_mencoes_br`
+        GROUP BY fonte, sg_uf, DATE_TRUNC(DATE(created_at), WEEK(MONDAY))
+    """,
+    # ── Trajetória 2018 / 2022 (resultado) + 2026 (pesquisa) por UF ───────
+    "vw_cenario_2018_2022_2026": f"""
+        SELECT
+            sg_uf,
+            nm_candidato,
+            sg_partido,
+            cd_cargo,
+            ds_cargo,
+            ano_eleicao,
+            total_votos,
+            ROUND(
+                total_votos / NULLIF(SUM(total_votos) OVER (
+                    PARTITION BY sg_uf, cd_cargo, ano_eleicao
+                ), 0) * 100, 1
+            )                                                                   AS pct_voto_uf,
+            'resultado'                                                         AS tipo_dado,
+            CAST(NULL AS INT64)                                                 AS qt_pesquisas,
+            CAST(NULL AS FLOAT64)                                               AS margem_erro_pp
+        FROM `{_PROJECT}.{_GOLD}.fact_candidato_eleicao`
+        WHERE ano_eleicao IN (2018, 2022)
+
+        UNION ALL
+
+        SELECT
+            uf                                                                  AS sg_uf,
+            candidato                                                           AS nm_candidato,
+            CAST(NULL AS STRING)                                                AS sg_partido,
+            cd_cargo,
+            CAST(NULL AS STRING)                                                AS ds_cargo,
+            2026                                                                AS ano_eleicao,
+            CAST(NULL AS INT64)                                                 AS total_votos,
+            ROUND(AVG(intencao_ajustada), 1)                                    AS pct_voto_uf,
+            'pesquisa'                                                          AS tipo_dado,
+            COUNT(*)                                                            AS qt_pesquisas,
+            ROUND(AVG(margem_erro), 1)                                          AS margem_erro_pp
+        FROM `{_PROJECT}.{_GOLD}.fact_pesquisa`
+        WHERE record_confidence_score >= 0.80
+          AND tipo_pesquisa = 'corrente'
+        GROUP BY uf, candidato, cd_cargo
+    """,
+    # ── Mapa de prioridade de campanha: municípios por competitividade ─────
+    "vw_mapa_prioridade_campanha": f"""
+        WITH top2 AS (
+            SELECT
+                cd_municipio_ibge,
+                nm_municipio,
+                sg_uf,
+                ano_eleicao,
+                cd_cargo,
+                nm_candidato,
+                sg_partido,
+                pct_votos_municipio,
+                rn_municipio
+            FROM `{_PROJECT}.{_GOLD}.fact_municipio_candidato_eleicao`
+            WHERE nr_turno = 1 AND rn_municipio <= 2
+        ),
+        margem AS (
+            SELECT
+                cd_municipio_ibge,
+                nm_municipio,
+                sg_uf,
+                ano_eleicao,
+                cd_cargo,
+                MAX(CASE WHEN rn_municipio = 1 THEN nm_candidato  END)          AS lider,
+                MAX(CASE WHEN rn_municipio = 1 THEN sg_partido    END)          AS partido_lider,
+                ROUND(MAX(CASE WHEN rn_municipio = 1 THEN pct_votos_municipio END), 1)
+                                                                                AS pct_lider,
+                MAX(CASE WHEN rn_municipio = 2 THEN nm_candidato  END)          AS segundo,
+                ROUND(MAX(CASE WHEN rn_municipio = 2 THEN pct_votos_municipio END), 1)
+                                                                                AS pct_segundo,
+                ROUND(
+                    MAX(CASE WHEN rn_municipio = 1 THEN pct_votos_municipio END) -
+                    MAX(CASE WHEN rn_municipio = 2 THEN pct_votos_municipio END), 1
+                )                                                               AS margem_pp
+            FROM top2
+            GROUP BY cd_municipio_ibge, nm_municipio, sg_uf, ano_eleicao, cd_cargo
+        )
+        SELECT
+            m.cd_municipio_ibge,
+            m.nm_municipio,
+            m.sg_uf,
+            m.ano_eleicao,
+            m.cd_cargo,
+            m.lider,
+            m.partido_lider,
+            m.pct_lider,
+            m.segundo,
+            m.pct_segundo,
+            m.margem_pp,
+            COALESCE(i.populacao_total, 0)                                      AS populacao,
+            i.idhm,
+            ROUND(GREATEST(0.0, 100.0 - m.margem_pp * 2.0), 1)                AS score_competitividade,
+            CASE
+                WHEN m.margem_pp <= 5  THEN 'Disputado'
+                WHEN m.margem_pp <= 15 THEN 'Competitivo'
+                WHEN m.margem_pp <= 30 THEN 'Inclinado'
+                ELSE                        'Definido'
+            END                                                                 AS classificacao_disputa
+        FROM margem m
+        LEFT JOIN `{_PROJECT}.{_GOLD}.fact_ibge_municipio` i
+            ON m.cd_municipio_ibge = i.cd_municipio_ibge
+    """,
 }
 
 

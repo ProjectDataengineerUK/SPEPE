@@ -13,6 +13,7 @@ import json
 import logging
 import os
 import uuid
+from pathlib import Path
 from contextlib import asynccontextmanager
 from enum import Enum
 from typing import Any
@@ -44,6 +45,8 @@ app.add_middleware(
 )
 
 logger = logging.getLogger("spepe.dashboard_api")
+
+_LOCAL_SILVER_DIR = Path(os.environ.get("DATA_DIR", "data")) / "silver"
 
 _HELP_TEXT = """\
 ## SPEPE — Comandos disponíveis
@@ -480,7 +483,8 @@ async def get_socioeconomico(
             return JSONResponse({"municipios": await _bq_socioeconomico(uf, ano, limit)})
         except Exception as exc:
             logger.warning("BigQuery socioeconomico falhou: %s", exc)
-    return JSONResponse({"municipios": [], "fonte": "indisponivel"})
+    data = _local_socioeconomico(uf, ano, limit)
+    return JSONResponse({"municipios": data, "fonte": "local" if data else "indisponivel"})
 
 
 async def _bq_socioeconomico(uf: str, ano: int, limit: int) -> list[dict]:
@@ -520,6 +524,48 @@ async def _bq_socioeconomico(uf: str, ano: int, limit: int) -> list[dict]:
     ]
 
 
+def _local_socioeconomico(uf: str, ano: int, limit: int) -> list[dict]:
+    import pandas as pd
+
+    files = sorted(_LOCAL_SILVER_DIR.glob("ibge_*.parquet"))
+    if not files:
+        return []
+    dfs = []
+    for f in files:
+        try:
+            dfs.append(pd.read_parquet(f))
+        except Exception:
+            pass
+    if not dfs:
+        return []
+    df = pd.concat(dfs, ignore_index=True)
+    if "sg_uf" in df.columns:
+        df = df[df["sg_uf"].str.upper() == uf.upper()]
+    if "ano" in df.columns:
+        df = df[df["ano"] == ano]
+    if "idhm" in df.columns:
+        df = df.sort_values("idhm", ascending=False)
+    df = df.head(limit)
+    result = []
+    for _, r in df.iterrows():
+        pct_pobreza = float(r.get("pct_extrema_pobreza") or 0)
+        taxa_analf = float(r.get("taxa_analfabetismo") or 0)
+        pct_urb = float(r.get("pct_urbano") or 0)
+        result.append(
+            {
+                "nm": str(r.get("nm_municipio", "")),
+                "idhm": round(float(r.get("idhm") or 0), 3),
+                "renda_per_capita": round(float(r.get("renda_per_capita") or 0), 0),
+                "gini": round(float(r.get("gini") or 0), 3),
+                "pct_extrema_pobreza": round(pct_pobreza * 100 if pct_pobreza <= 1 else pct_pobreza, 1),
+                "taxa_analfabetismo": round(taxa_analf * 100 if taxa_analf <= 1 else taxa_analf, 1),
+                "pct_urbano": round(pct_urb * 100 if pct_urb <= 1 else pct_urb, 1),
+                "populacao": int(r.get("populacao_total") or 0),
+            }
+        )
+    return result
+
+
 # ── Segurança Pública ──────────────────────────────────────────────────────
 
 
@@ -534,7 +580,8 @@ async def get_seguranca(
             return JSONResponse({"municipios": await _bq_seguranca(uf, ano, limit)})
         except Exception as exc:
             logger.warning("BigQuery seguranca falhou: %s", exc)
-    return JSONResponse({"municipios": [], "fonte": "indisponivel"})
+    data = _local_seguranca(uf, ano, limit)
+    return JSONResponse({"municipios": data, "fonte": "local" if data else "indisponivel"})
 
 
 async def _bq_seguranca(uf: str, ano: int, limit: int) -> list[dict]:
@@ -581,6 +628,50 @@ async def _bq_seguranca(uf: str, ano: int, limit: int) -> list[dict]:
     ]
 
 
+def _local_seguranca(uf: str, ano: int, limit: int) -> list[dict]:
+    import pandas as pd
+
+    files = sorted(_LOCAL_SILVER_DIR.glob("seguranca_municipal_*.parquet"))
+    if not files:
+        return []
+    dfs = []
+    for f in files:
+        try:
+            dfs.append(pd.read_parquet(f))
+        except Exception:
+            pass
+    if not dfs:
+        return []
+    df = pd.concat(dfs, ignore_index=True)
+    if "sg_uf" in df.columns:
+        df = df[df["sg_uf"].str.upper() == uf.upper()]
+    if "ano" in df.columns:
+        df = df[df["ano"] == ano]
+    sort_col = next(
+        (c for c in ("taxa_homicidio_100k", "taxa_homicidio") if c in df.columns), None
+    )
+    if sort_col:
+        df = df.sort_values(sort_col, ascending=False)
+    df = df.head(limit)
+    result = []
+    for _, r in df.iterrows():
+        result.append(
+            {
+                "nm": str(r.get("nm_municipio") or r.get("cd_municipio_ibge", "")),
+                "taxa_homicidio": round(
+                    float(r.get("taxa_homicidio_100k") or r.get("taxa_homicidio") or 0), 1
+                ),
+                "ivs_total": round(float(r.get("ivs_total") or r.get("ivs_valor") or 0), 3),
+                "ivs_infra": round(float(r.get("ivs_infraestrutura") or 0), 3),
+                "ivs_capital_humano": round(float(r.get("ivs_capital_humano") or 0), 3),
+                "ivs_renda": round(float(r.get("ivs_renda_trabalho") or 0), 3),
+                "taxa_roubo": round(float(r.get("taxa_roubo_100k") or 0), 1),
+                "qt_feminicidio": int(r.get("qt_feminicidio") or 0),
+            }
+        )
+    return result
+
+
 # ── Saúde Pública ──────────────────────────────────────────────────────────
 
 
@@ -595,7 +686,8 @@ async def get_saude(
             return JSONResponse({"municipios": await _bq_saude(uf, ano, limit)})
         except Exception as exc:
             logger.warning("BigQuery saude falhou: %s", exc)
-    return JSONResponse({"municipios": [], "fonte": "indisponivel"})
+    data = _local_saude(uf, ano, limit)
+    return JSONResponse({"municipios": data, "fonte": "local" if data else "indisponivel"})
 
 
 async def _bq_saude(uf: str, ano: int, limit: int) -> list[dict]:
@@ -639,6 +731,55 @@ async def _bq_saude(uf: str, ano: int, limit: int) -> list[dict]:
     ]
 
 
+def _local_saude(uf: str, ano: int, limit: int) -> list[dict]:
+    import pandas as pd
+
+    files = sorted(_LOCAL_SILVER_DIR.glob("saude_municipal_*.parquet"))
+    if not files:
+        return []
+    dfs = []
+    for f in files:
+        try:
+            dfs.append(pd.read_parquet(f))
+        except Exception:
+            pass
+    if not dfs:
+        return []
+    df = pd.concat(dfs, ignore_index=True)
+    if "sg_uf" in df.columns:
+        df = df[df["sg_uf"].str.upper() == uf.upper()]
+    if "ano" in df.columns:
+        df = df[df["ano"] == ano]
+    sort_col = next(
+        (c for c in ("taxa_mortalidade_infantil_1000", "tx_mortalidade_infantil") if c in df.columns),
+        None,
+    )
+    if sort_col:
+        df = df.sort_values(sort_col, ascending=True)
+    df = df.head(limit)
+    result = []
+    for _, r in df.iterrows():
+        cobertura = float(r.get("pct_cobertura_plano_saude") or r.get("cobertura_esf_pct") or 0)
+        result.append(
+            {
+                "nm": str(r.get("nm_municipio") or r.get("cd_municipio_ibge", "")),
+                "tx_mortalidade_infantil": round(
+                    float(
+                        r.get("taxa_mortalidade_infantil_1000") or r.get("tx_mortalidade_infantil") or 0
+                    ),
+                    1,
+                ),
+                "tx_mortalidade_materna": round(
+                    float(r.get("taxa_mortalidade_materna_100k") or r.get("tx_mortalidade_materna") or 0),
+                    1,
+                ),
+                "pct_cobertura_plano": round(cobertura * 100 if cobertura <= 1 else cobertura, 1),
+                "idsus": round(float(r.get("idsus_score") or 0), 3),
+            }
+        )
+    return result
+
+
 # ── Pesquisas Eleitorais ───────────────────────────────────────────────────
 
 
@@ -654,7 +795,8 @@ async def get_pesquisas(
             return JSONResponse(await _bq_pesquisas(cargo, sg_uf, ano, tipo))
         except Exception as exc:
             logger.warning("BigQuery pesquisas falhou: %s", exc)
-    return JSONResponse({"series": [], "house_effects": [], "fonte": "indisponivel"})
+    data = _local_pesquisas(cargo, sg_uf, ano, tipo)
+    return JSONResponse({**data, "fonte": "local" if data["series"] else "indisponivel"})
 
 
 async def _bq_pesquisas(cargo: str, sg_uf: str, ano: int, tipo: str = "corrente") -> dict:
@@ -663,9 +805,10 @@ async def _bq_pesquisas(cargo: str, sg_uf: str, ano: int, tipo: str = "corrente"
     client = bigquery.Client(project=settings.gcp_project_id)
     gold = f"{settings.gcp_project_id}.{settings.bigquery_dataset_gold}"
 
+    cd_cargo = _CARGO_CD.get(cargo, 1)
     tipo_filter = ""
     params = [
-        bigquery.ScalarQueryParameter("cargo", "STRING", cargo),
+        bigquery.ScalarQueryParameter("cd_cargo", "INT64", cd_cargo),
         bigquery.ScalarQueryParameter("sg_uf", "STRING", sg_uf.upper()),
         bigquery.ScalarQueryParameter("ano", "INT64", ano),
     ]
@@ -674,14 +817,14 @@ async def _bq_pesquisas(cargo: str, sg_uf: str, ano: int, tipo: str = "corrente"
         params.append(bigquery.ScalarQueryParameter("tipo_pesquisa", "STRING", tipo))
 
     query = f"""
-        SELECT data_pesquisa, instituto, candidato, tipo_pesquisa,
+        SELECT data_pesquisa_inicio, instituto, candidato, tipo_pesquisa,
                intencao_pct, intencao_ajustada, house_effect, margem_erro
         FROM `{gold}.fact_pesquisa`
-        WHERE cargo = @cargo
-          AND (sg_uf = @sg_uf OR sg_uf IS NULL OR @sg_uf = 'BR')
-          AND EXTRACT(YEAR FROM data_pesquisa) = @ano
+        WHERE cd_cargo = @cd_cargo
+          AND (uf = @sg_uf OR uf IS NULL OR @sg_uf = 'BR')
+          AND EXTRACT(YEAR FROM data_pesquisa_inicio) = @ano
           {tipo_filter}
-        ORDER BY candidato, data_pesquisa
+        ORDER BY candidato, data_pesquisa_inicio
     """
     job_config = bigquery.QueryJobConfig(query_parameters=params)
     rows = list(client.query(query, job_config=job_config).result())
@@ -691,7 +834,7 @@ async def _bq_pesquisas(cargo: str, sg_uf: str, ano: int, tipo: str = "corrente"
         cand = r.get("candidato", "")
         by_candidato.setdefault(cand, []).append(
             {
-                "data": str(r.get("data_pesquisa", ""))[:7],
+                "data": str(r.get("data_pesquisa_inicio", ""))[:7],
                 "instituto": r.get("instituto", ""),
                 "intencao": round(r.get("intencao_pct") or 0, 1),
                 "ajustada": round(r.get("intencao_ajustada") or r.get("intencao_pct") or 0, 1),
@@ -701,6 +844,51 @@ async def _bq_pesquisas(cargo: str, sg_uf: str, ano: int, tipo: str = "corrente"
         inst = r.get("instituto", "")
         if inst and inst not in institutes:
             institutes[inst] = round(r.get("house_effect") or 0, 2)
+    series = [{"candidato": c, "pontos": pts} for c, pts in by_candidato.items()]
+    house_effects = [{"instituto": k, "house_effect": v} for k, v in institutes.items()]
+    return {"series": series, "house_effects": house_effects, "tipo": tipo}
+
+
+def _local_pesquisas(cargo: str, sg_uf: str, ano: int, tipo: str) -> dict:
+    import pandas as pd
+
+    cd_cargo = _CARGO_CD.get(cargo, 1)
+    files = sorted(_LOCAL_SILVER_DIR.glob("fact_pesquisa_*.parquet"))
+    if not files:
+        return {"series": [], "house_effects": [], "tipo": tipo}
+    dfs = []
+    for f in files:
+        try:
+            dfs.append(pd.read_parquet(f))
+        except Exception:
+            pass
+    if not dfs:
+        return {"series": [], "house_effects": [], "tipo": tipo}
+    df = pd.concat(dfs, ignore_index=True)
+    if "cd_cargo" in df.columns:
+        df = df[df["cd_cargo"] == cd_cargo]
+    if "uf" in df.columns and sg_uf.upper() != "BR":
+        df = df[df["uf"].str.upper() == sg_uf.upper()]
+    if "data_pesquisa_inicio" in df.columns:
+        df = df[pd.to_datetime(df["data_pesquisa_inicio"], errors="coerce").dt.year == ano]
+    if tipo in ("corrente", "historica") and "tipo_pesquisa" in df.columns:
+        df = df[df["tipo_pesquisa"] == tipo]
+    by_candidato: dict[str, list] = {}
+    institutes: dict[str, float] = {}
+    for _, r in df.iterrows():
+        cand = str(r.get("candidato", ""))
+        by_candidato.setdefault(cand, []).append(
+            {
+                "data": str(r.get("data_pesquisa_inicio", ""))[:7],
+                "instituto": str(r.get("instituto", "")),
+                "intencao": round(float(r.get("intencao_pct") or 0), 1),
+                "ajustada": round(float(r.get("intencao_ajustada") or r.get("intencao_pct") or 0), 1),
+                "tipo": str(r.get("tipo_pesquisa", "")),
+            }
+        )
+        inst = str(r.get("instituto", ""))
+        if inst and inst not in institutes:
+            institutes[inst] = round(float(r.get("house_effect") or 0), 2)
     series = [{"candidato": c, "pontos": pts} for c, pts in by_candidato.items()]
     house_effects = [{"instituto": k, "house_effect": v} for k, v in institutes.items()]
     return {"series": series, "house_effects": house_effects, "tipo": tipo}

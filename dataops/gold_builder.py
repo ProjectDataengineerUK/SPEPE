@@ -240,11 +240,11 @@ def build_gold(use_bigquery: bool = False) -> dict:
     result["fact_candidato_dia"] = _write_gold(fact_cand, "fact_candidato_dia", use_bigquery)
 
     # ── Pesquisas ─────────────────────────────────────────────────────────────
-    ibge_data = _load_ibge_silver()
-    fact_pesq = _build_fact_pesquisa(ibge_data)
+    fact_pesq = _build_fact_pesquisa()
     result["fact_pesquisa"] = _write_gold(fact_pesq, "fact_pesquisa", use_bigquery)
 
     # ── IBGE indicadores municipais ───────────────────────────────────────────
+    ibge_data = _load_ibge_silver()
     fact_ibge = _build_fact_ibge_municipio(ibge_data)
     result["fact_ibge_municipio"] = _write_gold(fact_ibge, "fact_ibge_municipio", use_bigquery)
 
@@ -370,23 +370,36 @@ def _load_ibge_silver() -> pd.DataFrame:
     return pd.concat([pd.read_parquet(f) for f in ibge_files], ignore_index=True)
 
 
-def _build_fact_pesquisa(df_ibge: pd.DataFrame) -> pd.DataFrame:
-    """Build survey aggregation table (placeholder — populated by pesquisas MCP)."""
-    pesquisa_files = list((Path("data/bronze/pesquisas")).glob("*.parquet"))
-    if not pesquisa_files:
-        return pd.DataFrame(
-            columns=[
-                "data_pesquisa",
-                "instituto",
-                "candidato",
-                "intencao_pct",
-                "house_effect",
-                "intencao_ajustada",
-            ]
-        )
+_FACT_PESQUISA_EMPTY_COLS = [
+    "uf", "candidato", "instituto", "cd_cargo",
+    "data_pesquisa_inicio", "data_pesquisa_fim",
+    "intencao_pct", "house_effect", "intencao_ajustada",
+    "margem_erro", "record_confidence_score", "poll_id",
+    "ano", "tipo_pesquisa", "ingested_at",
+]
 
-    dfs = [pd.read_parquet(f) for f in pesquisa_files]
-    return pd.concat(dfs, ignore_index=True)
+
+def _build_fact_pesquisa() -> pd.DataFrame:
+    """Promote Silver fact_pesquisa_*.parquet files to Gold."""
+    silver_files = sorted(LOCAL_SILVER_DIR.glob("fact_pesquisa_*.parquet"))
+    if not silver_files:
+        logger.info("fact_pesquisa: nenhum Silver disponível — retornando vazio")
+        return pd.DataFrame(columns=_FACT_PESQUISA_EMPTY_COLS)
+
+    dfs = []
+    for f in silver_files:
+        try:
+            dfs.append(pd.read_parquet(f))
+            logger.info("fact_pesquisa Silver: %s (%d rows)", f.name, len(dfs[-1]))
+        except Exception as exc:
+            logger.warning("fact_pesquisa: falha ao ler %s: %s", f, exc)
+
+    if not dfs:
+        return pd.DataFrame(columns=_FACT_PESQUISA_EMPTY_COLS)
+
+    df = pd.concat(dfs, ignore_index=True)
+    logger.info("fact_pesquisa Gold: %d rows de %d arquivos Silver", len(df), len(silver_files))
+    return df
 
 
 def _build_fact_ibge_municipio(df_ibge: pd.DataFrame) -> pd.DataFrame:
