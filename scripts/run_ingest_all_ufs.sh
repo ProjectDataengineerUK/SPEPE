@@ -1,97 +1,187 @@
 #!/usr/bin/env bash
-# Ingestão TSE + IBGE para todas as 27 UFs — executa Cloud Run Jobs sequencialmente.
+# Ingestão completa Fase 1 — todas as fontes → Silver → Gold → semantic views.
+# Executa Cloud Run Jobs sequencialmente; falhas por UF não abordam o pipeline.
+#
+# Uso:
+#   ./scripts/run_ingest_all_ufs.sh              # todas as 27 UFs, ano 2022
+#   UFS="SP RJ MG" YEAR=2022 ./scripts/run_ingest_all_ufs.sh   # subconjunto
+#   SKIP_NATIONAL=1 ./scripts/run_ingest_all_ufs.sh             # só per-UF
+#   SKIP_PER_UF=1 ./scripts/run_ingest_all_ufs.sh               # só nacionais
 set -euo pipefail
 
-PROJECT="spepe-dev"
-REGION="southamerica-east1"
-YEAR="2022"
-IMAGE="southamerica-east1-docker.pkg.dev/spepe-dev/spepe/app:b538aa0f"
+PROJECT="${PROJECT:-spepe-dev}"
+REGION="${REGION:-southamerica-east1}"
+YEAR="${YEAR:-2022}"
+UFS="${UFS:-AC AL AP AM BA CE DF ES GO MA MT MS MG PA PB PR PE PI RJ RN RS RO RR SC SP SE TO}"
 
-UFS=(AC AL AP AM BA CE DF ES GO MA MT MS MG PA PB PR PE PI RJ RN RS RO RR SC SP SE TO)
+SKIP_NATIONAL="${SKIP_NATIONAL:-0}"
+SKIP_PER_UF="${SKIP_PER_UF:-0}"
+SKIP_OPTIONAL="${SKIP_OPTIONAL:-1}"   # social/digital/reddit — exigem API keys
+DRY_RUN="${DRY_RUN:-0}"
 
-echo "=== Atualizando imagem e memória dos jobs ==="
-for job in spepe-ibge-sync spepe-silver-transform spepe-gold-build; do
-  gcloud run jobs update "$job" \
-    --image "$IMAGE" \
-    --memory 2Gi --cpu 1 \
+# ── helpers ───────────────────────────────────────────────────────────────────
+
+FAILED=()
+SKIPPED=()
+
+run_job() {
+  local job_name="$1"; shift
+  local label="$1"; shift
+  local extra_args=("$@")
+
+  printf '\n--- %s (%s) ---\n' "$label" "$job_name"
+
+  if [[ "$DRY_RUN" == "1" ]]; then
+    echo "  [dry-run] gcloud run jobs execute $job_name ${extra_args[*]:-}"
+    return 0
+  fi
+
+  local cmd=(
+    gcloud run jobs execute "$job_name"
+    --region "$REGION"
+    --project "$PROJECT"
+    --wait
+    --quiet
+  )
+  if [[ ${#extra_args[@]} -gt 0 ]]; then
+    cmd+=(--args "${extra_args[*]}")
+  fi
+
+  if "${cmd[@]}" 2>&1; then
+    echo "  ✓ $label concluído"
+  else
+    echo "  ✗ $label FALHOU"
+    FAILED+=("$label")
+  fi
+}
+
+run_job_uf() {
+  local job_name="$1"
+  local label_prefix="$2"
+  local uf="$3"
+  shift 3
+  local extra_args=("$@")
+
+  run_job "$job_name" "${label_prefix} [${uf}]" "--uf" "$uf" "${extra_args[@]:-}"
+}
+
+# ── fase 1 — jobs nacionais ───────────────────────────────────────────────────
+
+if [[ "$SKIP_NATIONAL" != "1" ]]; then
+  echo "======================================================================"
+  echo "FASE 1 — Jobs nacionais (sem loop de UF)"
+  echo "======================================================================"
+
+  run_job "spepe-pesquisas-ingest" "Pesquisas eleitorais (TSE PesqEle + Atlas)"
+  run_job "spepe-camara-senado-ingest" "Câmara + Senado (votações, CEAP, parlamentares)"
+  run_job "spepe-tse-candidaturas-ingest" "TSE Candidaturas (BR)"
+fi
+
+# ── fase 2 — jobs por UF ─────────────────────────────────────────────────────
+
+if [[ "$SKIP_PER_UF" != "1" ]]; then
+  echo ""
+  echo "======================================================================"
+  printf 'FASE 2 — Jobs por UF (%s)\n' "$UFS"
+  echo "======================================================================"
+
+  read -ra UF_ARRAY <<< "$UFS"
+  echo "UFs a processar: ${#UF_ARRAY[@]}"
+
+  for UF in "${UF_ARRAY[@]}"; do
+    echo ""
+    echo "══ UF: $UF ══════════════════════════════════════════════════════════"
+
+    # TSE resultados eleitorais
+    run_job_uf "spepe-tse-ingest" "TSE resultados" "$UF" "--year" "$YEAR"
+
+    # TSE perfis de candidatos
+    run_job_uf "spepe-tse-perfil-ingest" "TSE perfis candidatos" "$UF"
+
+    # IBGE — demographics + socioeconomic indicators
+    run_job_uf "spepe-ibge-sync" "IBGE sync" "$UF"
+
+    # Segurança pública (IVS, Atlas da Violência, SINESP)
+    run_job_uf "spepe-security-ingest" "Segurança pública" "$UF"
+
+    # Saúde pública (DATASUS — mortalidade, cobertura ANS)
+    run_job_uf "spepe-datasus-ingest" "DataSUS saúde" "$UF"
+
+    # Economia (DIEESE cesta básica)
+    run_job_uf "spepe-dieese-ingest" "DIEESE cesta básica" "$UF"
+
+    # Acesso digital (CETIC TIC Domicílios)
+    run_job_uf "spepe-cetic-ingest" "CETIC acesso digital" "$UF"
+  done
+fi
+
+# ── fase 3 — opcional (exige API keys) ───────────────────────────────────────
+
+if [[ "$SKIP_OPTIONAL" != "1" ]]; then
+  echo ""
+  echo "======================================================================"
+  echo "FASE 3 — Jobs opcionais (requerem API keys em Secret Manager)"
+  echo "======================================================================"
+
+  run_job "spepe-digital-ingest" "Google Trends + Meta Ads"
+  run_job "spepe-social-ingest"  "Social listening (Twitter/X, Facebook)"
+  run_job "spepe-reddit-ingest"  "Reddit brasil/politica/brasilivre"
+fi
+
+# ── fase 4 — transformação silver → gold ─────────────────────────────────────
+
+echo ""
+echo "======================================================================"
+echo "FASE 4 — Transformação Silver → Gold (USE_BIGQUERY=true)"
+echo "======================================================================"
+
+run_job "spepe-silver-transform" "Silver transform (Bronze → Silver BQ)" \
+    "--use-bigquery" "--uf" "ALL"
+
+run_job "spepe-gold-build" "Gold build (Silver → Gold BQ)"
+
+# ── fase 5 — semantic layer ───────────────────────────────────────────────────
+
+echo ""
+echo "======================================================================"
+echo "FASE 5 — Criação das views semânticas no BigQuery Gold"
+echo "======================================================================"
+
+if [[ "$DRY_RUN" == "1" ]]; then
+  echo "  [dry-run] python -m dataops.semantic_layer"
+else
+  gcloud run jobs execute spepe-gold-build \
+    --args "python,-m,dataops.semantic_layer" \
     --region "$REGION" \
     --project "$PROJECT" \
-    --quiet
-  echo "  ✓ $job atualizado"
-done
-# TSE precisa de mais memória — zips grandes
-gcloud run jobs update spepe-tse-ingest \
-  --image "$IMAGE" \
-  --memory 4Gi --cpu 2 \
-  --region "$REGION" \
-  --project "$PROJECT" \
-  --quiet
-echo "  ✓ spepe-tse-ingest atualizado (4Gi)"
-
-echo ""
-echo "=== Iniciando ingestão: ${#UFS[@]} UFs, ano=$YEAR ==="
-FAILED=()
-
-for UF in "${UFS[@]}"; do
-  echo ""
-  echo "--- [$UF] TSE ingest ---"
-  if gcloud run jobs execute spepe-tse-ingest \
-      --update-env-vars "DEFAULT_UF=${UF},DEFAULT_ANO=${YEAR}" \
-      --region "$REGION" \
-      --project "$PROJECT" \
-      --wait \
-      --quiet 2>&1; then
-    echo "  ✓ TSE $UF concluído"
-  else
-    echo "  ✗ TSE $UF FALHOU"
-    FAILED+=("TSE-$UF")
-  fi
-
-  echo "--- [$UF] IBGE sync ---"
-  if gcloud run jobs execute spepe-ibge-sync \
-      --update-env-vars "DEFAULT_UF=${UF}" \
-      --region "$REGION" \
-      --project "$PROJECT" \
-      --wait \
-      --quiet 2>&1; then
-    echo "  ✓ IBGE $UF concluído"
-  else
-    echo "  ✗ IBGE $UF FALHOU"
-    FAILED+=("IBGE-$UF")
-  fi
-done
-
-echo ""
-echo "=== Transformação Silver → Gold ==="
-echo "--- Silver transform ---"
-if gcloud run jobs execute spepe-silver-transform \
-    --update-env-vars "USE_BIGQUERY=true" \
-    --region "$REGION" --project "$PROJECT" --wait --quiet 2>&1; then
-  echo "  ✓ Silver transform concluído"
-else
-  echo "  ✗ Silver transform FALHOU"
-  FAILED+=("SILVER")
+    --wait \
+    --quiet 2>/dev/null \
+  || python -m dataops.semantic_layer 2>&1 \
+  && echo "  ✓ Semantic views criadas" \
+  || { echo "  ⚠ Semantic layer: rode manualmente: python -m dataops.semantic_layer"; SKIPPED+=("semantic_layer"); }
 fi
 
-echo "--- Gold build ---"
-if gcloud run jobs execute spepe-gold-build \
-    --update-env-vars "USE_BIGQUERY=true" \
-    --region "$REGION" --project "$PROJECT" --wait --quiet 2>&1; then
-  echo "  ✓ Gold build concluído"
+# ── resumo ────────────────────────────────────────────────────────────────────
+
+echo ""
+echo "======================================================================"
+echo "RESUMO"
+echo "======================================================================"
+
+if [[ ${#FAILED[@]} -eq 0 ]]; then
+  echo "✅ Todos os jobs concluídos com sucesso."
 else
-  echo "  ✗ Gold build FALHOU"
-  FAILED+=("GOLD")
+  echo "❌ Falhas (${#FAILED[@]}): ${FAILED[*]}"
+fi
+
+if [[ ${#SKIPPED[@]} -gt 0 ]]; then
+  echo "⚠  Ignorados: ${SKIPPED[*]}"
 fi
 
 echo ""
-echo "=== Resumo ==="
-echo "UFs processadas: ${#UFS[@]}"
-if [ ${#FAILED[@]} -eq 0 ]; then
-  echo "Todos os jobs concluídos com sucesso."
-  echo ""
-  echo "Próximo passo: setar USE_BIGQUERY=true no serviço principal:"
-  echo "  gcloud run services update spepe-dev --update-env-vars USE_BIGQUERY=true --region $REGION --project $PROJECT"
-else
-  echo "Falhas (${#FAILED[@]}): ${FAILED[*]}"
-  exit 1
-fi
+echo "Próximo passo — ativar BigQuery no serviço principal:"
+echo "  gcloud run services update spepe-dev \\"
+echo "    --update-env-vars USE_BIGQUERY=true \\"
+echo "    --region $REGION --project $PROJECT"
+
+[[ ${#FAILED[@]} -eq 0 ]] || exit 1

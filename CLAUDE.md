@@ -548,13 +548,16 @@ Chaves-mestras: `cod_municipio_ibge`, `uf`, `ano_eleitoral`, `data_referencia`
 - [x] `__main__` em mlops/eval/eval_runner.py — já existia, CI usa --responses-file
 
 ### 🟠 **Valida Funcionalidade (Fase 1)**
-- [ ] Pipeline end-to-end: ingerir **todas 27 UFs** 2022 (TSE + IBGE) — requer GCP
+- [ ] Pipeline end-to-end: ingerir **todas 27 UFs** 2022 (todas as fontes) — requer GCP; usar `scripts/run_ingest_all_ufs.sh`
 - [x] Validar coluna `cd_cargo` em Gold — test_schema_gold_cd_cargo.py passando
 - [x] Testes passando: 172 pytest + eval_runner (0.995 score) + security scan (2026-05-04)
 - [x] Compilar Vertex AI pipeline KFP 2.x — output/ml_pipeline.yaml gerado (2026-04-26)
 - [x] Semantic layer completo: 8/8 views BigQuery (vw_pesquisa_vs_social, vw_narrativa_por_tema_uf, vw_cenario_2018_2022_2026, vw_mapa_prioridade_campanha) (2026-05-04)
 - [x] Dashboard API: column bugs corrigidos + local Silver fallbacks para 4 tabs (2026-05-04)
 - [x] gold_builder._build_fact_pesquisa() lê Silver correto (não Bronze) (2026-05-04)
+- [x] Gold BQ SQL: fact_ibge_municipio lê silver.ibge_* (não tse_*); fact_saude/segurança mapeiam colunas Silver reais (2026-05-04)
+- [x] Dashboard API BQ: _bq_candidatos/_bq_kpi/_bq_municipios usam fact_municipio_candidato_eleicao (2026-05-04)
+- [x] Varredura geral de coerência: 15 fontes auditadas, todos os bugs críticos corrigidos (2026-05-04)
 
 ### 🟡 **Produção Segura**
 - [ ] Secrets em Secret Manager (ANTHROPIC_API_KEY, META_APP_TOKEN, YOUTUBE_API_KEY) — requer GCP
