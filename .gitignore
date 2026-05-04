@@ -53,7 +53,9 @@ output/archetype_cache/
 
 # Logs
 logs/
-output/              # Runtime outputs: audit, reports, temp
+# Runtime outputs: audit, reports, temp
+output/audit/
+output/reports/
 *.log
 
 # Cache
