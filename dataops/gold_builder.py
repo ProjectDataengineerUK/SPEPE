@@ -42,22 +42,44 @@ def _build_gold_via_bigquery_sql() -> dict:
         "fact_secao_eleicao": f"""
             CREATE OR REPLACE TABLE `{gold}.fact_secao_eleicao` AS
             SELECT
-                sg_uf, cd_municipio, nr_zona, nr_secao, cd_cargo, ano_eleicao,
+                sg_uf, cd_municipio, nm_municipio, nr_zona, nr_secao,
+                nm_candidato, sg_partido, cd_cargo, ds_cargo, nr_turno, ano_eleicao,
                 SUM(qt_votos) AS total_votos,
-                COUNT(DISTINCT nr_candidato) AS n_candidatos,
                 CURRENT_TIMESTAMP() AS ingested_at
             FROM {silver_wc}
-            GROUP BY sg_uf, cd_municipio, nr_zona, nr_secao, cd_cargo, ano_eleicao
+            GROUP BY sg_uf, cd_municipio, nm_municipio, nr_zona, nr_secao,
+                     nm_candidato, sg_partido, cd_cargo, ds_cargo, nr_turno, ano_eleicao
         """,
         "fact_candidato_eleicao": f"""
             CREATE OR REPLACE TABLE `{gold}.fact_candidato_eleicao` AS
             SELECT
-                sg_uf, nr_candidato, nm_candidato, cd_cargo, ds_cargo, ano_eleicao,
+                sg_uf, nr_candidato, nm_candidato, sg_partido, cd_cargo, ds_cargo,
+                ano_eleicao,
                 SUM(qt_votos) AS total_votos,
                 COUNT(DISTINCT cd_municipio) AS n_municipios,
                 CURRENT_TIMESTAMP() AS ingested_at
             FROM {silver_wc}
-            GROUP BY sg_uf, nr_candidato, nm_candidato, cd_cargo, ds_cargo, ano_eleicao
+            GROUP BY sg_uf, nr_candidato, nm_candidato, sg_partido, cd_cargo, ds_cargo, ano_eleicao
+        """,
+        "fact_municipio_candidato_eleicao": f"""
+            CREATE OR REPLACE TABLE `{gold}.fact_municipio_candidato_eleicao` AS
+            SELECT
+                sg_uf, cd_municipio, nm_municipio, cd_municipio_ibge,
+                nm_candidato, sg_partido, cd_cargo, ds_cargo, nr_turno, ano_eleicao,
+                SUM(qt_votos) AS total_votos,
+                ROUND(
+                    SUM(qt_votos) / NULLIF(SUM(SUM(qt_votos)) OVER (
+                        PARTITION BY sg_uf, cd_municipio, cd_cargo, nr_turno, ano_eleicao
+                    ), 0) * 100, 1
+                ) AS pct_votos_municipio,
+                ROW_NUMBER() OVER (
+                    PARTITION BY sg_uf, cd_municipio, cd_cargo, nr_turno, ano_eleicao
+                    ORDER BY SUM(qt_votos) DESC
+                ) AS rn_municipio,
+                CURRENT_TIMESTAMP() AS ingested_at
+            FROM {silver_wc}
+            GROUP BY sg_uf, cd_municipio, nm_municipio, cd_municipio_ibge,
+                     nm_candidato, sg_partido, cd_cargo, ds_cargo, nr_turno, ano_eleicao
         """,
         "fact_ibge_municipio": f"""
             CREATE OR REPLACE TABLE `{gold}.fact_ibge_municipio` AS

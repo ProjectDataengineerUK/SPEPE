@@ -13,28 +13,23 @@ _SILVER = os.environ.get("BIGQUERY_DATASET_SILVER", "spepe_silver")
 
 
 _VIEWS: dict[str, str] = {
-    # ── Sentimento social agregado por candidato ───────────────────────────
+    # ── Sentimento social por fonte × UF × dia ────────────────────────────
+    # (candidato não disponível em social_mencoes_br — agregação por fonte/UF)
     "vw_sentimento_candidato": f"""
         SELECT
-            candidato,
+            fonte,
+            sg_uf,
             DATE(created_at)                                                AS data,
             COUNT(*)                                                        AS total_mencoes,
-            COUNTIF(sentiment = 'positivo')                                 AS positivo,
-            COUNTIF(sentiment = 'negativo')                                 AS negativo,
-            COUNTIF(sentiment = 'neutro')                                   AS neutro,
-            ROUND(COUNTIF(sentiment = 'positivo') / COUNT(*) * 100, 1)     AS pct_positivo,
-            ROUND(COUNTIF(sentiment = 'negativo') / COUNT(*) * 100, 1)     AS pct_negativo,
-            ROUND(
-                (COUNTIF(sentiment = 'positivo') - COUNTIF(sentiment = 'negativo'))
-                / COUNT(*) * 100, 1
-            )                                                               AS score_liquido,
-            SUM(like_count)                                                 AS total_likes,
-            SUM(retweet_count)                                              AS total_retweets
+            COALESCE(SUM(like_count), 0)                                    AS total_likes,
+            COALESCE(SUM(retweet_count), 0)                                 AS total_retweets,
+            COALESCE(SUM(reply_count), 0)                                   AS total_replies,
+            COALESCE(SUM(like_count), 0) + COALESCE(SUM(retweet_count), 0)
+                + COALESCE(SUM(reply_count), 0)                             AS total_engajamento
         FROM `{_PROJECT}.{_SILVER}.social_mencoes_br`
-        WHERE fonte = 'twitter_x'
-        GROUP BY candidato, DATE(created_at)
+        GROUP BY fonte, sg_uf, DATE(created_at)
     """,
-    # ── Vulnerabilidade sanitária × eleição por município ─────────────────
+    # ── Vulnerabilidade: eleição × segurança por município ────────────────
     "vw_vulnerabilidade_municipio": f"""
         SELECT
             e.cd_municipio_ibge,
@@ -44,19 +39,16 @@ _VIEWS: dict[str, str] = {
             e.nm_candidato                                                  AS vencedor,
             e.sg_partido                                                    AS partido_vencedor,
             ROUND(e.pct_votos_municipio, 1)                                 AS pct_vencedor,
-            d.taxa_mortalidade_infantil_1000,
-            d.taxa_mortalidade_materna_100k,
-            d.pct_cobertura_plano_saude,
-            i.pct_urbano,
-            i.populacao,
-            ROUND(
-                0.4 * COALESCE(d.taxa_mortalidade_infantil_1000 / 50.0, 0.5)
-                + 0.3 * COALESCE(1 - d.pct_cobertura_plano_saude / 100.0, 0.5)
-                + 0.3 * COALESCE(1 - i.pct_urbano / 100.0, 0.5)
-            , 3)                                                            AS svs_score
-        FROM `{_PROJECT}.{_GOLD}.fact_municipio_eleicao` e
-        LEFT JOIN `{_PROJECT}.{_SILVER}.datasus_municipios` d
-            ON e.cd_municipio_ibge = d.cd_municipio_ibge AND e.ano_eleicao = d.ano
+            s.ivs_total,
+            s.ivs_capital_humano,
+            s.ivs_infraestrutura,
+            s.ivs_renda_trabalho,
+            s.taxa_homicidio_100k,
+            i.populacao_total                                               AS populacao,
+            i.taxa_analfabetismo
+        FROM `{_PROJECT}.{_GOLD}.fact_municipio_candidato_eleicao` e
+        LEFT JOIN `{_PROJECT}.{_GOLD}.fact_seguranca_municipio` s
+            ON e.cd_municipio_ibge = s.cd_municipio_ibge AND s.ano = e.ano_eleicao
         LEFT JOIN `{_PROJECT}.{_GOLD}.fact_ibge_municipio` i
             ON e.cd_municipio_ibge = i.cd_municipio_ibge
         WHERE e.nr_turno = 1
@@ -72,40 +64,58 @@ _VIEWS: dict[str, str] = {
             e.nm_candidato                                                  AS vencedor,
             e.sg_partido                                                    AS partido_vencedor,
             ROUND(e.pct_votos_municipio, 1)                                 AS pct_vencedor,
-            i.populacao,
+            i.populacao_total                                               AS populacao,
+            i.taxa_analfabetismo,
             i.taxa_alfabetizacao,
-            i.pct_analfabetos,
-            i.pct_urbano,
-            i.pct_0_14,
-            i.pct_15_29,
-            i.pct_30_59,
-            i.pct_60_mais,
-            i.pct_catolico,
-            i.pct_sem_religiao
-        FROM `{_PROJECT}.{_GOLD}.fact_municipio_eleicao` e
+            i.idhm,
+            i.renda_per_capita,
+            i.gini,
+            i.pct_extrema_pobreza,
+            i.pct_urbano
+        FROM `{_PROJECT}.{_GOLD}.fact_municipio_candidato_eleicao` e
         LEFT JOIN `{_PROJECT}.{_GOLD}.fact_ibge_municipio` i
             ON e.cd_municipio_ibge = i.cd_municipio_ibge
         WHERE e.nr_turno = 1
           AND e.rn_municipio = 1
     """,
-    # ── Evolução de intenção de voto por UF ────────────────────────────────
+    # ── % de votos por candidato × UF ─────────────────────────────────────
     "vw_intencao_voto_uf": f"""
         SELECT
             sg_uf,
             nm_candidato,
             sg_partido,
+            cd_cargo,
+            ds_cargo,
             ano_eleicao,
-            nr_turno,
-            SUM(qt_votos)                                                   AS total_votos,
+            total_votos,
             ROUND(
-                SUM(qt_votos) / SUM(SUM(qt_votos)) OVER (
-                    PARTITION BY sg_uf, ano_eleicao, nr_turno
-                ) * 100, 1
+                total_votos / NULLIF(SUM(total_votos) OVER (
+                    PARTITION BY sg_uf, cd_cargo, ano_eleicao
+                ), 0) * 100, 1
             )                                                               AS pct_uf
-        FROM `{_PROJECT}.{_GOLD}.fact_municipio_eleicao`
-        GROUP BY sg_uf, nm_candidato, sg_partido, ano_eleicao, nr_turno
+        FROM `{_PROJECT}.{_GOLD}.fact_candidato_eleicao`
     """,
 }
+
+
+_MV_ZONA_SQL = """
+    SELECT
+        sg_uf,
+        cd_municipio,
+        nm_municipio,
+        nr_zona,
+        cd_cargo,
+        ds_cargo,
+        nm_candidato,
+        sg_partido,
+        nr_turno,
+        ano_eleicao,
+        SUM(total_votos) AS qt_votos_total,
+        COUNT(*)         AS qt_secoes
+    FROM `{project}.{gold}.fact_secao_eleicao`
+    GROUP BY sg_uf, cd_municipio, nm_municipio, nr_zona,
+             cd_cargo, ds_cargo, nm_candidato, sg_partido, nr_turno, ano_eleicao
+"""
 
 
 def create_semantic_views(project: str | None = None, replace: bool = True) -> dict[str, str]:
@@ -137,6 +147,22 @@ def create_semantic_views(project: str | None = None, replace: bool = True) -> d
         except Exception as exc:
             logger.error("Falha ao criar view %s: %s", view_name, exc)
             results[view_name] = f"erro: {exc}"
+
+    # ── Recria mv_zona_eleicao (MV depende de fact_secao_eleicao) ──────────
+    mv_id = f"{proj}.{_GOLD}.mv_zona_eleicao"
+    try:
+        client.delete_table(mv_id, not_found_ok=True)
+        mv_sql = _MV_ZONA_SQL.format(project=proj, gold=_GOLD)
+        mv_table = bigquery.Table(mv_id)
+        mv_table.mview_query = mv_sql.strip()
+        mv_table.mview_enable_refresh = True
+        mv_table.mview_refresh_interval = "3600s"
+        client.create_table(mv_table)
+        logger.info("MV recriada: %s", mv_id)
+        results["mv_zona_eleicao"] = "ok"
+    except Exception as exc:
+        logger.error("Falha ao recriar mv_zona_eleicao: %s", exc)
+        results["mv_zona_eleicao"] = f"erro: {exc}"
 
     return results
 

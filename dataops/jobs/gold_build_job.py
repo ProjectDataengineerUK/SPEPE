@@ -33,6 +33,12 @@ def main() -> None:
 
     logger.info(f"Gold build concluído: {result.get('tables')}")
 
+    if use_bq:
+        from dataops.semantic_layer import create_semantic_views
+
+        sem_results = create_semantic_views()
+        logger.info("Semantic layer: %s", sem_results)
+
 
 if __name__ == "__main__":
     main()
