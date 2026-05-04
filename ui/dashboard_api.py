@@ -646,37 +646,44 @@ async def _bq_saude(uf: str, ano: int, limit: int) -> list[dict]:
 async def get_pesquisas(
     cargo: str = Query("Presidente"),
     sg_uf: str = Query("BR"),
-    ano: int = Query(2022),
+    ano: int = Query(2026),
+    tipo: str = Query("corrente"),  # "corrente" | "historica" | "all"
 ) -> JSONResponse:
     if settings.gcp_project_id and os.environ.get("USE_BIGQUERY", "").lower() == "true":
         try:
-            return JSONResponse(await _bq_pesquisas(cargo, sg_uf, ano))
+            return JSONResponse(await _bq_pesquisas(cargo, sg_uf, ano, tipo))
         except Exception as exc:
             logger.warning("BigQuery pesquisas falhou: %s", exc)
     return JSONResponse({"series": [], "house_effects": [], "fonte": "indisponivel"})
 
 
-async def _bq_pesquisas(cargo: str, sg_uf: str, ano: int) -> dict:
+async def _bq_pesquisas(cargo: str, sg_uf: str, ano: int, tipo: str = "corrente") -> dict:
     from google.cloud import bigquery
 
     client = bigquery.Client(project=settings.gcp_project_id)
     gold = f"{settings.gcp_project_id}.{settings.bigquery_dataset_gold}"
+
+    tipo_filter = ""
+    params = [
+        bigquery.ScalarQueryParameter("cargo", "STRING", cargo),
+        bigquery.ScalarQueryParameter("sg_uf", "STRING", sg_uf.upper()),
+        bigquery.ScalarQueryParameter("ano", "INT64", ano),
+    ]
+    if tipo in ("corrente", "historica"):
+        tipo_filter = "AND tipo_pesquisa = @tipo_pesquisa"
+        params.append(bigquery.ScalarQueryParameter("tipo_pesquisa", "STRING", tipo))
+
     query = f"""
-        SELECT data_pesquisa, instituto, candidato,
+        SELECT data_pesquisa, instituto, candidato, tipo_pesquisa,
                intencao_pct, intencao_ajustada, house_effect, margem_erro
         FROM `{gold}.fact_pesquisa`
         WHERE cargo = @cargo
           AND (sg_uf = @sg_uf OR sg_uf IS NULL OR @sg_uf = 'BR')
           AND EXTRACT(YEAR FROM data_pesquisa) = @ano
+          {tipo_filter}
         ORDER BY candidato, data_pesquisa
     """
-    job_config = bigquery.QueryJobConfig(
-        query_parameters=[
-            bigquery.ScalarQueryParameter("cargo", "STRING", cargo),
-            bigquery.ScalarQueryParameter("sg_uf", "STRING", sg_uf.upper()),
-            bigquery.ScalarQueryParameter("ano", "INT64", ano),
-        ]
-    )
+    job_config = bigquery.QueryJobConfig(query_parameters=params)
     rows = list(client.query(query, job_config=job_config).result())
     by_candidato: dict[str, list] = {}
     institutes: dict[str, float] = {}
@@ -688,6 +695,7 @@ async def _bq_pesquisas(cargo: str, sg_uf: str, ano: int) -> dict:
                 "instituto": r.get("instituto", ""),
                 "intencao": round(r.get("intencao_pct") or 0, 1),
                 "ajustada": round(r.get("intencao_ajustada") or r.get("intencao_pct") or 0, 1),
+                "tipo": r.get("tipo_pesquisa", ""),
             }
         )
         inst = r.get("instituto", "")
@@ -695,7 +703,7 @@ async def _bq_pesquisas(cargo: str, sg_uf: str, ano: int) -> dict:
             institutes[inst] = round(r.get("house_effect") or 0, 2)
     series = [{"candidato": c, "pontos": pts} for c, pts in by_candidato.items()]
     house_effects = [{"instituto": k, "house_effect": v} for k, v in institutes.items()]
-    return {"series": series, "house_effects": house_effects}
+    return {"series": series, "house_effects": house_effects, "tipo": tipo}
 
 
 # ── Perfis Eleitorais ──────────────────────────────────────────────────────

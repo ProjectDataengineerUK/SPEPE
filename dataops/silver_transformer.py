@@ -471,6 +471,8 @@ def transform_pesquisas_to_silver(
         df["record_confidence_score"] = 0.50
 
     df["ano"] = year
+    _corrente_year = int(os.environ.get("PESQUISA_CORRENTE_YEAR", "2026"))
+    df["tipo_pesquisa"] = "corrente" if year == _corrente_year else "historica"
     df["ingested_at"] = pd.Timestamp.utcnow()
 
     if use_bigquery:
