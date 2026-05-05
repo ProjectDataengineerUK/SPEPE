@@ -19,6 +19,7 @@ locals {
     tse_candidaturas_ingest = { timeout = local.prod_mode ? "3600s" : "1800s", memory = "1Gi", cpu = "1", args = ["--uf", local.uf_arg] }
     reddit_ingest         = { timeout = "1800s", memory = "512Mi", cpu = "1", args = [] }
     camara_senado_ingest  = { timeout = "3600s", memory = "1Gi",   cpu = "1", args = [] }
+    endividamento_ingest  = { timeout = local.prod_mode ? "1800s" : "900s", memory = "512Mi", cpu = "1", args = ["--uf", local.uf_arg] }
   }
 
   # Env vars adicionais por job (além das compartilhadas)
@@ -57,6 +58,10 @@ locals {
       REDDIT_DIAS       = "30"
     }
     camara_senado_ingest = { LEGISLATURE = "57" }
+    endividamento_ingest = {
+      ENDIVIDAMENTO_YEAR_START = "2025"
+      ENDIVIDAMENTO_YEAR_END   = "2026"
+    }
   }
 
   job_entrypoints = {
@@ -75,6 +80,7 @@ locals {
     tse_candidaturas_ingest = ["python", "-m", "dataops.jobs.tse_candidaturas_ingest_job"]
     reddit_ingest           = ["python", "-m", "dataops.jobs.reddit_ingest_job"]
     camara_senado_ingest    = ["python", "-m", "dataops.jobs.camara_senado_ingest_job"]
+    endividamento_ingest    = ["python", "-m", "dataops.jobs.endividamento_ingest_job"]
   }
 }
 

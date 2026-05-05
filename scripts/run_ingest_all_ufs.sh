@@ -118,6 +118,9 @@ if [[ "$SKIP_PER_UF" != "1" ]]; then
 
     # Acesso digital (CETIC TIC Domicílios)
     run_job_uf "spepe-cetic-ingest" "CETIC acesso digital" "$UF"
+
+    # Endividamento das famílias (Banco Central SGS)
+    run_job_uf "spepe-endividamento-ingest" "Endividamento BCB" "$UF"
   done
 fi
 
