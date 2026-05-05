@@ -46,6 +46,7 @@ def _build_anthropic_client() -> anthropic.Anthropic | anthropic.AnthropicVertex
         )
     return anthropic.Anthropic(api_key=settings.anthropic_api_key)
 
+
 _SYSTEM = """\
 Você é o Supervisor do SPEPE. Use as ferramentas disponíveis para rotear e executar tarefas.
 

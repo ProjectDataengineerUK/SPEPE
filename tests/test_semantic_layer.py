@@ -38,6 +38,7 @@ def test_mv_zona_sql_defined():
 
 # ── SQL structure per view ─────────────────────────────────────────────────────
 
+
 @pytest.mark.parametrize("view_name", sorted(EXPECTED_VIEWS))
 def test_view_sql_has_select(view_name):
     sql = _VIEWS[view_name]
@@ -54,12 +55,15 @@ def test_view_sql_has_from(view_name):
 def test_view_references_project_placeholder(view_name):
     sql = _VIEWS[view_name]
     # All views must reference a GCP project — placeholder or resolved
-    assert "spepe" in sql.lower() or "{_project}" in sql.lower() or \
-           re.search(r"`[^`]+\.[^`]+\.[^`]+`", sql), \
-           f"{view_name}: no project.dataset.table reference"
+    assert (
+        "spepe" in sql.lower()
+        or "{_project}" in sql.lower()
+        or re.search(r"`[^`]+\.[^`]+\.[^`]+`", sql)
+    ), f"{view_name}: no project.dataset.table reference"
 
 
 # ── New views: column presence ─────────────────────────────────────────────────
+
 
 def test_vw_pesquisa_vs_social_columns():
     sql = _VIEWS["vw_pesquisa_vs_social"]
@@ -122,6 +126,7 @@ def test_vw_mapa_prioridade_joins_ibge():
 
 
 # ── Existing views: non-regression ────────────────────────────────────────────
+
 
 def test_vw_sentimento_candidato_sources():
     sql = _VIEWS["vw_sentimento_candidato"]

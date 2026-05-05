@@ -382,11 +382,21 @@ def _load_ibge_silver() -> pd.DataFrame:
 
 
 _FACT_PESQUISA_EMPTY_COLS = [
-    "uf", "candidato", "instituto", "cd_cargo",
-    "data_pesquisa_inicio", "data_pesquisa_fim",
-    "intencao_pct", "house_effect", "intencao_ajustada",
-    "margem_erro", "record_confidence_score", "poll_id",
-    "ano", "tipo_pesquisa", "ingested_at",
+    "uf",
+    "candidato",
+    "instituto",
+    "cd_cargo",
+    "data_pesquisa_inicio",
+    "data_pesquisa_fim",
+    "intencao_pct",
+    "house_effect",
+    "intencao_ajustada",
+    "margem_erro",
+    "record_confidence_score",
+    "poll_id",
+    "ano",
+    "tipo_pesquisa",
+    "ingested_at",
 ]
 
 

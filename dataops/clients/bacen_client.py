@@ -20,9 +20,9 @@ _BACEN_SGS = "https://api.bcb.gov.br/dados/serie/bcdata.sgs.{codigo}/dados"
 _SERIES: dict[str, tuple[int, str]] = {
     # (codigo_sgs, description)
     "endividamento_familias_pct": (29037, "Endividamento das famílias com SFN (% renda 12m)"),
-    "comprometimento_renda_pct":  (29038, "Comprometimento de renda das famílias com SFN (%)"),
-    "inadimplencia_pf_pct":       (21084, "Inadimplência PF — carteira total (%)"),
-    "inadimplencia_pf_credito":   (20400, "Inadimplência PF — crédito ampliado (%)"),
+    "comprometimento_renda_pct": (29038, "Comprometimento de renda das famílias com SFN (%)"),
+    "inadimplencia_pf_pct": (21084, "Inadimplência PF — carteira total (%)"),
+    "inadimplencia_pf_credito": (20400, "Inadimplência PF — crédito ampliado (%)"),
 }
 
 
@@ -53,10 +53,16 @@ def fetch_endividamento(year_start: int, year_end: int) -> pd.DataFrame:
         try:
             records = _fetch_series(codigo, data_inicial, data_final)
             if not records:
-                logger.warning("BCB SGS %d (%s): sem dados para %d-%d", codigo, col_name, year_start, year_end)
+                logger.warning(
+                    "BCB SGS %d (%s): sem dados para %d-%d", codigo, col_name, year_start, year_end
+                )
                 continue
             s = pd.Series(
-                {r["data"]: float(r["valor"].replace(",", ".")) for r in records if r.get("valor") not in (None, "", "-")},
+                {
+                    r["data"]: float(r["valor"].replace(",", "."))
+                    for r in records
+                    if r.get("valor") not in (None, "", "-")
+                },
                 name=col_name,
             )
             frames[col_name] = s
@@ -72,7 +78,9 @@ def fetch_endividamento(year_start: int, year_end: int) -> pd.DataFrame:
     df = df.reset_index()
 
     # Parse Brazilian date format DD/MM/YYYY → date
-    df["data_referencia"] = pd.to_datetime(df["data_referencia_bcb"], format="%d/%m/%Y", errors="coerce")
+    df["data_referencia"] = pd.to_datetime(
+        df["data_referencia_bcb"], format="%d/%m/%Y", errors="coerce"
+    )
     df = df.dropna(subset=["data_referencia"])
     df["ano"] = df["data_referencia"].dt.year
     df["mes"] = df["data_referencia"].dt.month
@@ -111,6 +119,8 @@ def build_endividamento_dataframe(
     result = pd.DataFrame(rows)
     logger.info(
         "BCB endividamento UF=%s: %d registros municipais × %d períodos",
-        uf.upper(), len(result), len(df_nacional),
+        uf.upper(),
+        len(result),
+        len(df_nacional),
     )
     return result

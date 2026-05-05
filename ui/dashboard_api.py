@@ -556,7 +556,9 @@ def _local_socioeconomico(uf: str, ano: int, limit: int) -> list[dict]:
                 "idhm": round(float(r.get("idhm") or 0), 3),
                 "renda_per_capita": round(float(r.get("renda_per_capita") or 0), 0),
                 "gini": round(float(r.get("gini") or 0), 3),
-                "pct_extrema_pobreza": round(pct_pobreza * 100 if pct_pobreza <= 1 else pct_pobreza, 1),
+                "pct_extrema_pobreza": round(
+                    pct_pobreza * 100 if pct_pobreza <= 1 else pct_pobreza, 1
+                ),
                 "taxa_analfabetismo": round(taxa_analf * 100 if taxa_analf <= 1 else taxa_analf, 1),
                 "pct_urbano": round(pct_urb * 100 if pct_urb <= 1 else pct_urb, 1),
                 "populacao": int(r.get("populacao_total") or 0),
@@ -646,9 +648,7 @@ def _local_seguranca(uf: str, ano: int, limit: int) -> list[dict]:
         df = df[df["sg_uf"].str.upper() == uf.upper()]
     if "ano" in df.columns:
         df = df[df["ano"] == ano]
-    sort_col = next(
-        (c for c in ("taxa_homicidio_100k", "taxa_homicidio") if c in df.columns), None
-    )
+    sort_col = next((c for c in ("taxa_homicidio_100k", "taxa_homicidio") if c in df.columns), None)
     if sort_col:
         df = df.sort_values(sort_col, ascending=False)
     df = df.head(limit)
@@ -750,7 +750,11 @@ def _local_saude(uf: str, ano: int, limit: int) -> list[dict]:
     if "ano" in df.columns:
         df = df[df["ano"] == ano]
     sort_col = next(
-        (c for c in ("taxa_mortalidade_infantil_1000", "tx_mortalidade_infantil") if c in df.columns),
+        (
+            c
+            for c in ("taxa_mortalidade_infantil_1000", "tx_mortalidade_infantil")
+            if c in df.columns
+        ),
         None,
     )
     if sort_col:
@@ -764,12 +768,18 @@ def _local_saude(uf: str, ano: int, limit: int) -> list[dict]:
                 "nm": str(r.get("nm_municipio") or r.get("cd_municipio_ibge", "")),
                 "tx_mortalidade_infantil": round(
                     float(
-                        r.get("taxa_mortalidade_infantil_1000") or r.get("tx_mortalidade_infantil") or 0
+                        r.get("taxa_mortalidade_infantil_1000")
+                        or r.get("tx_mortalidade_infantil")
+                        or 0
                     ),
                     1,
                 ),
                 "tx_mortalidade_materna": round(
-                    float(r.get("taxa_mortalidade_materna_100k") or r.get("tx_mortalidade_materna") or 0),
+                    float(
+                        r.get("taxa_mortalidade_materna_100k")
+                        or r.get("tx_mortalidade_materna")
+                        or 0
+                    ),
                     1,
                 ),
                 "pct_cobertura_plano": round(cobertura * 100 if cobertura <= 1 else cobertura, 1),
@@ -881,7 +891,9 @@ def _local_pesquisas(cargo: str, sg_uf: str, ano: int, tipo: str) -> dict:
                 "data": str(r.get("data_pesquisa_inicio", ""))[:7],
                 "instituto": str(r.get("instituto", "")),
                 "intencao": round(float(r.get("intencao_pct") or 0), 1),
-                "ajustada": round(float(r.get("intencao_ajustada") or r.get("intencao_pct") or 0), 1),
+                "ajustada": round(
+                    float(r.get("intencao_ajustada") or r.get("intencao_pct") or 0), 1
+                ),
                 "tipo": str(r.get("tipo_pesquisa", "")),
             }
         )

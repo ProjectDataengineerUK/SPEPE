@@ -24,19 +24,37 @@ _APISIDRA_BASE = "https://apisidra.ibge.gov.br/values"
 # c2072/77585 = Existência de conexão = Sim
 # c63/95826   = Condição de ocupação = Total
 # c125/2932   = Tipo de domicílio = Total
-_CENSO_URL = (
-    f"{_APISIDRA_BASE}/t/9936/n3/all/v/381,1000381/p/2022"
-    "/c2072/77585/c63/95826/c125/2932"
-)
+_CENSO_URL = f"{_APISIDRA_BASE}/t/9936/n3/all/v/381,1000381/p/2022/c2072/77585/c63/95826/c125/2932"
 
 # Código IBGE da UF (D1C) → sigla
 _IBGE_CODE_UF: dict[str, str] = {
-    "11": "RO", "12": "AC", "13": "AM", "14": "RR", "15": "PA",
-    "16": "AP", "17": "TO", "21": "MA", "22": "PI", "23": "CE",
-    "24": "RN", "25": "PB", "26": "PE", "27": "AL", "28": "SE",
-    "29": "BA", "31": "MG", "32": "ES", "33": "RJ", "35": "SP",
-    "41": "PR", "42": "SC", "43": "RS", "50": "MS", "51": "MT",
-    "52": "GO", "53": "DF",
+    "11": "RO",
+    "12": "AC",
+    "13": "AM",
+    "14": "RR",
+    "15": "PA",
+    "16": "AP",
+    "17": "TO",
+    "21": "MA",
+    "22": "PI",
+    "23": "CE",
+    "24": "RN",
+    "25": "PB",
+    "26": "PE",
+    "27": "AL",
+    "28": "SE",
+    "29": "BA",
+    "31": "MG",
+    "32": "ES",
+    "33": "RJ",
+    "35": "SP",
+    "41": "PR",
+    "42": "SC",
+    "43": "RS",
+    "50": "MS",
+    "51": "MT",
+    "52": "GO",
+    "53": "DF",
 }
 
 # Cached result — the Censo data is static, avoid redundant network calls
@@ -89,7 +107,11 @@ def fetch_cetic_indicators(uf: str, year: int) -> dict[str, float | None]:
         uf_data = _load_censo_cache()
     except Exception as exc:
         logger.warning("Censo 2022 internet fetch falhou: %s", exc)
-        return {"pct_internet_domiciliar": None, "pct_computador_domiciliar": None, "pct_smartphone_domiciliar": None}
+        return {
+            "pct_internet_domiciliar": None,
+            "pct_computador_domiciliar": None,
+            "pct_smartphone_domiciliar": None,
+        }
 
     indicators = uf_data.get(uf.upper(), {})
     result = {

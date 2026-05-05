@@ -30,28 +30,48 @@ _CAT_ALIMENTACAO = "7171"
 
 # Código da região metropolitana (D1C) → UF
 _METRO_UF: dict[str, str] = {
-    "1501": "PA",   # Belém
-    "2301": "CE",   # Fortaleza
-    "2601": "PE",   # Recife
-    "2901": "BA",   # Salvador
-    "3101": "MG",   # Belo Horizonte
-    "3201": "ES",   # Grande Vitória
-    "3301": "RJ",   # Rio de Janeiro
-    "3501": "SP",   # São Paulo
-    "4101": "PR",   # Curitiba
-    "4301": "RS",   # Porto Alegre
+    "1501": "PA",  # Belém
+    "2301": "CE",  # Fortaleza
+    "2601": "PE",  # Recife
+    "2901": "BA",  # Salvador
+    "3101": "MG",  # Belo Horizonte
+    "3201": "ES",  # Grande Vitória
+    "3301": "RJ",  # Rio de Janeiro
+    "3501": "SP",  # São Paulo
+    "4101": "PR",  # Curitiba
+    "4301": "RS",  # Porto Alegre
 }
 
 _UFS_WITH_METRO = set(_METRO_UF.values())
 
 _UF_CAPITAL_IBGE: dict[str, int] = {
-    "AC": 1200401, "AL": 2704302, "AM": 1302603, "AP": 1600303,
-    "BA": 2927408, "CE": 2304400, "DF": 5300108, "ES": 3205309,
-    "GO": 5208707, "MA": 2111300, "MG": 3106200, "MS": 5002704,
-    "MT": 5103403, "PA": 1501402, "PB": 2507507, "PE": 2611606,
-    "PI": 2211001, "PR": 4106902, "RJ": 3304557, "RN": 2408102,
-    "RO": 1100205, "RR": 1400100, "RS": 4314902, "SC": 4205407,
-    "SE": 2800308, "SP": 3550308, "TO": 1721000,
+    "AC": 1200401,
+    "AL": 2704302,
+    "AM": 1302603,
+    "AP": 1600303,
+    "BA": 2927408,
+    "CE": 2304400,
+    "DF": 5300108,
+    "ES": 3205309,
+    "GO": 5208707,
+    "MA": 2111300,
+    "MG": 3106200,
+    "MS": 5002704,
+    "MT": 5103403,
+    "PA": 1501402,
+    "PB": 2507507,
+    "PE": 2611606,
+    "PI": 2211001,
+    "PR": 4106902,
+    "RJ": 3304557,
+    "RN": 2408102,
+    "RO": 1100205,
+    "RR": 1400100,
+    "RS": 4314902,
+    "SC": 4205407,
+    "SE": 2800308,
+    "SP": 3550308,
+    "TO": 1721000,
 }
 
 
@@ -94,13 +114,15 @@ def _parse_rows(rows: list[dict]) -> pd.DataFrame:
             v = float(r["V"]) if r.get("V") not in (None, "", "...") else None
         except (TypeError, ValueError):
             v = None
-        records.append({
-            "metro_code": r.get("D1C", ""),
-            "metro_name": r.get("D1N", ""),
-            "var_code": r.get("D2C", ""),
-            "period": r.get("D3C", ""),
-            "value": v,
-        })
+        records.append(
+            {
+                "metro_code": r.get("D1C", ""),
+                "metro_name": r.get("D1N", ""),
+                "var_code": r.get("D2C", ""),
+                "period": r.get("D3C", ""),
+                "value": v,
+            }
+        )
     df = pd.DataFrame(records)
     return df[df["value"].notna()] if not df.empty else df
 
@@ -140,15 +162,17 @@ def fetch_ipca_alimentacao(year: int) -> pd.DataFrame:
                 df_p = df_uf[df_uf["period"] == period]
                 mensal = df_p[df_p["var_code"] == _VAR_MENSAL]["value"].values
                 acum12m = df_p[df_p["var_code"] == _VAR_12M]["value"].values
-                result_rows.append({
-                    "sg_uf": sg_uf,
-                    "periodo_yyyymm": period,
-                    "data_referencia": f"{period[:4]}-{period[4:6]}-01",
-                    "ipca_alimentacao_mensal_pct": float(mensal[0]) if len(mensal) else None,
-                    "ipca_alimentacao_12m_pct": float(acum12m[0]) if len(acum12m) else None,
-                    "granularidade": "RM",
-                    "fontes": f"IBGE IPCA tabela 1419 — Alimentação no domicílio ({metro_name})",
-                })
+                result_rows.append(
+                    {
+                        "sg_uf": sg_uf,
+                        "periodo_yyyymm": period,
+                        "data_referencia": f"{period[:4]}-{period[4:6]}-01",
+                        "ipca_alimentacao_mensal_pct": float(mensal[0]) if len(mensal) else None,
+                        "ipca_alimentacao_12m_pct": float(acum12m[0]) if len(acum12m) else None,
+                        "granularidade": "RM",
+                        "fontes": f"IBGE IPCA tabela 1419 — Alimentação no domicílio ({metro_name})",
+                    }
+                )
 
     if not df_nac.empty:
         ufs_sem_metro = set(_UF_CAPITAL_IBGE.keys()) - _UFS_WITH_METRO
@@ -157,15 +181,17 @@ def fetch_ipca_alimentacao(year: int) -> pd.DataFrame:
             mensal = df_p[df_p["var_code"] == _VAR_MENSAL]["value"].values
             acum12m = df_p[df_p["var_code"] == _VAR_12M]["value"].values
             for sg_uf in ufs_sem_metro:
-                result_rows.append({
-                    "sg_uf": sg_uf,
-                    "periodo_yyyymm": period,
-                    "data_referencia": f"{period[:4]}-{period[4:6]}-01",
-                    "ipca_alimentacao_mensal_pct": float(mensal[0]) if len(mensal) else None,
-                    "ipca_alimentacao_12m_pct": float(acum12m[0]) if len(acum12m) else None,
-                    "granularidade": "Nacional",
-                    "fontes": "IBGE IPCA tabela 1419 — Alimentação no domicílio (Brasil)",
-                })
+                result_rows.append(
+                    {
+                        "sg_uf": sg_uf,
+                        "periodo_yyyymm": period,
+                        "data_referencia": f"{period[:4]}-{period[4:6]}-01",
+                        "ipca_alimentacao_mensal_pct": float(mensal[0]) if len(mensal) else None,
+                        "ipca_alimentacao_12m_pct": float(acum12m[0]) if len(acum12m) else None,
+                        "granularidade": "Nacional",
+                        "fontes": "IBGE IPCA tabela 1419 — Alimentação no domicílio (Brasil)",
+                    }
+                )
 
     return pd.DataFrame(result_rows) if result_rows else pd.DataFrame()
 
@@ -199,6 +225,10 @@ def build_cesta_basica_dataframe(
     result = pd.DataFrame(rows)
     logger.info(
         "IPCA alimentação UF=%s year=%d: %d registros (%d municípios × %d meses)",
-        uf.upper(), year, len(result), len(municipios_ibge), len(df_uf),
+        uf.upper(),
+        year,
+        len(result),
+        len(municipios_ibge),
+        len(df_uf),
     )
     return result

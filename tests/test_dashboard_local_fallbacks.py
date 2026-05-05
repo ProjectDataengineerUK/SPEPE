@@ -11,6 +11,7 @@ import pytest
 
 # ── Fixtures ──────────────────────────────────────────────────────────────────
 
+
 @pytest.fixture()
 def silver_dir(tmp_path: Path) -> Path:
     return tmp_path / "silver"
@@ -139,6 +140,7 @@ def pesquisa_parquet(silver_dir: Path) -> Path:
 
 # ── Import helpers ─────────────────────────────────────────────────────────────
 
+
 def _import_locals():
     from ui.dashboard_api import (
         _local_pesquisas,
@@ -146,10 +148,12 @@ def _import_locals():
         _local_seguranca,
         _local_socioeconomico,
     )
+
     return _local_socioeconomico, _local_seguranca, _local_saude, _local_pesquisas
 
 
 # ── _local_socioeconomico ─────────────────────────────────────────────────────
+
 
 def test_local_socioeconomico_returns_list(ibge_parquet):
     _local_socioeconomico, *_ = _import_locals()
@@ -164,8 +168,16 @@ def test_local_socioeconomico_schema(ibge_parquet):
     with patch("ui.dashboard_api._LOCAL_SILVER_DIR", ibge_parquet):
         result = _local_socioeconomico("SP", 2022, 20)
     row = result[0]
-    for key in ("nm", "idhm", "renda_per_capita", "gini", "pct_extrema_pobreza",
-                "taxa_analfabetismo", "pct_urbano", "populacao"):
+    for key in (
+        "nm",
+        "idhm",
+        "renda_per_capita",
+        "gini",
+        "pct_extrema_pobreza",
+        "taxa_analfabetismo",
+        "pct_urbano",
+        "populacao",
+    ):
         assert key in row, f"missing key: {key}"
 
 
@@ -207,6 +219,7 @@ def test_local_socioeconomico_empty_dir(tmp_path):
 
 # ── _local_seguranca ──────────────────────────────────────────────────────────
 
+
 def test_local_seguranca_returns_list(seguranca_parquet):
     _, _local_seguranca, *_ = _import_locals()
     with patch("ui.dashboard_api._LOCAL_SILVER_DIR", seguranca_parquet):
@@ -220,8 +233,16 @@ def test_local_seguranca_schema(seguranca_parquet):
     with patch("ui.dashboard_api._LOCAL_SILVER_DIR", seguranca_parquet):
         result = _local_seguranca("SP", 2022, 15)
     row = result[0]
-    for key in ("nm", "taxa_homicidio", "ivs_total", "ivs_infra",
-                "ivs_capital_humano", "ivs_renda", "taxa_roubo", "qt_feminicidio"):
+    for key in (
+        "nm",
+        "taxa_homicidio",
+        "ivs_total",
+        "ivs_infra",
+        "ivs_capital_humano",
+        "ivs_renda",
+        "taxa_roubo",
+        "qt_feminicidio",
+    ):
         assert key in row, f"missing key: {key}"
 
 
@@ -242,6 +263,7 @@ def test_local_seguranca_empty(tmp_path):
 
 # ── _local_saude ──────────────────────────────────────────────────────────────
 
+
 def test_local_saude_returns_list(saude_parquet):
     _, _, _local_saude, _ = _import_locals()
     with patch("ui.dashboard_api._LOCAL_SILVER_DIR", saude_parquet):
@@ -255,8 +277,13 @@ def test_local_saude_schema(saude_parquet):
     with patch("ui.dashboard_api._LOCAL_SILVER_DIR", saude_parquet):
         result = _local_saude("SP", 2022, 15)
     row = result[0]
-    for key in ("nm", "tx_mortalidade_infantil", "tx_mortalidade_materna",
-                "pct_cobertura_plano", "idsus"):
+    for key in (
+        "nm",
+        "tx_mortalidade_infantil",
+        "tx_mortalidade_materna",
+        "pct_cobertura_plano",
+        "idsus",
+    ):
         assert key in row, f"missing key: {key}"
 
 
@@ -277,6 +304,7 @@ def test_local_saude_empty(tmp_path):
 
 
 # ── _local_pesquisas ──────────────────────────────────────────────────────────
+
 
 def test_local_pesquisas_returns_dict(pesquisa_parquet):
     *_, _local_pesquisas = _import_locals()

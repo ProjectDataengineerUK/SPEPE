@@ -86,7 +86,8 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--years", nargs="+", type=int, default=_DEFAULT_YEARS)
     parser.add_argument(
-        "--legislature", type=int,
+        "--legislature",
+        type=int,
         default=int(os.environ.get("LEGISLATURE", str(_LEGISLATURE))),
     )
     args = parser.parse_args()
