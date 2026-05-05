@@ -51,14 +51,6 @@ resource "google_cloud_run_v2_service" "spepe" {
         value = "true"
       }
       env {
-        name  = "USE_VERTEX_CLAUDE"
-        value = (var.environment == "prod" || var.environment == "staging") ? "true" : "false"
-      }
-      env {
-        name  = "VERTEX_CLAUDE_LOCATION"
-        value = "us-east5"
-      }
-      env {
         name = "ANTHROPIC_API_KEY"
         value_source {
           secret_key_ref {
