@@ -44,9 +44,13 @@ run_job() {
     --quiet
   )
   if [[ ${#extra_args[@]} -gt 0 ]]; then
-    local args_csv
-    args_csv=$(IFS=','; echo "${extra_args[*]}")
-    cmd+=(--args "$args_csv")
+    # Build comma-separated string, skipping empty elements
+    local args_csv=""
+    for arg in "${extra_args[@]}"; do
+      [[ -n "$arg" ]] && args_csv+="${args_csv:+,}${arg}"
+    done
+    # Use --args=VALUE (not --args VALUE) so gcloud doesn't misparse values starting with --
+    [[ -n "$args_csv" ]] && cmd+=("--args=${args_csv}")
   fi
 
   if "${cmd[@]}" 2>&1; then
@@ -64,7 +68,7 @@ run_job_uf() {
   shift 3
   local extra_args=("$@")
 
-  run_job "$job_name" "${label_prefix} [${uf}]" "--uf" "$uf" "${extra_args[@]:-}"
+  run_job "$job_name" "${label_prefix} [${uf}]" "--uf" "$uf" "${extra_args[@]+"${extra_args[@]}"}"
 }
 
 # ── fase 1 — jobs nacionais ───────────────────────────────────────────────────
