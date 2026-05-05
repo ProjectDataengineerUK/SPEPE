@@ -1,7 +1,10 @@
-"""CETIC.br substitute — IBGE SIDRA PNAD TIC Domicílios (internet access by UF).
+"""CETIC substitute — IBGE Censo Demográfico 2022: domicílios com internet por UF.
 
-CETIC TIC Domicílios uses IBGE PNAD Contínua methodology.
-SIDRA is the authoritative API; we query it directly.
+Substitui a tabela PNAD TIC (9174) que está com instabilidade no SIDRA v3.
+O Censo 2022 oferece cobertura completa (todos os 27 estados) com dados superiores.
+
+Source: IBGE SIDRA tabela 9936 via apisidra.ibge.gov.br (público, sem autenticação).
+Classificação 2072/77585 = "Existência de conexão domiciliar à Internet = Sim".
 """
 
 from __future__ import annotations
@@ -14,94 +17,89 @@ from tenacity import retry, stop_after_attempt, wait_exponential
 
 logger = logging.getLogger("spepe.clients.cetic")
 
-_SIDRA_BASE = "https://servicodados.ibge.gov.br/api/v3/agregados"
+_APISIDRA_BASE = "https://apisidra.ibge.gov.br/values"
 
-# PNAD Contínua — Suplemento Anual TIC
-# Tabela 9174: "Domicílios particulares permanentes com acesso à Internet"
-_TABLE_INTERNET = "9174"
-_VAR_INTERNET = "9607"   # % domicílios com internet
+# Tabela 9936: Domicílios particulares permanentes ocupados, por existência de
+# conexão domiciliar à Internet — Censo Demográfico 2022
+# c2072/77585 = Existência de conexão = Sim
+# c63/95826   = Condição de ocupação = Total
+# c125/2932   = Tipo de domicílio = Total
+_CENSO_URL = (
+    f"{_APISIDRA_BASE}/t/9936/n3/all/v/381,1000381/p/2022"
+    "/c2072/77585/c63/95826/c125/2932"
+)
 
-# Tabela 9173: "Domicílios particulares permanentes com microcomputador"
-_TABLE_COMPUTER = "9173"
-_VAR_COMPUTER = "9607"   # Variável pode ter o mesmo código neste contexto
-
-# Fallback table for internet: 7065 variable 93085 (renda — not internet, but fallback)
-# We'll keep table 9174 as sole source and gracefully log when unavailable.
-
-# IBGE numeric code for each UF (N3 = unidade da federação level)
-_UF_IBGE_CODE: dict[str, str] = {
-    "AC": "12", "AL": "27", "AM": "13", "AP": "16", "BA": "29",
-    "CE": "23", "DF": "53", "ES": "32", "GO": "52", "MA": "21",
-    "MG": "31", "MS": "50", "MT": "51", "PA": "15", "PB": "25",
-    "PE": "26", "PI": "22", "PR": "41", "RJ": "33", "RN": "24",
-    "RO": "11", "RR": "14", "RS": "43", "SC": "42", "SE": "28",
-    "SP": "35", "TO": "17",
+# Código IBGE da UF (D1C) → sigla
+_IBGE_CODE_UF: dict[str, str] = {
+    "11": "RO", "12": "AC", "13": "AM", "14": "RR", "15": "PA",
+    "16": "AP", "17": "TO", "21": "MA", "22": "PI", "23": "CE",
+    "24": "RN", "25": "PB", "26": "PE", "27": "AL", "28": "SE",
+    "29": "BA", "31": "MG", "32": "ES", "33": "RJ", "35": "SP",
+    "41": "PR", "42": "SC", "43": "RS", "50": "MS", "51": "MT",
+    "52": "GO", "53": "DF",
 }
+
+# Cached result — the Censo data is static, avoid redundant network calls
+_censo_cache: dict[str, dict] | None = None
 
 
 @retry(stop=stop_after_attempt(3), wait=wait_exponential(min=2, max=20))
-def _sidra_get(table: str, year: int, variable: str, uf_code: str) -> list[dict]:
-    url = (
-        f"{_SIDRA_BASE}/{table}/periodos/{year}/variaveis/{variable}"
-        f"?localidades=N3[{uf_code}]"
-    )
-    resp = requests.get(url, timeout=30)
+def _fetch_censo_internet() -> list[dict]:
+    resp = requests.get(_CENSO_URL, timeout=60)
     resp.raise_for_status()
     data = resp.json()
-    # SIDRA v3 returns a list with one element per variável
-    if isinstance(data, list) and data:
-        resultados = data[0].get("resultados", [])
-        if resultados:
-            return resultados[0].get("series", [])
-    return []
+    return data[1:] if data else []
 
 
-def _extract_value(series: list[dict], year: int) -> float | None:
-    for s in series:
-        raw = s.get("serie", {}).get(str(year))
-        if raw is not None:
-            try:
-                v = float(str(raw).replace(",", "."))
-                return None if v < 0 else v
-            except (TypeError, ValueError):
-                pass
-    return None
+def _load_censo_cache() -> dict[str, dict]:
+    global _censo_cache
+    if _censo_cache is not None:
+        return _censo_cache
+
+    rows = _fetch_censo_internet()
+    result: dict[str, dict] = {}
+    for r in rows:
+        sg_uf = _IBGE_CODE_UF.get(r.get("D1C", ""))
+        if not sg_uf:
+            continue
+        if sg_uf not in result:
+            result[sg_uf] = {"pct_internet_domiciliar": None, "total_domicilios_com_internet": None}
+        var_code = r.get("D2C", "")
+        try:
+            v = float(r["V"]) if r.get("V") not in (None, "", "...") else None
+        except (TypeError, ValueError):
+            v = None
+        if var_code == "381":
+            result[sg_uf]["total_domicilios_com_internet"] = v
+        elif var_code == "1000381":
+            result[sg_uf]["pct_internet_domiciliar"] = v
+
+    _censo_cache = result
+    logger.info("Censo 2022 internet: %d UFs carregadas", len(result))
+    return result
 
 
 def fetch_cetic_indicators(uf: str, year: int) -> dict[str, float | None]:
-    """Return TIC Domicílios indicators for a UF from IBGE SIDRA PNAD TIC."""
-    uf_code = _UF_IBGE_CODE.get(uf.upper())
-    result: dict[str, float | None] = {
-        "pct_internet_domiciliar": None,
+    """Return digital access indicators for a UF from Censo 2022.
+
+    The year parameter is accepted for interface compatibility; the Censo snapshot
+    is from 2022 regardless of the requested year.
+    """
+    try:
+        uf_data = _load_censo_cache()
+    except Exception as exc:
+        logger.warning("Censo 2022 internet fetch falhou: %s", exc)
+        return {"pct_internet_domiciliar": None, "pct_computador_domiciliar": None, "pct_smartphone_domiciliar": None}
+
+    indicators = uf_data.get(uf.upper(), {})
+    result = {
+        "pct_internet_domiciliar": indicators.get("pct_internet_domiciliar"),
         "pct_computador_domiciliar": None,
         "pct_smartphone_domiciliar": None,
     }
-
-    if not uf_code:
-        logger.error("UF não mapeada para IBGE code: %s", uf)
-        return result
-
-    # Internet access
-    try:
-        series = _sidra_get(_TABLE_INTERNET, year, _VAR_INTERNET, uf_code)
-        result["pct_internet_domiciliar"] = _extract_value(series, year)
-    except Exception as exc:
-        logger.warning("SIDRA internet table=%s UF=%s year=%d: %s", _TABLE_INTERNET, uf, year, exc)
-
-    # Computer access — try same table with variable 9608 if 9174 has it, else skip
-    try:
-        series_c = _sidra_get(_TABLE_INTERNET, year, "9608", uf_code)
-        result["pct_computador_domiciliar"] = _extract_value(series_c, year)
-    except Exception:
-        pass  # optional indicator — no warning needed
-
-    # Smartphone — PNAD TIC does not publish smartphone at UF level in SIDRA
-    # Leave as None; Silver transformer will handle nulls gracefully.
-
     logger.info(
-        "CETIC/SIDRA UF=%s year=%d: internet=%.1f%%",
+        "Censo 2022 internet UF=%s: %.1f%%",
         uf.upper(),
-        year,
         result["pct_internet_domiciliar"] or 0,
     )
     return result
@@ -114,22 +112,22 @@ def build_digital_access_dataframe(
 ) -> pd.DataFrame:
     """Build DataFrame with digital access indicators for all municipalities.
 
-    PNAD TIC provides state-level data; values are propagated to municipalities.
+    Uses Censo Demográfico 2022; values propagated to all municipalities in UF.
     """
     indicators = fetch_cetic_indicators(uf, year)
 
     if indicators.get("pct_internet_domiciliar") is None:
-        logger.warning("Sem dado SIDRA TIC para UF=%s year=%d", uf, year)
+        logger.warning("Sem dado Censo 2022 internet para UF=%s", uf)
         return pd.DataFrame()
 
     rows = [
         {
             "cd_municipio_ibge": cd,
             "sg_uf": uf.upper(),
-            "ano": year,
+            "ano": 2022,
             **indicators,
             "granularidade": "UF",
-            "fontes": f"IBGE SIDRA PNAD TIC {year} (tabela {_TABLE_INTERNET})",
+            "fontes": "IBGE Censo Demográfico 2022 (tabela 9936)",
         }
         for cd in municipios_ibge
     ]

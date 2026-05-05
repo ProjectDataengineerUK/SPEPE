@@ -1,13 +1,15 @@
-"""DIEESE client — Cesta Básica Nacional (preço mensal por capital de UF).
+"""DIEESE substitute — IBGE IPCA 'alimentação no domicílio' por região metropolitana.
 
-Primary source: DIEESE public CSV endpoint (national, all capitals).
-Fallback: IPEADATA OData API with known series codes per UF capital.
+DIEESE só disponibiliza API para São Paulo no IPEADATA. Para os demais estados,
+usamos o IPCA 'alimentação no domicílio' por região metropolitana como proxy.
+Estados sem RM IPCA usam o dado nacional.
+
+Source: IBGE SIDRA tabela 1419 via apisidra.ibge.gov.br (público, sem autenticação).
 """
 
 from __future__ import annotations
 
 import logging
-from io import StringIO
 
 import pandas as pd
 import requests
@@ -15,43 +17,33 @@ from tenacity import retry, stop_after_attempt, wait_exponential
 
 logger = logging.getLogger("spepe.clients.dieese")
 
-# DIEESE publishes a monthly CSV with cesta básica values for ~18 capitals.
-# coduf=0 returns all cities tracked by DIEESE.
-_DIEESE_CSV_URL = (
-    "https://www.dieese.org.br/analise/web/remuneracao/"
-    "processamentoRemuneracaoRetornoCSV.do"
-    "?tipo=1&coduf=0&codmun=0&ano={year}&mes=12"
-)
+_APISIDRA_BASE = "https://apisidra.ibge.gov.br/values"
 
-# IPEADATA OData — fallback series by UF capital.
-# DIEESE tracks ~18 capitals; remaining UFs use the national median.
-_IPEADATA_BASE = "https://ipeadata.gov.br/api/odata4/ValoresSerie"
-_IPEADATA_NATIONAL_SERIES = "DIEESE_CBSAL"  # salário mínimo necessário (proxy)
+# Tabela 7060: IPCA variações por grupo e região metropolitana (a partir de jan/2020)
+# Variável 63: variação mensal (%); variável 2265: variação acumulada 12 meses (%)
+# Classificação 315 / categoria 7171: "11.Alimentação no domicílio"
+_TABLE_IPCA = "7060"
+_VAR_MENSAL = "63"
+_VAR_12M = "2265"
+_CLASSIF_ALIMENTACAO = "315"
+_CAT_ALIMENTACAO = "7171"
 
-# Known IPEADATA series codes for cesta básica by UF capital
-# Format: PRECOS12_CB{city}12  (monthly frequency = 12)
-_UF_IPEADATA_SERIES: dict[str, str] = {
-    "SP": "PRECOS12_CBSP12",
-    "RJ": "PRECOS12_CBRJ12",
-    "MG": "PRECOS12_CBBH12",
-    "RS": "PRECOS12_CBPA12",
-    "PR": "PRECOS12_CBCT12",
-    "BA": "PRECOS12_CBSA12",
-    "CE": "PRECOS12_CBFO12",
-    "PE": "PRECOS12_CBRE12",
-    "GO": "PRECOS12_CBGO12",
-    "MS": "PRECOS12_CBCG12",
-    "ES": "PRECOS12_CBVI12",
-    "MA": "PRECOS12_CBSL12",
-    "PA": "PRECOS12_CBBEL12",
-    "SC": "PRECOS12_CBFL12",
-    "AM": "PRECOS12_CBMA12",
-    "PI": "PRECOS12_CBTE12",
-    "SE": "PRECOS12_CBARA12",
-    "RN": "PRECOS12_CBNAT12",
+# Código da região metropolitana (D1C) → UF
+_METRO_UF: dict[str, str] = {
+    "1501": "PA",   # Belém
+    "2301": "CE",   # Fortaleza
+    "2601": "PE",   # Recife
+    "2901": "BA",   # Salvador
+    "3101": "MG",   # Belo Horizonte
+    "3201": "ES",   # Grande Vitória
+    "3301": "RJ",   # Rio de Janeiro
+    "3501": "SP",   # São Paulo
+    "4101": "PR",   # Curitiba
+    "4301": "RS",   # Porto Alegre
 }
 
-# Map UF → capital IBGE code
+_UFS_WITH_METRO = set(_METRO_UF.values())
+
 _UF_CAPITAL_IBGE: dict[str, int] = {
     "AC": 1200401, "AL": 2704302, "AM": 1302603, "AP": 1600303,
     "BA": 2927408, "CE": 2304400, "DF": 5300108, "ES": 3205309,
@@ -63,101 +55,119 @@ _UF_CAPITAL_IBGE: dict[str, int] = {
 }
 
 
-@retry(stop=stop_after_attempt(2), wait=wait_exponential(min=5, max=20))
-def _fetch_dieese_csv(year: int) -> pd.DataFrame:
-    url = _DIEESE_CSV_URL.format(year=year)
-    resp = requests.get(url, timeout=60)
-    resp.raise_for_status()
-    content = resp.content.decode("latin-1", errors="replace")
-    # DIEESE CSVs use semicolons as separator
-    df = pd.read_csv(StringIO(content), sep=";", decimal=",", thousands=".", encoding="latin-1")
-    return df
+def _months_for_year(year: int) -> str:
+    return ",".join(f"{year}{m:02d}" for m in range(1, 13))
 
 
 @retry(stop=stop_after_attempt(3), wait=wait_exponential(min=2, max=20))
-def _fetch_ipeadata_series(series_code: str) -> list[dict]:
-    url = f"{_IPEADATA_BASE}(SERCODIGO='{series_code}')?$top=24&$orderby=VALDATA desc"
+def _fetch_ipca_metro(year: int) -> list[dict]:
+    periods = _months_for_year(year)
+    url = (
+        f"{_APISIDRA_BASE}/t/{_TABLE_IPCA}/n7/all"
+        f"/v/{_VAR_MENSAL},{_VAR_12M}/p/{periods}"
+        f"/c{_CLASSIF_ALIMENTACAO}/{_CAT_ALIMENTACAO}"
+    )
     resp = requests.get(url, timeout=60)
     resp.raise_for_status()
-    return resp.json().get("value", [])
+    data = resp.json()
+    return data[1:] if data else []
 
 
-def _parse_dieese_csv_for_uf(df: pd.DataFrame, uf: str, year: int) -> float | None:
-    """Extract cesta básica value for a UF from DIEESE national CSV."""
-    uf_upper = uf.upper()
-    # Normalize column names
-    df.columns = [c.strip().lower().replace(" ", "_") for c in df.columns]
-
-    # Look for UF column (various possible names)
-    uf_col = next((c for c in df.columns if "uf" in c or "sigla" in c or "estado" in c), None)
-    val_col = next(
-        (c for c in df.columns if "cesta" in c or "valor" in c or "preco" in c or "vl" in c),
-        None,
+@retry(stop=stop_after_attempt(3), wait=wait_exponential(min=2, max=20))
+def _fetch_ipca_nacional(year: int) -> list[dict]:
+    periods = _months_for_year(year)
+    url = (
+        f"{_APISIDRA_BASE}/t/{_TABLE_IPCA}/n1/1"
+        f"/v/{_VAR_MENSAL},{_VAR_12M}/p/{periods}"
+        f"/c{_CLASSIF_ALIMENTACAO}/{_CAT_ALIMENTACAO}"
     )
-
-    if not uf_col or not val_col:
-        logger.debug("DIEESE CSV colunas não reconhecidas: %s", list(df.columns))
-        return None
-
-    row = df[df[uf_col].astype(str).str.upper().str.strip() == uf_upper]
-    if row.empty:
-        return None
-
-    try:
-        val = float(str(row.iloc[0][val_col]).replace(",", ".").replace("R$", "").strip())
-        return val if val > 0 else None
-    except (TypeError, ValueError):
-        return None
+    resp = requests.get(url, timeout=60)
+    resp.raise_for_status()
+    data = resp.json()
+    return data[1:] if data else []
 
 
-def _fetch_via_ipeadata(uf: str, year: int) -> float | None:
-    series_code = _UF_IPEADATA_SERIES.get(uf.upper(), _IPEADATA_NATIONAL_SERIES)
-    try:
-        entries = _fetch_ipeadata_series(series_code)
-    except Exception as exc:
-        logger.warning("IPEADATA fetch failed (series=%s): %s", series_code, exc)
-        return None
-
-    year_entries = [e for e in entries if str(year) in str(e.get("VALDATA", ""))]
-    vals = []
-    for e in year_entries:
+def _parse_rows(rows: list[dict]) -> pd.DataFrame:
+    records = []
+    for r in rows:
         try:
-            v = float(e["VALVALOR"])
-            if v > 0:
-                vals.append(v)
-        except (TypeError, ValueError, KeyError):
-            pass
+            v = float(r["V"]) if r.get("V") not in (None, "", "...") else None
+        except (TypeError, ValueError):
+            v = None
+        records.append({
+            "metro_code": r.get("D1C", ""),
+            "metro_name": r.get("D1N", ""),
+            "var_code": r.get("D2C", ""),
+            "period": r.get("D3C", ""),
+            "value": v,
+        })
+    df = pd.DataFrame(records)
+    return df[df["value"].notna()] if not df.empty else df
 
-    return round(sum(vals) / len(vals), 2) if vals else None
 
+def fetch_ipca_alimentacao(year: int) -> pd.DataFrame:
+    """Fetch IPCA alimentação no domicílio for all metro regions + national for a year.
 
-def fetch_cesta_basica_uf(uf: str, year: int) -> dict[str, float | None]:
-    """Return cesta básica indicators for a UF in a given year."""
-    uf_upper = uf.upper()
-    result: dict[str, float | None] = {
-        "cesta_basica_capital_brl": None,
-        "variacao_cesta_mensal_pct": None,
-        "horas_trabalho_cesta": None,
-    }
-
-    # Primary: DIEESE direct CSV
+    Returns tidy DataFrame with: sg_uf, periodo_yyyymm, data_referencia,
+    ipca_alimentacao_mensal_pct, ipca_alimentacao_12m_pct, granularidade, fontes.
+    """
+    df_metro = pd.DataFrame()
     try:
-        df_csv = _fetch_dieese_csv(year)
-        value = _parse_dieese_csv_for_uf(df_csv, uf_upper, year)
-        if value:
-            result["cesta_basica_capital_brl"] = value
-            logger.info("DIEESE CSV: UF=%s year=%d R$ %.2f", uf_upper, year, value)
-            return result
+        df_metro = _parse_rows(_fetch_ipca_metro(year))
+        logger.info("IPCA metro: %d observações para %d", len(df_metro), year)
     except Exception as exc:
-        logger.warning("DIEESE CSV indisponível (UF=%s year=%d): %s", uf_upper, year, exc)
+        logger.warning("IPCA metro fetch falhou: %s", exc)
 
-    # Fallback: IPEADATA per-capital series
-    value = _fetch_via_ipeadata(uf_upper, year)
-    if value:
-        result["cesta_basica_capital_brl"] = value
-        logger.info("IPEADATA DIEESE: UF=%s year=%d R$ %.2f", uf_upper, year, value)
+    df_nac = pd.DataFrame()
+    try:
+        df_nac = _parse_rows(_fetch_ipca_nacional(year))
+        logger.info("IPCA nacional: %d observações para %d", len(df_nac), year)
+    except Exception as exc:
+        logger.warning("IPCA nacional fetch falhou: %s", exc)
 
-    return result
+    if df_metro.empty and df_nac.empty:
+        return pd.DataFrame()
+
+    result_rows = []
+
+    if not df_metro.empty:
+        for metro_code, sg_uf in _METRO_UF.items():
+            df_uf = df_metro[df_metro["metro_code"] == metro_code]
+            if df_uf.empty:
+                continue
+            metro_name = df_uf["metro_name"].iloc[0]
+            for period in sorted(df_uf["period"].unique()):
+                df_p = df_uf[df_uf["period"] == period]
+                mensal = df_p[df_p["var_code"] == _VAR_MENSAL]["value"].values
+                acum12m = df_p[df_p["var_code"] == _VAR_12M]["value"].values
+                result_rows.append({
+                    "sg_uf": sg_uf,
+                    "periodo_yyyymm": period,
+                    "data_referencia": f"{period[:4]}-{period[4:6]}-01",
+                    "ipca_alimentacao_mensal_pct": float(mensal[0]) if len(mensal) else None,
+                    "ipca_alimentacao_12m_pct": float(acum12m[0]) if len(acum12m) else None,
+                    "granularidade": "RM",
+                    "fontes": f"IBGE IPCA tabela 1419 — Alimentação no domicílio ({metro_name})",
+                })
+
+    if not df_nac.empty:
+        ufs_sem_metro = set(_UF_CAPITAL_IBGE.keys()) - _UFS_WITH_METRO
+        for period in sorted(df_nac["period"].unique()):
+            df_p = df_nac[df_nac["period"] == period]
+            mensal = df_p[df_p["var_code"] == _VAR_MENSAL]["value"].values
+            acum12m = df_p[df_p["var_code"] == _VAR_12M]["value"].values
+            for sg_uf in ufs_sem_metro:
+                result_rows.append({
+                    "sg_uf": sg_uf,
+                    "periodo_yyyymm": period,
+                    "data_referencia": f"{period[:4]}-{period[4:6]}-01",
+                    "ipca_alimentacao_mensal_pct": float(mensal[0]) if len(mensal) else None,
+                    "ipca_alimentacao_12m_pct": float(acum12m[0]) if len(acum12m) else None,
+                    "granularidade": "Nacional",
+                    "fontes": "IBGE IPCA tabela 1419 — Alimentação no domicílio (Brasil)",
+                })
+
+    return pd.DataFrame(result_rows) if result_rows else pd.DataFrame()
 
 
 def build_cesta_basica_dataframe(
@@ -165,27 +175,30 @@ def build_cesta_basica_dataframe(
     year: int,
     municipios_ibge: list[int],
 ) -> pd.DataFrame:
-    """Build DataFrame with cesta básica reference for all municipalities.
+    """Build DataFrame with IPCA alimentação indicators for all municipalities.
 
-    Capital price is propagated to all municipalities in the UF —
-    DIEESE only publishes at capital level.
+    Returns one row per municipality × month with IPCA alimentação no domicílio.
     """
-    cesta = fetch_cesta_basica_uf(uf, year)
-
-    if cesta.get("cesta_basica_capital_brl") is None:
-        logger.warning("Sem dado DIEESE para UF=%s year=%d", uf, year)
+    df_ipca = fetch_ipca_alimentacao(year)
+    if df_ipca.empty:
+        logger.warning("Sem dados IPCA alimentação para year=%d", year)
         return pd.DataFrame()
 
-    rows = [
-        {
-            "cd_municipio_ibge": cd,
-            "sg_uf": uf.upper(),
-            "data_referencia": f"{year}-12-01",
-            "cesta_basica_capital_brl": cesta["cesta_basica_capital_brl"],
-            "variacao_cesta_mensal_pct": cesta["variacao_cesta_mensal_pct"],
-            "horas_trabalho_cesta": cesta["horas_trabalho_cesta"],
-            "fontes": "DIEESE Cesta Básica Nacional",
-        }
-        for cd in municipios_ibge
-    ]
-    return pd.DataFrame(rows)
+    df_uf = df_ipca[df_ipca["sg_uf"] == uf.upper()]
+    if df_uf.empty:
+        logger.warning("Sem dados IPCA alimentação para UF=%s year=%d", uf, year)
+        return pd.DataFrame()
+
+    rows = []
+    for _, ipca_row in df_uf.iterrows():
+        for cd in municipios_ibge:
+            r = ipca_row.to_dict()
+            r["cd_municipio_ibge"] = cd
+            rows.append(r)
+
+    result = pd.DataFrame(rows)
+    logger.info(
+        "IPCA alimentação UF=%s year=%d: %d registros (%d municípios × %d meses)",
+        uf.upper(), year, len(result), len(municipios_ibge), len(df_uf),
+    )
+    return result
