@@ -7,7 +7,6 @@ API: https://api.bcb.gov.br/dados/serie/bcdata.sgs.{codigo}/dados
 from __future__ import annotations
 
 import logging
-from datetime import date
 
 import pandas as pd
 import requests
