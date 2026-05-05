@@ -44,7 +44,9 @@ run_job() {
     --quiet
   )
   if [[ ${#extra_args[@]} -gt 0 ]]; then
-    cmd+=(--args "${extra_args[*]}")
+    local args_csv
+    args_csv=$(IFS=','; echo "${extra_args[*]}")
+    cmd+=(--args "$args_csv")
   fi
 
   if "${cmd[@]}" 2>&1; then
