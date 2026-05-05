@@ -142,7 +142,7 @@ echo "FASE 4 — Transformação Silver → Gold (USE_BIGQUERY=true)"
 echo "======================================================================"
 
 run_job "spepe-silver-transform" "Silver transform (Bronze → Silver BQ)" \
-    "--use-bigquery" "--uf" "ALL"
+    "--uf" "ALL"
 
 run_job "spepe-gold-build" "Gold build (Silver → Gold BQ)"
 

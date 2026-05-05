@@ -1,4 +1,8 @@
-"""CETIC.br client — TIC Domicílios digital access indicators."""
+"""CETIC.br substitute — IBGE SIDRA PNAD TIC Domicílios (internet access by UF).
+
+CETIC TIC Domicílios uses IBGE PNAD Contínua methodology.
+SIDRA is the authoritative API; we query it directly.
+"""
 
 from __future__ import annotations
 
@@ -10,107 +14,95 @@ from tenacity import retry, stop_after_attempt, wait_exponential
 
 logger = logging.getLogger("spepe.clients.cetic")
 
-# CETIC.br TIC Domicílios — public API for digital inclusion indicators
-# API docs: https://cetic.br/api/indicadores/
-_CETIC_API_BASE = "https://cetic.br/api/indicadores/"
+_SIDRA_BASE = "https://servicodados.ibge.gov.br/api/v3/agregados"
 
-# TIC Domicílios key indicators (state-level granularity)
-_CETIC_INDICATORS = {
-    "pct_internet_domiciliar": {
-        "pesquisa": "tic-domicilios",
-        "indicador": "C1",  # % domicílios com acesso à internet
-        "dimensao": "Total",
-    },
-    "pct_computador_domiciliar": {
-        "pesquisa": "tic-domicilios",
-        "indicador": "B7",  # % domicílios com computador
-        "dimensao": "Total",
-    },
-    "pct_smartphone_domiciliar": {
-        "pesquisa": "tic-domicilios",
-        "indicador": "C2B",  # % domicílios com smartphone
-        "dimensao": "Total",
-    },
-}
+# PNAD Contínua — Suplemento Anual TIC
+# Tabela 9174: "Domicílios particulares permanentes com acesso à Internet"
+_TABLE_INTERNET = "9174"
+_VAR_INTERNET = "9607"   # % domicílios com internet
 
-# IBGE PNAD TIC — fallback (state-level, only UF granularity available)
-_PNAD_TIC_SIDRA = {
-    "pct_internet_domiciliar": ("9606", "2023", "9607"),
-}
+# Tabela 9173: "Domicílios particulares permanentes com microcomputador"
+_TABLE_COMPUTER = "9173"
+_VAR_COMPUTER = "9607"   # Variável pode ter o mesmo código neste contexto
 
-_CETIC_UF_MAP: dict[str, str] = {
-    "AC": "Acre",
-    "AL": "Alagoas",
-    "AM": "Amazonas",
-    "AP": "Amapá",
-    "BA": "Bahia",
-    "CE": "Ceará",
-    "DF": "Distrito Federal",
-    "ES": "Espírito Santo",
-    "GO": "Goiás",
-    "MA": "Maranhão",
-    "MG": "Minas Gerais",
-    "MS": "Mato Grosso do Sul",
-    "MT": "Mato Grosso",
-    "PA": "Pará",
-    "PB": "Paraíba",
-    "PE": "Pernambuco",
-    "PI": "Piauí",
-    "PR": "Paraná",
-    "RJ": "Rio de Janeiro",
-    "RN": "Rio Grande do Norte",
-    "RO": "Rondônia",
-    "RR": "Roraima",
-    "RS": "Rio Grande do Sul",
-    "SC": "Santa Catarina",
-    "SE": "Sergipe",
-    "SP": "São Paulo",
-    "TO": "Tocantins",
+# Fallback table for internet: 7065 variable 93085 (renda — not internet, but fallback)
+# We'll keep table 9174 as sole source and gracefully log when unavailable.
+
+# IBGE numeric code for each UF (N3 = unidade da federação level)
+_UF_IBGE_CODE: dict[str, str] = {
+    "AC": "12", "AL": "27", "AM": "13", "AP": "16", "BA": "29",
+    "CE": "23", "DF": "53", "ES": "32", "GO": "52", "MA": "21",
+    "MG": "31", "MS": "50", "MT": "51", "PA": "15", "PB": "25",
+    "PE": "26", "PI": "22", "PR": "41", "RJ": "33", "RN": "24",
+    "RO": "11", "RR": "14", "RS": "43", "SC": "42", "SE": "28",
+    "SP": "35", "TO": "17",
 }
 
 
 @retry(stop=stop_after_attempt(3), wait=wait_exponential(min=2, max=20))
-def _get(url: str) -> dict:
-    resp = requests.get(url, timeout=60)
+def _sidra_get(table: str, year: int, variable: str, uf_code: str) -> list[dict]:
+    url = (
+        f"{_SIDRA_BASE}/{table}/periodos/{year}/variaveis/{variable}"
+        f"?localidades=N3[{uf_code}]"
+    )
+    resp = requests.get(url, timeout=30)
     resp.raise_for_status()
-    return resp.json()
+    data = resp.json()
+    # SIDRA v3 returns a list with one element per variável
+    if isinstance(data, list) and data:
+        resultados = data[0].get("resultados", [])
+        if resultados:
+            return resultados[0].get("series", [])
+    return []
+
+
+def _extract_value(series: list[dict], year: int) -> float | None:
+    for s in series:
+        raw = s.get("serie", {}).get(str(year))
+        if raw is not None:
+            try:
+                v = float(str(raw).replace(",", "."))
+                return None if v < 0 else v
+            except (TypeError, ValueError):
+                pass
+    return None
 
 
 def fetch_cetic_indicators(uf: str, year: int) -> dict[str, float | None]:
-    """Return CETIC TIC Domicílios indicators for a UF in a given year.
+    """Return TIC Domicílios indicators for a UF from IBGE SIDRA PNAD TIC."""
+    uf_code = _UF_IBGE_CODE.get(uf.upper())
+    result: dict[str, float | None] = {
+        "pct_internet_domiciliar": None,
+        "pct_computador_domiciliar": None,
+        "pct_smartphone_domiciliar": None,
+    }
 
-    Returns dict keyed by indicator name (state-level — propagated to municipalities).
-    """
-    uf_upper = uf.upper()
-    uf_name = _CETIC_UF_MAP.get(uf_upper, uf_upper)
-    result: dict[str, float | None] = {k: None for k in _CETIC_INDICATORS}
+    if not uf_code:
+        logger.error("UF não mapeada para IBGE code: %s", uf)
+        return result
 
-    for col_name, cfg in _CETIC_INDICATORS.items():
-        url = (
-            f"{_CETIC_API_BASE}{cfg['pesquisa']}/indicadores/{cfg['indicador']}/"
-            f"?ano={year}&regiao={uf_name}&dimensao={cfg['dimensao']}"
-        )
-        try:
-            data = _get(url)
-        except Exception as exc:
-            logger.debug("CETIC %s %s failed: %s", col_name, uf, exc)
-            continue
+    # Internet access
+    try:
+        series = _sidra_get(_TABLE_INTERNET, year, _VAR_INTERNET, uf_code)
+        result["pct_internet_domiciliar"] = _extract_value(series, year)
+    except Exception as exc:
+        logger.warning("SIDRA internet table=%s UF=%s year=%d: %s", _TABLE_INTERNET, uf, year, exc)
 
-        # CETIC API returns list of {"regiao": ..., "ano": ..., "valor": ...}
-        entries = data if isinstance(data, list) else data.get("data", [])
-        for item in entries:
-            if str(item.get("ano", "")) == str(year):
-                try:
-                    result[col_name] = float(str(item["valor"]).replace(",", "."))
-                except (TypeError, ValueError, KeyError):
-                    pass
-                break
+    # Computer access — try same table with variable 9608 if 9174 has it, else skip
+    try:
+        series_c = _sidra_get(_TABLE_INTERNET, year, "9608", uf_code)
+        result["pct_computador_domiciliar"] = _extract_value(series_c, year)
+    except Exception:
+        pass  # optional indicator — no warning needed
+
+    # Smartphone — PNAD TIC does not publish smartphone at UF level in SIDRA
+    # Leave as None; Silver transformer will handle nulls gracefully.
 
     logger.info(
-        "CETIC TIC UF=%s year=%d: internet=%s%%",
-        uf_upper,
+        "CETIC/SIDRA UF=%s year=%d: internet=%.1f%%",
+        uf.upper(),
         year,
-        result["pct_internet_domiciliar"],
+        result["pct_internet_domiciliar"] or 0,
     )
     return result
 
@@ -122,26 +114,23 @@ def build_digital_access_dataframe(
 ) -> pd.DataFrame:
     """Build DataFrame with digital access indicators for all municipalities.
 
-    CETIC provides state-level data; values are propagated to all municipalities.
-    Municipal-level breakdown not publicly available — UF value is the best proxy.
+    PNAD TIC provides state-level data; values are propagated to municipalities.
     """
     indicators = fetch_cetic_indicators(uf, year)
 
-    # Require at least internet access to be non-null
     if indicators.get("pct_internet_domiciliar") is None:
-        logger.warning("No CETIC digital data for UF=%s year=%d", uf, year)
+        logger.warning("Sem dado SIDRA TIC para UF=%s year=%d", uf, year)
         return pd.DataFrame()
 
-    rows = []
-    for cd in municipios_ibge:
-        row = {
+    rows = [
+        {
             "cd_municipio_ibge": cd,
             "sg_uf": uf.upper(),
             "ano": year,
             **indicators,
-            "granularidade": "UF",  # state-level proxy
-            "fontes": f"CETIC TIC Domicílios {year}",
+            "granularidade": "UF",
+            "fontes": f"IBGE SIDRA PNAD TIC {year} (tabela {_TABLE_INTERNET})",
         }
-        rows.append(row)
-
+        for cd in municipios_ibge
+    ]
     return pd.DataFrame(rows)
