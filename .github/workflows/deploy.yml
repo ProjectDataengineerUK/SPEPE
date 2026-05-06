@@ -131,7 +131,8 @@ jobs:
           for JOB in spepe-tse-ingest spepe-tse-perfil-ingest spepe-tse-candidaturas-ingest \
                      spepe-ibge-sync spepe-digital-ingest spepe-silver-transform spepe-gold-build \
                      spepe-social-ingest spepe-pesquisas-ingest spepe-security-ingest spepe-datasus-ingest \
-                     spepe-dieese-ingest spepe-cetic-ingest spepe-reddit-ingest spepe-camara-senado-ingest; do
+                     spepe-dieese-ingest spepe-cetic-ingest spepe-reddit-ingest spepe-camara-senado-ingest \
+                     spepe-endividamento-ingest; do
             gcloud run jobs update "${JOB}" \
               --image "${IMAGE}" \
               --region "${{ env.GCP_REGION }}" \
@@ -179,6 +180,20 @@ jobs:
           image: ${{ needs.build-push.outputs.image_tag }}
           region: ${{ env.GCP_REGION }}
           project_id: ${{ vars.GCP_PROJECT_ID }}
+
+      - name: Update Cloud Run Jobs to new image
+        run: |
+          IMAGE="${{ needs.build-push.outputs.image_tag }}"
+          for JOB in spepe-tse-ingest spepe-tse-perfil-ingest spepe-tse-candidaturas-ingest \
+                     spepe-ibge-sync spepe-digital-ingest spepe-silver-transform spepe-gold-build \
+                     spepe-social-ingest spepe-pesquisas-ingest spepe-security-ingest spepe-datasus-ingest \
+                     spepe-dieese-ingest spepe-cetic-ingest spepe-reddit-ingest spepe-camara-senado-ingest \
+                     spepe-endividamento-ingest; do
+            gcloud run jobs update "${JOB}" \
+              --image "${IMAGE}" \
+              --region "${{ env.GCP_REGION }}" \
+              --project "${{ vars.GCP_PROJECT_ID }}" 2>&1 || echo "Warning: could not update ${JOB}"
+          done
 
       - name: Smoke test — prod health check
         run: |
