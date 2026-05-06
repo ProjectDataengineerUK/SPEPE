@@ -998,8 +998,6 @@ def transform_digital_to_silver(year: int, use_bigquery: bool = False) -> dict:
     """
     LOCAL_SILVER_DIR.mkdir(parents=True, exist_ok=True)
 
-    from dataops.source_registry import get_source_meta
-
     results: dict[str, dict] = {}
 
     def _read_bronze(filename: str) -> pd.DataFrame:
@@ -1045,8 +1043,6 @@ def transform_digital_to_silver(year: int, use_bigquery: bool = False) -> dict:
         logger.info("Digital Silver local %s: %d rows", path, len(df))
         return str(path)
 
-    meta_score = get_source_meta("meta_ad_library") if "meta_ad_library" in __import__("dataops.source_registry", fromlist=["SOURCE_REGISTRY"]).SOURCE_REGISTRY else None
-
     # ── Meta Ads summary ──────────────────────────────────────────────────────
     ads_df = _read_bronze(f"meta_ads_{year}.parquet")
     if not ads_df.empty:
@@ -1086,7 +1082,6 @@ def transform_digital_to_silver(year: int, use_bigquery: bool = False) -> dict:
     trends_df = _read_bronze(f"google_trends_timeline_{year}.parquet")
     if not trends_df.empty:
         # Pivot wide → long: one row per (date, candidato)
-        ts_col = "date" if "date" in trends_df.columns else trends_df.columns[0]
         id_cols = [c for c in ("date", "ano", "fonte") if c in trends_df.columns]
         val_cols = [c for c in trends_df.columns if c not in id_cols]
         long_df = trends_df.melt(id_vars=id_cols, value_vars=val_cols,
