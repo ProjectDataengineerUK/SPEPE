@@ -147,7 +147,7 @@ def _fetch_feed_raw(url: str, timeout: int = 20) -> list[dict[str, Any]]:
     import xml.etree.ElementTree as ET
 
     try:
-        headers = {"User-Agent": "SPEPE-NewsBot/1.0 (electoral-research@spepe.br)"}
+        headers = {"User-Agent": "SPEPE-NewsBot/1.0 (electoral-research-bot)"}
         resp = requests.get(url, headers=headers, timeout=timeout)
         resp.raise_for_status()
         root = ET.fromstring(resp.content)
