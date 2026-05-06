@@ -1,5 +1,15 @@
-"""Cloud Run Job: Twitter/X + Facebook → Bronze layer."""
+"""Cloud Run Job: social media + imprensa → Bronze layer.
 
+Fontes coletadas:
+  Twitter/X      — X_BEARER_TOKEN (opcional)
+  Facebook       — META_APP_TOKEN (opcional, pages públicas)
+  YouTube        — YOUTUBE_API_KEY (opcional)
+  Bluesky        — sem credenciais (AT Protocol público)
+  GDELT          — sem credenciais (imprensa BR indexada)
+  RSS portais BR — sem credenciais (G1, Folha, Poder360, etc.)
+
+Cada registro recebe score_confiabilidade + tipo_fonte via source_registry.
+"""
 from __future__ import annotations
 
 import json
@@ -11,6 +21,9 @@ from pathlib import Path
 import pandas as pd
 
 from dataops.bronze_writer import write_bronze
+from dataops.clients.bluesky_client import fetch_bluesky_mentions
+from dataops.clients.gdelt_client import fetch_gdelt_mentions
+from dataops.clients.news_rss_client import fetch_rss_mentions
 from dataops.clients.social_client import (
     aggregate_x_sentiment,
     enrich_sentiment_vertex,
@@ -18,12 +31,12 @@ from dataops.clients.social_client import (
     fetch_x_mentions,
     fetch_youtube_videos,
 )
+from dataops.source_registry import enrich_with_source_meta
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s %(message)s")
 logger = logging.getLogger("spepe.jobs.social_ingest")
 
 _DEFAULT_CANDIDATOS = [
-    # ── Presidenciáveis 2026 ──────────────────────────────────────
     "Lula",
     "Lula da Silva",
     "Tarcísio de Freitas",
@@ -35,102 +48,83 @@ _DEFAULT_CANDIDATOS = [
     "Alckmin",
     "Geraldo Alckmin",
     "Rodrigo Pacheco",
-    # ── SP Estado 2026 ────────────────────────────────────────────
     "Fernando Haddad",
     "Guilherme Boulos",
 ]
 
-# IDs de páginas Facebook — configurar via env var SOCIAL_FB_PAGES
-# Formato: ID numérico da página (não @handle)
-# Obter em: https://developers.facebook.com/tools/explorer/
 _DEFAULT_FB_PAGES: list[str] = []
 
 
+def _write(df: pd.DataFrame, source: str, year: int, filename: str, use_gcs: bool) -> None:
+    if df.empty:
+        logger.info("Skipping empty dataframe: %s", filename)
+        return
+    write_bronze(df=df, source=source, year=year, uf="BR", filename=filename, use_gcs=use_gcs)
+    logger.info("%s Bronze: %d registros → %s", source.upper(), len(df), filename)
+
+
 def main(candidatos: list[str], fb_pages: list[str], dias: int, year: int) -> None:
-    logger.info("Social ingest job: %d candidatos, %d dias", len(candidatos), dias)
-    cache_dir = Path("data/bronze/social")
-    cache_dir.mkdir(parents=True, exist_ok=True)
-
+    logger.info("Social ingest job: %d candidatos, %d dias, year=%d", len(candidatos), dias, year)
     use_gcs = bool(os.environ.get("GCS_BUCKET"))
+    gcp_project = os.environ.get("GCP_PROJECT_ID", "")
 
-    # ── Twitter/X ──────────────────────────────────────────────────────────
+    Path("data/bronze/social").mkdir(parents=True, exist_ok=True)
+
+    # ── Twitter/X ─────────────────────────────────────────────────────────────
     mentions = fetch_x_mentions(candidatos, dias=dias, max_por_candidato=500)
     if mentions:
-        df_x = pd.DataFrame(mentions)
-        write_bronze(
-            df=df_x,
-            source="social",
-            year=year,
-            uf="BR",
-            filename=f"twitter_mencoes_{year}.parquet",
-            use_gcs=use_gcs,
-        )
-        logger.info("Twitter/X Bronze: %d menções", len(df_x))
+        if gcp_project:
+            mentions = enrich_sentiment_vertex(mentions, text_field="text", project=gcp_project)
+        enrich_with_source_meta(mentions)
+        _write(pd.DataFrame(mentions), "social", year, f"twitter_mencoes_{year}.parquet", use_gcs)
 
         sentimento = aggregate_x_sentiment(mentions)
-        df_sent = pd.DataFrame(sentimento)
-        write_bronze(
-            df=df_sent,
-            source="social",
-            year=year,
-            uf="BR",
-            filename=f"twitter_sentimento_{year}.parquet",
-            use_gcs=use_gcs,
-        )
-        logger.info("Twitter/X sentimento agregado: %d candidatos", len(df_sent))
+        _write(pd.DataFrame(sentimento), "social", year, f"twitter_sentimento_{year}.parquet", use_gcs)
     else:
-        logger.warning("Twitter/X: nenhuma menção coletada (token ausente ou API vazia)")
+        logger.warning("Twitter/X: nenhuma menção (token ausente ou API vazia)")
 
-    # ── Facebook ───────────────────────────────────────────────────────────
+    # ── Facebook ──────────────────────────────────────────────────────────────
     if fb_pages:
         posts = fetch_fb_page_posts(fb_pages, dias=dias)
         if posts:
-            df_fb = pd.DataFrame(posts)
-            write_bronze(
-                df=df_fb,
-                source="social",
-                year=year,
-                uf="BR",
-                filename=f"facebook_posts_{year}.parquet",
-                use_gcs=use_gcs,
-            )
-            logger.info("Facebook Bronze: %d posts", len(df_fb))
+            enrich_with_source_meta(posts)
+            _write(pd.DataFrame(posts), "social", year, f"facebook_posts_{year}.parquet", use_gcs)
     else:
         logger.info("Facebook: nenhuma página configurada — pulando")
 
-    # ── YouTube Data API v3 ────────────────────────────────────────────────
+    # ── YouTube ───────────────────────────────────────────────────────────────
     yt_records = fetch_youtube_videos(candidatos, year=year, max_por_candidato=200)
     if yt_records:
-        gcp_project = os.environ.get("GCP_PROJECT_ID", "")
-        yt_records = enrich_sentiment_vertex(yt_records, text_field="title", project=gcp_project)
-        df_yt = pd.DataFrame(yt_records)
-        write_bronze(
-            df=df_yt,
-            source="social",
-            year=year,
-            uf="BR",
-            filename=f"youtube_videos_{year}.parquet",
-            use_gcs=use_gcs,
-        )
-        logger.info("YouTube Bronze: %d vídeos", len(df_yt))
-    else:
-        logger.info("YouTube: nenhum vídeo coletado (chave ausente ou API vazia)")
-
-    # ── Vertex NLP enrichment for Twitter/X (if GCP available) ───────────
-    if mentions:
-        gcp_project = os.environ.get("GCP_PROJECT_ID", "")
         if gcp_project:
-            mentions = enrich_sentiment_vertex(mentions, text_field="text", project=gcp_project)
-            df_x_enriched = pd.DataFrame(mentions)
-            write_bronze(
-                df=df_x_enriched,
-                source="social",
-                year=year,
-                uf="BR",
-                filename=f"twitter_mencoes_enriched_{year}.parquet",
-                use_gcs=use_gcs,
-            )
-            logger.info("Twitter/X Vertex NLP: %d registros enriquecidos", len(mentions))
+            yt_records = enrich_sentiment_vertex(yt_records, text_field="title", project=gcp_project)
+        enrich_with_source_meta(yt_records)
+        _write(pd.DataFrame(yt_records), "social", year, f"youtube_videos_{year}.parquet", use_gcs)
+    else:
+        logger.info("YouTube: nenhum vídeo (chave ausente ou API vazia)")
+
+    # ── Bluesky (sem credenciais) ─────────────────────────────────────────────
+    bsky_posts = fetch_bluesky_mentions(candidatos, dias=dias, max_por_candidato=100)
+    if bsky_posts:
+        enrich_with_source_meta(bsky_posts)
+        _write(pd.DataFrame(bsky_posts), "social", year, f"bluesky_posts_{year}.parquet", use_gcs)
+    else:
+        logger.info("Bluesky: nenhum post coletado")
+
+    # ── GDELT — imprensa BR (sem credenciais) ─────────────────────────────────
+    gdelt_articles = fetch_gdelt_mentions(candidatos, dias=min(dias, 90))
+    if gdelt_articles:
+        enrich_with_source_meta(gdelt_articles, fonte_field="fonte_especifica")
+        _write(pd.DataFrame(gdelt_articles), "social", year, f"gdelt_noticias_{year}.parquet", use_gcs)
+    else:
+        logger.info("GDELT: nenhum artigo coletado")
+
+    # ── RSS portais BR (sem credenciais) ─────────────────────────────────────
+    rss_articles = fetch_rss_mentions(candidatos)
+    if rss_articles:
+        enrich_with_source_meta(rss_articles, fonte_field="fonte_especifica")
+        _write(pd.DataFrame(rss_articles), "social", year, f"rss_noticias_{year}.parquet", use_gcs)
+    else:
+        logger.info("RSS: nenhum artigo coletado")
 
     logger.info("Social ingest concluído")
 
@@ -142,12 +136,10 @@ if __name__ == "__main__":
     parser.add_argument(
         "--candidatos",
         default=os.environ.get("SOCIAL_CANDIDATOS", json.dumps(_DEFAULT_CANDIDATOS)),
-        help="JSON list de nomes de candidatos",
     )
     parser.add_argument(
         "--fb-pages",
         default=os.environ.get("SOCIAL_FB_PAGES", json.dumps(_DEFAULT_FB_PAGES)),
-        help="JSON list de IDs de páginas Facebook",
     )
     parser.add_argument("--dias", type=int, default=int(os.environ.get("SOCIAL_DIAS", "7")))
     parser.add_argument("--year", type=int, default=int(os.environ.get("DEFAULT_ANO", "2026")))

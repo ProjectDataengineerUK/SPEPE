@@ -47,6 +47,10 @@ kfp==2.11.0
 # Digital Data
 pytrends==4.9.2
 
+# Social / News
+feedparser==6.0.11
+atproto==0.0.55
+
 # MCP / Agent tooling
 mcp==1.27.0
 

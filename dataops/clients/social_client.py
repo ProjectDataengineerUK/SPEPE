@@ -3,6 +3,9 @@
 Twitter/X: recent search (free tier — 500k tweets/month, 7-day lookback).
 Facebook:  Page posts + reactions via Graph API (requires page token).
 YouTube:   Search + video stats via Data API v3 (requires YOUTUBE_API_KEY).
+
+All fetch functions add 'fonte' field compatible with source_registry.SOURCE_REGISTRY.
+Call enrich_with_source_meta() after fetch to add score_confiabilidade + tipo_fonte.
 """
 
 from __future__ import annotations

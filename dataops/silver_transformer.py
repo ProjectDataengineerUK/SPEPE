@@ -492,10 +492,10 @@ def transform_social_to_silver(
     year: int,
     use_bigquery: bool = False,
 ) -> dict:
-    """Transform Bronze social data (Twitter/X + Facebook + YouTube) to Silver layer.
+    """Transform Bronze social data (Twitter/X + Facebook + YouTube + Bluesky + GDELT + RSS) to Silver.
 
     Reads: raw/social/{year}/BR/ (GCS) or local bronze/social/{year}/BR/
-    Writes: Silver table `social_mencoes_br` with candidato × semana × sentiment.
+    Writes: Silver table `social_mencoes_br` with candidato × semana × sentiment × score_confiabilidade.
     """
     LOCAL_SILVER_DIR.mkdir(parents=True, exist_ok=True)
 
@@ -513,6 +513,9 @@ def transform_social_to_silver(
             "twitter_mencoes_*.parquet",
             "facebook_posts_*.parquet",
             "youtube_videos_*.parquet",
+            "bluesky_posts_*.parquet",
+            "gdelt_noticias_*.parquet",
+            "rss_noticias_*.parquet",
         ]
         for pattern in patterns:
             for f in bronze_social.glob(pattern) if bronze_social.exists() else []:
@@ -605,6 +608,26 @@ def transform_social_to_silver(
     df["ano"] = year
     df["ingested_at"] = pd.Timestamp.utcnow()
 
+    # Source reliability metadata — enrich if not already present from Bronze
+    from dataops.source_registry import get_source_meta
+
+    if "score_confiabilidade" not in df.columns:
+        df["score_confiabilidade"] = df["fonte"].apply(
+            lambda f: get_source_meta(str(f) if f else "desconhecido").score_confiabilidade
+        )
+    if "tipo_fonte" not in df.columns:
+        df["tipo_fonte"] = df["fonte"].apply(
+            lambda f: get_source_meta(str(f) if f else "desconhecido").tipo_fonte
+        )
+    if "vies_politico" not in df.columns:
+        df["vies_politico"] = df["fonte"].apply(
+            lambda f: get_source_meta(str(f) if f else "desconhecido").vies_politico
+        )
+    if "alcance_fonte" not in df.columns:
+        df["alcance_fonte"] = df["fonte"].apply(
+            lambda f: get_source_meta(str(f) if f else "desconhecido").alcance
+        )
+
     # Mantém apenas colunas necessárias para o Silver
     keep = [
         "candidato",
@@ -622,6 +645,10 @@ def transform_social_to_silver(
         "reply_count",
         "view_count",
         "comment_count",
+        "score_confiabilidade",
+        "tipo_fonte",
+        "vies_politico",
+        "alcance_fonte",
         "ingested_at",
     ]
     df = df[[c for c in keep if c in df.columns]]

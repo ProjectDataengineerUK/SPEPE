@@ -146,30 +146,46 @@ def _build_gold_via_bigquery_sql() -> dict:
         "fact_social_municipio": f"""
             CREATE OR REPLACE TABLE `{gold}.fact_social_municipio` AS
             SELECT
-                COALESCE(sg_uf, '')             AS sg_uf,
-                COALESCE(candidato, 'desconhecido') AS candidato,
+                COALESCE(sg_uf, '')                         AS sg_uf,
+                COALESCE(candidato, 'desconhecido')         AS candidato,
                 fonte,
+                COALESCE(tipo_fonte, 'desconhecido')        AS tipo_fonte,
+                COALESCE(vies_politico, 'variado')          AS vies_politico,
                 ano_semana,
-                SAFE_CAST(semana AS INT64)       AS semana,
-                SAFE_CAST(ano AS INT64)          AS ano,
-                DATE(created_at)                 AS data_referencia,
-                COUNT(*)                         AS qt_posts,
-                COALESCE(SUM(like_count), 0)     AS total_likes,
-                COALESCE(SUM(retweet_count), 0)  AS total_retweets,
-                COALESCE(SUM(reply_count), 0)    AS total_comments,
-                COALESCE(SUM(view_count), 0)     AS total_views,
+                SAFE_CAST(semana AS INT64)                  AS semana,
+                SAFE_CAST(ano AS INT64)                     AS ano,
+                DATE(created_at)                            AS data_referencia,
+                COUNT(*)                                    AS qt_posts,
+                COALESCE(SUM(like_count), 0)                AS total_likes,
+                COALESCE(SUM(retweet_count), 0)             AS total_retweets,
+                COALESCE(SUM(reply_count), 0)               AS total_comments,
+                COALESCE(SUM(view_count), 0)                AS total_views,
                 COALESCE(SUM(like_count), 0) + COALESCE(SUM(retweet_count), 0)
-                    + COALESCE(SUM(reply_count), 0) AS total_engajamento,
-                COUNTIF(sentiment = 'positivo')  AS qt_positivo,
-                COUNTIF(sentiment = 'negativo')  AS qt_negativo,
-                COUNTIF(sentiment = 'neutro')    AS qt_neutro,
+                    + COALESCE(SUM(reply_count), 0)         AS total_engajamento,
+                COUNTIF(sentiment = 'positivo')             AS qt_positivo,
+                COUNTIF(sentiment = 'negativo')             AS qt_negativo,
+                COUNTIF(sentiment = 'neutro')               AS qt_neutro,
                 SAFE_DIVIDE(
                     COUNTIF(sentiment = 'positivo') - COUNTIF(sentiment = 'negativo'),
                     COUNT(*)
-                ) * 100                          AS score_liquido_sentimento,
-                CURRENT_TIMESTAMP()              AS ingested_at
+                ) * 100                                     AS score_liquido_sentimento,
+                -- Média ponderada: sentimento × score_confiabilidade da fonte
+                SAFE_DIVIDE(
+                    SUM(
+                        CASE sentiment
+                            WHEN 'positivo' THEN  COALESCE(score_confiabilidade, 5.0)
+                            WHEN 'negativo' THEN -COALESCE(score_confiabilidade, 5.0)
+                            ELSE 0
+                        END
+                    ),
+                    SUM(COALESCE(score_confiabilidade, 5.0))
+                ) * 100                                     AS score_ponderado_sentimento,
+                AVG(COALESCE(score_confiabilidade, 5.0))    AS score_medio_confiabilidade,
+                CURRENT_TIMESTAMP()                         AS ingested_at
             FROM `{silver}.social_mencoes_br`
-            GROUP BY sg_uf, candidato, fonte, ano_semana, semana, ano, DATE(created_at)
+            GROUP BY
+                sg_uf, candidato, fonte, tipo_fonte, vies_politico,
+                ano_semana, semana, ano, DATE(created_at)
         """,
         # fact_pesquisa: promote Silver fact_pesquisa (multi-ano) → Gold
         # Skipped silently if Silver table does not exist yet
@@ -560,7 +576,19 @@ def _build_fact_social() -> pd.DataFrame:
         if col not in df.columns:
             df[col] = 0
 
-    group_cols = ["sg_uf", "candidato", "fonte", "ano_semana", "semana", "ano", "data_referencia"]
+    # Default source score if not present in Silver
+    if "score_confiabilidade" not in df.columns:
+        df["score_confiabilidade"] = 5.0
+    if "tipo_fonte" not in df.columns:
+        df["tipo_fonte"] = "desconhecido"
+    if "vies_politico" not in df.columns:
+        df["vies_politico"] = "variado"
+    df["score_confiabilidade"] = pd.to_numeric(df["score_confiabilidade"], errors="coerce").fillna(5.0)
+
+    group_cols = [
+        "sg_uf", "candidato", "fonte", "tipo_fonte", "vies_politico",
+        "ano_semana", "semana", "ano", "data_referencia",
+    ]
     group_cols = [c for c in group_cols if c in df.columns]
 
     fact = df.groupby(group_cols, as_index=False, dropna=False).agg(
@@ -572,6 +600,7 @@ def _build_fact_social() -> pd.DataFrame:
         qt_positivo=("sentiment", lambda s: (s == "positivo").sum()),
         qt_negativo=("sentiment", lambda s: (s == "negativo").sum()),
         qt_neutro=("sentiment", lambda s: (s == "neutro").sum()),
+        score_medio_confiabilidade=("score_confiabilidade", "mean"),
     )
     fact["total_engajamento"] = (
         fact["total_likes"] + fact["total_retweets"] + fact["total_comments"]
@@ -581,6 +610,17 @@ def _build_fact_social() -> pd.DataFrame:
         (fact["qt_positivo"] - fact["qt_negativo"]) / fact["qt_posts"] * 100,
         0.0,
     )
+    # Weighted sentiment: positive/negative weighted by source score
+    def _weighted_sentiment(sub: pd.DataFrame) -> float:
+        scores = sub["score_confiabilidade"].values
+        signs = sub["sentiment"].map({"positivo": 1, "negativo": -1, "neutro": 0}).fillna(0).values
+        total_weight = scores.sum()
+        return float((signs * scores).sum() / total_weight * 100) if total_weight > 0 else 0.0
+
+    weighted = df.groupby(group_cols, dropna=False).apply(_weighted_sentiment).reset_index()
+    weighted.columns = list(group_cols) + ["score_ponderado_sentimento"]
+    fact = fact.merge(weighted, on=group_cols, how="left")
+
     fact["ingested_at"] = pd.Timestamp.utcnow()
     logger.info("fact_social_municipio: %d rows", len(fact))
     return fact
