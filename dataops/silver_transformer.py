@@ -1113,6 +1113,264 @@ def transform_digital_to_silver(year: int, use_bigquery: bool = False) -> dict:
     return {"status": "ok", "tables": results}
 
 
+def transform_emendas_to_silver(year: int, use_bigquery: bool = False) -> dict:
+    """Transform Bronze emendas parlamentares to Silver.
+
+    Reads:  raw/emendas/{year}/BR/emendas_BR_{year}.parquet  (GCS or local)
+    Writes: Silver table `emendas_parlamentares` (BQ WRITE_APPEND pre-delete) or local parquet.
+
+    Schema enforced:
+      ano, sg_uf, cd_municipio_ibge, nm_municipio,
+      nm_parlamentar, sg_partido, sg_uf_parlamentar, ds_cargo_parlamentar,
+      tp_emenda, ds_area, ds_subfuncao,
+      vl_empenhado, vl_liquidado, vl_pago,
+      nr_emenda, fonte, ingested_at
+    """
+    LOCAL_SILVER_DIR.mkdir(parents=True, exist_ok=True)
+
+    # ── Read Bronze ────────────────────────────────────────────────────────────
+    df = pd.DataFrame()
+    if GCS_BUCKET:
+        prefix = f"raw/emendas/{year}/BR/"
+        logger.info("Emendas Bronze GCS: prefix=%s", prefix)
+        try:
+            df = _read_gcs_parquet_glob(GCS_BUCKET, prefix)
+        except Exception as exc:
+            logger.warning("GCS read emendas %d: %s", year, exc)
+
+    if df.empty:
+        bronze_path = LOCAL_BRONZE_DIR / "emendas" / str(year) / "BR"
+        files = list(bronze_path.glob("*.parquet")) if bronze_path.exists() else []
+        if files:
+            df = pd.concat([pd.read_parquet(f) for f in files], ignore_index=True)
+
+    if df.empty:
+        return {"status": "error", "message": f"Bronze emendas vazio para ano={year}"}
+
+    # ── Normalize ──────────────────────────────────────────────────────────────
+    df = df.copy()
+    if "ano" not in df.columns:
+        df["ano"] = year
+
+    for col in ("vl_empenhado", "vl_liquidado", "vl_pago"):
+        if col in df.columns:
+            df[col] = pd.to_numeric(df[col], errors="coerce").fillna(0.0)
+
+    if "cd_municipio_ibge" in df.columns:
+        df["cd_municipio_ibge"] = (
+            pd.to_numeric(df["cd_municipio_ibge"], errors="coerce")
+            .astype("float64")
+        )
+
+    # Truncate IBGE code to 7 digits (some sources send 8)
+    if "cd_municipio_ibge" in df.columns:
+        df["cd_municipio_ibge"] = df["cd_municipio_ibge"].apply(
+            lambda v: int(str(int(v))[:7]) if pd.notna(v) and v > 0 else None
+        )
+
+    str_cols = [
+        "nm_municipio", "sg_uf", "nm_parlamentar", "sg_partido",
+        "sg_uf_parlamentar", "ds_cargo_parlamentar", "tp_emenda",
+        "ds_area", "ds_subfuncao", "nr_emenda", "fonte",
+    ]
+    for col in str_cols:
+        if col in df.columns:
+            df[col] = df[col].fillna("").astype(str).str.strip()
+
+    if "fonte" not in df.columns or df["fonte"].eq("").all():
+        df["fonte"] = "portal_transparencia_emendas"
+
+    df["score_confiabilidade"] = 9.0  # Portal da Transparência — dado oficial federal
+    df["ingested_at"] = pd.Timestamp.utcnow()
+
+    logger.info(
+        "Emendas Silver %d: %d registros | %d UFs | R$ %.1fM pago",
+        year, len(df),
+        df["sg_uf"].nunique() if "sg_uf" in df.columns else 0,
+        df["vl_pago"].sum() / 1e6 if "vl_pago" in df.columns else 0,
+    )
+
+    # ── Write ──────────────────────────────────────────────────────────────────
+    if use_bigquery:
+        project = os.environ.get("GCP_PROJECT_ID", "spepe-dev")
+        dataset = os.environ.get("BIGQUERY_DATASET_SILVER", "spepe_silver")
+        try:
+            from google.cloud import bigquery
+            from google.cloud.bigquery import SchemaUpdateOption, WriteDisposition
+
+            client = bigquery.Client(project=project)
+            table_id = f"{project}.{dataset}.emendas_parlamentares"
+            df_bq = _normalize_for_bq(df)
+
+            try:
+                client.query(f"DELETE FROM `{table_id}` WHERE ano = {year}").result()
+                logger.info("Emendas Silver pre-delete ano=%d OK", year)
+            except Exception:
+                pass
+
+            job_config = bigquery.LoadJobConfig(
+                write_disposition=WriteDisposition.WRITE_APPEND,
+                create_disposition="CREATE_IF_NEEDED",
+                autodetect=True,
+                schema_update_options=[SchemaUpdateOption.ALLOW_FIELD_ADDITION],
+            )
+            client.load_table_from_dataframe(df_bq, table_id, job_config=job_config).result()
+            logger.info("Emendas Silver BQ: %s (%d rows)", table_id, len(df))
+            return {"status": "ok", "path": table_id, "rows": len(df)}
+        except ImportError:
+            logger.warning("google-cloud-bigquery não disponível. Usando local.")
+
+    path_local = LOCAL_SILVER_DIR / f"emendas_parlamentares_{year}.parquet"
+    df.to_parquet(path_local, index=False, compression="zstd")
+    logger.info("Emendas Silver local: %s (%d rows)", path_local, len(df))
+    return {"status": "ok", "path": str(path_local), "rows": len(df)}
+
+
+def transform_sancoes_to_silver(use_bigquery: bool = False) -> dict:
+    """Transform Bronze CEIS + CNEP sanções to Silver.
+
+    Reads:  raw/sancoes/snapshot/BR/ceis_BR_snapshot.parquet  (GCS or local)
+            raw/sancoes/snapshot/BR/cnep_BR_snapshot.parquet
+    Writes: Silver table `sancoes_empresas` (BQ WRITE_TRUNCATE) or local parquet.
+
+    Schema enforced:
+      fonte_sistema (CEIS|CNEP), nm_pessoa, tp_pessoa, nr_cpf_cnpj (mascarado),
+      nm_sancionador, tp_sancao, dt_inicio_sancao, dt_fim_sancao,
+      nm_orgao_sancionador, sg_uf_sancionador, nm_municipio_sancionador,
+      valor_multa, score_confiabilidade, ingested_at
+    """
+    LOCAL_SILVER_DIR.mkdir(parents=True, exist_ok=True)
+
+    frames: list[pd.DataFrame] = []
+
+    def _read_sancoes_bronze(sistema: str) -> pd.DataFrame:
+        prefix = f"raw/sancoes/snapshot/BR/{sistema.lower()}_BR_snapshot.parquet"
+        if GCS_BUCKET:
+            try:
+                import io
+                from google.cloud import storage
+                client = storage.Client()
+                blob = client.bucket(GCS_BUCKET).blob(prefix)
+                if blob.exists():
+                    return pd.read_parquet(io.BytesIO(blob.download_as_bytes()))
+            except Exception as exc:
+                logger.warning("GCS read %s: %s", prefix, exc)
+        local = LOCAL_BRONZE_DIR / "sancoes" / "snapshot" / "BR" / f"{sistema.lower()}_BR_snapshot.parquet"
+        if local.exists():
+            return pd.read_parquet(local)
+        return pd.DataFrame()
+
+    for sistema in ("ceis", "cnep"):
+        df_s = _read_sancoes_bronze(sistema)
+        if not df_s.empty:
+            df_s["fonte_sistema"] = sistema.upper()
+            frames.append(df_s)
+            logger.info("Sanções Bronze %s: %d registros", sistema.upper(), len(df_s))
+
+    if not frames:
+        return {"status": "error", "message": "Bronze sanções vazio (CEIS + CNEP)"}
+
+    df = pd.concat(frames, ignore_index=True)
+    df = df.copy()
+
+    # ── Normalize field names (Portal da Transparência schema) ────────────────
+    _rename = {
+        "nomeInfrator": "nm_pessoa",
+        "tipoPessoa": "tp_pessoa",
+        "cpfCnpj": "nr_cpf_cnpj",
+        "nomeSancionado": "nm_pessoa",
+        "cpfCnpjSancionado": "nr_cpf_cnpj",
+        "tipoSancao": "tp_sancao",
+        "dataInicioSancao": "dt_inicio_sancao",
+        "dataFimSancao": "dt_fim_sancao",
+        "orgaoSancionador": "nm_orgao_sancionador",
+        "ufOrgaoSancionador": "sg_uf_sancionador",
+        "municipioSancionador": "nm_municipio_sancionador",
+        "valorMulta": "valor_multa",
+        "nomeFantasia": "nm_fantasia",
+        "razaoSocial": "nm_razao_social",
+        "fundamentacaoLegal": "ds_fundamentacao",
+    }
+    df = df.rename(columns={k: v for k, v in _rename.items() if k in df.columns})
+
+    # Ensure canonical columns exist
+    for col in (
+        "nm_pessoa", "tp_pessoa", "nr_cpf_cnpj", "tp_sancao",
+        "dt_inicio_sancao", "dt_fim_sancao", "nm_orgao_sancionador",
+        "sg_uf_sancionador", "nm_municipio_sancionador",
+    ):
+        if col not in df.columns:
+            df[col] = ""
+
+    # Parse dates
+    for col in ("dt_inicio_sancao", "dt_fim_sancao"):
+        df[col] = pd.to_datetime(df[col], errors="coerce", dayfirst=True)
+
+    # Mask CPF/CNPJ — keep only last 4 digits visible
+    if "nr_cpf_cnpj" in df.columns:
+        def _mask_doc(v: str) -> str:
+            v = str(v).strip() if pd.notna(v) else ""
+            digits = "".join(c for c in v if c.isdigit())
+            if len(digits) >= 4:
+                return "*" * (len(digits) - 4) + digits[-4:]
+            return "****"
+        df["nr_cpf_cnpj"] = df["nr_cpf_cnpj"].apply(_mask_doc)
+
+    # Numeric
+    if "valor_multa" in df.columns:
+        df["valor_multa"] = pd.to_numeric(df["valor_multa"], errors="coerce").fillna(0.0)
+
+    # String clean
+    str_cols = [
+        "nm_pessoa", "tp_pessoa", "tp_sancao", "nm_orgao_sancionador",
+        "sg_uf_sancionador", "nm_municipio_sancionador", "fonte_sistema",
+    ]
+    for col in str_cols:
+        if col in df.columns:
+            df[col] = df[col].fillna("").astype(str).str.strip()
+
+    if "fonte" not in df.columns:
+        df["fonte"] = "portal_transparencia_sancoes"
+    df["score_confiabilidade"] = 9.5  # CEIS/CNEP = cadastros federais oficiais
+    df["ingested_at"] = pd.Timestamp.utcnow()
+
+    logger.info(
+        "Sanções Silver: %d registros | CEIS=%d | CNEP=%d",
+        len(df),
+        (df["fonte_sistema"] == "CEIS").sum(),
+        (df["fonte_sistema"] == "CNEP").sum(),
+    )
+
+    # ── Write ──────────────────────────────────────────────────────────────────
+    if use_bigquery:
+        project = os.environ.get("GCP_PROJECT_ID", "spepe-dev")
+        dataset = os.environ.get("BIGQUERY_DATASET_SILVER", "spepe_silver")
+        try:
+            from google.cloud import bigquery
+            from google.cloud.bigquery import SchemaUpdateOption, WriteDisposition
+
+            client = bigquery.Client(project=project)
+            table_id = f"{project}.{dataset}.sancoes_empresas"
+            df_bq = _normalize_for_bq(df)
+
+            job_config = bigquery.LoadJobConfig(
+                write_disposition=WriteDisposition.WRITE_TRUNCATE,
+                create_disposition="CREATE_IF_NEEDED",
+                autodetect=True,
+                schema_update_options=[SchemaUpdateOption.ALLOW_FIELD_ADDITION],
+            )
+            client.load_table_from_dataframe(df_bq, table_id, job_config=job_config).result()
+            logger.info("Sanções Silver BQ: %s (%d rows)", table_id, len(df))
+            return {"status": "ok", "path": table_id, "rows": len(df)}
+        except ImportError:
+            logger.warning("google-cloud-bigquery não disponível. Usando local.")
+
+    path_local = LOCAL_SILVER_DIR / "sancoes_empresas_snapshot.parquet"
+    df.to_parquet(path_local, index=False, compression="zstd")
+    logger.info("Sanções Silver local: %s (%d rows)", path_local, len(df))
+    return {"status": "ok", "path": str(path_local), "rows": len(df)}
+
+
 def _dataframe_to_bq_schema(df: pd.DataFrame) -> list:
     from google.cloud import bigquery
 

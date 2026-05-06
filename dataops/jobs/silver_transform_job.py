@@ -18,8 +18,10 @@ def main(uf: str, years: list[int] | None = None, include_social: bool = True) -
         transform_cadunico_to_silver,
         transform_digital_to_silver,
         transform_economia_to_silver,
+        transform_emendas_to_silver,
         transform_pesquisas_to_silver,
         transform_saude_to_silver,
+        transform_sancoes_to_silver,
         transform_seguranca_to_silver,
         transform_social_to_silver,
         transform_to_silver,
@@ -133,6 +135,28 @@ def main(uf: str, years: list[int] | None = None, include_social: bool = True) -
                 "Digital Silver ano=%d: %s (pode ser vazio se digital_ingest não rodou)",
                 digital_year, r.get("message"),
             )
+
+    # ── Emendas Parlamentares (nacional — BR, multi-ano) ────────────────────
+    _ey_env = os.environ.get("EMENDAS_YEARS", "2018,2022,2025")
+    emendas_years = [int(y.strip()) for y in _ey_env.split(",") if y.strip()]
+    for emendas_year in emendas_years:
+        logger.info("Silver emendas: ano=%d", emendas_year)
+        r = transform_emendas_to_silver(emendas_year, use_bigquery=use_bq)
+        if r.get("status") == "ok":
+            logger.info("Emendas Silver OK ano=%d: %d rows", emendas_year, r.get("rows", 0))
+        else:
+            logger.warning(
+                "Emendas Silver ano=%d: %s (Bronze pode estar vazio — 403 API)",
+                emendas_year, r.get("message"),
+            )
+
+    # ── Sanções CEIS + CNEP (snapshot único) ────────────────────────────────
+    logger.info("Silver sanções CEIS+CNEP")
+    r = transform_sancoes_to_silver(use_bigquery=use_bq)
+    if r.get("status") == "ok":
+        logger.info("Sanções Silver OK: %d rows", r.get("rows", 0))
+    else:
+        logger.warning("Sanções Silver: %s (Bronze pode estar vazio)", r.get("message"))
 
     if not all_ok:
         sys.exit(1)

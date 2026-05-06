@@ -280,6 +280,71 @@ def _build_gold_via_bigquery_sql() -> dict:
             WHERE sg_uf IS NOT NULL
             GROUP BY candidato, sg_uf, ano
         """,
+        # ── Emendas por UF × parlamentar × área ──────────────────────────────────
+        "fact_emendas_parlamentar": f"""
+            CREATE OR REPLACE TABLE `{gold}.fact_emendas_parlamentar` AS
+            SELECT
+                ano,
+                sg_uf,
+                sg_uf_parlamentar,
+                nm_parlamentar,
+                sg_partido,
+                ds_cargo_parlamentar,
+                tp_emenda,
+                ds_area,
+                COUNT(*)                        AS qt_emendas,
+                SUM(vl_empenhado)               AS vl_empenhado_total,
+                SUM(vl_liquidado)               AS vl_liquidado_total,
+                SUM(vl_pago)                    AS vl_pago_total,
+                AVG(vl_pago)                    AS vl_pago_medio,
+                COUNT(DISTINCT cd_municipio_ibge) AS qt_municipios_atendidos,
+                CURRENT_TIMESTAMP()             AS ingested_at
+            FROM `{silver}.emendas_parlamentares`
+            WHERE vl_pago > 0
+            GROUP BY
+                ano, sg_uf, sg_uf_parlamentar, nm_parlamentar, sg_partido,
+                ds_cargo_parlamentar, tp_emenda, ds_area
+        """,
+        # ── Emendas por município × área (cruzamento territorial) ─────────────
+        "fact_emendas_municipio": f"""
+            CREATE OR REPLACE TABLE `{gold}.fact_emendas_municipio` AS
+            SELECT
+                ano,
+                cd_municipio_ibge,
+                nm_municipio,
+                sg_uf,
+                ds_area,
+                tp_emenda,
+                COUNT(*)                        AS qt_emendas,
+                COUNT(DISTINCT nm_parlamentar)  AS qt_parlamentares_distintos,
+                SUM(vl_empenhado)               AS vl_empenhado_total,
+                SUM(vl_liquidado)               AS vl_liquidado_total,
+                SUM(vl_pago)                    AS vl_pago_total,
+                CURRENT_TIMESTAMP()             AS ingested_at
+            FROM `{silver}.emendas_parlamentares`
+            WHERE cd_municipio_ibge IS NOT NULL
+            GROUP BY ano, cd_municipio_ibge, nm_municipio, sg_uf, ds_area, tp_emenda
+        """,
+        # ── Sanções por UF × tipo ─────────────────────────────────────────────
+        "fact_sancoes_uf": f"""
+            CREATE OR REPLACE TABLE `{gold}.fact_sancoes_uf` AS
+            SELECT
+                fonte_sistema,
+                sg_uf_sancionador                   AS sg_uf,
+                tp_sancao,
+                tp_pessoa,
+                EXTRACT(YEAR FROM dt_inicio_sancao) AS ano_sancao,
+                COUNT(*)                            AS qt_sancoes,
+                SUM(valor_multa)                    AS vl_multa_total,
+                AVG(valor_multa)                    AS vl_multa_medio,
+                COUNT(DISTINCT nm_orgao_sancionador) AS qt_orgaos_sancionadores,
+                CURRENT_TIMESTAMP()                 AS ingested_at
+            FROM `{silver}.sancoes_empresas`
+            WHERE sg_uf_sancionador IS NOT NULL AND sg_uf_sancionador != ''
+            GROUP BY
+                fonte_sistema, sg_uf_sancionador, tp_sancao, tp_pessoa,
+                EXTRACT(YEAR FROM dt_inicio_sancao)
+        """,
         # ── Índice combinado: gasto Meta Ads + interesse Trends + sentimento social ──
         "fact_indice_digital_candidato": f"""
             CREATE OR REPLACE TABLE `{gold}.fact_indice_digital_candidato` AS
@@ -337,6 +402,9 @@ def _build_gold_via_bigquery_sql() -> dict:
         "fact_meta_ads_demografico",
         "fact_google_trends_uf",
         "fact_indice_digital_candidato",
+        "fact_emendas_parlamentar",
+        "fact_emendas_municipio",
+        "fact_sancoes_uf",
     }
 
     results = {}
@@ -449,6 +517,19 @@ def build_gold(use_bigquery: bool = False) -> dict:
     result["fact_economico_municipio"] = _write_gold(
         fact_eco, "fact_economico_municipio", use_bigquery
     )
+
+    # ── Emendas Parlamentares ─────────────────────────────────────────────────
+    fact_emendas_parl, fact_emendas_mun = _build_fact_emendas()
+    result["fact_emendas_parlamentar"] = _write_gold(
+        fact_emendas_parl, "fact_emendas_parlamentar", use_bigquery
+    )
+    result["fact_emendas_municipio"] = _write_gold(
+        fact_emendas_mun, "fact_emendas_municipio", use_bigquery
+    )
+
+    # ── Sanções CEIS + CNEP ────────────────────────────────────────────────────
+    fact_sancoes = _build_fact_sancoes_uf()
+    result["fact_sancoes_uf"] = _write_gold(fact_sancoes, "fact_sancoes_uf", use_bigquery)
 
     # ── Digital (Meta Ads + Google Trends) ───────────────────────────────────
     fact_meta_uf = _build_fact_meta_ads_uf()
@@ -826,6 +907,94 @@ def _build_fact_meta_ads_demografico() -> pd.DataFrame:
     )
     fact["ingested_at"] = pd.Timestamp.utcnow()
     logger.info("fact_meta_ads_demografico: %d rows", len(fact))
+    return fact
+
+
+def _build_fact_emendas() -> tuple[pd.DataFrame, pd.DataFrame]:
+    """Aggregate Silver emendas_parlamentares into two Gold facts (local path)."""
+    files = list(LOCAL_SILVER_DIR.glob("emendas_parlamentares_*.parquet"))
+    if not files:
+        logger.info("fact_emendas_*: nenhum Silver emendas disponível")
+        return pd.DataFrame(), pd.DataFrame()
+
+    df = pd.concat([pd.read_parquet(f) for f in files], ignore_index=True)
+
+    for col in ("vl_empenhado", "vl_liquidado", "vl_pago"):
+        if col not in df.columns:
+            df[col] = 0.0
+        df[col] = pd.to_numeric(df[col], errors="coerce").fillna(0.0)
+
+    df_pago = df[df["vl_pago"] > 0] if "vl_pago" in df.columns else df
+
+    # ── por parlamentar ───────────────────────────────────────────────────────
+    parl_cols = [c for c in [
+        "ano", "sg_uf", "sg_uf_parlamentar", "nm_parlamentar",
+        "sg_partido", "ds_cargo_parlamentar", "tp_emenda", "ds_area",
+    ] if c in df_pago.columns]
+
+    fact_parl = df_pago.groupby(parl_cols, as_index=False, dropna=False).agg(
+        qt_emendas=("vl_pago", "count"),
+        vl_empenhado_total=("vl_empenhado", "sum"),
+        vl_liquidado_total=("vl_liquidado", "sum"),
+        vl_pago_total=("vl_pago", "sum"),
+        vl_pago_medio=("vl_pago", "mean"),
+        qt_municipios_atendidos=("cd_municipio_ibge", "nunique") if "cd_municipio_ibge" in df_pago.columns else ("vl_pago", "count"),
+    )
+    fact_parl["ingested_at"] = pd.Timestamp.utcnow()
+    logger.info("fact_emendas_parlamentar: %d rows", len(fact_parl))
+
+    # ── por município ─────────────────────────────────────────────────────────
+    mun_cols = [c for c in [
+        "ano", "cd_municipio_ibge", "nm_municipio", "sg_uf", "ds_area", "tp_emenda",
+    ] if c in df.columns]
+
+    df_mun = df[df["cd_municipio_ibge"].notna()] if "cd_municipio_ibge" in df.columns else df
+    fact_mun = df_mun.groupby(mun_cols, as_index=False, dropna=False).agg(
+        qt_emendas=("vl_pago", "count"),
+        qt_parlamentares_distintos=("nm_parlamentar", "nunique") if "nm_parlamentar" in df_mun.columns else ("vl_pago", "count"),
+        vl_empenhado_total=("vl_empenhado", "sum"),
+        vl_liquidado_total=("vl_liquidado", "sum"),
+        vl_pago_total=("vl_pago", "sum"),
+    )
+    fact_mun["ingested_at"] = pd.Timestamp.utcnow()
+    logger.info("fact_emendas_municipio: %d rows", len(fact_mun))
+
+    return fact_parl, fact_mun
+
+
+def _build_fact_sancoes_uf() -> pd.DataFrame:
+    """Aggregate Silver sancoes_empresas into Gold fact_sancoes_uf (local path)."""
+    files = list(LOCAL_SILVER_DIR.glob("sancoes_empresas_*.parquet"))
+    if not files:
+        logger.info("fact_sancoes_uf: nenhum Silver sanções disponível")
+        return pd.DataFrame()
+
+    df = pd.concat([pd.read_parquet(f) for f in files], ignore_index=True)
+
+    if "dt_inicio_sancao" in df.columns:
+        ts = pd.to_datetime(df["dt_inicio_sancao"], errors="coerce")
+        df["ano_sancao"] = ts.dt.year.astype("Int64")
+    if "valor_multa" not in df.columns:
+        df["valor_multa"] = 0.0
+    df["valor_multa"] = pd.to_numeric(df["valor_multa"], errors="coerce").fillna(0.0)
+
+    df_filtered = df[
+        df["sg_uf_sancionador"].notna() & (df["sg_uf_sancionador"] != "")
+    ] if "sg_uf_sancionador" in df.columns else df
+
+    group_cols = [c for c in [
+        "fonte_sistema", "sg_uf_sancionador", "tp_sancao", "tp_pessoa", "ano_sancao",
+    ] if c in df_filtered.columns]
+
+    fact = df_filtered.groupby(group_cols, as_index=False, dropna=False).agg(
+        qt_sancoes=("valor_multa", "count"),
+        vl_multa_total=("valor_multa", "sum"),
+        vl_multa_medio=("valor_multa", "mean"),
+        qt_orgaos_sancionadores=("nm_orgao_sancionador", "nunique") if "nm_orgao_sancionador" in df_filtered.columns else ("valor_multa", "count"),
+    )
+    fact.rename(columns={"sg_uf_sancionador": "sg_uf"}, inplace=True)
+    fact["ingested_at"] = pd.Timestamp.utcnow()
+    logger.info("fact_sancoes_uf: %d rows", len(fact))
     return fact
 
 
