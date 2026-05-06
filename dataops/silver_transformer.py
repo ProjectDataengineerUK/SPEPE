@@ -976,6 +976,143 @@ def transform_cadunico_to_silver(
     return {"status": "ok", "path": path, "rows": len(df)}
 
 
+def transform_digital_to_silver(year: int, use_bigquery: bool = False) -> dict:
+    """Transform Bronze digital data (Meta Ads + Google Trends) to Silver layer.
+
+    Meta Ads Bronze files:
+      digital/{year}/BR/meta_ads_{year}.parquet         → Silver meta_ads_BR
+      digital/{year}/BR/meta_ads_regioes_{year}.parquet → Silver meta_ads_regioes_BR
+
+    Google Trends Bronze files:
+      digital/{year}/BR/google_trends_timeline_{year}.parquet → Silver google_trends_BR
+      digital/{year}/BR/google_trends_por_uf_{year}.parquet   → Silver google_trends_uf_BR
+
+    All tables include score_confiabilidade from source_registry.
+    """
+    LOCAL_SILVER_DIR.mkdir(parents=True, exist_ok=True)
+
+    from dataops.source_registry import get_source_meta
+
+    results: dict[str, dict] = {}
+
+    def _read_bronze(filename: str) -> pd.DataFrame:
+        if GCS_BUCKET:
+            prefix = f"raw/digital/{year}/BR/{filename}"
+            try:
+                from google.cloud import storage
+                client = storage.Client()
+                bucket = client.bucket(GCS_BUCKET)
+                blob = bucket.blob(prefix)
+                if blob.exists():
+                    import io
+                    return pd.read_parquet(io.BytesIO(blob.download_as_bytes()))
+            except Exception as exc:
+                logger.warning("GCS read %s: %s", prefix, exc)
+        local = LOCAL_BRONZE_DIR / "digital" / str(year) / "BR" / filename
+        if local.exists():
+            return pd.read_parquet(local)
+        return pd.DataFrame()
+
+    def _write_silver(df: pd.DataFrame, table_name: str) -> str:
+        if df.empty:
+            return ""
+        if use_bigquery:
+            project = os.environ.get("GCP_PROJECT_ID", "")
+            dataset = os.environ.get("BIGQUERY_DATASET_SILVER", "spepe_silver")
+            table_id = f"{project}.{dataset}.{table_name}"
+            from google.cloud import bigquery
+            from google.cloud.bigquery import SchemaUpdateOption, WriteDisposition
+            bq = bigquery.Client(project=project)
+            bq.query(f"DELETE FROM `{table_id}` WHERE ano = {year}",
+                     job_config=bigquery.QueryJobConfig()).result()
+            cfg = bigquery.LoadJobConfig(
+                write_disposition=WriteDisposition.WRITE_APPEND,
+                autodetect=True,
+                schema_update_options=[SchemaUpdateOption.ALLOW_FIELD_ADDITION],
+            )
+            bq.load_table_from_dataframe(df, table_id, job_config=cfg).result()
+            logger.info("Digital Silver BQ %s: %d rows", table_id, len(df))
+            return table_id
+        path = LOCAL_SILVER_DIR / f"{table_name}_{year}.parquet"
+        df.to_parquet(path, index=False, compression="zstd")
+        logger.info("Digital Silver local %s: %d rows", path, len(df))
+        return str(path)
+
+    meta_score = get_source_meta("meta_ad_library") if "meta_ad_library" in __import__("dataops.source_registry", fromlist=["SOURCE_REGISTRY"]).SOURCE_REGISTRY else None
+
+    # ── Meta Ads summary ──────────────────────────────────────────────────────
+    ads_df = _read_bronze(f"meta_ads_{year}.parquet")
+    if not ads_df.empty:
+        ads_df["ano"] = year
+        ads_df["ingested_at"] = pd.Timestamp.utcnow()
+        ads_df["score_confiabilidade"] = 8.0
+        ads_df["tipo_fonte"] = "agregador"
+        ads_df["vies_politico"] = "neutro"
+        results["meta_ads_BR"] = {
+            "path": _write_silver(ads_df, "meta_ads_BR"),
+            "rows": len(ads_df),
+        }
+
+    # ── Meta Ads por UF (region_distribution explodido) ───────────────────────
+    regions_df = _read_bronze(f"meta_ads_regioes_{year}.parquet")
+    if not regions_df.empty:
+        regions_df["ano"] = year
+        regions_df["ingested_at"] = pd.Timestamp.utcnow()
+        regions_df["score_confiabilidade"] = 8.0
+        regions_df["tipo_fonte"] = "agregador"
+        results["meta_ads_regioes_BR"] = {
+            "path": _write_silver(regions_df, "meta_ads_regioes_BR"),
+            "rows": len(regions_df),
+        }
+
+    # ── Meta Ads demográfico ───────────────────────────────────────────────────
+    demo_df = _read_bronze(f"meta_ads_demograficos_{year}.parquet")
+    if not demo_df.empty:
+        demo_df["ano"] = year
+        demo_df["ingested_at"] = pd.Timestamp.utcnow()
+        results["meta_ads_demograficos_BR"] = {
+            "path": _write_silver(demo_df, "meta_ads_demograficos_BR"),
+            "rows": len(demo_df),
+        }
+
+    # ── Google Trends timeline ─────────────────────────────────────────────────
+    trends_df = _read_bronze(f"google_trends_timeline_{year}.parquet")
+    if not trends_df.empty:
+        # Pivot wide → long: one row per (date, candidato)
+        ts_col = "date" if "date" in trends_df.columns else trends_df.columns[0]
+        id_cols = [c for c in ("date", "ano", "fonte") if c in trends_df.columns]
+        val_cols = [c for c in trends_df.columns if c not in id_cols]
+        long_df = trends_df.melt(id_vars=id_cols, value_vars=val_cols,
+                                  var_name="candidato", value_name="interesse_busca")
+        long_df["ano"] = year
+        long_df["fonte"] = "google_trends"
+        long_df["score_confiabilidade"] = 7.0
+        long_df["tipo_fonte"] = "agregador"
+        long_df["vies_politico"] = "neutro"
+        long_df["ingested_at"] = pd.Timestamp.utcnow()
+        results["google_trends_BR"] = {
+            "path": _write_silver(long_df, "google_trends_BR"),
+            "rows": len(long_df),
+        }
+
+    # ── Google Trends por UF ──────────────────────────────────────────────────
+    trends_uf_df = _read_bronze(f"google_trends_por_uf_{year}.parquet")
+    if not trends_uf_df.empty:
+        trends_uf_df["ano"] = year
+        trends_uf_df["score_confiabilidade"] = 7.0
+        trends_uf_df["tipo_fonte"] = "agregador"
+        trends_uf_df["ingested_at"] = pd.Timestamp.utcnow()
+        results["google_trends_uf_BR"] = {
+            "path": _write_silver(trends_uf_df, "google_trends_uf_BR"),
+            "rows": len(trends_uf_df),
+        }
+
+    if not results:
+        return {"status": "error", "message": f"Nenhum dado digital Bronze para {year}"}
+
+    return {"status": "ok", "tables": results}
+
+
 def _dataframe_to_bq_schema(df: pd.DataFrame) -> list:
     from google.cloud import bigquery
 

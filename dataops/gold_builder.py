@@ -213,6 +213,118 @@ def _build_gold_via_bigquery_sql() -> dict:
             FROM `{silver}.transferencias_sociais`
             WHERE cd_municipio_ibge IS NOT NULL
         """,
+        # ── Meta Ad Library por UF (gasto × impressões × candidato × semana) ──
+        "fact_meta_ads_uf": f"""
+            CREATE OR REPLACE TABLE `{gold}.fact_meta_ads_uf` AS
+            WITH base AS (
+                SELECT
+                    candidato,
+                    sg_uf,
+                    SAFE_CAST(ano AS INT64)                                  AS ano,
+                    DATE(PARSE_TIMESTAMP('%Y-%m-%dT%H:%M:%S%Ez', dt_inicio)) AS dt_inicio,
+                    FORMAT_DATE('%Y-W%V', DATE(PARSE_TIMESTAMP('%Y-%m-%dT%H:%M:%S%Ez', dt_inicio)))
+                                                                             AS ano_semana,
+                    SAFE_CAST(FORMAT_DATE('%V', DATE(PARSE_TIMESTAMP('%Y-%m-%dT%H:%M:%S%Ez', dt_inicio))) AS INT64)
+                                                                             AS semana,
+                    COALESCE(vl_gasto_estimado_uf, 0.0)                     AS vl_gasto_estimado_uf,
+                    COALESCE(qt_impressoes_estimadas_uf, 0.0)               AS qt_impressoes_estimadas_uf
+                FROM `{silver}.meta_ads_regioes_BR`
+                WHERE sg_uf IS NOT NULL AND sg_uf != ''
+            )
+            SELECT
+                candidato,
+                sg_uf,
+                ano,
+                ano_semana,
+                semana,
+                COUNT(DISTINCT dt_inicio)                                    AS qt_anuncios,
+                SUM(vl_gasto_estimado_uf)                                   AS vl_gasto_total_uf,
+                SUM(qt_impressoes_estimadas_uf)                             AS qt_impressoes_total_uf,
+                AVG(vl_gasto_estimado_uf)                                   AS vl_gasto_medio_por_anuncio,
+                SAFE_DIVIDE(
+                    SUM(vl_gasto_estimado_uf),
+                    NULLIF(SUM(qt_impressoes_estimadas_uf), 0) / 1000.0
+                )                                                            AS custo_por_mil_impressoes,
+                CURRENT_TIMESTAMP()                                         AS ingested_at
+            FROM base
+            GROUP BY candidato, sg_uf, ano, ano_semana, semana
+        """,
+        # ── Meta Ads demográfico (perfil etário/gênero por candidato × UF) ────
+        "fact_meta_ads_demografico": f"""
+            CREATE OR REPLACE TABLE `{gold}.fact_meta_ads_demografico` AS
+            SELECT
+                candidato,
+                faixa_etaria,
+                genero,
+                SAFE_CAST(ano AS INT64)                                     AS ano,
+                COUNT(DISTINCT ad_id)                                       AS qt_anuncios,
+                SUM(COALESCE(vl_gasto_estimado_demo, 0.0))                  AS vl_gasto_estimado_total,
+                AVG(COALESCE(pct_demografico, 0.0))                         AS pct_demografico_medio,
+                CURRENT_TIMESTAMP()                                         AS ingested_at
+            FROM `{silver}.meta_ads_demograficos_BR`
+            WHERE faixa_etaria IS NOT NULL
+            GROUP BY candidato, faixa_etaria, genero, ano
+        """,
+        # ── Google Trends por UF (interesse de busca × candidato × semana) ───
+        "fact_google_trends_uf": f"""
+            CREATE OR REPLACE TABLE `{gold}.fact_google_trends_uf` AS
+            SELECT
+                candidato,
+                sg_uf,
+                SAFE_CAST(ano AS INT64)                                     AS ano,
+                AVG(COALESCE(SAFE_CAST(interesse_busca AS FLOAT64), 0.0))   AS interesse_busca_medio,
+                MAX(COALESCE(SAFE_CAST(interesse_busca AS FLOAT64), 0.0))   AS interesse_busca_max,
+                COUNT(*)                                                    AS qt_semanas,
+                CURRENT_TIMESTAMP()                                         AS ingested_at
+            FROM `{silver}.google_trends_uf_BR`
+            WHERE sg_uf IS NOT NULL
+            GROUP BY candidato, sg_uf, ano
+        """,
+        # ── Índice combinado: gasto Meta Ads + interesse Trends + sentimento social ──
+        "fact_indice_digital_candidato": f"""
+            CREATE OR REPLACE TABLE `{gold}.fact_indice_digital_candidato` AS
+            WITH ads AS (
+                SELECT
+                    candidato, sg_uf, ano,
+                    SUM(vl_gasto_total_uf)       AS vl_gasto_total,
+                    SUM(qt_impressoes_total_uf)  AS qt_impressoes,
+                    SUM(qt_anuncios)             AS qt_anuncios
+                FROM `{gold}.fact_meta_ads_uf`
+                GROUP BY candidato, sg_uf, ano
+            ),
+            trends AS (
+                SELECT candidato, sg_uf, ano,
+                    AVG(interesse_busca_medio)   AS interesse_busca
+                FROM `{gold}.fact_google_trends_uf`
+                GROUP BY candidato, sg_uf, ano
+            ),
+            social AS (
+                SELECT
+                    COALESCE(candidato, 'desconhecido') AS candidato,
+                    COALESCE(sg_uf, '')                 AS sg_uf,
+                    SAFE_CAST(ano AS INT64)             AS ano,
+                    SUM(qt_posts)                       AS qt_mencoes,
+                    AVG(score_liquido_sentimento)        AS score_sentimento,
+                    AVG(score_medio_confiabilidade)      AS score_confiabilidade_medio
+                FROM `{gold}.fact_social_municipio`
+                GROUP BY candidato, sg_uf, ano
+            )
+            SELECT
+                COALESCE(ads.candidato, trends.candidato, social.candidato) AS candidato,
+                COALESCE(ads.sg_uf, trends.sg_uf, social.sg_uf)             AS sg_uf,
+                COALESCE(ads.ano, trends.ano, social.ano)                   AS ano,
+                COALESCE(ads.vl_gasto_total, 0.0)                           AS vl_gasto_meta_ads,
+                COALESCE(ads.qt_impressoes, 0.0)                            AS qt_impressoes_ads,
+                COALESCE(ads.qt_anuncios, 0)                                AS qt_anuncios,
+                COALESCE(trends.interesse_busca, 0.0)                       AS interesse_busca_google,
+                COALESCE(social.qt_mencoes, 0)                              AS qt_mencoes_sociais,
+                COALESCE(social.score_sentimento, 0.0)                      AS score_sentimento_social,
+                COALESCE(social.score_confiabilidade_medio, 0.0)            AS score_confiabilidade_social,
+                CURRENT_TIMESTAMP()                                         AS ingested_at
+            FROM ads
+            FULL OUTER JOIN trends USING (candidato, sg_uf, ano)
+            FULL OUTER JOIN social USING (candidato, sg_uf, ano)
+        """,
     }
 
     # Tables that may have no Silver source yet — skip without failing the job
@@ -221,6 +333,10 @@ def _build_gold_via_bigquery_sql() -> dict:
         "fact_social_municipio",
         "fact_economico_municipio",
         "fact_transferencias_sociais",
+        "fact_meta_ads_uf",
+        "fact_meta_ads_demografico",
+        "fact_google_trends_uf",
+        "fact_indice_digital_candidato",
     }
 
     results = {}
@@ -332,6 +448,20 @@ def build_gold(use_bigquery: bool = False) -> dict:
     fact_eco = _build_fact_economico()
     result["fact_economico_municipio"] = _write_gold(
         fact_eco, "fact_economico_municipio", use_bigquery
+    )
+
+    # ── Digital (Meta Ads + Google Trends) ───────────────────────────────────
+    fact_meta_uf = _build_fact_meta_ads_uf()
+    result["fact_meta_ads_uf"] = _write_gold(fact_meta_uf, "fact_meta_ads_uf", use_bigquery)
+
+    fact_meta_demo = _build_fact_meta_ads_demografico()
+    result["fact_meta_ads_demografico"] = _write_gold(
+        fact_meta_demo, "fact_meta_ads_demografico", use_bigquery
+    )
+
+    fact_trends_uf = _build_fact_google_trends_uf()
+    result["fact_google_trends_uf"] = _write_gold(
+        fact_trends_uf, "fact_google_trends_uf", use_bigquery
     )
 
     return {"status": "ok", "tables": result}
@@ -636,6 +766,90 @@ def _build_fact_economico() -> pd.DataFrame:
     df["ingested_at"] = pd.Timestamp.utcnow()
     logger.info("fact_economico_municipio: %d rows de %d arquivos Silver", len(df), len(files))
     return df
+
+
+def _build_fact_meta_ads_uf() -> pd.DataFrame:
+    """Aggregate Silver meta_ads_regioes into Gold fact_meta_ads_uf (local path)."""
+    files = list(LOCAL_SILVER_DIR.glob("meta_ads_regioes_BR_*.parquet"))
+    if not files:
+        logger.info("fact_meta_ads_uf: nenhum Silver meta_ads_regioes disponível")
+        return pd.DataFrame()
+
+    df = pd.concat([pd.read_parquet(f) for f in files], ignore_index=True)
+
+    if "dt_inicio" in df.columns:
+        ts = pd.to_datetime(df["dt_inicio"], errors="coerce")
+        df["ano_semana"] = ts.dt.strftime("%Y-W%V").fillna("")
+        df["semana"] = ts.dt.isocalendar().week.astype("Int64")
+
+    for col in ("vl_gasto_estimado_uf", "qt_impressoes_estimadas_uf"):
+        if col not in df.columns:
+            df[col] = 0.0
+
+    group_cols = [c for c in ["candidato", "sg_uf", "ano", "ano_semana", "semana"] if c in df.columns]
+    fact = df.groupby(group_cols, as_index=False, dropna=False).agg(
+        qt_anuncios=("ad_id", "nunique") if "ad_id" in df.columns else ("vl_gasto_estimado_uf", "count"),
+        vl_gasto_total_uf=("vl_gasto_estimado_uf", "sum"),
+        qt_impressoes_total_uf=("qt_impressoes_estimadas_uf", "sum"),
+    )
+    fact["custo_por_mil_impressoes"] = fact.apply(
+        lambda r: r["vl_gasto_total_uf"] / r["qt_impressoes_total_uf"] * 1000
+        if r["qt_impressoes_total_uf"] > 0 else 0.0,
+        axis=1,
+    )
+    fact["ingested_at"] = pd.Timestamp.utcnow()
+    logger.info("fact_meta_ads_uf: %d rows", len(fact))
+    return fact
+
+
+def _build_fact_meta_ads_demografico() -> pd.DataFrame:
+    """Aggregate Silver meta_ads_demograficos into Gold fact_meta_ads_demografico (local path)."""
+    files = list(LOCAL_SILVER_DIR.glob("meta_ads_demograficos_BR_*.parquet"))
+    if not files:
+        logger.info("fact_meta_ads_demografico: nenhum Silver meta_ads_demograficos disponível")
+        return pd.DataFrame()
+
+    df = pd.concat([pd.read_parquet(f) for f in files], ignore_index=True)
+
+    for col in ("vl_gasto_estimado_demo", "pct_demografico"):
+        if col not in df.columns:
+            df[col] = 0.0
+    for col in ("faixa_etaria", "genero"):
+        if col not in df.columns:
+            df[col] = "desconhecido"
+
+    group_cols = [c for c in ["candidato", "faixa_etaria", "genero", "ano"] if c in df.columns]
+    fact = df.groupby(group_cols, as_index=False, dropna=False).agg(
+        qt_anuncios=("ad_id", "nunique") if "ad_id" in df.columns else ("vl_gasto_estimado_demo", "count"),
+        vl_gasto_estimado_total=("vl_gasto_estimado_demo", "sum"),
+        pct_demografico_medio=("pct_demografico", "mean"),
+    )
+    fact["ingested_at"] = pd.Timestamp.utcnow()
+    logger.info("fact_meta_ads_demografico: %d rows", len(fact))
+    return fact
+
+
+def _build_fact_google_trends_uf() -> pd.DataFrame:
+    """Aggregate Silver google_trends_uf into Gold fact_google_trends_uf (local path)."""
+    files = list(LOCAL_SILVER_DIR.glob("google_trends_uf_BR_*.parquet"))
+    if not files:
+        logger.info("fact_google_trends_uf: nenhum Silver google_trends_uf disponível")
+        return pd.DataFrame()
+
+    df = pd.concat([pd.read_parquet(f) for f in files], ignore_index=True)
+
+    if "interesse_busca" not in df.columns:
+        df["interesse_busca"] = 0
+    df["interesse_busca"] = pd.to_numeric(df["interesse_busca"], errors="coerce").fillna(0)
+
+    group_cols = [c for c in ["candidato", "sg_uf", "ano"] if c in df.columns]
+    fact = df.groupby(group_cols, as_index=False, dropna=False).agg(
+        interesse_busca_medio=("interesse_busca", "mean"),
+        interesse_busca_max=("interesse_busca", "max"),
+    )
+    fact["ingested_at"] = pd.Timestamp.utcnow()
+    logger.info("fact_google_trends_uf: %d rows", len(fact))
+    return fact
 
 
 def _write_gold(df: pd.DataFrame, table_name: str, use_bigquery: bool) -> str:

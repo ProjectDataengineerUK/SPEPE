@@ -16,6 +16,7 @@ DQ_THRESHOLD = float(os.environ.get("DQ_SCORE_THRESHOLD", "95.0"))
 def main(uf: str, years: list[int] | None = None, include_social: bool = True) -> None:
     from dataops.silver_transformer import (
         transform_cadunico_to_silver,
+        transform_digital_to_silver,
         transform_economia_to_silver,
         transform_pesquisas_to_silver,
         transform_saude_to_silver,
@@ -117,6 +118,20 @@ def main(uf: str, years: list[int] | None = None, include_social: bool = True) -
         else:
             logger.warning(
                 "Social Silver: %s (pode ser vazio se social_ingest não rodou)", r.get("message")
+            )
+
+    # ── Digital (Meta Ads + Google Trends — BR, multi-ano) ──────────────────
+    _dy_env = os.environ.get("DIGITAL_YEARS", "2018,2022,2026")
+    digital_years = [int(y.strip()) for y in _dy_env.split(",") if y.strip()]
+    for digital_year in digital_years:
+        logger.info("Silver digital: ano=%d", digital_year)
+        r = transform_digital_to_silver(digital_year, use_bigquery=use_bq)
+        if r.get("status") == "ok":
+            logger.info("Digital Silver OK ano=%d: %d rows", digital_year, r.get("rows", 0))
+        else:
+            logger.warning(
+                "Digital Silver ano=%d: %s (pode ser vazio se digital_ingest não rodou)",
+                digital_year, r.get("message"),
             )
 
     if not all_ok:
