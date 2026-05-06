@@ -459,8 +459,8 @@ async def get_meta(
     results = []
     for nm in candidatos_nm:
         try:
-            df = fetch_meta_ads(nm, access_token=token, country="BR")
-            spend = df["spend_upper"].sum() if not df.empty else 0.0
+            ads_df, _, _ = fetch_meta_ads([nm], access_token=token, country="BR")
+            spend = ads_df["vl_gasto_max"].sum() if not ads_df.empty else 0.0
             results.append({"candidato": nm, "gasto_r": spend})
         except Exception as exc:
             logger.warning("Meta Ads %s falhou: %s", nm, exc)

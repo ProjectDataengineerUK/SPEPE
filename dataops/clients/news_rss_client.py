@@ -126,7 +126,7 @@ def _fetch_feed_raw(url: str, timeout: int = 20) -> list[dict[str, Any]]:
     Returns list of raw items [{title, link, description, pubDate, ...}].
     """
     try:
-        import feedparser  # type: ignore
+        import feedparser
 
         parsed = feedparser.parse(url)
         items = []
