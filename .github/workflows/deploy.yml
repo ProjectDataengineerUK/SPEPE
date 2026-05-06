@@ -133,7 +133,8 @@ jobs:
                      spepe-ibge-sync spepe-digital-ingest spepe-silver-transform spepe-gold-build \
                      spepe-social-ingest spepe-pesquisas-ingest spepe-security-ingest spepe-datasus-ingest \
                      spepe-dieese-ingest spepe-cetic-ingest spepe-reddit-ingest spepe-camara-senado-ingest \
-                     spepe-endividamento-ingest spepe-cadunico-ingest spepe-emendas-ingest; do
+                     spepe-endividamento-ingest spepe-cadunico-ingest spepe-emendas-ingest \
+                     spepe-sancoes-ingest; do
             gcloud run jobs update "${JOB}" \
               --image "${IMAGE}" \
               --region "${{ env.GCP_REGION }}" \
@@ -201,7 +202,8 @@ jobs:
                      spepe-ibge-sync spepe-digital-ingest spepe-silver-transform spepe-gold-build \
                      spepe-social-ingest spepe-pesquisas-ingest spepe-security-ingest spepe-datasus-ingest \
                      spepe-dieese-ingest spepe-cetic-ingest spepe-reddit-ingest spepe-camara-senado-ingest \
-                     spepe-endividamento-ingest spepe-cadunico-ingest spepe-emendas-ingest; do
+                     spepe-endividamento-ingest spepe-cadunico-ingest spepe-emendas-ingest \
+                     spepe-sancoes-ingest; do
             gcloud run jobs update "${JOB}" \
               --image "${IMAGE}" \
               --region "${{ env.GCP_REGION }}" \
