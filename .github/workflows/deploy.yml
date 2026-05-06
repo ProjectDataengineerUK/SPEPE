@@ -163,7 +163,8 @@ jobs:
     needs: [build-push, deploy-staging]
     # Only run when explicitly targeting prod via workflow_dispatch
     if: github.event.inputs.environment == 'prod'
-    environment: prod
+    # Use staging environment credentials — same WIF SA, granted run.developer on spepe-prod
+    environment: staging
     permissions:
       contents: read
       id-token: write
