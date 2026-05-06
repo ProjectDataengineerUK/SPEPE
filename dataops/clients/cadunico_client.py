@@ -133,7 +133,7 @@ def _fetch_cadunico_dados_gov(year: int) -> pd.DataFrame:
             for resource in pkg.get("resources", []):
                 if str(year) in resource.get("name", "") and resource.get("format", "").upper() == "CSV":
                     csv_url = resource["url"]
-                    df_csv = pd.read_csv(csv_url, sep=";", encoding="latin1", dtype=str, nrows=10)
+                    pd.read_csv(csv_url, sep=";", encoding="latin1", dtype=str, nrows=10)
                     logger.info("dados.gov.br CadÚnico %d: encontrado %s", year, csv_url)
                     # Schema varies — return empty and rely on other sources
                     return pd.DataFrame()
