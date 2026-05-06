@@ -916,13 +916,20 @@ def transform_cadunico_to_silver(
     if "ano" not in df.columns:
         df["ano"] = year
 
-    for col in (
+    numeric_cols = (
         "qtd_beneficiarios_bolsa_familia",
         "valor_total_bolsa_familia_reais",
+        "qtd_beneficiarios_novo_bolsa_familia",
+        "valor_total_novo_bolsa_familia_reais",
+        "qtd_beneficiarios_bpc",
+        "valor_total_bpc_reais",
+        "qtd_beneficiarios_auxilio_emergencial",
+        "valor_total_auxilio_emergencial_reais",
         "qtd_familias_cadunico",
         "qtd_familias_extrema_pobreza",
         "qtd_familias_baixa_renda",
-    ):
+    )
+    for col in numeric_cols:
         if col in df.columns:
             df[col] = pd.to_numeric(df[col], errors="coerce")
 
