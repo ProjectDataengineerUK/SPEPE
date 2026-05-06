@@ -1,9 +1,9 @@
 """CadÚnico + Bolsa Família — dados agregados por município.
 
-Três fontes públicas sem autenticação:
+Fontes:
   A) Portal da Transparência API — beneficiários Bolsa Família por município (dezembro do ano)
-  B) MI Social / SAGI CSV — famílias CadÚnico por município e faixa de renda
-  C) Fallback: combina A + B para produzir DataFrame consolidado
+     Requer: TRANSPARENCIA_API_KEY (cadastro gratuito em portaldatransparencia.gov.br/api-de-dados/cadastrar)
+  B) MI Social / SAGI CSV — famílias CadÚnico por município e faixa de renda (sem autenticação)
 
 Referência: https://api.portaldatransparencia.gov.br/swagger-ui.html
 """
@@ -12,6 +12,7 @@ from __future__ import annotations
 
 import io
 import logging
+import os
 
 import pandas as pd
 import requests
@@ -25,9 +26,19 @@ _SAGI_BASE = "https://aplicacoes.mds.gov.br/sagi/vis/data3"
 _PAGE_SIZE = 500
 
 
+def _transparencia_headers() -> dict[str, str]:
+    api_key = os.environ.get("TRANSPARENCIA_API_KEY", "")
+    if not api_key:
+        logger.warning(
+            "TRANSPARENCIA_API_KEY não configurada — Portal da Transparência retornará 401. "
+            "Cadastre em portaldatransparencia.gov.br/api-de-dados/cadastrar"
+        )
+    return {"chave-api-dados": api_key} if api_key else {}
+
+
 @retry(stop=stop_after_attempt(3), wait=wait_exponential(multiplier=1, min=2, max=10))
 def _get_transparencia(url: str, params: dict) -> list[dict]:
-    resp = requests.get(url, params=params, timeout=60)
+    resp = requests.get(url, params=params, headers=_transparencia_headers(), timeout=60)
     resp.raise_for_status()
     return resp.json()
 
