@@ -175,13 +175,24 @@ jobs:
           workload_identity_provider: ${{ vars.WIF_PROVIDER }}
           service_account: ${{ vars.WIF_SERVICE_ACCOUNT }}
 
-      - id: deploy
-        uses: google-github-actions/deploy-cloudrun@v2
-        with:
-          service: spepe-prod
-          image: ${{ needs.build-push.outputs.image_tag }}
-          region: ${{ env.GCP_REGION }}
-          project_id: spepe-prod
+      - uses: google-github-actions/setup-gcloud@v2
+
+      - name: Deploy to Cloud Run prod
+        id: deploy
+        run: |
+          gcloud run deploy spepe-prod \
+            --image "${{ needs.build-push.outputs.image_tag }}" \
+            --service-account "spepe-cloud-run@spepe-prod.iam.gserviceaccount.com" \
+            --set-env-vars "GCP_PROJECT_ID=spepe-prod,USE_BIGQUERY=true,DEFAULT_UF=SP,DEFAULT_ANO=2022,ENVIRONMENT=prod" \
+            --set-secrets "ANTHROPIC_API_KEY=ANTHROPIC_API_KEY:latest" \
+            --allow-unauthenticated \
+            --port 8080 \
+            --memory 2Gi \
+            --cpu 1 \
+            --cpu-boost \
+            --timeout 60 \
+            --region "${{ env.GCP_REGION }}" \
+            --project spepe-prod
 
       - name: Update Cloud Run Jobs to new image
         run: |
@@ -199,7 +210,7 @@ jobs:
 
       - name: Smoke test — prod health check
         run: |
-          echo "Service deployed to: ${{ steps.deploy.outputs.url }}"
+          echo "Smoke test: checking spepe-prod service readiness"
           for i in $(seq 1 10); do
             READY=$(gcloud run services describe spepe-prod \
               --region "${{ env.GCP_REGION }}" \
