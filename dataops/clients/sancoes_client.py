@@ -64,28 +64,39 @@ def _fetch_paginated(endpoint: str, extra_params: dict | None = None) -> list[di
     return rows
 
 
+def _extract_str(val: object, key: str = "descricao") -> str:
+    """Extract string from a value that may be a dict, list, or scalar."""
+    if isinstance(val, dict):
+        return str(val.get(key) or val.get("nome") or val.get("id") or "")
+    if isinstance(val, list):
+        return ", ".join(_extract_str(v, key) for v in val)
+    return str(val or "")
+
+
 def _normalize_sancao(item: dict, origem: str) -> dict:
-    """Flatten a sanção record to a flat dict."""
+    """Flatten a sanção record to a flat dict — handles nested API dicts."""
     sancionado = item.get("sancionado") or {}
+    if isinstance(sancionado, str):
+        sancionado = {}
     orgao = item.get("orgaoSancionador") or {}
+    if isinstance(orgao, str):
+        orgao = {}
+
+    cpf_cnpj = str(sancionado.get("cpfCnpj") or "").replace(".", "").replace("-", "").replace("/", "")
+
     return {
         "origem": origem,
         "nm_sancionado": (sancionado.get("nome") or "").strip().upper(),
-        "nr_cpf_cnpj": str(sancionado.get("cpfCnpj") or "")
-        .replace(".", "")
-        .replace("-", "")
-        .replace("/", ""),
-        "tp_pessoa": "PF"
-        if len(str(sancionado.get("cpfCnpj") or "").replace(".", "").replace("-", "")) == 11
-        else "PJ",
-        "sg_uf_sancionado": sancionado.get("uf") or "",
-        "nm_orgao_sancionador": orgao.get("nome") or "",
-        "sg_uf_orgao": orgao.get("uf") or "",
-        "tp_sancao": item.get("tipoSancao") or "",
+        "nr_cpf_cnpj": cpf_cnpj,
+        "tp_pessoa": "PF" if len(cpf_cnpj) == 11 else "PJ",
+        "sg_uf_sancionado": _extract_str(sancionado.get("uf"), "sigla"),
+        "nm_orgao_sancionador": _extract_str(orgao.get("nome") or orgao),
+        "sg_uf_orgao": _extract_str(orgao.get("uf"), "sigla"),
+        "tp_sancao": _extract_str(item.get("tipoSancao")),
         "dt_inicio_sancao": str(item.get("dataInicioSancao") or ""),
         "dt_fim_sancao": str(item.get("dataFimSancao") or ""),
-        "ds_fundamentacao": item.get("fundamentacaoLegal") or "",
-        "nm_processo": item.get("numeroProcesso") or "",
+        "ds_fundamentacao": _extract_str(item.get("fundamentacaoLegal")),
+        "nm_processo": str(item.get("numeroProcesso") or ""),
         "fonte": "portal_transparencia",
     }
 
