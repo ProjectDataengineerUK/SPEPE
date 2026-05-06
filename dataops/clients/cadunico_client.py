@@ -55,7 +55,9 @@ def _fetch_bolsa_familia_municipio(year: int) -> pd.DataFrame:
                 {
                     "cd_municipio_ibge": str(mun.get("codigoIBGE", ""))[:7],
                     "nm_municipio": mun.get("nomeIBGE", ""),
-                    "sg_uf": mun.get("uf", {}).get("sigla", "") if isinstance(mun.get("uf"), dict) else "",
+                    "sg_uf": mun.get("uf", {}).get("sigla", "")
+                    if isinstance(mun.get("uf"), dict)
+                    else "",
                     "ano": year,
                     "mes": int(str(mes_ano)[4:6]),
                     "qtd_beneficiarios_bolsa_familia": item.get("quantidadeBeneficiados", 0),
@@ -96,17 +98,27 @@ def _fetch_cadunico_sagi(year: int) -> pd.DataFrame:
         if df.empty:
             return pd.DataFrame()
 
-        df = df.rename(columns={
-            "id_municipio": "cd_municipio_ibge",
-            "qtd_familias_cadunico": "qtd_familias_cadunico",
-            "qtd_familias_pobreza": "qtd_familias_baixa_renda",
-            "qtd_familias_extrema_pobreza": "qtd_familias_extrema_pobreza",
-        })
+        df = df.rename(
+            columns={
+                "id_municipio": "cd_municipio_ibge",
+                "qtd_familias_cadunico": "qtd_familias_cadunico",
+                "qtd_familias_pobreza": "qtd_familias_baixa_renda",
+                "qtd_familias_extrema_pobreza": "qtd_familias_extrema_pobreza",
+            }
+        )
         df["ano"] = year
         df["fonte"] = "sagi_mds"
-        for col in ["qtd_familias_cadunico", "qtd_familias_baixa_renda", "qtd_familias_extrema_pobreza"]:
+        for col in [
+            "qtd_familias_cadunico",
+            "qtd_familias_baixa_renda",
+            "qtd_familias_extrema_pobreza",
+        ]:
             if col in df.columns:
-                df[col] = pd.to_numeric(df[col].str.replace(",", "."), errors="coerce").fillna(0).astype(int)
+                df[col] = (
+                    pd.to_numeric(df[col].str.replace(",", "."), errors="coerce")
+                    .fillna(0)
+                    .astype(int)
+                )
 
         logger.info("SAGI CadÚnico %d: %d municípios", year, len(df))
         return df
@@ -131,7 +143,10 @@ def _fetch_cadunico_dados_gov(year: int) -> pd.DataFrame:
 
         for pkg in results:
             for resource in pkg.get("resources", []):
-                if str(year) in resource.get("name", "") and resource.get("format", "").upper() == "CSV":
+                if (
+                    str(year) in resource.get("name", "")
+                    and resource.get("format", "").upper() == "CSV"
+                ):
                     csv_url = resource["url"]
                     pd.read_csv(csv_url, sep=";", encoding="latin1", dtype=str, nrows=10)
                     logger.info("dados.gov.br CadÚnico %d: encontrado %s", year, csv_url)
@@ -171,7 +186,14 @@ def fetch_cadunico_municipio(year: int) -> pd.DataFrame:
     df_sagi["cd_municipio_ibge"] = df_sagi["cd_municipio_ibge"].str[:7]
 
     df = df_bf.merge(
-        df_sagi[["cd_municipio_ibge", "qtd_familias_cadunico", "qtd_familias_extrema_pobreza", "qtd_familias_baixa_renda"]],
+        df_sagi[
+            [
+                "cd_municipio_ibge",
+                "qtd_familias_cadunico",
+                "qtd_familias_extrema_pobreza",
+                "qtd_familias_baixa_renda",
+            ]
+        ],
         on="cd_municipio_ibge",
         how="left",
     )
