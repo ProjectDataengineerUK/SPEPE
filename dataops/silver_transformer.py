@@ -390,6 +390,7 @@ def _write_bigquery_pesquisas(df: pd.DataFrame, year: int) -> str:
         write_disposition="WRITE_APPEND",
         create_disposition="CREATE_IF_NEEDED",
         autodetect=True,
+        schema_update_options=[bigquery.SchemaUpdateOption.ALLOW_FIELD_ADDITION],
     )
     job = client.load_table_from_dataframe(df, table_id, job_config=job_config)
     job.result()
