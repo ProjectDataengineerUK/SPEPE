@@ -23,6 +23,7 @@ tenacity>=8.0
 requests>=2.31
 httpx>=0.25
 aiohttp>=3.9
+fastapi>=0.100.0
 
 # Testing
 pytest>=8.1.0
