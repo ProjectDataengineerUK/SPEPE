@@ -135,7 +135,7 @@ def _fetch_cadunico_dados_gov(year: int) -> pd.DataFrame:
     try:
         resp = requests.get(
             search_url,
-            params={"q": "cadastro unico municipio", "rows": 5},
+            params={"q": "cadastro unico municipio", "rows": "5"},
             timeout=30,
         )
         resp.raise_for_status()
