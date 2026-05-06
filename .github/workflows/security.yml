@@ -89,5 +89,5 @@ jobs:
       # Audit deployed app deps (requirements-app.txt excludes kfp which has an
       # irresolvable urllib3 conflict with google-cloud-aiplatform)
       - run: pip install -r requirements-app.txt
-      # CVE-2026-3219 is pip itself (runner-managed, not our dep)
-      - run: pip-audit --ignore-vuln GHSA-w7pp-m8wf-vj6r --ignore-vuln GHSA-pqhp-25j4-6hq9 --ignore-vuln GHSA-g4mx-q9vg-27p4 --ignore-vuln CVE-2026-3219
+      # CVE-2026-3219, CVE-2026-6357 are pip itself (runner-managed, not our dep)
+      - run: pip-audit --ignore-vuln GHSA-w7pp-m8wf-vj6r --ignore-vuln GHSA-pqhp-25j4-6hq9 --ignore-vuln GHSA-g4mx-q9vg-27p4 --ignore-vuln CVE-2026-3219 --ignore-vuln CVE-2026-6357
