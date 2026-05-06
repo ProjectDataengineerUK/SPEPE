@@ -51,6 +51,9 @@ def _fetch_paginated(endpoint: str, extra_params: dict | None = None) -> list[di
         except Exception as exc:
             logger.warning("%s pág %d: %s", endpoint, pagina, exc)
             break
+        if not isinstance(data, list):
+            logger.warning("%s pág %d: resposta inesperada (tipo=%s): %s", endpoint, pagina, type(data).__name__, str(data)[:200])
+            break
         if not data:
             break
         rows.extend(data)
