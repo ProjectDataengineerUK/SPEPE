@@ -758,6 +758,96 @@ def transform_economia_to_silver(
     return {"status": "ok", "path": path, "rows": len(df)}
 
 
+def transform_cadunico_to_silver(
+    year: int,
+    use_bigquery: bool = False,
+) -> dict:
+    """Transform Bronze CadÚnico + Bolsa Família data to Silver.
+
+    Reads:  raw/cadunico/{year}/BR/cadunico_BR_{year}.parquet  (GCS or local)
+    Writes: Silver table `transferencias_sociais` (BigQuery WRITE_APPEND pre-delete) or local parquet.
+    """
+    LOCAL_SILVER_DIR.mkdir(parents=True, exist_ok=True)
+
+    bronze_path = LOCAL_BRONZE_DIR / "cadunico" / str(year) / "BR"
+    files = list(bronze_path.glob(f"cadunico_BR_{year}.parquet")) if bronze_path.exists() else []
+
+    if not files and GCS_BUCKET:
+        prefix = f"raw/cadunico/{year}/BR/"
+        logger.info("CadÚnico Bronze GCS: prefix=%s", prefix)
+        df = _read_gcs_parquet_glob(GCS_BUCKET, prefix)
+    elif files:
+        df = pd.concat([pd.read_parquet(f) for f in files], ignore_index=True)
+    else:
+        return {"status": "error", "message": f"Bronze CadÚnico vazio para ano={year}"}
+
+    if df.empty:
+        return {"status": "error", "message": f"Bronze CadÚnico vazio para ano={year}"}
+
+    df = df.copy()
+    if "ano" not in df.columns:
+        df["ano"] = year
+
+    for col in (
+        "qtd_beneficiarios_bolsa_familia",
+        "valor_total_bolsa_familia_reais",
+        "qtd_familias_cadunico",
+        "qtd_familias_extrema_pobreza",
+        "qtd_familias_baixa_renda",
+    ):
+        if col in df.columns:
+            df[col] = pd.to_numeric(df[col], errors="coerce")
+
+    if "cd_municipio_ibge" in df.columns:
+        df["cd_municipio_ibge"] = pd.to_numeric(df["cd_municipio_ibge"], errors="coerce").astype(
+            "float64"
+        )
+
+    df["ingested_at"] = pd.Timestamp.utcnow()
+
+    logger.info("CadÚnico Silver %d: %d municípios", year, len(df))
+
+    if use_bigquery:
+        project = os.environ.get("GCP_PROJECT_ID", "spepe-dev")
+        dataset = os.environ.get("BIGQUERY_DATASET_SILVER", "spepe_silver")
+        try:
+            from google.cloud import bigquery
+
+            client = bigquery.Client(project=project)
+            table_id = f"{project}.{dataset}.transferencias_sociais"
+            df_bq = _normalize_for_bq(df)
+
+            # Pre-delete year slice to allow idempotent re-runs
+            try:
+                client.query(f"DELETE FROM `{table_id}` WHERE ano = {year}").result()
+                logger.info("CadÚnico Silver pre-delete ano=%d OK", year)
+            except Exception:
+                pass  # table may not exist yet
+
+            job_config = bigquery.LoadJobConfig(
+                write_disposition="WRITE_APPEND",
+                create_disposition="CREATE_IF_NEEDED",
+                autodetect=True,
+                schema_update_options=[bigquery.SchemaUpdateOption.ALLOW_FIELD_ADDITION],
+            )
+            job = client.load_table_from_dataframe(df_bq, table_id, job_config=job_config)
+            job.result()
+            logger.info("CadÚnico Silver BigQuery: %s (%d rows)", table_id, len(df))
+            path = table_id
+        except ImportError:
+            logger.warning("google-cloud-bigquery não disponível. Usando local.")
+            path_local = LOCAL_SILVER_DIR / f"transferencias_sociais_{year}.parquet"
+            df.to_parquet(path_local, index=False, compression="zstd")
+            path = str(path_local)
+    else:
+        path_local = LOCAL_SILVER_DIR / f"transferencias_sociais_{year}.parquet"
+        df.to_parquet(path_local, index=False, compression="zstd")
+        path = str(path_local)
+        logger.info("CadÚnico Silver local: %s (%d rows)", path, len(df))
+
+    return {"status": "ok", "path": path, "rows": len(df)}
+
+
 def _dataframe_to_bq_schema(df: pd.DataFrame) -> list:
     from google.cloud import bigquery
 

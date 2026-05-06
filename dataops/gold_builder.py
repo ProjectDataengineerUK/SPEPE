@@ -165,10 +165,35 @@ def _build_gold_via_bigquery_sql() -> dict:
             CREATE OR REPLACE TABLE `{gold}.fact_pesquisa` AS
             SELECT * FROM `{silver}.fact_pesquisa`
         """,
+        "fact_transferencias_sociais": f"""
+            CREATE OR REPLACE TABLE `{gold}.fact_transferencias_sociais` AS
+            SELECT
+                CAST(cd_municipio_ibge AS INT64)                            AS cd_municipio_ibge,
+                nm_municipio,
+                sg_uf,
+                CAST(ano AS INT64)                                          AS ano,
+                COALESCE(SAFE_CAST(qtd_beneficiarios_bolsa_familia AS INT64), 0)
+                                                                            AS qtd_beneficiarios_bolsa_familia,
+                COALESCE(SAFE_CAST(valor_total_bolsa_familia_reais AS FLOAT64), 0.0)
+                                                                            AS valor_total_bolsa_familia_reais,
+                COALESCE(SAFE_CAST(qtd_familias_cadunico AS INT64), 0)      AS qtd_familias_cadunico,
+                COALESCE(SAFE_CAST(qtd_familias_extrema_pobreza AS INT64), 0)
+                                                                            AS qtd_familias_extrema_pobreza,
+                COALESCE(SAFE_CAST(qtd_familias_baixa_renda AS INT64), 0)   AS qtd_familias_baixa_renda,
+                fonte,
+                CURRENT_TIMESTAMP()                                         AS ingested_at
+            FROM `{silver}.transferencias_sociais`
+            WHERE cd_municipio_ibge IS NOT NULL
+        """,
     }
 
     # Tables that may have no Silver source yet — skip without failing the job
-    _OPTIONAL = {"fact_pesquisa", "fact_social_municipio", "fact_economico_municipio"}
+    _OPTIONAL = {
+        "fact_pesquisa",
+        "fact_social_municipio",
+        "fact_economico_municipio",
+        "fact_transferencias_sociais",
+    }
 
     results = {}
     for table_name, sql in sqls.items():

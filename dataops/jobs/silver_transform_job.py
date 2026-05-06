@@ -15,6 +15,7 @@ DQ_THRESHOLD = float(os.environ.get("DQ_SCORE_THRESHOLD", "95.0"))
 
 def main(uf: str, years: list[int] | None = None, include_social: bool = True) -> None:
     from dataops.silver_transformer import (
+        transform_cadunico_to_silver,
         transform_economia_to_silver,
         transform_pesquisas_to_silver,
         transform_saude_to_silver,
@@ -94,6 +95,17 @@ def main(uf: str, years: list[int] | None = None, include_social: bool = True) -
             logger.info("Economia Silver OK %s/%d: %d rows", uf, year, r.get("rows", 0))
         else:
             logger.warning("Economia Silver %s/%d: %s", uf, year, r.get("message"))
+
+    # ── CadÚnico + Bolsa Família (nacional — BR, multi-ano) ─────────────────
+    _cy_env = os.environ.get("CADUNICO_YEARS", "2018,2022,2024,2025")
+    cadunico_years = [int(y.strip()) for y in _cy_env.split(",") if y.strip()]
+    for cadunico_year in cadunico_years:
+        logger.info("Silver CadÚnico: ano=%d", cadunico_year)
+        r = transform_cadunico_to_silver(cadunico_year, use_bigquery=use_bq)
+        if r.get("status") == "ok":
+            logger.info("CadÚnico Silver OK ano=%d: %d rows", cadunico_year, r.get("rows", 0))
+        else:
+            logger.warning("CadÚnico Silver ano=%d: %s", cadunico_year, r.get("message"))
 
     # ── Social (Twitter/Facebook/YouTube — BR) ──────────────────────────────
     if include_social:
