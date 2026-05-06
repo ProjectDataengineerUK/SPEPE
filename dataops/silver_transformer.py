@@ -1241,10 +1241,10 @@ def transform_sancoes_to_silver(use_bigquery: bool = False) -> dict:
     Writes: Silver table `sancoes_empresas` (BQ WRITE_TRUNCATE) or local parquet.
 
     Schema enforced:
-      fonte_sistema (CEIS|CNEP), nm_pessoa, tp_pessoa, nr_cpf_cnpj (mascarado),
+      fonte_sistema (CEIS|CNEP|CEAF|CEPIM), nm_pessoa, tp_pessoa, nr_cpf_cnpj (mascarado),
       nm_sancionador, tp_sancao, dt_inicio_sancao, dt_fim_sancao,
       nm_orgao_sancionador, sg_uf_sancionador, nm_municipio_sancionador,
-      valor_multa, score_confiabilidade, ingested_at
+      valor_multa, nm_cargo (CEAF), score_confiabilidade, ingested_at
     """
     LOCAL_SILVER_DIR.mkdir(parents=True, exist_ok=True)
 
@@ -1267,7 +1267,7 @@ def transform_sancoes_to_silver(use_bigquery: bool = False) -> dict:
             return pd.read_parquet(local)
         return pd.DataFrame()
 
-    for sistema in ("ceis", "cnep"):
+    for sistema in ("ceis", "cnep", "ceaf", "cepim"):
         df_s = _read_sancoes_bronze(sistema)
         if not df_s.empty:
             df_s["fonte_sistema"] = sistema.upper()
@@ -1275,7 +1275,7 @@ def transform_sancoes_to_silver(use_bigquery: bool = False) -> dict:
             logger.info("Sanções Bronze %s: %d registros", sistema.upper(), len(df_s))
 
     if not frames:
-        return {"status": "error", "message": "Bronze sanções vazio (CEIS + CNEP)"}
+        return {"status": "error", "message": "Bronze sanções vazio (CEIS + CNEP + CEAF + CEPIM)"}
 
     df = pd.concat(frames, ignore_index=True)
     df = df.copy()
@@ -1300,11 +1300,12 @@ def transform_sancoes_to_silver(use_bigquery: bool = False) -> dict:
     }
     df = df.rename(columns={k: v for k, v in _rename.items() if k in df.columns})
 
-    # Ensure canonical columns exist
+    # Ensure canonical columns exist (nm_cargo e nm_orgao_lotacao são específicos do CEAF)
     for col in (
         "nm_pessoa", "tp_pessoa", "nr_cpf_cnpj", "tp_sancao",
         "dt_inicio_sancao", "dt_fim_sancao", "nm_orgao_sancionador",
         "sg_uf_sancionador", "nm_municipio_sancionador",
+        "nm_cargo", "nm_orgao_lotacao",
     ):
         if col not in df.columns:
             df[col] = ""
@@ -1338,14 +1339,16 @@ def transform_sancoes_to_silver(use_bigquery: bool = False) -> dict:
 
     if "fonte" not in df.columns:
         df["fonte"] = "portal_transparencia_sancoes"
-    df["score_confiabilidade"] = 9.5  # CEIS/CNEP = cadastros federais oficiais
+    df["score_confiabilidade"] = 9.5  # cadastros federais oficiais
     df["ingested_at"] = pd.Timestamp.utcnow()
 
     logger.info(
-        "Sanções Silver: %d registros | CEIS=%d | CNEP=%d",
+        "Sanções Silver: %d registros | CEIS=%d | CNEP=%d | CEAF=%d | CEPIM=%d",
         len(df),
         (df["fonte_sistema"] == "CEIS").sum(),
         (df["fonte_sistema"] == "CNEP").sum(),
+        (df["fonte_sistema"] == "CEAF").sum(),
+        (df["fonte_sistema"] == "CEPIM").sum(),
     )
 
     # ── Write ──────────────────────────────────────────────────────────────────
