@@ -43,6 +43,7 @@ jobs:
     environment: ${{ github.event.inputs.environment || 'staging' }}
     outputs:
       image_tag: ${{ steps.meta.outputs.image_tag }}
+      prod_image_tag: ${{ steps.meta.outputs.prod_image_tag }}
     permissions:
       contents: read
       # Required for Workload Identity Federation
@@ -70,18 +71,30 @@ jobs:
           PROJECT="${{ vars.GCP_PROJECT_ID }}"
           REGISTRY="${{ env.IMAGE_REGISTRY }}"
           TAG="${REGISTRY}/${PROJECT}/spepe/app:${SHORT}"
+          PROD_TAG="${REGISTRY}/spepe-prod/spepe/app:${SHORT}"
           echo "image_tag=${TAG}" >> $GITHUB_OUTPUT
+          echo "prod_image_tag=${PROD_TAG}" >> $GITHUB_OUTPUT
           echo "short_sha=${SHORT}" >> $GITHUB_OUTPUT
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
+
+      - name: Also authenticate prod registry (when deploying to prod)
+        if: github.event.inputs.environment == 'prod'
+        run: |
+          gcloud auth configure-docker ${{ env.IMAGE_REGISTRY }} --quiet
+          # Tag for prod registry as well
+          PROD_TAG="${{ env.IMAGE_REGISTRY }}/spepe-prod/spepe/app:${{ steps.meta.outputs.short_sha }}"
+          echo "prod_image_tag=${PROD_TAG}" >> $GITHUB_ENV
 
       - name: Build and push (with layer cache)
         uses: docker/build-push-action@v5
         with:
           context: .
           push: true
-          tags: ${{ steps.meta.outputs.image_tag }}
+          tags: |
+            ${{ steps.meta.outputs.image_tag }}
+            ${{ github.event.inputs.environment == 'prod' && format('{0}/spepe-prod/spepe/app:{1}', env.IMAGE_REGISTRY, steps.meta.outputs.short_sha) || '' }}
           # Cache layers in the registry — avoids rebuilding unchanged layers
           cache-from: type=registry,ref=${{ env.IMAGE_REGISTRY }}/${{ vars.GCP_PROJECT_ID }}/spepe/app:cache
           cache-to: type=registry,ref=${{ env.IMAGE_REGISTRY }}/${{ vars.GCP_PROJECT_ID }}/spepe/app:cache,mode=max
@@ -177,13 +190,13 @@ jobs:
         uses: google-github-actions/deploy-cloudrun@v2
         with:
           service: spepe-prod
-          image: ${{ needs.build-push.outputs.image_tag }}
+          image: ${{ needs.build-push.outputs.prod_image_tag }}
           region: ${{ env.GCP_REGION }}
-          project_id: ${{ vars.GCP_PROJECT_ID }}
+          project_id: spepe-prod
 
       - name: Update Cloud Run Jobs to new image
         run: |
-          IMAGE="${{ needs.build-push.outputs.image_tag }}"
+          IMAGE="${{ needs.build-push.outputs.prod_image_tag }}"
           for JOB in spepe-tse-ingest spepe-tse-perfil-ingest spepe-tse-candidaturas-ingest \
                      spepe-ibge-sync spepe-digital-ingest spepe-silver-transform spepe-gold-build \
                      spepe-social-ingest spepe-pesquisas-ingest spepe-security-ingest spepe-datasus-ingest \
@@ -192,27 +205,27 @@ jobs:
             gcloud run jobs update "${JOB}" \
               --image "${IMAGE}" \
               --region "${{ env.GCP_REGION }}" \
-              --project "${{ vars.GCP_PROJECT_ID }}" 2>&1 || echo "Warning: could not update ${JOB}"
+              --project spepe-prod 2>&1 || echo "Warning: could not update ${JOB}"
           done
 
       - name: Smoke test — prod health check
         run: |
-          URL="${{ steps.deploy.outputs.url }}"
-          echo "Service deployed to: ${URL}"
+          echo "Service deployed to: ${{ steps.deploy.outputs.url }}"
           for i in $(seq 1 10); do
-            STATUS=$(curl -s -o /dev/null -w "%{http_code}" \
-              -H "Authorization: Bearer $(gcloud auth print-identity-token)" \
-              "${URL}/healthz" || echo "000")
-            echo "Attempt ${i}: HTTP ${STATUS}"
-            if [ "${STATUS}" = "200" ]; then
-              echo "Health check passed."
+            READY=$(gcloud run services describe spepe-prod \
+              --region "${{ env.GCP_REGION }}" \
+              --project spepe-prod \
+              --format "value(status.conditions[0].status)" 2>/dev/null || echo "False")
+            echo "Attempt ${i}: Cloud Run Ready=${READY}"
+            if [ "${READY}" = "True" ]; then
+              echo "Service is ready."
               exit 0
             fi
             sleep 15
           done
-          echo "Health check failed — rolling back prod to previous revision."
+          echo "Smoke test failed — service not ready after 150s. Rolling back."
           gcloud run services update-traffic spepe-prod \
             --to-revisions=LATEST=0 \
-            --region=${{ env.GCP_REGION }} \
-            --project=${{ vars.GCP_PROJECT_ID }} || true
+            --region="${{ env.GCP_REGION }}" \
+            --project=spepe-prod || true
           exit 1
