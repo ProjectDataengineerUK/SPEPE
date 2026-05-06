@@ -9,6 +9,7 @@ Endpoints acessíveis com key básica do Portal da Transparência:
 Para anos históricos (2018, 2022): tenta /bolsa-familia-por-municipio;
 se retornar 403 (nível insuficiente), usa SAGI como fallback.
 """
+
 from __future__ import annotations
 
 import io
@@ -77,6 +78,7 @@ def _fetch_paginated_municipio(endpoint: str, mes_ano: str) -> list[dict]:
 
 # ── Novo Bolsa Família (2023+) ────────────────────────────────────────────────
 
+
 def _fetch_novo_bolsa_familia(year: int) -> pd.DataFrame:
     """Fetch Novo Bolsa Família por município (dezembro do ano). Válido a partir de 2023."""
     mes_ano = f"{year}12"
@@ -87,16 +89,20 @@ def _fetch_novo_bolsa_familia(year: int) -> pd.DataFrame:
     records = []
     for item in rows:
         mun = item.get("municipio") or {}
-        records.append({
-            "cd_municipio_ibge": str(mun.get("codigoIBGE") or "")[:7],
-            "nm_municipio": mun.get("nomeIBGE") or mun.get("nome") or "",
-            "sg_uf": _uf_from(mun.get("uf")),
-            "ano": year,
-            "mes": 12,
-            "qtd_beneficiarios_novo_bolsa_familia": int(item.get("quantidadeBeneficiados") or 0),
-            "valor_total_novo_bolsa_familia_reais": float(item.get("valor") or 0),
-            "fonte": "portal_transparencia_novo_bf",
-        })
+        records.append(
+            {
+                "cd_municipio_ibge": str(mun.get("codigoIBGE") or "")[:7],
+                "nm_municipio": mun.get("nomeIBGE") or mun.get("nome") or "",
+                "sg_uf": _uf_from(mun.get("uf")),
+                "ano": year,
+                "mes": 12,
+                "qtd_beneficiarios_novo_bolsa_familia": int(
+                    item.get("quantidadeBeneficiados") or 0
+                ),
+                "valor_total_novo_bolsa_familia_reais": float(item.get("valor") or 0),
+                "fonte": "portal_transparencia_novo_bf",
+            }
+        )
 
     df = pd.DataFrame(records)
     df["cd_municipio_ibge"] = df["cd_municipio_ibge"].str[:7]
@@ -105,6 +111,7 @@ def _fetch_novo_bolsa_familia(year: int) -> pd.DataFrame:
 
 
 # ── Bolsa Família histórico (pré-2023) ────────────────────────────────────────
+
 
 def _fetch_bolsa_familia_historico(year: int) -> pd.DataFrame:
     """Fetch Bolsa Família por município (dezembro do ano). Pode retornar 403 com key básica."""
@@ -116,16 +123,18 @@ def _fetch_bolsa_familia_historico(year: int) -> pd.DataFrame:
     records = []
     for item in rows:
         mun = item.get("municipio") or {}
-        records.append({
-            "cd_municipio_ibge": str(mun.get("codigoIBGE") or "")[:7],
-            "nm_municipio": mun.get("nomeIBGE") or mun.get("nome") or "",
-            "sg_uf": _uf_from(mun.get("uf")),
-            "ano": year,
-            "mes": 12,
-            "qtd_beneficiarios_bolsa_familia": int(item.get("quantidadeBeneficiados") or 0),
-            "valor_total_bolsa_familia_reais": float(item.get("valor") or 0),
-            "fonte": "portal_transparencia_bf",
-        })
+        records.append(
+            {
+                "cd_municipio_ibge": str(mun.get("codigoIBGE") or "")[:7],
+                "nm_municipio": mun.get("nomeIBGE") or mun.get("nome") or "",
+                "sg_uf": _uf_from(mun.get("uf")),
+                "ano": year,
+                "mes": 12,
+                "qtd_beneficiarios_bolsa_familia": int(item.get("quantidadeBeneficiados") or 0),
+                "valor_total_bolsa_familia_reais": float(item.get("valor") or 0),
+                "fonte": "portal_transparencia_bf",
+            }
+        )
 
     df = pd.DataFrame(records)
     df["cd_municipio_ibge"] = df["cd_municipio_ibge"].str[:7]
@@ -134,6 +143,7 @@ def _fetch_bolsa_familia_historico(year: int) -> pd.DataFrame:
 
 
 # ── BPC por município ──────────────────────────────────────────────────────────
+
 
 def _fetch_bpc(year: int) -> pd.DataFrame:
     """Fetch BPC (Benefício de Prestação Continuada) por município (dezembro do ano)."""
@@ -145,16 +155,18 @@ def _fetch_bpc(year: int) -> pd.DataFrame:
     records = []
     for item in rows:
         mun = item.get("municipio") or {}
-        records.append({
-            "cd_municipio_ibge": str(mun.get("codigoIBGE") or "")[:7],
-            "nm_municipio": mun.get("nomeIBGE") or mun.get("nome") or "",
-            "sg_uf": _uf_from(mun.get("uf")),
-            "ano": year,
-            "mes": 12,
-            "qtd_beneficiarios_bpc": int(item.get("quantidadeBeneficiados") or 0),
-            "valor_total_bpc_reais": float(item.get("valor") or 0),
-            "fonte": "portal_transparencia_bpc",
-        })
+        records.append(
+            {
+                "cd_municipio_ibge": str(mun.get("codigoIBGE") or "")[:7],
+                "nm_municipio": mun.get("nomeIBGE") or mun.get("nome") or "",
+                "sg_uf": _uf_from(mun.get("uf")),
+                "ano": year,
+                "mes": 12,
+                "qtd_beneficiarios_bpc": int(item.get("quantidadeBeneficiados") or 0),
+                "valor_total_bpc_reais": float(item.get("valor") or 0),
+                "fonte": "portal_transparencia_bpc",
+            }
+        )
 
     df = pd.DataFrame(records)
     df["cd_municipio_ibge"] = df["cd_municipio_ibge"].str[:7]
@@ -163,6 +175,7 @@ def _fetch_bpc(year: int) -> pd.DataFrame:
 
 
 # ── Auxílio Emergencial por município ──────────────────────────────────────────
+
 
 def _fetch_auxilio_emergencial(year: int) -> pd.DataFrame:
     """Fetch Auxílio Emergencial por município. Disponível para 2020 e 2021."""
@@ -177,16 +190,20 @@ def _fetch_auxilio_emergencial(year: int) -> pd.DataFrame:
     records = []
     for item in rows:
         mun = item.get("municipio") or {}
-        records.append({
-            "cd_municipio_ibge": str(mun.get("codigoIBGE") or "")[:7],
-            "nm_municipio": mun.get("nomeIBGE") or mun.get("nome") or "",
-            "sg_uf": _uf_from(mun.get("uf")),
-            "ano": year,
-            "mes": 12,
-            "qtd_beneficiarios_auxilio_emergencial": int(item.get("quantidadeBeneficiados") or 0),
-            "valor_total_auxilio_emergencial_reais": float(item.get("valor") or 0),
-            "fonte": "portal_transparencia_aux_emergencial",
-        })
+        records.append(
+            {
+                "cd_municipio_ibge": str(mun.get("codigoIBGE") or "")[:7],
+                "nm_municipio": mun.get("nomeIBGE") or mun.get("nome") or "",
+                "sg_uf": _uf_from(mun.get("uf")),
+                "ano": year,
+                "mes": 12,
+                "qtd_beneficiarios_auxilio_emergencial": int(
+                    item.get("quantidadeBeneficiados") or 0
+                ),
+                "valor_total_auxilio_emergencial_reais": float(item.get("valor") or 0),
+                "fonte": "portal_transparencia_aux_emergencial",
+            }
+        )
 
     df = pd.DataFrame(records)
     df["cd_municipio_ibge"] = df["cd_municipio_ibge"].str[:7]
@@ -195,6 +212,7 @@ def _fetch_auxilio_emergencial(year: int) -> pd.DataFrame:
 
 
 # ── SAGI / MI Social (fallback sem auth) ──────────────────────────────────────
+
 
 def _fetch_cadunico_sagi(year: int) -> pd.DataFrame:
     """Fetch famílias CadÚnico por município via SAGI/MI Social (sem autenticação)."""
@@ -213,18 +231,26 @@ def _fetch_cadunico_sagi(year: int) -> pd.DataFrame:
         if df.empty:
             return pd.DataFrame()
 
-        df = df.rename(columns={
-            "id_municipio": "cd_municipio_ibge",
-            "qtd_familias_pobreza": "qtd_familias_baixa_renda",
-        })
+        df = df.rename(
+            columns={
+                "id_municipio": "cd_municipio_ibge",
+                "qtd_familias_pobreza": "qtd_familias_baixa_renda",
+            }
+        )
         df["ano"] = year
         df["fonte"] = "sagi_mds"
 
-        for col in ("qtd_familias_cadunico", "qtd_familias_baixa_renda", "qtd_familias_extrema_pobreza"):
+        for col in (
+            "qtd_familias_cadunico",
+            "qtd_familias_baixa_renda",
+            "qtd_familias_extrema_pobreza",
+        ):
             if col in df.columns:
-                df[col] = pd.to_numeric(
-                    df[col].str.replace(",", "."), errors="coerce"
-                ).fillna(0).astype(int)
+                df[col] = (
+                    pd.to_numeric(df[col].str.replace(",", "."), errors="coerce")
+                    .fillna(0)
+                    .astype(int)
+                )
 
         logger.info("SAGI CadÚnico %d: %d municípios", year, len(df))
         return df
@@ -234,6 +260,7 @@ def _fetch_cadunico_sagi(year: int) -> pd.DataFrame:
 
 
 # ── Consolidação ───────────────────────────────────────────────────────────────
+
 
 def fetch_cadunico_municipio(year: int) -> pd.DataFrame:
     """Fetch consolidated social programs data by municipality for a year.
@@ -296,8 +323,11 @@ def fetch_cadunico_municipio(year: int) -> pd.DataFrame:
         base = pd.DataFrame()
 
     if not df_sagi.empty:
-        sagi_cols = [c for c in df_sagi.columns
-                     if c not in ("fonte", "nm_municipio", "sg_uf") or c == "cd_municipio_ibge"]
+        sagi_cols = [
+            c
+            for c in df_sagi.columns
+            if c not in ("fonte", "nm_municipio", "sg_uf") or c == "cd_municipio_ibge"
+        ]
         if base.empty:
             base = df_sagi
         else:

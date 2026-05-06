@@ -10,6 +10,7 @@ Google Trends:
   - Interesse de busca relativo (0-100) por candidato × UF × semana
   - Sem API key — pytrends (scraping oficial do Google Trends)
 """
+
 from __future__ import annotations
 
 import json
@@ -29,17 +30,40 @@ _ADS_ARCHIVE_URL = f"{_GRAPH_BASE}/ads_archive"
 
 # ── Mapeamento estado BR → UF ────────────────────────────────────────────────
 _BR_STATE_TO_UF: dict[str, str] = {
-    "Acre": "AC", "Alagoas": "AL", "Amapá": "AP", "Amazonas": "AM",
-    "Bahia": "BA", "Ceará": "CE", "Espírito Santo": "ES", "Goiás": "GO",
-    "Maranhão": "MA", "Mato Grosso": "MT", "Mato Grosso do Sul": "MS",
-    "Minas Gerais": "MG", "Pará": "PA", "Paraíba": "PB", "Paraná": "PR",
-    "Pernambuco": "PE", "Piauí": "PI", "Rio de Janeiro": "RJ",
-    "Rio Grande do Norte": "RN", "Rio Grande do Sul": "RS", "Rondônia": "RO",
-    "Roraima": "RR", "Santa Catarina": "SC", "São Paulo": "SP",
-    "Sergipe": "SE", "Tocantins": "TO", "Distrito Federal": "DF",
+    "Acre": "AC",
+    "Alagoas": "AL",
+    "Amapá": "AP",
+    "Amazonas": "AM",
+    "Bahia": "BA",
+    "Ceará": "CE",
+    "Espírito Santo": "ES",
+    "Goiás": "GO",
+    "Maranhão": "MA",
+    "Mato Grosso": "MT",
+    "Mato Grosso do Sul": "MS",
+    "Minas Gerais": "MG",
+    "Pará": "PA",
+    "Paraíba": "PB",
+    "Paraná": "PR",
+    "Pernambuco": "PE",
+    "Piauí": "PI",
+    "Rio de Janeiro": "RJ",
+    "Rio Grande do Norte": "RN",
+    "Rio Grande do Sul": "RS",
+    "Rondônia": "RO",
+    "Roraima": "RR",
+    "Santa Catarina": "SC",
+    "São Paulo": "SP",
+    "Sergipe": "SE",
+    "Tocantins": "TO",
+    "Distrito Federal": "DF",
     # Variantes com acento diferente
-    "Amapa": "AP", "Para": "PA", "Paraiba": "PB", "Parana": "PR",
-    "Piaui": "PI", "Rondonia": "RO",
+    "Amapa": "AP",
+    "Para": "PA",
+    "Paraiba": "PB",
+    "Parana": "PR",
+    "Piaui": "PI",
+    "Rondonia": "RO",
 }
 
 
@@ -291,7 +315,9 @@ def fetch_meta_ads(
 
     logger.info(
         "Meta Ads total: %d anúncios | %d regiões | %d demos",
-        len(ads_df), len(regions_df), len(demo_df),
+        len(ads_df),
+        len(regions_df),
+        len(demo_df),
     )
     return ads_df, regions_df, demo_df
 
@@ -319,7 +345,7 @@ def fetch_trends(
         pt = TrendReq(hl="pt-BR", tz=-180, timeout=(10, 30), retries=3, backoff_factor=0.5)
 
         frames: list[pd.DataFrame] = []
-        chunks = [keywords[i: i + 5] for i in range(0, len(keywords), 5)]
+        chunks = [keywords[i : i + 5] for i in range(0, len(keywords), 5)]
 
         for chunk in chunks:
             pt.build_payload(chunk, timeframe=timeframe, geo=geo)
@@ -363,7 +389,7 @@ def fetch_trends_by_uf(
     rows: list[dict] = []
     try:
         pt = TrendReq(hl="pt-BR", tz=-180, timeout=(10, 30), retries=2, backoff_factor=0.5)
-        for chunk in [keywords[i: i + 5] for i in range(0, len(keywords), 5)]:
+        for chunk in [keywords[i : i + 5] for i in range(0, len(keywords), 5)]:
             pt.build_payload(chunk, timeframe=timeframe, geo="BR")
             df_region = pt.interest_by_region(resolution="REGION", inc_low_vol=True)
             df_region = df_region.reset_index()
@@ -371,13 +397,15 @@ def fetch_trends_by_uf(
                 uf = _state_to_uf(str(row.get("geoName", "")))
                 for kw in chunk:
                     if kw in row:
-                        rows.append({
-                            "keyword": kw,
-                            "candidato": kw,
-                            "sg_uf": uf,
-                            "interesse_busca": int(row[kw]),
-                            "fonte": "google_trends",
-                        })
+                        rows.append(
+                            {
+                                "keyword": kw,
+                                "candidato": kw,
+                                "sg_uf": uf,
+                                "interesse_busca": int(row[kw]),
+                                "fonte": "google_trends",
+                            }
+                        )
             time.sleep(1.5)
     except Exception as exc:
         logger.error("Google Trends by UF falhou: %s", exc)

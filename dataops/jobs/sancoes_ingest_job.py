@@ -1,4 +1,5 @@
 """Cloud Run Job: CEIS + CNEP + CEAF + CEPIM (sanções federais) → Bronze layer."""
+
 from __future__ import annotations
 
 import logging

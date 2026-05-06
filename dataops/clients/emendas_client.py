@@ -72,7 +72,13 @@ def _fetch_emendas_year(year: int) -> pd.DataFrame:
             logger.warning("Emendas ano=%d pág %d: %s", year, pagina, exc)
             break
         if not isinstance(data, list):
-            logger.warning("Emendas ano=%d pág %d: resposta inesperada (tipo=%s): %s", year, pagina, type(data).__name__, str(data)[:200])
+            logger.warning(
+                "Emendas ano=%d pág %d: resposta inesperada (tipo=%s): %s",
+                year,
+                pagina,
+                type(data).__name__,
+                str(data)[:200],
+            )
             break
         if not data:
             break

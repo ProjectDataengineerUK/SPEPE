@@ -9,6 +9,7 @@ API DOC 2.0: https://blog.gdeltproject.org/gdelt-doc-2-0-api-debuts/
   - Sentimento: AvgTone pré-calculado (negativo < 0 < positivo)
   - Modos: artlist (lista de artigos), timelinevol, timelinesenti
 """
+
 from __future__ import annotations
 
 import logging
@@ -187,6 +188,7 @@ def _parse_gdelt_date(seendate: str) -> str:
 def _extract_domain(url: str) -> str:
     try:
         from urllib.parse import urlparse
+
         return urlparse(url).netloc.lower().lstrip("www.")
     except Exception:
         return ""

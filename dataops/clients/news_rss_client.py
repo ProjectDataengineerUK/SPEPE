@@ -6,6 +6,7 @@ R7 e outros. Sem API key — totalmente grátis.
 Detecta menções de candidatos por nome (case-insensitive substring match)
 e aplica análise de sentimento rule-based no título + descrição.
 """
+
 from __future__ import annotations
 
 import logging
@@ -60,14 +61,39 @@ FEED_REGISTRY: dict[str, dict[str, str]] = {
 
 # ── Sentiment — shared lexicon ────────────────────────────────────────────────
 _POSITIVE_TERMS = {
-    "aprovação", "cresce", "vence", "lidera", "vitória", "positivo",
-    "apoio", "conquista", "melhora", "progresso", "esperança",
-    "confiança", "aprovado", "recorde", "alta",
+    "aprovação",
+    "cresce",
+    "vence",
+    "lidera",
+    "vitória",
+    "positivo",
+    "apoio",
+    "conquista",
+    "melhora",
+    "progresso",
+    "esperança",
+    "confiança",
+    "aprovado",
+    "recorde",
+    "alta",
 }
 _NEGATIVE_TERMS = {
-    "corrupção", "escândalo", "crise", "queda", "preso", "condenado",
-    "denúncia", "fraude", "impeachment", "reprovação", "rejeição",
-    "protesto", "colapso", "falso", "mentira", "derrota",
+    "corrupção",
+    "escândalo",
+    "crise",
+    "queda",
+    "preso",
+    "condenado",
+    "denúncia",
+    "fraude",
+    "impeachment",
+    "reprovação",
+    "rejeição",
+    "protesto",
+    "colapso",
+    "falso",
+    "mentira",
+    "derrota",
 }
 
 
@@ -147,7 +173,9 @@ def _fetch_feed_raw(url: str, timeout: int = 20) -> list[dict[str, Any]]:
                     {
                         "title": (entry.findtext("atom:title", namespaces=ns) or "").strip(),
                         "link": link_el.get("href", "") if link_el is not None else "",
-                        "description": (entry.findtext("atom:summary", namespaces=ns) or "").strip(),
+                        "description": (
+                            entry.findtext("atom:summary", namespaces=ns) or ""
+                        ).strip(),
                         "pubDate": (entry.findtext("atom:published", namespaces=ns) or "").strip(),
                     }
                 )
@@ -232,6 +260,7 @@ def fetch_rss_mentions(
 def _extract_domain(url: str) -> str:
     try:
         from urllib.parse import urlparse
+
         return urlparse(url).netloc.lower().lstrip("www.")
     except Exception:
         return ""

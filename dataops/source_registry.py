@@ -12,6 +12,7 @@ Methodology:
   - Oficial: highest factual reliability, may have institutional bias
   - Aggregador (GDELT, Google News): no original content, scores source diversity
 """
+
 from __future__ import annotations
 
 from dataclasses import dataclass

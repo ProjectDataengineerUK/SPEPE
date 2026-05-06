@@ -9,6 +9,7 @@ Google Trends:
   - Interesse de busca relativo (0-100) nacional e por UF
   - Arquivos Bronze separados: timeline e por_uf
 """
+
 from __future__ import annotations
 
 import logging
@@ -32,9 +33,15 @@ _CANDIDATOS_BY_YEAR: dict[int, list[str]] = {
     2018: ["Lula", "Jair Bolsonaro", "Ciro Gomes", "Geraldo Alckmin"],
     2022: ["Lula", "Jair Bolsonaro", "Ciro Gomes", "Simone Tebet"],
     2026: [
-        "Lula", "Tarcísio de Freitas", "Jair Bolsonaro",
-        "Ciro Gomes", "Simone Tebet", "Geraldo Alckmin",
-        "Fernando Haddad", "Guilherme Boulos", "Rodrigo Pacheco",
+        "Lula",
+        "Tarcísio de Freitas",
+        "Jair Bolsonaro",
+        "Ciro Gomes",
+        "Simone Tebet",
+        "Geraldo Alckmin",
+        "Fernando Haddad",
+        "Guilherme Boulos",
+        "Rodrigo Pacheco",
     ],
 }
 

@@ -1005,11 +1005,13 @@ def transform_digital_to_silver(year: int, use_bigquery: bool = False) -> dict:
             prefix = f"raw/digital/{year}/BR/{filename}"
             try:
                 from google.cloud import storage
+
                 client = storage.Client()
                 bucket = client.bucket(GCS_BUCKET)
                 blob = bucket.blob(prefix)
                 if blob.exists():
                     import io
+
                     return pd.read_parquet(io.BytesIO(blob.download_as_bytes()))
             except Exception as exc:
                 logger.warning("GCS read %s: %s", prefix, exc)
@@ -1027,9 +1029,11 @@ def transform_digital_to_silver(year: int, use_bigquery: bool = False) -> dict:
             table_id = f"{project}.{dataset}.{table_name}"
             from google.cloud import bigquery
             from google.cloud.bigquery import SchemaUpdateOption, WriteDisposition
+
             bq = bigquery.Client(project=project)
-            bq.query(f"DELETE FROM `{table_id}` WHERE ano = {year}",
-                     job_config=bigquery.QueryJobConfig()).result()
+            bq.query(
+                f"DELETE FROM `{table_id}` WHERE ano = {year}", job_config=bigquery.QueryJobConfig()
+            ).result()
             cfg = bigquery.LoadJobConfig(
                 write_disposition=WriteDisposition.WRITE_APPEND,
                 autodetect=True,
@@ -1084,8 +1088,9 @@ def transform_digital_to_silver(year: int, use_bigquery: bool = False) -> dict:
         # Pivot wide → long: one row per (date, candidato)
         id_cols = [c for c in ("date", "ano", "fonte") if c in trends_df.columns]
         val_cols = [c for c in trends_df.columns if c not in id_cols]
-        long_df = trends_df.melt(id_vars=id_cols, value_vars=val_cols,
-                                  var_name="candidato", value_name="interesse_busca")
+        long_df = trends_df.melt(
+            id_vars=id_cols, value_vars=val_cols, var_name="candidato", value_name="interesse_busca"
+        )
         long_df["ano"] = year
         long_df["fonte"] = "google_trends"
         long_df["score_confiabilidade"] = 7.0
@@ -1159,9 +1164,8 @@ def transform_emendas_to_silver(year: int, use_bigquery: bool = False) -> dict:
             df[col] = pd.to_numeric(df[col], errors="coerce").fillna(0.0)
 
     if "cd_municipio_ibge" in df.columns:
-        df["cd_municipio_ibge"] = (
-            pd.to_numeric(df["cd_municipio_ibge"], errors="coerce")
-            .astype("float64")
+        df["cd_municipio_ibge"] = pd.to_numeric(df["cd_municipio_ibge"], errors="coerce").astype(
+            "float64"
         )
 
     # Truncate IBGE code to 7 digits (some sources send 8)
@@ -1171,9 +1175,17 @@ def transform_emendas_to_silver(year: int, use_bigquery: bool = False) -> dict:
         )
 
     str_cols = [
-        "nm_municipio", "sg_uf", "nm_parlamentar", "sg_partido",
-        "sg_uf_parlamentar", "ds_cargo_parlamentar", "tp_emenda",
-        "ds_area", "ds_subfuncao", "nr_emenda", "fonte",
+        "nm_municipio",
+        "sg_uf",
+        "nm_parlamentar",
+        "sg_partido",
+        "sg_uf_parlamentar",
+        "ds_cargo_parlamentar",
+        "tp_emenda",
+        "ds_area",
+        "ds_subfuncao",
+        "nr_emenda",
+        "fonte",
     ]
     for col in str_cols:
         if col in df.columns:
@@ -1187,7 +1199,8 @@ def transform_emendas_to_silver(year: int, use_bigquery: bool = False) -> dict:
 
     logger.info(
         "Emendas Silver %d: %d registros | %d UFs | R$ %.1fM pago",
-        year, len(df),
+        year,
+        len(df),
         df["sg_uf"].nunique() if "sg_uf" in df.columns else 0,
         df["vl_pago"].sum() / 1e6 if "vl_pago" in df.columns else 0,
     )
@@ -1251,13 +1264,20 @@ def transform_sancoes_to_silver(use_bigquery: bool = False) -> dict:
             try:
                 import io
                 from google.cloud import storage
+
                 client = storage.Client()
                 blob = client.bucket(GCS_BUCKET).blob(prefix)
                 if blob.exists():
                     return pd.read_parquet(io.BytesIO(blob.download_as_bytes()))
             except Exception as exc:
                 logger.warning("GCS read %s: %s", prefix, exc)
-        local = LOCAL_BRONZE_DIR / "sancoes" / "snapshot" / "BR" / f"{sistema.lower()}_BR_snapshot.parquet"
+        local = (
+            LOCAL_BRONZE_DIR
+            / "sancoes"
+            / "snapshot"
+            / "BR"
+            / f"{sistema.lower()}_BR_snapshot.parquet"
+        )
         if local.exists():
             return pd.read_parquet(local)
         return pd.DataFrame()
@@ -1297,10 +1317,17 @@ def transform_sancoes_to_silver(use_bigquery: bool = False) -> dict:
 
     # Ensure canonical columns exist (nm_cargo e nm_orgao_lotacao são específicos do CEAF)
     for col in (
-        "nm_pessoa", "tp_pessoa", "nr_cpf_cnpj", "tp_sancao",
-        "dt_inicio_sancao", "dt_fim_sancao", "nm_orgao_sancionador",
-        "sg_uf_sancionador", "nm_municipio_sancionador",
-        "nm_cargo", "nm_orgao_lotacao",
+        "nm_pessoa",
+        "tp_pessoa",
+        "nr_cpf_cnpj",
+        "tp_sancao",
+        "dt_inicio_sancao",
+        "dt_fim_sancao",
+        "nm_orgao_sancionador",
+        "sg_uf_sancionador",
+        "nm_municipio_sancionador",
+        "nm_cargo",
+        "nm_orgao_lotacao",
     ):
         if col not in df.columns:
             df[col] = ""
@@ -1311,12 +1338,14 @@ def transform_sancoes_to_silver(use_bigquery: bool = False) -> dict:
 
     # Mask CPF/CNPJ — keep only last 4 digits visible
     if "nr_cpf_cnpj" in df.columns:
+
         def _mask_doc(v: str) -> str:
             v = str(v).strip() if pd.notna(v) else ""
             digits = "".join(c for c in v if c.isdigit())
             if len(digits) >= 4:
                 return "*" * (len(digits) - 4) + digits[-4:]
             return "****"
+
         df["nr_cpf_cnpj"] = df["nr_cpf_cnpj"].apply(_mask_doc)
 
     # Numeric
@@ -1325,8 +1354,13 @@ def transform_sancoes_to_silver(use_bigquery: bool = False) -> dict:
 
     # String clean
     str_cols = [
-        "nm_pessoa", "tp_pessoa", "tp_sancao", "nm_orgao_sancionador",
-        "sg_uf_sancionador", "nm_municipio_sancionador", "fonte_sistema",
+        "nm_pessoa",
+        "tp_pessoa",
+        "tp_sancao",
+        "nm_orgao_sancionador",
+        "sg_uf_sancionador",
+        "nm_municipio_sancionador",
+        "fonte_sistema",
     ]
     for col in str_cols:
         if col in df.columns:

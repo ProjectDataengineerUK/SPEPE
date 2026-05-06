@@ -794,11 +794,20 @@ def _build_fact_social() -> pd.DataFrame:
         df["tipo_fonte"] = "desconhecido"
     if "vies_politico" not in df.columns:
         df["vies_politico"] = "variado"
-    df["score_confiabilidade"] = pd.to_numeric(df["score_confiabilidade"], errors="coerce").fillna(5.0)
+    df["score_confiabilidade"] = pd.to_numeric(df["score_confiabilidade"], errors="coerce").fillna(
+        5.0
+    )
 
     group_cols = [
-        "sg_uf", "candidato", "fonte", "tipo_fonte", "vies_politico",
-        "ano_semana", "semana", "ano", "data_referencia",
+        "sg_uf",
+        "candidato",
+        "fonte",
+        "tipo_fonte",
+        "vies_politico",
+        "ano_semana",
+        "semana",
+        "ano",
+        "data_referencia",
     ]
     group_cols = [c for c in group_cols if c in df.columns]
 
@@ -821,6 +830,7 @@ def _build_fact_social() -> pd.DataFrame:
         (fact["qt_positivo"] - fact["qt_negativo"]) / fact["qt_posts"] * 100,
         0.0,
     )
+
     # Weighted sentiment: positive/negative weighted by source score
     def _weighted_sentiment(sub: pd.DataFrame) -> float:
         scores = sub["score_confiabilidade"].values
@@ -867,15 +877,22 @@ def _build_fact_meta_ads_uf() -> pd.DataFrame:
         if col not in df.columns:
             df[col] = 0.0
 
-    group_cols = [c for c in ["candidato", "sg_uf", "ano", "ano_semana", "semana"] if c in df.columns]
+    group_cols = [
+        c for c in ["candidato", "sg_uf", "ano", "ano_semana", "semana"] if c in df.columns
+    ]
     fact = df.groupby(group_cols, as_index=False, dropna=False).agg(
-        qt_anuncios=("ad_id", "nunique") if "ad_id" in df.columns else ("vl_gasto_estimado_uf", "count"),
+        qt_anuncios=("ad_id", "nunique")
+        if "ad_id" in df.columns
+        else ("vl_gasto_estimado_uf", "count"),
         vl_gasto_total_uf=("vl_gasto_estimado_uf", "sum"),
         qt_impressoes_total_uf=("qt_impressoes_estimadas_uf", "sum"),
     )
     fact["custo_por_mil_impressoes"] = fact.apply(
-        lambda r: r["vl_gasto_total_uf"] / r["qt_impressoes_total_uf"] * 1000
-        if r["qt_impressoes_total_uf"] > 0 else 0.0,
+        lambda r: (
+            r["vl_gasto_total_uf"] / r["qt_impressoes_total_uf"] * 1000
+            if r["qt_impressoes_total_uf"] > 0
+            else 0.0
+        ),
         axis=1,
     )
     fact["ingested_at"] = pd.Timestamp.utcnow()
@@ -901,7 +918,9 @@ def _build_fact_meta_ads_demografico() -> pd.DataFrame:
 
     group_cols = [c for c in ["candidato", "faixa_etaria", "genero", "ano"] if c in df.columns]
     fact = df.groupby(group_cols, as_index=False, dropna=False).agg(
-        qt_anuncios=("ad_id", "nunique") if "ad_id" in df.columns else ("vl_gasto_estimado_demo", "count"),
+        qt_anuncios=("ad_id", "nunique")
+        if "ad_id" in df.columns
+        else ("vl_gasto_estimado_demo", "count"),
         vl_gasto_estimado_total=("vl_gasto_estimado_demo", "sum"),
         pct_demografico_medio=("pct_demografico", "mean"),
     )
@@ -927,10 +946,20 @@ def _build_fact_emendas() -> tuple[pd.DataFrame, pd.DataFrame]:
     df_pago = df[df["vl_pago"] > 0] if "vl_pago" in df.columns else df
 
     # ── por parlamentar ───────────────────────────────────────────────────────
-    parl_cols = [c for c in [
-        "ano", "sg_uf", "sg_uf_parlamentar", "nm_parlamentar",
-        "sg_partido", "ds_cargo_parlamentar", "tp_emenda", "ds_area",
-    ] if c in df_pago.columns]
+    parl_cols = [
+        c
+        for c in [
+            "ano",
+            "sg_uf",
+            "sg_uf_parlamentar",
+            "nm_parlamentar",
+            "sg_partido",
+            "ds_cargo_parlamentar",
+            "tp_emenda",
+            "ds_area",
+        ]
+        if c in df_pago.columns
+    ]
 
     fact_parl = df_pago.groupby(parl_cols, as_index=False, dropna=False).agg(
         qt_emendas=("vl_pago", "count"),
@@ -938,20 +967,33 @@ def _build_fact_emendas() -> tuple[pd.DataFrame, pd.DataFrame]:
         vl_liquidado_total=("vl_liquidado", "sum"),
         vl_pago_total=("vl_pago", "sum"),
         vl_pago_medio=("vl_pago", "mean"),
-        qt_municipios_atendidos=("cd_municipio_ibge", "nunique") if "cd_municipio_ibge" in df_pago.columns else ("vl_pago", "count"),
+        qt_municipios_atendidos=("cd_municipio_ibge", "nunique")
+        if "cd_municipio_ibge" in df_pago.columns
+        else ("vl_pago", "count"),
     )
     fact_parl["ingested_at"] = pd.Timestamp.utcnow()
     logger.info("fact_emendas_parlamentar: %d rows", len(fact_parl))
 
     # ── por município ─────────────────────────────────────────────────────────
-    mun_cols = [c for c in [
-        "ano", "cd_municipio_ibge", "nm_municipio", "sg_uf", "ds_area", "tp_emenda",
-    ] if c in df.columns]
+    mun_cols = [
+        c
+        for c in [
+            "ano",
+            "cd_municipio_ibge",
+            "nm_municipio",
+            "sg_uf",
+            "ds_area",
+            "tp_emenda",
+        ]
+        if c in df.columns
+    ]
 
     df_mun = df[df["cd_municipio_ibge"].notna()] if "cd_municipio_ibge" in df.columns else df
     fact_mun = df_mun.groupby(mun_cols, as_index=False, dropna=False).agg(
         qt_emendas=("vl_pago", "count"),
-        qt_parlamentares_distintos=("nm_parlamentar", "nunique") if "nm_parlamentar" in df_mun.columns else ("vl_pago", "count"),
+        qt_parlamentares_distintos=("nm_parlamentar", "nunique")
+        if "nm_parlamentar" in df_mun.columns
+        else ("vl_pago", "count"),
         vl_empenhado_total=("vl_empenhado", "sum"),
         vl_liquidado_total=("vl_liquidado", "sum"),
         vl_pago_total=("vl_pago", "sum"),
@@ -978,19 +1020,31 @@ def _build_fact_sancoes_uf() -> pd.DataFrame:
         df["valor_multa"] = 0.0
     df["valor_multa"] = pd.to_numeric(df["valor_multa"], errors="coerce").fillna(0.0)
 
-    df_filtered = df[
-        df["sg_uf_sancionador"].notna() & (df["sg_uf_sancionador"] != "")
-    ] if "sg_uf_sancionador" in df.columns else df
+    df_filtered = (
+        df[df["sg_uf_sancionador"].notna() & (df["sg_uf_sancionador"] != "")]
+        if "sg_uf_sancionador" in df.columns
+        else df
+    )
 
-    group_cols = [c for c in [
-        "fonte_sistema", "sg_uf_sancionador", "tp_sancao", "tp_pessoa", "ano_sancao",
-    ] if c in df_filtered.columns]
+    group_cols = [
+        c
+        for c in [
+            "fonte_sistema",
+            "sg_uf_sancionador",
+            "tp_sancao",
+            "tp_pessoa",
+            "ano_sancao",
+        ]
+        if c in df_filtered.columns
+    ]
 
     fact = df_filtered.groupby(group_cols, as_index=False, dropna=False).agg(
         qt_sancoes=("valor_multa", "count"),
         vl_multa_total=("valor_multa", "sum"),
         vl_multa_medio=("valor_multa", "mean"),
-        qt_orgaos_sancionadores=("nm_orgao_sancionador", "nunique") if "nm_orgao_sancionador" in df_filtered.columns else ("valor_multa", "count"),
+        qt_orgaos_sancionadores=("nm_orgao_sancionador", "nunique")
+        if "nm_orgao_sancionador" in df_filtered.columns
+        else ("valor_multa", "count"),
     )
     fact.rename(columns={"sg_uf_sancionador": "sg_uf"}, inplace=True)
     fact["ingested_at"] = pd.Timestamp.utcnow()

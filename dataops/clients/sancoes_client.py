@@ -13,6 +13,7 @@ Uso eleitoral:
   CEAF     : identificar servidores expulsos que tentam voltar via mandato
   CEPIM    : ONGs associadas a candidatos que estão impedidas de receber verbas
 """
+
 from __future__ import annotations
 
 import logging
@@ -56,7 +57,10 @@ def _fetch_paginated(endpoint: str, extra_params: dict | None = None) -> list[di
         if not isinstance(data, list):
             logger.warning(
                 "%s pág %d: resposta inesperada (tipo=%s): %s",
-                endpoint, pagina, type(data).__name__, str(data)[:200],
+                endpoint,
+                pagina,
+                type(data).__name__,
+                str(data)[:200],
             )
             break
         if not data:
@@ -80,6 +84,7 @@ def _extract_str(val: object, key: str = "descricao") -> str:
 
 # ── CEIS ─────────────────────────────────────────────────────────────────────
 
+
 def _normalize_ceis_cnep(item: dict, origem: str) -> dict:
     """Flatten CEIS/CNEP record — handles nested API dicts."""
     sancionado = item.get("sancionado") or {}
@@ -90,8 +95,7 @@ def _normalize_ceis_cnep(item: dict, origem: str) -> dict:
         orgao = {}
 
     cpf_cnpj = (
-        str(sancionado.get("cpfCnpj") or "")
-        .replace(".", "").replace("-", "").replace("/", "")
+        str(sancionado.get("cpfCnpj") or "").replace(".", "").replace("-", "").replace("/", "")
     )
     return {
         "origem": origem,
@@ -136,6 +140,7 @@ def fetch_cnep() -> pd.DataFrame:
 
 # ── CEAF ─────────────────────────────────────────────────────────────────────
 
+
 def _normalize_ceaf(item: dict) -> dict:
     """Flatten CEAF (expulsões de servidores) record."""
     servidor = item.get("servidor") or {}
@@ -145,7 +150,9 @@ def _normalize_ceaf(item: dict) -> dict:
     if isinstance(orgao, str):
         orgao = {}
 
-    cpf = str(servidor.get("cpf") or servidor.get("cpfCnpj") or "").replace(".", "").replace("-", "")
+    cpf = (
+        str(servidor.get("cpf") or servidor.get("cpfCnpj") or "").replace(".", "").replace("-", "")
+    )
     return {
         "origem": "CEAF",
         "nm_sancionado": (servidor.get("nome") or "").strip().upper(),
@@ -179,6 +186,7 @@ def fetch_ceaf() -> pd.DataFrame:
 
 # ── CEPIM ─────────────────────────────────────────────────────────────────────
 
+
 def _normalize_cepim(item: dict) -> dict:
     """Flatten CEPIM (entidades sem fins lucrativos impedidas) record."""
     entidade = item.get("entidade") or {}
@@ -188,10 +196,17 @@ def _normalize_cepim(item: dict) -> dict:
     if isinstance(orgao_superior, str):
         orgao_superior = {}
 
-    cnpj = str(entidade.get("cnpj") or entidade.get("cpfCnpj") or "").replace(".", "").replace("-", "").replace("/", "")
+    cnpj = (
+        str(entidade.get("cnpj") or entidade.get("cpfCnpj") or "")
+        .replace(".", "")
+        .replace("-", "")
+        .replace("/", "")
+    )
     return {
         "origem": "CEPIM",
-        "nm_sancionado": (entidade.get("nome") or entidade.get("razaoSocial") or "").strip().upper(),
+        "nm_sancionado": (entidade.get("nome") or entidade.get("razaoSocial") or "")
+        .strip()
+        .upper(),
         "nr_cpf_cnpj": cnpj,
         "tp_pessoa": "PJ",
         "sg_uf_sancionado": _extract_str(entidade.get("uf"), "sigla"),
@@ -219,6 +234,7 @@ def fetch_cepim() -> pd.DataFrame:
 
 
 # ── Consolidação ───────────────────────────────────────────────────────────────
+
 
 def fetch_sancoes() -> pd.DataFrame:
     """Fetch CEIS + CNEP + CEAF + CEPIM combined, deduplicated.

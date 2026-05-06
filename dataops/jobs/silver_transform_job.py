@@ -133,7 +133,8 @@ def main(uf: str, years: list[int] | None = None, include_social: bool = True) -
         else:
             logger.warning(
                 "Digital Silver ano=%d: %s (pode ser vazio se digital_ingest não rodou)",
-                digital_year, r.get("message"),
+                digital_year,
+                r.get("message"),
             )
 
     # ── Emendas Parlamentares (nacional — BR, multi-ano) ────────────────────
@@ -147,7 +148,8 @@ def main(uf: str, years: list[int] | None = None, include_social: bool = True) -
         else:
             logger.warning(
                 "Emendas Silver ano=%d: %s (Bronze pode estar vazio — 403 API)",
-                emendas_year, r.get("message"),
+                emendas_year,
+                r.get("message"),
             )
 
     # ── Sanções CEIS + CNEP (snapshot único) ────────────────────────────────

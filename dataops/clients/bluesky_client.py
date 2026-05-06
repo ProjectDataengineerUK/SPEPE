@@ -8,6 +8,7 @@ API pública: https://public.api.bsky.app/xrpc/
   - Rate limit: ~3000 req/5min por IP (muito permissivo)
   - Endpoint: app.bsky.feed.searchPosts
 """
+
 from __future__ import annotations
 
 import logging
@@ -24,14 +25,38 @@ _BSKY_BASE = "https://public.api.bsky.app/xrpc"
 _SEARCH_ENDPOINT = f"{_BSKY_BASE}/app.bsky.feed.searchPosts"
 
 _POSITIVE_TERMS = {
-    "ótimo", "excelente", "apoio", "voto", "melhor", "progresso",
-    "esperança", "confiança", "bom", "parabéns", "aprovado", "correto",
-    "lidera", "vitória", "conquista",
+    "ótimo",
+    "excelente",
+    "apoio",
+    "voto",
+    "melhor",
+    "progresso",
+    "esperança",
+    "confiança",
+    "bom",
+    "parabéns",
+    "aprovado",
+    "correto",
+    "lidera",
+    "vitória",
+    "conquista",
 }
 _NEGATIVE_TERMS = {
-    "horrível", "péssimo", "corrupto", "mentiroso", "ladrão", "vergonha",
-    "contra", "nunca", "repúdio", "pior", "errado", "denúncia",
-    "escândalo", "fraude", "rejeição",
+    "horrível",
+    "péssimo",
+    "corrupto",
+    "mentiroso",
+    "ladrão",
+    "vergonha",
+    "contra",
+    "nunca",
+    "repúdio",
+    "pior",
+    "errado",
+    "denúncia",
+    "escândalo",
+    "fraude",
+    "rejeição",
 }
 
 

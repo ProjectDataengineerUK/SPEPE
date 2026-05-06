@@ -10,6 +10,7 @@ Fontes coletadas:
 
 Cada registro recebe score_confiabilidade + tipo_fonte via source_registry.
 """
+
 from __future__ import annotations
 
 import json
@@ -79,7 +80,9 @@ def main(candidatos: list[str], fb_pages: list[str], dias: int, year: int) -> No
         _write(pd.DataFrame(mentions), "social", year, f"twitter_mencoes_{year}.parquet", use_gcs)
 
         sentimento = aggregate_x_sentiment(mentions)
-        _write(pd.DataFrame(sentimento), "social", year, f"twitter_sentimento_{year}.parquet", use_gcs)
+        _write(
+            pd.DataFrame(sentimento), "social", year, f"twitter_sentimento_{year}.parquet", use_gcs
+        )
     else:
         logger.warning("Twitter/X: nenhuma menção (token ausente ou API vazia)")
 
@@ -96,7 +99,9 @@ def main(candidatos: list[str], fb_pages: list[str], dias: int, year: int) -> No
     yt_records = fetch_youtube_videos(candidatos, year=year, max_por_candidato=200)
     if yt_records:
         if gcp_project:
-            yt_records = enrich_sentiment_vertex(yt_records, text_field="title", project=gcp_project)
+            yt_records = enrich_sentiment_vertex(
+                yt_records, text_field="title", project=gcp_project
+            )
         enrich_with_source_meta(yt_records)
         _write(pd.DataFrame(yt_records), "social", year, f"youtube_videos_{year}.parquet", use_gcs)
     else:
@@ -114,7 +119,9 @@ def main(candidatos: list[str], fb_pages: list[str], dias: int, year: int) -> No
     gdelt_articles = fetch_gdelt_mentions(candidatos, dias=min(dias, 90))
     if gdelt_articles:
         enrich_with_source_meta(gdelt_articles, fonte_field="fonte_especifica")
-        _write(pd.DataFrame(gdelt_articles), "social", year, f"gdelt_noticias_{year}.parquet", use_gcs)
+        _write(
+            pd.DataFrame(gdelt_articles), "social", year, f"gdelt_noticias_{year}.parquet", use_gcs
+        )
     else:
         logger.info("GDELT: nenhum artigo coletado")
 
