@@ -146,18 +146,30 @@ def _build_gold_via_bigquery_sql() -> dict:
         "fact_social_municipio": f"""
             CREATE OR REPLACE TABLE `{gold}.fact_social_municipio` AS
             SELECT
-                sg_uf,
+                COALESCE(sg_uf, '')             AS sg_uf,
+                COALESCE(candidato, 'desconhecido') AS candidato,
                 fonte,
-                DATE(created_at) AS data_referencia,
-                COUNT(*) AS qt_posts,
-                COALESCE(SUM(like_count), 0)    AS total_likes,
-                COALESCE(SUM(retweet_count), 0) AS total_retweets,
-                COALESCE(SUM(reply_count), 0)   AS total_comments,
+                ano_semana,
+                SAFE_CAST(semana AS INT64)       AS semana,
+                SAFE_CAST(ano AS INT64)          AS ano,
+                DATE(created_at)                 AS data_referencia,
+                COUNT(*)                         AS qt_posts,
+                COALESCE(SUM(like_count), 0)     AS total_likes,
+                COALESCE(SUM(retweet_count), 0)  AS total_retweets,
+                COALESCE(SUM(reply_count), 0)    AS total_comments,
+                COALESCE(SUM(view_count), 0)     AS total_views,
                 COALESCE(SUM(like_count), 0) + COALESCE(SUM(retweet_count), 0)
                     + COALESCE(SUM(reply_count), 0) AS total_engajamento,
-                CURRENT_TIMESTAMP() AS ingested_at
+                COUNTIF(sentiment = 'positivo')  AS qt_positivo,
+                COUNTIF(sentiment = 'negativo')  AS qt_negativo,
+                COUNTIF(sentiment = 'neutro')    AS qt_neutro,
+                SAFE_DIVIDE(
+                    COUNTIF(sentiment = 'positivo') - COUNTIF(sentiment = 'negativo'),
+                    COUNT(*)
+                ) * 100                          AS score_liquido_sentimento,
+                CURRENT_TIMESTAMP()              AS ingested_at
             FROM `{silver}.social_mencoes_br`
-            GROUP BY sg_uf, fonte, DATE(created_at)
+            GROUP BY sg_uf, candidato, fonte, ano_semana, semana, ano, DATE(created_at)
         """,
         # fact_pesquisa: promote Silver fact_pesquisa (multi-ano) → Gold
         # Skipped silently if Silver table does not exist yet
@@ -517,44 +529,57 @@ def _build_fact_saude() -> pd.DataFrame:
 
 
 def _build_fact_social() -> pd.DataFrame:
-    """Aggregate Silver social_mencoes_br files into Gold fact_social_municipio."""
+    """Aggregate Silver social_mencoes_br files into Gold fact_social_municipio (local path)."""
     files = list(LOCAL_SILVER_DIR.glob("social_mencoes_br_*.parquet"))
     if not files:
         logger.info("fact_social_municipio: nenhum Silver social disponível")
         return pd.DataFrame()
 
+    import numpy as np
+
     frames = [pd.read_parquet(f) for f in files]
     df = pd.concat(frames, ignore_index=True)
 
-    group_cols = ["sg_uf", "fonte"]
-    if "created_at" in df.columns:
-        df["data_referencia"] = pd.to_datetime(df["created_at"], errors="coerce").dt.date
-        group_cols.append("data_referencia")
-    else:
-        df["data_referencia"] = pd.Timestamp.utcnow().date()
-        group_cols.append("data_referencia")
+    if "candidato" not in df.columns:
+        df["candidato"] = "desconhecido"
+    if "sg_uf" not in df.columns:
+        df["sg_uf"] = ""
+    if "sentiment" not in df.columns:
+        df["sentiment"] = "neutro"
+    if "ano_semana" not in df.columns:
+        df["ano_semana"] = ""
+    if "semana" not in df.columns:
+        df["semana"] = 0
 
-    if "ano" in df.columns:
-        group_cols.append("ano")
+    ts = pd.to_datetime(df.get("created_at", pd.NaT), errors="coerce")
+    df["data_referencia"] = ts.dt.date
+    if df["ano_semana"].eq("").all():
+        df["ano_semana"] = ts.dt.strftime("%Y-W%V").fillna("")
 
-    agg: dict[str, object] = {"qt_posts": ("fonte", "count")}
-    for col, alias in [
-        ("like_count", "total_likes"),
-        ("likes", "total_likes"),
-        ("retweet_count", "total_retweets"),
-        ("reply_count", "total_comments"),
-        ("comments", "total_comments"),
-        ("shares", "total_shares"),
-    ]:
-        if col in df.columns and alias not in agg:
-            agg[alias] = (col, "sum")
+    for col in ("like_count", "retweet_count", "reply_count", "view_count"):
+        if col not in df.columns:
+            df[col] = 0
 
-    avail_group = [c for c in group_cols if c in df.columns or c == "data_referencia"]
-    fact = df.groupby([c for c in avail_group if c in df.columns], as_index=False).agg(**agg)
-    fact["total_engajamento"] = sum(
-        fact.get(c, 0)
-        for c in ("total_likes", "total_retweets", "total_comments", "total_shares")
-        if c in fact.columns
+    group_cols = ["sg_uf", "candidato", "fonte", "ano_semana", "semana", "ano", "data_referencia"]
+    group_cols = [c for c in group_cols if c in df.columns]
+
+    fact = df.groupby(group_cols, as_index=False, dropna=False).agg(
+        qt_posts=("fonte", "count"),
+        total_likes=("like_count", "sum"),
+        total_retweets=("retweet_count", "sum"),
+        total_comments=("reply_count", "sum"),
+        total_views=("view_count", "sum"),
+        qt_positivo=("sentiment", lambda s: (s == "positivo").sum()),
+        qt_negativo=("sentiment", lambda s: (s == "negativo").sum()),
+        qt_neutro=("sentiment", lambda s: (s == "neutro").sum()),
+    )
+    fact["total_engajamento"] = (
+        fact["total_likes"] + fact["total_retweets"] + fact["total_comments"]
+    )
+    fact["score_liquido_sentimento"] = np.where(
+        fact["qt_posts"] > 0,
+        (fact["qt_positivo"] - fact["qt_negativo"]) / fact["qt_posts"] * 100,
+        0.0,
     )
     fact["ingested_at"] = pd.Timestamp.utcnow()
     logger.info("fact_social_municipio: %d rows", len(fact))

@@ -492,58 +492,159 @@ def transform_social_to_silver(
     year: int,
     use_bigquery: bool = False,
 ) -> dict:
-    """Transform Bronze social data (Twitter/X + Facebook) to Silver layer.
+    """Transform Bronze social data (Twitter/X + Facebook + YouTube) to Silver layer.
 
-    Reads: raw/social/{year}/BR/twitter_mencoes_*.parquet
-    Writes: Silver table `social_mencoes_br` (BigQuery) or local parquet.
+    Reads: raw/social/{year}/BR/ (GCS) or local bronze/social/{year}/BR/
+    Writes: Silver table `social_mencoes_br` with candidato × semana × sentiment.
     """
     LOCAL_SILVER_DIR.mkdir(parents=True, exist_ok=True)
 
     frames: list[pd.DataFrame] = []
-    bronze_social = LOCAL_BRONZE_DIR / "social" / str(year) / "BR"
 
-    patterns = [
-        "twitter_mencoes_*.parquet",
-        "facebook_posts_*.parquet",
-        "youtube_videos_*.parquet",
-    ]
-    for pattern in patterns:
-        files = list(bronze_social.glob(pattern)) if bronze_social.exists() else []
-        for f in files:
-            try:
-                frames.append(pd.read_parquet(f))
-                logger.info("Social Bronze lido: %s (%d rows)", f.name, len(frames[-1]))
-            except Exception as exc:
-                logger.warning("Falha ao ler %s: %s", f, exc)
+    if GCS_BUCKET:
+        prefix = f"raw/social/{year}/BR/"
+        df_gcs = _read_gcs_parquet_glob(GCS_BUCKET, prefix)
+        if not df_gcs.empty:
+            frames.append(df_gcs)
+            logger.info("Social Bronze GCS: %d registros (ano=%d)", len(df_gcs), year)
+    else:
+        bronze_social = LOCAL_BRONZE_DIR / "social" / str(year) / "BR"
+        patterns = [
+            "twitter_mencoes_*.parquet",
+            "facebook_posts_*.parquet",
+            "youtube_videos_*.parquet",
+        ]
+        for pattern in patterns:
+            for f in bronze_social.glob(pattern) if bronze_social.exists() else []:
+                try:
+                    frames.append(pd.read_parquet(f))
+                    logger.info("Social Bronze local: %s (%d rows)", f.name, len(frames[-1]))
+                except Exception as exc:
+                    logger.warning("Falha ao ler %s: %s", f, exc)
 
     if not frames:
         return {"status": "error", "message": f"Bronze social vazio para {year}"}
 
     df = pd.concat(frames, ignore_index=True)
 
-    # Normaliza timestamp para UTC
-    for col in ("created_at", "created_time"):
+    # Normaliza timestamp para UTC → colunas de semana e data
+    for col in ("created_at", "created_time", "published_at"):
         if col in df.columns:
             df[col] = pd.to_datetime(df[col], errors="coerce", utc=True)
+            break
 
-    # Garante coluna fonte
+    ts_col = next(
+        (c for c in ("created_at", "created_time", "published_at") if c in df.columns), None
+    )
+    if ts_col:
+        df["created_at"] = df[ts_col]
+    else:
+        df["created_at"] = pd.NaT
+
+    df["data_referencia"] = pd.to_datetime(df["created_at"], errors="coerce").dt.date
+    df["semana"] = (
+        pd.to_datetime(df["created_at"], errors="coerce").dt.isocalendar().week.astype("Int64")
+    )
+    df["ano_semana"] = (
+        pd.to_datetime(df["created_at"], errors="coerce")
+        .dt.strftime("%Y-W%V")
+        .fillna(f"{year}-W00")
+    )
+
+    # Candidato canônico — Twitter/X já traz; YouTube/FB pode não ter
+    if "candidato" not in df.columns:
+        df["candidato"] = "desconhecido"
+    else:
+        df["candidato"] = df["candidato"].fillna("desconhecido").str.strip()
+
+    # Fonte canônica
     if "fonte" not in df.columns:
-        df["fonte"] = "desconhecido"
+        df["fonte"] = "social"
 
-    # Coluna canônica de texto
-    if "text" not in df.columns and "message" in df.columns:
-        df["text"] = df["message"]
+    # Texto canônico
+    for txt_col in ("text", "message", "title", "description"):
+        if txt_col in df.columns:
+            df["text"] = df[txt_col].fillna("")
+            break
+    if "text" not in df.columns:
+        df["text"] = ""
+
+    # Sentimento canônico (positivo | negativo | neutro)
+    if "sentiment" not in df.columns:
+        df["sentiment"] = "neutro"
+    df["sentiment"] = (
+        df["sentiment"]
+        .str.lower()
+        .replace({"positive": "positivo", "negative": "negativo", "neutral": "neutro"})
+        .fillna("neutro")
+    )
+
+    # UF — best-effort: campo direto ou inferido do location
+    if "sg_uf" not in df.columns:
+        for uf_col in ("uf", "state", "user_location"):
+            if uf_col in df.columns:
+                df["sg_uf"] = df[uf_col].str.upper().str[:2]
+                break
+        else:
+            df["sg_uf"] = ""
 
     # Métricas numéricas
-    for col in ("like_count", "retweet_count", "reply_count", "likes", "comments", "shares"):
+    for col in (
+        "like_count",
+        "retweet_count",
+        "reply_count",
+        "likes",
+        "comments",
+        "shares",
+        "view_count",
+        "comment_count",
+    ):
         if col in df.columns:
             df[col] = pd.to_numeric(df[col], errors="coerce").fillna(0).astype(int)
 
     df["ano"] = year
     df["ingested_at"] = pd.Timestamp.utcnow()
 
+    # Mantém apenas colunas necessárias para o Silver
+    keep = [
+        "candidato",
+        "fonte",
+        "sg_uf",
+        "text",
+        "sentiment",
+        "created_at",
+        "data_referencia",
+        "semana",
+        "ano_semana",
+        "ano",
+        "like_count",
+        "retweet_count",
+        "reply_count",
+        "view_count",
+        "comment_count",
+        "ingested_at",
+    ]
+    df = df[[c for c in keep if c in df.columns]]
+
     if use_bigquery:
-        path = _write_bigquery(df, "social_mencoes_br")
+        project = os.environ.get("GCP_PROJECT_ID", "")
+        dataset = os.environ.get("BIGQUERY_DATASET_SILVER", "spepe_silver")
+        table_id = f"{project}.{dataset}.social_mencoes_br"
+        from google.cloud import bigquery
+        from google.cloud.bigquery import SchemaUpdateOption, WriteDisposition
+
+        client = bigquery.Client(project=project)
+        client.query(
+            f"DELETE FROM `{table_id}` WHERE ano = {year}", job_config=bigquery.QueryJobConfig()
+        ).result()
+        job_config = bigquery.LoadJobConfig(
+            write_disposition=WriteDisposition.WRITE_APPEND,
+            autodetect=True,
+            schema_update_options=[SchemaUpdateOption.ALLOW_FIELD_ADDITION],
+        )
+        client.load_table_from_dataframe(df, table_id, job_config=job_config).result()
+        path = table_id
+        logger.info("Social Silver BQ: %s (%d rows)", path, len(df))
     else:
         path_local = LOCAL_SILVER_DIR / f"social_mencoes_br_{year}.parquet"
         df.to_parquet(path_local, index=False, compression="zstd")
