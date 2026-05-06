@@ -37,5 +37,6 @@ pydantic==2.13.2
 pydantic-settings==2.13.1
 tenacity>=8.2.3
 requests==2.33.1
+pytrends==4.9.2
 httpx==0.28.1
 aiohttp==3.13.5
