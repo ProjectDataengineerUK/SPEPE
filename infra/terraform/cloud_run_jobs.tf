@@ -21,6 +21,7 @@ locals {
     camara_senado_ingest  = { timeout = "3600s", memory = "1Gi",   cpu = "1", args = [] }
     endividamento_ingest  = { timeout = local.prod_mode ? "1800s" : "900s", memory = "512Mi", cpu = "1", args = ["--uf", local.uf_arg] }
     cadunico_ingest       = { timeout = "3600s", memory = "512Mi", cpu = "1", args = [] }
+    emendas_ingest        = { timeout = "3600s", memory = "512Mi", cpu = "1", args = [] }
   }
 
   # Env vars adicionais por job (além das compartilhadas)
@@ -64,6 +65,7 @@ locals {
       ENDIVIDAMENTO_YEAR_END   = "2026"
     }
     cadunico_ingest = { CADUNICO_YEAR = "2022" }
+    emendas_ingest  = { EMENDAS_YEAR = "2022" }
   }
 
   job_entrypoints = {
@@ -84,6 +86,7 @@ locals {
     camara_senado_ingest    = ["python", "-m", "dataops.jobs.camara_senado_ingest_job"]
     endividamento_ingest    = ["python", "-m", "dataops.jobs.endividamento_ingest_job"]
     cadunico_ingest         = ["python", "-m", "dataops.jobs.cadunico_ingest_job"]
+    emendas_ingest          = ["python", "-m", "dataops.jobs.emendas_ingest_job"]
   }
 }
 
