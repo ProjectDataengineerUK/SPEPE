@@ -16,7 +16,6 @@ import json
 import logging
 import os
 import time
-from datetime import datetime, timezone
 from typing import Any
 
 import pandas as pd
@@ -40,7 +39,7 @@ _BR_STATE_TO_UF: dict[str, str] = {
     "Sergipe": "SE", "Tocantins": "TO", "Distrito Federal": "DF",
     # Variantes com acento diferente
     "Amapa": "AP", "Para": "PA", "Paraiba": "PB", "Parana": "PR",
-    "Piauí": "PI", "Piaui": "PI", "Rondonia": "RO",
+    "Piaui": "PI", "Rondonia": "RO",
 }
 
 

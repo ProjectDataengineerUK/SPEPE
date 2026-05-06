@@ -107,8 +107,6 @@ def fetch_bluesky_mentions(
                 record = post.get("record", {})
                 text = record.get("text", "")
                 author = post.get("author", {})
-                counts = post.get("likeCount", 0), post.get("repostCount", 0), post.get("replyCount", 0)
-
                 results.append(
                     {
                         "candidato": candidato,
