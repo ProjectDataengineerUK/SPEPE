@@ -84,7 +84,7 @@ _VIEWS: dict[str, str] = {
         SELECT
             sg_uf,
             nm_candidato,
-            sg_partido,
+            CAST(sg_partido AS STRING)                                          AS sg_partido,
             cd_cargo,
             ds_cargo,
             ano_eleicao,
@@ -174,12 +174,13 @@ _VIEWS: dict[str, str] = {
             GROUP BY fonte, sg_uf, DATE_TRUNC(DATE(created_at), WEEK(MONDAY))
         )
     """,
-    # ── Trajetória 2018 / 2022 (resultado) + 2026 (pesquisa) por UF ───────
+    # ── Trajetória 2018 / 2022 por UF (Fase 1: apenas resultado real) ──────
+    # Fase 2: adicionar branch 2026 quando Silver pesquisas tiver candidato × intencao_ajustada
     "vw_cenario_2018_2022_2026": f"""
         SELECT
             sg_uf,
             nm_candidato,
-            sg_partido,
+            CAST(sg_partido AS STRING)                                          AS sg_partido,
             cd_cargo,
             ds_cargo,
             ano_eleicao,
@@ -194,25 +195,6 @@ _VIEWS: dict[str, str] = {
             CAST(NULL AS FLOAT64)                                               AS margem_erro_pp
         FROM `{_PROJECT}.{_GOLD}.fact_candidato_eleicao`
         WHERE ano_eleicao IN (2018, 2022)
-
-        UNION ALL
-
-        SELECT
-            uf                                                                  AS sg_uf,
-            candidato                                                           AS nm_candidato,
-            CAST(NULL AS STRING)                                                AS sg_partido,
-            cd_cargo,
-            CAST(NULL AS STRING)                                                AS ds_cargo,
-            2026                                                                AS ano_eleicao,
-            CAST(NULL AS INT64)                                                 AS total_votos,
-            ROUND(AVG(intencao_ajustada), 1)                                    AS pct_voto_uf,
-            'pesquisa'                                                          AS tipo_dado,
-            COUNT(*)                                                            AS qt_pesquisas,
-            ROUND(AVG(margem_erro), 1)                                          AS margem_erro_pp
-        FROM `{_PROJECT}.{_GOLD}.fact_pesquisa`
-        WHERE record_confidence_score >= 0.80
-          AND tipo_pesquisa = 'corrente'
-        GROUP BY uf, candidato, cd_cargo
     """,
     # ── Transferências sociais por município × ano ───────────────────────
     "vw_transferencias_municipio": f"""
@@ -576,8 +558,8 @@ _MV_ZONA_SQL = """
         sg_partido,
         nr_turno,
         ano_eleicao,
-        SUM(qt_votos) AS qt_votos_total,
-        COUNT(*)         AS qt_secoes
+        SUM(total_votos) AS qt_votos_total,
+        COUNT(*)          AS qt_secoes
     FROM `{project}.{gold}.fact_secao_eleicao`
     GROUP BY sg_uf, cd_municipio, nm_municipio, nr_zona,
              cd_cargo, nm_candidato, sg_partido, nr_turno, ano_eleicao
