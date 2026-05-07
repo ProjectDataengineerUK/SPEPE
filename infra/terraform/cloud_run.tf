@@ -76,7 +76,8 @@ resource "google_cloud_run_v2_service_iam_member" "invoker" {
   location = var.region
   role     = "roles/run.invoker"
 
-  # In dev: allow unauthenticated access for faster iteration.
-  # In staging/prod: restrict to the IAP-managed service account.
-  member = var.environment == "dev" ? "allUsers" : "serviceAccount:${google_service_account.cloud_run.email}"
+  # dev:            allUsers — no LB, direct Cloud Run URL.
+  # prod + no IAP:  allUsers — LB (serverless NEG) is the perimeter; IAP not provisioned.
+  # prod + IAP:     IAP service agent handles auth; allUsers not needed but harmless.
+  member = local.iap_enabled ? "serviceAccount:${google_service_account.cloud_run.email}" : "allUsers"
 }
