@@ -31,7 +31,7 @@ locals {
     ibge_sync        = {}
     security_ingest  = {}
     datasus_ingest   = {}
-    dieese_ingest    = {}
+    dieese_ingest    = { DEFAULT_ANO = "2025" }
     cetic_ingest     = {}
     silver_transform = { SOCIAL_YEAR = "2026" }
     gold_build       = {}

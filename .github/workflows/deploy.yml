@@ -198,16 +198,28 @@ jobs:
       - name: Update Cloud Run Jobs to new image
         run: |
           IMAGE="${{ needs.build-push.outputs.image_tag }}"
+          REGION="${{ env.GCP_REGION }}"
+          SA="spepe-dataops-jobs@spepe-prod.iam.gserviceaccount.com"
           for JOB in spepe-tse-ingest spepe-tse-perfil-ingest spepe-tse-candidaturas-ingest \
                      spepe-ibge-sync spepe-digital-ingest spepe-silver-transform spepe-gold-build \
                      spepe-social-ingest spepe-pesquisas-ingest spepe-security-ingest spepe-datasus-ingest \
                      spepe-dieese-ingest spepe-cetic-ingest spepe-reddit-ingest spepe-camara-senado-ingest \
                      spepe-endividamento-ingest spepe-cadunico-ingest spepe-emendas-ingest \
                      spepe-sancoes-ingest; do
-            gcloud run jobs update "${JOB}" \
-              --image "${IMAGE}" \
-              --region "${{ env.GCP_REGION }}" \
-              --project spepe-prod 2>&1 || echo "Warning: could not update ${JOB}"
+            if gcloud run jobs describe "${JOB}" --region "${REGION}" --project spepe-prod &>/dev/null; then
+              gcloud run jobs update "${JOB}" \
+                --image "${IMAGE}" \
+                --region "${REGION}" \
+                --project spepe-prod 2>&1 || echo "Warning: could not update ${JOB}"
+            else
+              echo "Job ${JOB} not found — creating with base config (Terraform will reconcile env vars)"
+              gcloud run jobs create "${JOB}" \
+                --image "${IMAGE}" \
+                --region "${REGION}" \
+                --service-account "${SA}" \
+                --memory 512Mi --cpu 1 --task-timeout 3600 \
+                --project spepe-prod 2>&1 || echo "Warning: could not create ${JOB}"
+            fi
           done
 
       - name: Smoke test — prod health check
