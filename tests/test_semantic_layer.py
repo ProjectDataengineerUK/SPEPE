@@ -10,7 +10,7 @@ from dataops.semantic_layer import _VIEWS, _MV_ZONA_SQL
 # ── Registry ──────────────────────────────────────────────────────────────────
 
 EXPECTED_VIEWS = {
-    "vw_sentimento_candidato",
+    "vw_sentimento_municipio",
     "vw_vulnerabilidade_municipio",
     "vw_perfil_municipio",
     "vw_intencao_voto_uf",
@@ -18,6 +18,12 @@ EXPECTED_VIEWS = {
     "vw_narrativa_por_tema_uf",
     "vw_cenario_2018_2022_2026",
     "vw_mapa_prioridade_campanha",
+    "vw_transferencias_municipio",
+    "vw_transferencias_vs_eleicao",
+    "vw_emendas_municipio",
+    "vw_emendas_vs_eleicao",
+    "vw_sancoes_uf",
+    "vw_score_municipal_integrado",
 }
 
 
@@ -67,7 +73,8 @@ def test_view_references_project_placeholder(view_name):
 
 def test_vw_pesquisa_vs_social_columns():
     sql = _VIEWS["vw_pesquisa_vs_social"]
-    for col in ("intencao_media_pct", "total_mencoes", "total_engajamento", "delta_intencao_pp"):
+    # Fase 1: raw polling metadata (no candidate-level intentions yet)
+    for col in ("qt_pesquisas", "qt_institutos", "total_mencoes", "total_engajamento"):
         assert col in sql, f"vw_pesquisa_vs_social missing column: {col}"
 
 
@@ -128,8 +135,8 @@ def test_vw_mapa_prioridade_joins_ibge():
 # ── Existing views: non-regression ────────────────────────────────────────────
 
 
-def test_vw_sentimento_candidato_sources():
-    sql = _VIEWS["vw_sentimento_candidato"]
+def test_vw_sentimento_municipio_sources():
+    sql = _VIEWS["vw_sentimento_municipio"]
     assert "social_mencoes_br" in sql
 
 
