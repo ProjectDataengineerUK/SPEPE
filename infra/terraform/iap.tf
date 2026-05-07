@@ -55,11 +55,15 @@ resource "google_compute_global_address" "spepe" {
 
 resource "google_compute_managed_ssl_certificate" "spepe" {
   count   = local.lb_enabled ? 1 : 0
-  name    = "spepe-ssl-cert"
+  name    = "spepe-ssl-cert-v2"
   project = var.project_id
 
   managed {
-    domains = [var.domain]
+    domains = [var.domain, "www.${var.domain}"]
+  }
+
+  lifecycle {
+    create_before_destroy = true
   }
 }
 
