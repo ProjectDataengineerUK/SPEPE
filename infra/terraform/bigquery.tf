@@ -247,7 +247,6 @@ resource "google_bigquery_table" "mv_zona_eleicao" {
     query               = <<-EOT
       SELECT
         sg_uf,
-        sg_regiao,
         cd_municipio,
         nm_municipio,
         nr_zona,
@@ -256,10 +255,11 @@ resource "google_bigquery_table" "mv_zona_eleicao" {
         sg_partido,
         nr_turno,
         ano_eleicao,
-        SUM(qt_votos) AS qt_votos_total,
-        COUNT(*)      AS qt_secoes
+        SUM(total_votos) AS qt_votos_total,
+        COUNT(*)         AS qt_secoes
       FROM `${var.project_id}.spepe_gold.fact_secao_eleicao`
-      GROUP BY 1, 2, 3, 4, 5, 6, 7, 8, 9, 10
+      GROUP BY sg_uf, cd_municipio, nm_municipio, nr_zona,
+               cd_cargo, nm_candidato, sg_partido, nr_turno, ano_eleicao
     EOT
     enable_refresh      = true
     refresh_interval_ms = 3600000
