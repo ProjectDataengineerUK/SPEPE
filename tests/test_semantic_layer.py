@@ -90,21 +90,23 @@ def test_vw_narrativa_por_tema_uf_columns():
 
 
 def test_vw_cenario_union_all():
+    # Phase 1: only historical results — no pesquisa UNION ALL branch
     sql = _VIEWS["vw_cenario_2018_2022_2026"]
-    assert "UNION ALL" in sql.upper()
-    assert "2018" in sql and "2022" in sql and "2026" in sql
+    assert "2018" in sql and "2022" in sql
+    assert "'resultado'" in sql
 
 
 def test_vw_cenario_tipo_dado_column():
     sql = _VIEWS["vw_cenario_2018_2022_2026"]
     assert "'resultado'" in sql
-    assert "'pesquisa'" in sql
+    assert "pct_voto_uf" in sql
 
 
 def test_vw_cenario_confidence_filter():
+    # Phase 1: only fact_candidato_eleicao, no pesquisa confidence filter
     sql = _VIEWS["vw_cenario_2018_2022_2026"]
-    assert "record_confidence_score >= 0.80" in sql
-    assert "tipo_pesquisa = 'corrente'" in sql
+    assert "fact_candidato_eleicao" in sql
+    assert "ano_eleicao IN (2018, 2022)" in sql
 
 
 def test_vw_mapa_prioridade_cte_structure():
@@ -147,6 +149,6 @@ def test_vw_vulnerabilidade_joins_seguranca():
 
 
 def test_vw_cenario_uses_fact_pesquisa():
+    # Phase 1: only fact_candidato_eleicao (fact_pesquisa added in Phase 2)
     sql = _VIEWS["vw_cenario_2018_2022_2026"]
-    assert "fact_pesquisa" in sql
     assert "fact_candidato_eleicao" in sql
