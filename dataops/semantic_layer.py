@@ -14,8 +14,8 @@ _SILVER = os.environ.get("BIGQUERY_DATASET_SILVER", "spepe_silver")
 
 _VIEWS: dict[str, str] = {
     # ── Sentimento social por fonte × UF × dia ────────────────────────────
-    # (candidato não disponível em social_mencoes_br — agregação por fonte/UF)
-    "vw_sentimento_candidato": f"""
+    # Nota: social_mencoes_br não tem candidato populado — agregação por fonte/UF
+    "vw_sentimento_municipio": f"""
         SELECT
             fonte,
             sg_uf,
@@ -210,6 +210,292 @@ _VIEWS: dict[str, str] = {
         WHERE record_confidence_score >= 0.80
           AND tipo_pesquisa = 'corrente'
         GROUP BY uf, candidato, cd_cargo
+    """,
+    # ── Transferências sociais por município × ano ───────────────────────
+    "vw_transferencias_municipio": f"""
+        SELECT
+            t.cd_municipio_ibge,
+            t.nm_municipio,
+            t.sg_uf,
+            t.ano,
+            t.qtd_beneficiarios_bolsa_familia,
+            t.valor_total_bolsa_familia_reais,
+            t.qtd_familias_cadunico,
+            t.qtd_familias_extrema_pobreza,
+            t.qtd_familias_baixa_renda,
+            i.populacao_total,
+            ROUND(
+                SAFE_DIVIDE(t.qtd_beneficiarios_bolsa_familia, NULLIF(i.populacao_total, 0)) * 100,
+                1
+            )                                               AS pct_pop_beneficiaria_bf,
+            ROUND(
+                SAFE_DIVIDE(t.valor_total_bolsa_familia_reais, NULLIF(i.populacao_total, 0)),
+                2
+            )                                               AS vl_bf_per_capita,
+            ROUND(
+                SAFE_DIVIDE(
+                    t.qtd_familias_extrema_pobreza,
+                    NULLIF(t.qtd_familias_cadunico, 0)
+                ) * 100, 1
+            )                                               AS pct_extrema_no_cadunico
+        FROM `{_PROJECT}.{_GOLD}.fact_transferencias_sociais` t
+        LEFT JOIN `{_PROJECT}.{_GOLD}.fact_ibge_municipio` i
+            ON t.cd_municipio_ibge = i.cd_municipio_ibge
+    """,
+    # ── Transferências sociais × resultado eleitoral ──────────────────────
+    "vw_transferencias_vs_eleicao": f"""
+        WITH eleicao AS (
+            SELECT
+                cd_municipio_ibge, nm_municipio, sg_uf, ano_eleicao,
+                nm_candidato    AS vencedor,
+                sg_partido      AS partido_vencedor,
+                ROUND(pct_votos_municipio, 1) AS pct_vencedor
+            FROM `{_PROJECT}.{_GOLD}.fact_municipio_candidato_eleicao`
+            WHERE nr_turno = 1 AND rn_municipio = 1
+        ),
+        transferencias_max AS (
+            SELECT
+                cd_municipio_ibge,
+                MAX(ano)                                     AS ano_ref,
+                SUM(qtd_beneficiarios_bolsa_familia)         AS qtd_beneficiarios_bf,
+                SUM(valor_total_bolsa_familia_reais)         AS vl_bf_total,
+                SUM(qtd_familias_cadunico)                   AS qtd_familias_cadunico,
+                SUM(qtd_familias_extrema_pobreza)            AS qtd_familias_extrema_pobreza
+            FROM `{_PROJECT}.{_GOLD}.fact_transferencias_sociais`
+            GROUP BY cd_municipio_ibge
+        )
+        SELECT
+            e.cd_municipio_ibge,
+            e.nm_municipio,
+            e.sg_uf,
+            e.ano_eleicao,
+            e.vencedor,
+            e.partido_vencedor,
+            e.pct_vencedor,
+            t.ano_ref                                        AS ano_transferencia,
+            t.qtd_beneficiarios_bf,
+            t.vl_bf_total,
+            t.qtd_familias_cadunico,
+            t.qtd_familias_extrema_pobreza,
+            i.populacao_total,
+            i.idhm,
+            i.renda_per_capita,
+            i.pct_extrema_pobreza,
+            ROUND(
+                SAFE_DIVIDE(t.qtd_beneficiarios_bf, NULLIF(i.populacao_total, 0)) * 100,
+                1
+            )                                               AS pct_dependencia_bf,
+            ROUND(
+                SAFE_DIVIDE(t.vl_bf_total, NULLIF(i.populacao_total, 0)),
+                2
+            )                                               AS vl_bf_per_capita
+        FROM eleicao e
+        LEFT JOIN transferencias_max t USING (cd_municipio_ibge)
+        LEFT JOIN `{_PROJECT}.{_GOLD}.fact_ibge_municipio` i USING (cd_municipio_ibge)
+    """,
+    # ── Emendas parlamentares por município × área (+ per capita) ────────
+    "vw_emendas_municipio": f"""
+        SELECT
+            em.ano,
+            em.cd_municipio_ibge,
+            em.nm_municipio,
+            em.sg_uf,
+            em.ds_area,
+            em.tp_emenda,
+            em.qt_emendas,
+            em.qt_parlamentares_distintos,
+            em.vl_empenhado_total,
+            em.vl_liquidado_total,
+            em.vl_pago_total,
+            i.populacao_total,
+            ROUND(
+                SAFE_DIVIDE(em.vl_pago_total, NULLIF(i.populacao_total, 0)),
+                2
+            )                                               AS vl_pago_per_capita,
+            ROUND(
+                SAFE_DIVIDE(em.vl_pago_total, NULLIF(em.vl_empenhado_total, 0)) * 100,
+                1
+            )                                               AS taxa_execucao_pct
+        FROM `{_PROJECT}.{_GOLD}.fact_emendas_municipio` em
+        LEFT JOIN `{_PROJECT}.{_GOLD}.fact_ibge_municipio` i USING (cd_municipio_ibge)
+    """,
+    # ── Emendas por partido × UF × eleição (influência eleitoral) ─────────
+    "vw_emendas_vs_eleicao": f"""
+        WITH emendas_partido_uf AS (
+            SELECT
+                ano,
+                sg_uf,
+                sg_partido,
+                SUM(qt_emendas)    AS qt_emendas_total,
+                SUM(vl_pago_total) AS vl_pago_total,
+                COUNT(DISTINCT nm_parlamentar) AS qt_parlamentares
+            FROM `{_PROJECT}.{_GOLD}.fact_emendas_parlamentar`
+            GROUP BY ano, sg_uf, sg_partido
+        ),
+        votos_uf AS (
+            SELECT
+                sg_uf,
+                nm_candidato,
+                sg_partido,
+                cd_cargo,
+                ds_cargo,
+                ano_eleicao,
+                total_votos,
+                ROUND(
+                    total_votos / NULLIF(
+                        SUM(total_votos) OVER (PARTITION BY sg_uf, cd_cargo, ano_eleicao),
+                        0
+                    ) * 100, 1
+                )                  AS pct_votos_uf
+            FROM `{_PROJECT}.{_GOLD}.fact_candidato_eleicao`
+        )
+        SELECT
+            v.sg_uf,
+            v.nm_candidato,
+            v.sg_partido,
+            v.cd_cargo,
+            v.ds_cargo,
+            v.ano_eleicao,
+            v.total_votos,
+            v.pct_votos_uf,
+            COALESCE(em.qt_emendas_total, 0)    AS qt_emendas_partido_uf,
+            COALESCE(em.vl_pago_total, 0.0)     AS vl_emendas_partido_uf,
+            COALESCE(em.qt_parlamentares, 0)    AS qt_parlamentares_ativos
+        FROM votos_uf v
+        LEFT JOIN emendas_partido_uf em
+            ON v.sg_uf = em.sg_uf
+            AND v.sg_partido = em.sg_partido
+            AND v.ano_eleicao = em.ano
+    """,
+    # ── Sanções federais por UF (proxy de governança) ─────────────────────
+    "vw_sancoes_uf": f"""
+        SELECT
+            sg_uf,
+            fonte_sistema,
+            tp_sancao,
+            tp_pessoa,
+            ano_sancao,
+            qt_sancoes,
+            vl_multa_total,
+            ROUND(SAFE_DIVIDE(vl_multa_total, NULLIF(qt_sancoes, 0)), 2) AS vl_multa_medio,
+            qt_orgaos_sancionadores
+        FROM `{_PROJECT}.{_GOLD}.fact_sancoes_uf`
+        WHERE sg_uf IS NOT NULL AND sg_uf != ''
+    """,
+    # ── Score municipal integrado: todas as dimensões em 1 view ───────────
+    # Ponto de entrada principal para analista e perfilador
+    "vw_score_municipal_integrado": f"""
+        WITH eleicao_ref AS (
+            SELECT
+                cd_municipio_ibge,
+                nm_municipio,
+                sg_uf,
+                MAX(ano_eleicao)                             AS ano_eleicao_ref
+            FROM `{_PROJECT}.{_GOLD}.fact_municipio_candidato_eleicao`
+            WHERE nr_turno = 1 AND rn_municipio = 1
+            GROUP BY cd_municipio_ibge, nm_municipio, sg_uf
+        ),
+        vencedor_ref AS (
+            SELECT
+                cd_municipio_ibge,
+                nm_candidato    AS vencedor,
+                sg_partido      AS partido_vencedor,
+                cd_cargo,
+                pct_votos_municipio AS pct_vencedor
+            FROM `{_PROJECT}.{_GOLD}.fact_municipio_candidato_eleicao`
+            WHERE nr_turno = 1 AND rn_municipio = 1
+              AND (cd_municipio_ibge, ano_eleicao) IN (
+                  SELECT cd_municipio_ibge, MAX(ano_eleicao)
+                  FROM `{_PROJECT}.{_GOLD}.fact_municipio_candidato_eleicao`
+                  GROUP BY cd_municipio_ibge
+              )
+        ),
+        emendas_acum AS (
+            SELECT
+                cd_municipio_ibge,
+                SUM(vl_pago_total)  AS vl_emendas_total,
+                SUM(qt_emendas)     AS qt_emendas_total
+            FROM `{_PROJECT}.{_GOLD}.fact_emendas_municipio`
+            GROUP BY cd_municipio_ibge
+        ),
+        transferencias_acum AS (
+            SELECT
+                cd_municipio_ibge,
+                SUM(qtd_beneficiarios_bolsa_familia)    AS qtd_beneficiarios_bf,
+                SUM(valor_total_bolsa_familia_reais)    AS vl_bf_total,
+                SUM(qtd_familias_cadunico)              AS qtd_familias_cadunico,
+                SUM(qtd_familias_extrema_pobreza)       AS qtd_familias_extrema_pobreza
+            FROM `{_PROJECT}.{_GOLD}.fact_transferencias_sociais`
+            GROUP BY cd_municipio_ibge
+        )
+        SELECT
+            er.cd_municipio_ibge,
+            er.nm_municipio,
+            er.sg_uf,
+            er.ano_eleicao_ref,
+            vr.vencedor,
+            vr.partido_vencedor,
+            ROUND(vr.pct_vencedor, 1)                       AS pct_vencedor,
+
+            -- Socioeconômico IBGE
+            i.idhm,
+            i.renda_per_capita,
+            i.gini,
+            i.pct_extrema_pobreza,
+            i.taxa_analfabetismo,
+            i.pct_urbano,
+            CAST(i.populacao_total AS INT64)                AS populacao_total,
+
+            -- Segurança pública
+            s.ivs_total,
+            s.ivs_capital_humano,
+            s.ivs_infraestrutura,
+            s.ivs_renda_trabalho,
+            s.taxa_homicidio_100k,
+
+            -- Saúde
+            sa.taxa_mortalidade_infantil_1000,
+            sa.idsus_score,
+
+            -- Transferências sociais
+            t.qtd_beneficiarios_bf,
+            t.qtd_familias_cadunico,
+            t.qtd_familias_extrema_pobreza,
+            ROUND(
+                SAFE_DIVIDE(t.qtd_beneficiarios_bf, NULLIF(i.populacao_total, 0)) * 100,
+                1
+            )                                               AS pct_pop_beneficiaria_bf,
+            ROUND(
+                SAFE_DIVIDE(t.vl_bf_total, NULLIF(i.populacao_total, 0)),
+                2
+            )                                               AS vl_bf_per_capita,
+
+            -- Emendas parlamentares
+            COALESCE(em.vl_emendas_total, 0.0)              AS vl_emendas_total,
+            COALESCE(em.qt_emendas_total, 0)                AS qt_emendas_total,
+            ROUND(
+                SAFE_DIVIDE(em.vl_emendas_total, NULLIF(i.populacao_total, 0)),
+                2
+            )                                               AS vl_emendas_per_capita,
+
+            -- Score de desenvolvimento composto (0–100)
+            -- Componentes: IDHM (40%) + segurança (20%) + saúde (20%) + renda (20%)
+            ROUND(
+                COALESCE(i.idhm, 0.5) * 40.0
+                + (1.0 - LEAST(1.0, COALESCE(SAFE_DIVIDE(s.ivs_total, 1.0), 0.5))) * 20.0
+                + (1.0 - LEAST(1.0, COALESCE(SAFE_DIVIDE(sa.taxa_mortalidade_infantil_1000, 50.0), 0.5))) * 20.0
+                + (1.0 - LEAST(1.0, COALESCE(SAFE_DIVIDE(i.pct_extrema_pobreza, 50.0), 0.5))) * 20.0
+            , 1)                                            AS score_desenvolvimento,
+
+            CURRENT_TIMESTAMP()                             AS ingested_at
+
+        FROM eleicao_ref er
+        LEFT JOIN vencedor_ref vr USING (cd_municipio_ibge)
+        LEFT JOIN `{_PROJECT}.{_GOLD}.fact_ibge_municipio` i USING (cd_municipio_ibge)
+        LEFT JOIN `{_PROJECT}.{_GOLD}.fact_seguranca_municipio` s USING (cd_municipio_ibge)
+        LEFT JOIN `{_PROJECT}.{_GOLD}.fact_saude_municipio` sa USING (cd_municipio_ibge)
+        LEFT JOIN transferencias_acum t USING (cd_municipio_ibge)
+        LEFT JOIN emendas_acum em USING (cd_municipio_ibge)
     """,
     # ── Mapa de prioridade de campanha: municípios por competitividade ─────
     "vw_mapa_prioridade_campanha": f"""
