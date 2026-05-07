@@ -54,7 +54,7 @@ variable "billing_account_id" {
 }
 
 variable "domain" {
-  description = "Public domain for the HTTPS Load Balancer (e.g. spepe.example.com). Required for staging/prod IAP."
+  description = "Custom domain for the HTTPS LB (e.g. spepe.com.br). When set, provisions LB + SSL cert and restricts Cloud Run ingress to LB only. Works on personal GCP projects (use_iap=false)."
   type        = string
   default     = ""
 }

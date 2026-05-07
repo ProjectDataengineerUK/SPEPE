@@ -3,8 +3,9 @@ resource "google_cloud_run_v2_service" "spepe" {
   location = var.region
   labels   = local.labels
 
-  # Restrict to LB only when IAP is enabled; otherwise allow all (direct URL)
-  ingress = (var.environment != "dev" && var.use_iap) ? "INGRESS_TRAFFIC_INTERNAL_LOAD_BALANCER" : "INGRESS_TRAFFIC_ALL"
+  # When a custom domain LB exists, restrict traffic to LB only (hides raw Cloud Run URL).
+  # In dev (no domain), allow all traffic for fast iteration.
+  ingress = local.lb_enabled ? "INGRESS_TRAFFIC_INTERNAL_LOAD_BALANCER" : "INGRESS_TRAFFIC_ALL"
 
   template {
     service_account = google_service_account.cloud_run.email

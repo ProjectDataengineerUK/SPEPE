@@ -1,11 +1,14 @@
 locals {
-  # IAP and the HTTPS Load Balancer are only provisioned in staging/prod.
-  # In dev, Cloud Run uses allUsers + INGRESS_TRAFFIC_ALL for fast iteration.
-  iap_enabled = var.environment != "dev" && var.use_iap
+  # lb_enabled:  HTTPS LB + custom domain + Google-managed SSL cert.
+  #              Requires only var.domain != "".  Works on personal GCP projects.
+  lb_enabled = var.domain != "" && var.environment != "dev"
+
+  # iap_enabled: lb_enabled + IAP auth layer.
+  #              Requires var.use_iap=true AND project under Google Workspace org.
+  iap_enabled = local.lb_enabled && var.use_iap
 }
 
-# ── IAP Brand + OAuth Client ──────────────────────────────────────────────────
-# A brand is per-project and cannot be deleted once created.
+# ── IAP Brand + OAuth Client (Workspace org only) ────────────────────────────
 
 resource "google_iap_brand" "spepe" {
   count             = local.iap_enabled ? 1 : 0
@@ -20,7 +23,6 @@ resource "google_iap_client" "spepe" {
   brand        = google_iap_brand.spepe[0].name
 }
 
-# Store the OAuth client secret so the app can verify IAP-signed headers
 resource "google_secret_manager_secret" "iap_client_secret" {
   count     = local.iap_enabled ? 1 : 0
   secret_id = "IAP_CLIENT_SECRET"
@@ -43,16 +45,16 @@ resource "google_secret_manager_secret_iam_member" "cloud_run_iap_secret" {
   member    = "serviceAccount:${google_service_account.cloud_run.email}"
 }
 
-# ── External HTTPS Load Balancer ──────────────────────────────────────────────
+# ── External HTTPS Load Balancer (lb_enabled — personal GCP ok) ──────────────
 
 resource "google_compute_global_address" "spepe" {
-  count   = local.iap_enabled ? 1 : 0
+  count   = local.lb_enabled ? 1 : 0
   name    = "spepe-lb-ip"
   project = var.project_id
 }
 
 resource "google_compute_managed_ssl_certificate" "spepe" {
-  count   = local.iap_enabled ? 1 : 0
+  count   = local.lb_enabled ? 1 : 0
   name    = "spepe-ssl-cert"
   project = var.project_id
 
@@ -63,7 +65,7 @@ resource "google_compute_managed_ssl_certificate" "spepe" {
 
 # Serverless NEG connects the LB backend to the Cloud Run service
 resource "google_compute_region_network_endpoint_group" "spepe" {
-  count                 = local.iap_enabled ? 1 : 0
+  count                 = local.lb_enabled ? 1 : 0
   name                  = "spepe-serverless-neg"
   region                = var.region
   network_endpoint_type = "SERVERLESS"
@@ -75,7 +77,7 @@ resource "google_compute_region_network_endpoint_group" "spepe" {
 }
 
 resource "google_compute_backend_service" "spepe" {
-  count                 = local.iap_enabled ? 1 : 0
+  count                 = local.lb_enabled ? 1 : 0
   name                  = "spepe-backend"
   project               = var.project_id
   load_balancing_scheme = "EXTERNAL_MANAGED"
@@ -85,21 +87,25 @@ resource "google_compute_backend_service" "spepe" {
     group = google_compute_region_network_endpoint_group.spepe[0].id
   }
 
-  iap {
-    oauth2_client_id     = google_iap_client.spepe[0].client_id
-    oauth2_client_secret = google_iap_client.spepe[0].secret
+  # IAP block only when use_iap=true (requires Google Workspace org)
+  dynamic "iap" {
+    for_each = local.iap_enabled ? [1] : []
+    content {
+      oauth2_client_id     = google_iap_client.spepe[0].client_id
+      oauth2_client_secret = google_iap_client.spepe[0].secret
+    }
   }
 }
 
 resource "google_compute_url_map" "spepe" {
-  count           = local.iap_enabled ? 1 : 0
+  count           = local.lb_enabled ? 1 : 0
   name            = "spepe-url-map"
   project         = var.project_id
   default_service = google_compute_backend_service.spepe[0].id
 }
 
 resource "google_compute_target_https_proxy" "spepe" {
-  count            = local.iap_enabled ? 1 : 0
+  count            = local.lb_enabled ? 1 : 0
   name             = "spepe-https-proxy"
   project          = var.project_id
   url_map          = google_compute_url_map.spepe[0].id
@@ -107,7 +113,7 @@ resource "google_compute_target_https_proxy" "spepe" {
 }
 
 resource "google_compute_global_forwarding_rule" "spepe" {
-  count                 = local.iap_enabled ? 1 : 0
+  count                 = local.lb_enabled ? 1 : 0
   name                  = "spepe-forwarding-rule"
   project               = var.project_id
   target                = google_compute_target_https_proxy.spepe[0].id
@@ -116,7 +122,7 @@ resource "google_compute_global_forwarding_rule" "spepe" {
   load_balancing_scheme = "EXTERNAL_MANAGED"
 }
 
-# ── IAP Access Policy ─────────────────────────────────────────────────────────
+# ── IAP Access Policy (Workspace org only) ────────────────────────────────────
 
 resource "google_iap_web_backend_service_iam_member" "admin" {
   count               = local.iap_enabled ? 1 : 0
@@ -145,7 +151,7 @@ resource "google_project_iam_member" "iap_run_invoker" {
 # ── Outputs ───────────────────────────────────────────────────────────────────
 
 output "load_balancer_ip" {
-  value       = local.iap_enabled ? google_compute_global_address.spepe[0].address : null
+  value       = local.lb_enabled ? google_compute_global_address.spepe[0].address : null
   description = "External LB IP — point your domain A record here before SSL cert can provision"
 }
 

@@ -3,8 +3,8 @@
 **Sistema de Perfilamento do Eleitorado e Previsão Eleitoral**
 Análise eleitoral brasileira via multi-agentes LLM com arquitetura Medallion no GCP.
 
-**Estado atual:** v1.0.0-rc — Código completo, aguardando ingestão 27 UFs + deploy GCP
-**Próximo:** v1.0.0 — Produção com 5 domínios de dados (2026-Q2)
+**Estado atual:** v1.1 — 19 Cloud Run Jobs em prod; 13 módulos de dados; CadÚnico/Emendas/Sanções adicionados
+**Próximo:** Redes Sociais (módulo #4) + Silver/Gold Emendas + Silver/Gold Sanções
 
 ---
 
@@ -300,7 +300,7 @@ html_path = os.path.expanduser("~/.agent/diagrams/spepe-app.html")
 | `bigquery_mlops.tf` | Dataset MLOps — model_evaluations, bias_metrics, fact_predictions |
 | `cloud_run.tf` | Serviço principal Chainlit/FastAPI |
 | `cloud_run_canary.tf` | Traffic split para challenger |
-| `cloud_run_jobs.tf` | 5 Cloud Run Jobs (tse_ingest, ibge_sync, digital_ingest, silver_transform, gold_build) |
+| `cloud_run_jobs.tf` | 19 Cloud Run Jobs — tse_ingest, ibge_sync, digital_ingest, social_ingest, pesquisas_ingest, security_ingest, datasus_ingest, dieese_ingest, cetic_ingest, tse_perfil_ingest, tse_candidaturas_ingest, reddit_ingest, camara_senado_ingest, endividamento_ingest, cadunico_ingest, emendas_ingest, sancoes_ingest, silver_transform, gold_build |
 | `secrets.tf` | Secret Manager: ANTHROPIC_API_KEY, META_APP_TOKEN, YOUTUBE_API_KEY + IAM |
 | `artifact_registry.tf` | Repositório Docker `spepe` + IAM |
 | `pubsub.tf` | Topic `drift-detected` para auto-retrain loop |
@@ -539,40 +539,44 @@ Chaves-mestras: `cod_municipio_ibge`, `uf`, `ano_eleitoral`, `data_referencia`
 
 ---
 
-## Pendências v1.0.0 — Crítico
+## Pendências v1.1 — Estado 2026-05-06
 
 ### 🔴 **Bloqueia Deploy**
 - [x] ANTHROPIC_API_KEY exposta revogada em console.anthropic.com (2026-04-26)
 - [x] CI/CD verde no GitHub — Docker build + Cloud Run deploy confirmado (2026-04-26)
 - [x] Routing chainlit_app.py corrigido — custom routes antes do SPA catch-all (2026-04-26)
-- [x] `__main__` em mlops/eval/eval_runner.py — já existia, CI usa --responses-file
 
-### 🟠 **Valida Funcionalidade (Fase 1)**
-- [ ] Pipeline end-to-end: ingerir **todas 27 UFs** 2022 (todas as fontes) — requer GCP; usar `scripts/run_ingest_all_ufs.sh`
-- [x] Validar coluna `cd_cargo` em Gold — test_schema_gold_cd_cargo.py passando
+### 🟠 **Valida Funcionalidade**
+- [ ] Pipeline end-to-end: ingerir **todas 27 UFs** 2022 (todas as fontes) — requer GCP
 - [x] Testes passando: 172 pytest + eval_runner (0.995 score) + security scan (2026-05-04)
 - [x] Compilar Vertex AI pipeline KFP 2.x — output/ml_pipeline.yaml gerado (2026-04-26)
-- [x] Semantic layer completo: 8/8 views BigQuery (vw_pesquisa_vs_social, vw_narrativa_por_tema_uf, vw_cenario_2018_2022_2026, vw_mapa_prioridade_campanha) (2026-05-04)
+- [x] Semantic layer completo: 8/8 views BigQuery (2026-05-04)
 - [x] Dashboard API: column bugs corrigidos + local Silver fallbacks para 4 tabs (2026-05-04)
-- [x] gold_builder._build_fact_pesquisa() lê Silver correto (não Bronze) (2026-05-04)
-- [x] Gold BQ SQL: fact_ibge_municipio lê silver.ibge_* (não tse_*); fact_saude/segurança mapeiam colunas Silver reais (2026-05-04)
-- [x] Dashboard API BQ: _bq_candidatos/_bq_kpi/_bq_municipios usam fact_municipio_candidato_eleicao (2026-05-04)
-- [x] Varredura geral de coerência: 15 fontes auditadas, todos os bugs críticos corrigidos (2026-05-04)
+- [x] Gold BQ SQL: todas as fact tables com colunas Silver reais (2026-05-04)
+- [x] CadÚnico/BF Bronze 4 anos: 2018/2022/2024/2025 em spepe-prod (2026-05-06)
+- [x] Silver transferencias_sociais: rodando (2026-05-06)
+- [x] Gold fact_transferencias_sociais: definido em gold_builder.py (2026-05-06)
+- [x] Silver + Gold emendas parlamentares: transform_emendas_to_silver() implementado + wired no job
+- [x] Silver + Gold sanções CEIS+CNEP: transform_sancoes_to_silver() implementado + wired no job
+- [ ] Rodar spepe-emendas-ingest (anos 2018/2022/2025) — aguarda CI build
+- [ ] Rodar spepe-sancoes-ingest (snapshot histórico) — aguarda CI build
+- [ ] **Módulo Redes Sociais**: Twitter/X sentiment, YouTube, TikTok — principal pendência v1.2
 
 ### 🟡 **Produção Segura**
-- [ ] Secrets em Secret Manager (ANTHROPIC_API_KEY, META_APP_TOKEN, YOUTUBE_API_KEY) — requer GCP
-- [ ] Provisionar IAP via Terraform (security/iap_config.yaml → google_iap_*) — requer GCP
+- [x] TRANSPARENCIA_API_KEY em Secret Manager + cadunico/emendas/sancoes clients (2026-05-06)
+- [ ] Secrets: META_APP_TOKEN, YOUTUBE_API_KEY — requer GCP (quando Social for implementado)
+- [ ] Provisionar IAP via Terraform — requer GCP
 - [x] Validar imports: nenhuma referência a `mcp_servers.*` em agentes/dataops
 
 ### 🟢 **Infraestrutura**
+- [x] 19 Cloud Run Jobs no Terraform + deploy.yml (2026-05-06)
 - [x] README Quick Start — seção existe com variáveis mínimas locais
-- [ ] Release v1.0.0: tag v1.0.0 → push
-- [ ] Deploy: Terraform apply staging → deploy.yml workflow → prod
+- [ ] Release tag v1.1.0 → push
 
 ---
 
 ## Pendências Conhecidas — Documento
 
-Para referência histórica (pode ser feito pós-v1.0.0):
+Para referência histórica:
+- [ ] IAP não provisionado — para quando Cloud Run for protegido com autenticação
 - [ ] `drift_config.yaml` — existe em mlops/monitoring/, já resolvido
-- [ ] IAP não provisionado (vide Pendências Críticas acima)
