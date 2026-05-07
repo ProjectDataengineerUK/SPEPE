@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import datetime
 import logging
 import os
 
@@ -95,24 +96,23 @@ _VIEWS: dict[str, str] = {
             )                                                               AS pct_uf
         FROM `{_PROJECT}.{_GOLD}.fact_candidato_eleicao`
     """,
-    # ── Pesquisa vs sinal digital: intenção × engajamento por UF × semana ──
-    # fact_pesquisa usa colunas: uf, candidato, data_pesquisa_inicio, intencao_ajustada
-    # social_mencoes_br usa: sg_uf, created_at, like_count, retweet_count, reply_count
+    # ── Atividade de pesquisas × engajamento social por UF × semana ──────────
+    # Fase 1: fact_pesquisa tem schema raw TSE PesqEle (registro de pesquisas,
+    # sem intenção por candidato). Fase 2: adicionar candidato × intencao_ajustada
+    # quando Silver pesquisas for processado com dados de resultados.
     "vw_pesquisa_vs_social": f"""
         WITH pesquisa_semanal AS (
             SELECT
                 uf                                                              AS sg_uf,
-                candidato                                                       AS nm_candidato,
-                cd_cargo,
-                DATE_TRUNC(data_pesquisa_inicio, WEEK(MONDAY))                 AS semana,
-                ROUND(AVG(intencao_ajustada), 1)                               AS intencao_media_pct,
+                ds_cargo,
+                DATE_TRUNC(DATE(data_pesquisa_inicio), WEEK(MONDAY))           AS semana,
                 COUNT(*)                                                        AS qt_pesquisas,
-                ROUND(AVG(margem_erro), 1)                                      AS margem_media_pp
+                COUNT(DISTINCT nm_empresa)                                      AS qt_institutos
             FROM `{_PROJECT}.{_GOLD}.fact_pesquisa`
             WHERE record_confidence_score >= 0.80
               AND data_pesquisa_inicio IS NOT NULL
-            GROUP BY uf, candidato, cd_cargo,
-                     DATE_TRUNC(data_pesquisa_inicio, WEEK(MONDAY))
+            GROUP BY uf, ds_cargo,
+                     DATE_TRUNC(DATE(data_pesquisa_inicio), WEEK(MONDAY))
         ),
         social_semanal AS (
             SELECT
@@ -127,20 +127,12 @@ _VIEWS: dict[str, str] = {
         )
         SELECT
             p.sg_uf,
-            p.nm_candidato,
-            p.cd_cargo,
+            p.ds_cargo,
             p.semana,
-            p.intencao_media_pct,
             p.qt_pesquisas,
-            p.margem_media_pp,
+            p.qt_institutos,
             COALESCE(s.total_mencoes, 0)                                        AS total_mencoes,
-            COALESCE(s.total_engajamento, 0)                                    AS total_engajamento,
-            ROUND(
-                p.intencao_media_pct - LAG(p.intencao_media_pct) OVER (
-                    PARTITION BY p.sg_uf, p.nm_candidato, p.cd_cargo
-                    ORDER BY p.semana
-                ), 1
-            )                                                                   AS delta_intencao_pp
+            COALESCE(s.total_engajamento, 0)                                    AS total_engajamento
         FROM pesquisa_semanal p
         LEFT JOIN social_semanal s
             ON p.sg_uf = s.sg_uf AND p.semana = s.semana
@@ -148,28 +140,39 @@ _VIEWS: dict[str, str] = {
     # ── Narrativa por plataforma × UF × semana ────────────────────────────
     # Fase 1: 'fonte' (plataforma) como proxy de tema.
     # Fase 2: substituir por coluna 'tema' gerada por NLP Vertex AI.
+    # Subquery necessária: BQ não aceita window function sobre COUNT(*) no mesmo nível do GROUP BY.
     "vw_narrativa_por_tema_uf": f"""
         SELECT
-            fonte                                                               AS plataforma,
+            plataforma,
             sg_uf,
-            DATE_TRUNC(DATE(created_at), WEEK(MONDAY))                         AS semana,
-            COUNT(*)                                                            AS volume_mencoes,
-            COALESCE(SUM(like_count), 0)
-                + COALESCE(SUM(retweet_count), 0)
-                + COALESCE(SUM(reply_count), 0)                                AS engajamento_total,
+            semana,
+            volume_mencoes,
+            engajamento_total,
+            engajamento_por_mencao,
             ROUND(
-                (COALESCE(SUM(like_count), 0)
-                    + COALESCE(SUM(retweet_count), 0)
-                    + COALESCE(SUM(reply_count), 0))
-                / NULLIF(COUNT(*), 0), 1
-            )                                                                   AS engajamento_por_mencao,
-            ROUND(
-                COUNT(*) / NULLIF(SUM(COUNT(*)) OVER (
-                    PARTITION BY sg_uf, DATE_TRUNC(DATE(created_at), WEEK(MONDAY))
-                ), 0) * 100, 1
+                volume_mencoes / NULLIF(
+                    SUM(volume_mencoes) OVER (PARTITION BY sg_uf, semana),
+                    0
+                ) * 100, 1
             )                                                                   AS share_plataforma_pct
-        FROM `{_PROJECT}.{_SILVER}.social_mencoes_br`
-        GROUP BY fonte, sg_uf, DATE_TRUNC(DATE(created_at), WEEK(MONDAY))
+        FROM (
+            SELECT
+                fonte                                                           AS plataforma,
+                sg_uf,
+                DATE_TRUNC(DATE(created_at), WEEK(MONDAY))                     AS semana,
+                COUNT(*)                                                        AS volume_mencoes,
+                COALESCE(SUM(like_count), 0)
+                    + COALESCE(SUM(retweet_count), 0)
+                    + COALESCE(SUM(reply_count), 0)                            AS engajamento_total,
+                ROUND(
+                    (COALESCE(SUM(like_count), 0)
+                        + COALESCE(SUM(retweet_count), 0)
+                        + COALESCE(SUM(reply_count), 0))
+                    / NULLIF(COUNT(*), 0), 1
+                )                                                               AS engajamento_por_mencao
+            FROM `{_PROJECT}.{_SILVER}.social_mencoes_br`
+            GROUP BY fonte, sg_uf, DATE_TRUNC(DATE(created_at), WEEK(MONDAY))
+        )
     """,
     # ── Trajetória 2018 / 2022 (resultado) + 2026 (pesquisa) por UF ───────
     "vw_cenario_2018_2022_2026": f"""
@@ -569,16 +572,15 @@ _MV_ZONA_SQL = """
         nm_municipio,
         nr_zona,
         cd_cargo,
-        ds_cargo,
         nm_candidato,
         sg_partido,
         nr_turno,
         ano_eleicao,
-        SUM(total_votos) AS qt_votos_total,
+        SUM(qt_votos) AS qt_votos_total,
         COUNT(*)         AS qt_secoes
     FROM `{project}.{gold}.fact_secao_eleicao`
     GROUP BY sg_uf, cd_municipio, nm_municipio, nr_zona,
-             cd_cargo, ds_cargo, nm_candidato, sg_partido, nr_turno, ano_eleicao
+             cd_cargo, nm_candidato, sg_partido, nr_turno, ano_eleicao
 """
 
 
@@ -620,7 +622,7 @@ def create_semantic_views(project: str | None = None, replace: bool = True) -> d
         mv_table = bigquery.Table(mv_id)
         mv_table.mview_query = mv_sql.strip()
         mv_table.mview_enable_refresh = True
-        mv_table.mview_refresh_interval = "3600s"
+        mv_table.mview_refresh_interval = datetime.timedelta(hours=1)
         client.create_table(mv_table)
         logger.info("MV recriada: %s", mv_id)
         results["mv_zona_eleicao"] = "ok"
