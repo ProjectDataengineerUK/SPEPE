@@ -1389,7 +1389,7 @@ def transform_sancoes_to_silver(use_bigquery: bool = False) -> dict:
         dataset = os.environ.get("BIGQUERY_DATASET_SILVER", "spepe_silver")
         try:
             from google.cloud import bigquery
-            from google.cloud.bigquery import SchemaUpdateOption, WriteDisposition
+            from google.cloud.bigquery import WriteDisposition
 
             client = bigquery.Client(project=project)
             table_id = f"{project}.{dataset}.sancoes_empresas"
@@ -1399,7 +1399,6 @@ def transform_sancoes_to_silver(use_bigquery: bool = False) -> dict:
                 write_disposition=WriteDisposition.WRITE_TRUNCATE,
                 create_disposition="CREATE_IF_NEEDED",
                 autodetect=True,
-                schema_update_options=[SchemaUpdateOption.ALLOW_FIELD_ADDITION],
             )
             client.load_table_from_dataframe(df_bq, table_id, job_config=job_config).result()
             logger.info("Sanções Silver BQ: %s (%d rows)", table_id, len(df))
