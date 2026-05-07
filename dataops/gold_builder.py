@@ -30,42 +30,50 @@ def _build_gold_via_bigquery_sql() -> dict:
         "fact_municipio_eleicao": f"""
             CREATE OR REPLACE TABLE `{gold}.fact_municipio_eleicao` AS
             SELECT
-                sg_uf, cd_municipio, nm_municipio, cd_cargo, ds_cargo,
-                ano_eleicao,
+                sg_uf, cd_municipio,
+                nm_municipio_x AS nm_municipio,
+                cd_cargo, ds_cargo, ano_eleicao,
                 SUM(qt_votos) AS total_votos,
                 COUNT(DISTINCT nr_candidato) AS n_candidatos,
                 COUNT(DISTINCT CONCAT(CAST(nr_zona AS STRING), '-', CAST(nr_secao AS STRING))) AS n_secoes,
                 CURRENT_TIMESTAMP() AS ingested_at
             FROM {silver_wc}
-            GROUP BY sg_uf, cd_municipio, nm_municipio, cd_cargo, ds_cargo, ano_eleicao
+            GROUP BY sg_uf, cd_municipio, nm_municipio_x, cd_cargo, ds_cargo, ano_eleicao
         """,
         "fact_secao_eleicao": f"""
             CREATE OR REPLACE TABLE `{gold}.fact_secao_eleicao` AS
             SELECT
-                sg_uf, cd_municipio, nm_municipio, nr_zona, nr_secao,
-                nm_candidato, sg_partido, cd_cargo, ds_cargo, nr_turno, ano_eleicao,
+                sg_uf, cd_municipio,
+                nm_municipio_x AS nm_municipio,
+                nr_zona, nr_secao, nm_candidato,
+                NULL AS sg_partido,
+                cd_cargo, ds_cargo, nr_turno, ano_eleicao,
                 SUM(qt_votos) AS total_votos,
                 CURRENT_TIMESTAMP() AS ingested_at
             FROM {silver_wc}
-            GROUP BY sg_uf, cd_municipio, nm_municipio, nr_zona, nr_secao,
-                     nm_candidato, sg_partido, cd_cargo, ds_cargo, nr_turno, ano_eleicao
+            GROUP BY sg_uf, cd_municipio, nm_municipio_x, nr_zona, nr_secao,
+                     nm_candidato, cd_cargo, ds_cargo, nr_turno, ano_eleicao
         """,
         "fact_candidato_eleicao": f"""
             CREATE OR REPLACE TABLE `{gold}.fact_candidato_eleicao` AS
             SELECT
-                sg_uf, nr_candidato, nm_candidato, sg_partido, cd_cargo, ds_cargo,
-                ano_eleicao,
+                sg_uf, nr_candidato, nm_candidato,
+                NULL AS sg_partido,
+                cd_cargo, ds_cargo, ano_eleicao,
                 SUM(qt_votos) AS total_votos,
                 COUNT(DISTINCT cd_municipio) AS n_municipios,
                 CURRENT_TIMESTAMP() AS ingested_at
             FROM {silver_wc}
-            GROUP BY sg_uf, nr_candidato, nm_candidato, sg_partido, cd_cargo, ds_cargo, ano_eleicao
+            GROUP BY sg_uf, nr_candidato, nm_candidato, cd_cargo, ds_cargo, ano_eleicao
         """,
         "fact_municipio_candidato_eleicao": f"""
             CREATE OR REPLACE TABLE `{gold}.fact_municipio_candidato_eleicao` AS
             SELECT
-                sg_uf, cd_municipio, nm_municipio, cd_municipio_ibge,
-                nm_candidato, sg_partido, cd_cargo, ds_cargo, nr_turno, ano_eleicao,
+                sg_uf, cd_municipio,
+                nm_municipio_x AS nm_municipio,
+                cd_municipio_ibge, nm_candidato,
+                NULL AS sg_partido,
+                cd_cargo, ds_cargo, nr_turno, ano_eleicao,
                 SUM(qt_votos) AS total_votos,
                 ROUND(
                     SUM(qt_votos) / NULLIF(SUM(SUM(qt_votos)) OVER (
@@ -78,47 +86,45 @@ def _build_gold_via_bigquery_sql() -> dict:
                 ) AS rn_municipio,
                 CURRENT_TIMESTAMP() AS ingested_at
             FROM {silver_wc}
-            GROUP BY sg_uf, cd_municipio, nm_municipio, cd_municipio_ibge,
-                     nm_candidato, sg_partido, cd_cargo, ds_cargo, nr_turno, ano_eleicao
+            GROUP BY sg_uf, cd_municipio, nm_municipio_x, cd_municipio_ibge,
+                     nm_candidato, cd_cargo, ds_cargo, nr_turno, ano_eleicao
         """,
         "fact_ibge_municipio": f"""
             CREATE OR REPLACE TABLE `{gold}.fact_ibge_municipio` AS
             SELECT
-                SAFE_CAST(cd_municipio_ibge AS INT64)          AS cd_municipio_ibge,
+                SAFE_CAST(cd_municipio_ibge AS INT64)                       AS cd_municipio_ibge,
                 sg_uf,
-                ANY_VALUE(nm_municipio)                         AS nm_municipio,
-                MAX(SAFE_CAST(ano AS INT64))                    AS ano,
-                MAX(SAFE_CAST(idhm AS FLOAT64))                 AS idhm,
-                MAX(SAFE_CAST(renda_per_capita AS FLOAT64))     AS renda_per_capita,
-                MAX(SAFE_CAST(gini AS FLOAT64))                 AS gini,
-                MAX(SAFE_CAST(pct_extrema_pobreza AS FLOAT64))  AS pct_extrema_pobreza,
-                MAX(SAFE_CAST(taxa_analfabetismo AS FLOAT64))   AS taxa_analfabetismo,
-                MAX(SAFE_CAST(pct_urbano AS FLOAT64))           AS pct_urbano,
-                MAX(SAFE_CAST(populacao_total AS FLOAT64))      AS populacao_total,
+                ANY_VALUE(nm_municipio_x)                                   AS nm_municipio,
+                2022                                                        AS ano,
+                MAX(IF(indicador='populacao',
+                    SAFE_CAST(valor AS FLOAT64), NULL))                     AS populacao_total,
+                MAX(IF(indicador='taxa_alfabetizacao',
+                    SAFE_CAST(valor AS FLOAT64), NULL))                     AS taxa_alfabetizacao,
+                MAX(IF(indicador='pct_analfabetos',
+                    SAFE_CAST(valor AS FLOAT64), NULL))                     AS taxa_analfabetismo,
+                CAST(NULL AS FLOAT64)                                       AS idhm,
+                CAST(NULL AS FLOAT64)                                       AS renda_per_capita,
+                CAST(NULL AS FLOAT64)                                       AS gini,
+                CAST(NULL AS FLOAT64)                                       AS pct_extrema_pobreza,
+                CAST(NULL AS FLOAT64)                                       AS pct_urbano,
                 CURRENT_TIMESTAMP() AS ingested_at
-            FROM `{silver}.ibge_*`
+            FROM {silver_wc}
             WHERE cd_municipio_ibge IS NOT NULL
             GROUP BY cd_municipio_ibge, sg_uf
         """,
         "fact_seguranca_municipio": f"""
             CREATE OR REPLACE TABLE `{gold}.fact_seguranca_municipio` AS
             SELECT
-                CAST(cd_municipio_ibge AS INT64)                    AS cd_municipio_ibge,
+                CAST(cd_municipio_ibge AS INT64)         AS cd_municipio_ibge,
                 sg_uf,
-                COALESCE(SAFE_CAST(ano AS INT64), 2022)             AS ano,
-                COALESCE(
-                    SAFE_CAST(ivs_total AS FLOAT64),
-                    SAFE_CAST(ivs_valor AS FLOAT64)
-                )                                                   AS ivs_total,
-                SAFE_CAST(ivs_infraestrutura AS FLOAT64)            AS ivs_infraestrutura,
-                SAFE_CAST(ivs_capital_humano AS FLOAT64)            AS ivs_capital_humano,
-                SAFE_CAST(ivs_renda_trabalho AS FLOAT64)            AS ivs_renda_trabalho,
-                COALESCE(
-                    SAFE_CAST(taxa_homicidio_100k AS FLOAT64),
-                    SAFE_CAST(taxa_homicidio AS FLOAT64)
-                )                                                   AS taxa_homicidio_100k,
-                SAFE_CAST(taxa_roubo_100k AS FLOAT64)               AS taxa_roubo_100k,
-                SAFE_CAST(qt_feminicidio AS INT64)                  AS qt_feminicidio,
+                COALESCE(SAFE_CAST(ano AS INT64), 2022)  AS ano,
+                SAFE_CAST(ivs_total AS FLOAT64)          AS ivs_total,
+                SAFE_CAST(ivs_infraestrutura AS FLOAT64) AS ivs_infraestrutura,
+                SAFE_CAST(ivs_capital_humano AS FLOAT64) AS ivs_capital_humano,
+                SAFE_CAST(ivs_renda_trabalho AS FLOAT64) AS ivs_renda_trabalho,
+                CAST(NULL AS FLOAT64)                    AS taxa_homicidio_100k,
+                CAST(NULL AS FLOAT64)                    AS taxa_roubo_100k,
+                CAST(NULL AS INT64)                      AS qt_feminicidio,
                 CURRENT_TIMESTAMP() AS ingested_at
             FROM `{silver}.seguranca_municipal`
             WHERE cd_municipio_ibge IS NOT NULL
@@ -126,19 +132,13 @@ def _build_gold_via_bigquery_sql() -> dict:
         "fact_saude_municipio": f"""
             CREATE OR REPLACE TABLE `{gold}.fact_saude_municipio` AS
             SELECT
-                CAST(cd_municipio_ibge AS INT64)             AS cd_municipio_ibge,
+                CAST(cd_municipio_ibge AS INT64)        AS cd_municipio_ibge,
                 sg_uf,
-                COALESCE(SAFE_CAST(ano AS INT64), 2022)      AS ano,
-                COALESCE(
-                    SAFE_CAST(taxa_mortalidade_infantil_1000 AS FLOAT64),
-                    SAFE_CAST(tx_mortalidade_infantil AS FLOAT64)
-                )                                            AS taxa_mortalidade_infantil_1000,
-                SAFE_CAST(taxa_mortalidade_materna_100k AS FLOAT64) AS taxa_mortalidade_materna_100k,
-                COALESCE(
-                    SAFE_CAST(pct_cobertura_plano_saude AS FLOAT64),
-                    SAFE_CAST(cobertura_esf_pct AS FLOAT64)
-                )                                            AS pct_cobertura_plano_saude,
-                SAFE_CAST(idsus_score AS FLOAT64)            AS idsus_score,
+                COALESCE(SAFE_CAST(ano AS INT64), 2022) AS ano,
+                CAST(NULL AS FLOAT64)                   AS taxa_mortalidade_infantil_1000,
+                CAST(NULL AS FLOAT64)                   AS taxa_mortalidade_materna_100k,
+                CAST(NULL AS FLOAT64)                   AS pct_cobertura_plano_saude,
+                CAST(NULL AS FLOAT64)                   AS idsus_score,
                 CURRENT_TIMESTAMP() AS ingested_at
             FROM `{silver}.saude_municipal`
             WHERE cd_municipio_ibge IS NOT NULL
@@ -335,8 +335,8 @@ def _build_gold_via_bigquery_sql() -> dict:
                 tp_pessoa,
                 EXTRACT(YEAR FROM dt_inicio_sancao) AS ano_sancao,
                 COUNT(*)                            AS qt_sancoes,
-                SUM(valor_multa)                    AS vl_multa_total,
-                AVG(valor_multa)                    AS vl_multa_medio,
+                CAST(NULL AS FLOAT64)               AS vl_multa_total,
+                CAST(NULL AS FLOAT64)               AS vl_multa_medio,
                 COUNT(DISTINCT nm_orgao_sancionador) AS qt_orgaos_sancionadores,
                 CURRENT_TIMESTAMP()                 AS ingested_at
             FROM `{silver}.sancoes_empresas`
