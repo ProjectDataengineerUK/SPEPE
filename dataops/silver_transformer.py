@@ -1258,8 +1258,11 @@ def transform_sancoes_to_silver(use_bigquery: bool = False) -> dict:
 
     frames: list[pd.DataFrame] = []
 
+    _sancoes_year = os.environ.get("SANCOES_YEAR", "2026")
+
     def _read_sancoes_bronze(sistema: str) -> pd.DataFrame:
-        prefix = f"raw/sancoes/snapshot/BR/{sistema.lower()}_BR_snapshot.parquet"
+        # Bronze writer stores at raw/sancoes/{year}/BR/ (year = snapshot year, e.g. 2026)
+        prefix = f"raw/sancoes/{_sancoes_year}/BR/{sistema.lower()}_BR_snapshot.parquet"
         if GCS_BUCKET:
             try:
                 import io
@@ -1274,7 +1277,7 @@ def transform_sancoes_to_silver(use_bigquery: bool = False) -> dict:
         local = (
             LOCAL_BRONZE_DIR
             / "sancoes"
-            / "snapshot"
+            / _sancoes_year
             / "BR"
             / f"{sistema.lower()}_BR_snapshot.parquet"
         )

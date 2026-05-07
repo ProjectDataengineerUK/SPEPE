@@ -65,8 +65,8 @@ locals {
       ENDIVIDAMENTO_YEAR_START = "2025"
       ENDIVIDAMENTO_YEAR_END   = "2026"
     }
-    cadunico_ingest = { CADUNICO_YEAR = "2022" }
-    emendas_ingest  = { EMENDAS_YEAR = "2022" }
+    cadunico_ingest = { CADUNICO_YEAR = "2018,2022,2024,2025" }
+    emendas_ingest  = { EMENDAS_YEAR = "2018,2022,2025" }
     sancoes_ingest  = { SANCOES_YEAR = "2026" }
   }
 
@@ -160,6 +160,15 @@ resource "google_cloud_run_v2_job" "spepe_jobs" {
             }
           }
         }
+        env {
+          name = "TRANSPARENCIA_API_KEY"
+          value_source {
+            secret_key_ref {
+              secret  = "TRANSPARENCIA_API_KEY"
+              version = "latest"
+            }
+          }
+        }
 
         dynamic "env" {
           for_each = local.job_extra_env[each.key]
@@ -176,6 +185,7 @@ resource "google_cloud_run_v2_job" "spepe_jobs" {
     google_secret_manager_secret_iam_member.dataops_meta,
     google_secret_manager_secret_iam_member.dataops_youtube,
     google_secret_manager_secret_iam_member.dataops_x_bearer,
+    google_secret_manager_secret_iam_member.dataops_transparencia,
   ]
 }
 

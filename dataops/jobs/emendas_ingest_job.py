@@ -16,7 +16,8 @@ logging.basicConfig(
 )
 logger = logging.getLogger("spepe.jobs.emendas_ingest")
 
-DEFAULT_YEAR = int(os.environ.get("EMENDAS_YEAR", os.environ.get("DEFAULT_ANO", "2022")))
+_YEARS_ENV = os.environ.get("EMENDAS_YEAR", os.environ.get("DEFAULT_ANO", "2022"))
+DEFAULT_YEARS = [int(y.strip()) for y in _YEARS_ENV.split(",") if y.strip()]
 
 
 def main(year: int) -> None:
@@ -43,6 +44,9 @@ def main(year: int) -> None:
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="SPEPE Emendas Parlamentares Ingest Job")
-    parser.add_argument("--year", type=int, default=DEFAULT_YEAR)
+    parser.add_argument("--year", type=int, default=None)
     args = parser.parse_args()
-    main(year=args.year)
+
+    years = [args.year] if args.year else DEFAULT_YEARS
+    for y in years:
+        main(year=y)

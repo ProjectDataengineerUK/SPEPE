@@ -143,3 +143,16 @@ resource "google_secret_manager_secret_iam_member" "dataops_reddit_secret" {
   role      = "roles/secretmanager.secretAccessor"
   member    = "serviceAccount:${google_service_account.dataops_jobs.email}"
 }
+
+# ── Portal Transparência API Key — CadÚnico, Emendas, Sanções ────────────────
+# Secret created out-of-band; managed here for IAM only.
+data "google_secret_manager_secret" "transparencia_api_key" {
+  secret_id = "TRANSPARENCIA_API_KEY"
+  project   = var.project_id
+}
+
+resource "google_secret_manager_secret_iam_member" "dataops_transparencia" {
+  secret_id = data.google_secret_manager_secret.transparencia_api_key.id
+  role      = "roles/secretmanager.secretAccessor"
+  member    = "serviceAccount:${google_service_account.dataops_jobs.email}"
+}
