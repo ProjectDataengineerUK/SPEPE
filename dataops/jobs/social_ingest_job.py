@@ -23,7 +23,6 @@ import pandas as pd
 
 from dataops.bronze_writer import write_bronze
 from dataops.clients.bluesky_client import fetch_bluesky_mentions
-from dataops.clients.gdelt_client import fetch_gdelt_mentions
 from dataops.clients.news_rss_client import fetch_rss_mentions
 from dataops.clients.social_client import (
     aggregate_x_sentiment,
@@ -115,15 +114,8 @@ def main(candidatos: list[str], fb_pages: list[str], dias: int, year: int) -> No
     else:
         logger.info("Bluesky: nenhum post coletado")
 
-    # ── GDELT — imprensa BR (sem credenciais) ─────────────────────────────────
-    gdelt_articles = fetch_gdelt_mentions(candidatos, dias=min(dias, 90))
-    if gdelt_articles:
-        enrich_with_source_meta(gdelt_articles, fonte_field="fonte_especifica")
-        _write(
-            pd.DataFrame(gdelt_articles), "social", year, f"gdelt_noticias_{year}.parquet", use_gcs
-        )
-    else:
-        logger.info("GDELT: nenhum artigo coletado")
+    # GDELT desabilitado — rate limit severo bloqueia o job inteiro (30s/candidato)
+    logger.info("GDELT: desabilitado (rate limit)")
 
     # ── RSS portais BR (sem credenciais) ─────────────────────────────────────
     rss_articles = fetch_rss_mentions(candidatos)
