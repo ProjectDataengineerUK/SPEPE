@@ -48,6 +48,12 @@ resource "google_project_iam_member" "cloud_run_vertex_user" {
   member  = "serviceAccount:${google_service_account.cloud_run.email}"
 }
 
+resource "google_project_iam_member" "cloud_run_run_viewer" {
+  project = var.project_id
+  role    = "roles/run.viewer"
+  member  = "serviceAccount:${google_service_account.cloud_run.email}"
+}
+
 # ── IAM — DataOps Jobs SA ─────────────────────────────────────────────────────
 
 resource "google_project_iam_member" "dataops_bigquery" {
