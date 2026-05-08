@@ -11,22 +11,79 @@ from pydantic import BaseModel, field_validator
 
 logger = logging.getLogger("spepe.agents.tools")
 
-JobName = Literal["tse_ingest", "ibge_sync", "silver_transform", "gold_build", "digital_ingest"]
+JobName = Literal[
+    # TSE
+    "tse_ingest", "tse_perfil_ingest", "tse_candidaturas_ingest",
+    # IBGE / Public data
+    "ibge_sync", "datasus_ingest", "security_ingest", "cetic_ingest",
+    "dieese_ingest", "endividamento_ingest", "cadunico_ingest",
+    # Social / Digital
+    "digital_ingest", "social_ingest", "reddit_ingest",
+    # Political / Fiscal
+    "pesquisas_ingest", "camara_senado_ingest",
+    "emendas_ingest", "sancoes_ingest",
+    # Pipeline
+    "silver_transform", "gold_build",
+    # Discovery
+    "candidatos_discovery",
+]
 
 ALLOWED_JOBS: dict[JobName, str] = {
+    # TSE
     "tse_ingest": "dataops/jobs/tse_ingest_job.py",
+    "tse_perfil_ingest": "dataops/jobs/tse_perfil_ingest_job.py",
+    "tse_candidaturas_ingest": "dataops/jobs/tse_candidaturas_ingest_job.py",
+    # IBGE / Public data
     "ibge_sync": "dataops/jobs/ibge_sync_job.py",
+    "datasus_ingest": "dataops/jobs/datasus_ingest_job.py",
+    "security_ingest": "dataops/jobs/security_ingest_job.py",
+    "cetic_ingest": "dataops/jobs/cetic_ingest_job.py",
+    "dieese_ingest": "dataops/jobs/dieese_ingest_job.py",
+    "endividamento_ingest": "dataops/jobs/endividamento_ingest_job.py",
+    "cadunico_ingest": "dataops/jobs/cadunico_ingest_job.py",
+    # Social / Digital
+    "digital_ingest": "dataops/jobs/digital_ingest_job.py",
+    "social_ingest": "dataops/jobs/social_ingest_job.py",
+    "reddit_ingest": "dataops/jobs/reddit_ingest_job.py",
+    # Political / Fiscal
+    "pesquisas_ingest": "dataops/jobs/pesquisas_ingest_job.py",
+    "camara_senado_ingest": "dataops/jobs/camara_senado_ingest_job.py",
+    "emendas_ingest": "dataops/jobs/emendas_ingest_job.py",
+    "sancoes_ingest": "dataops/jobs/sancoes_ingest_job.py",
+    # Pipeline
     "silver_transform": "dataops/jobs/silver_transform_job.py",
     "gold_build": "dataops/jobs/gold_build_job.py",
-    "digital_ingest": "dataops/jobs/digital_ingest_job.py",
+    # Discovery
+    "candidatos_discovery": "dataops/jobs/candidatos_discovery_job.py",
 }
 
 CLOUD_RUN_JOBS: dict[JobName, str] = {
+    # TSE
     "tse_ingest": "spepe-tse-ingest",
+    "tse_perfil_ingest": "spepe-tse-perfil-ingest",
+    "tse_candidaturas_ingest": "spepe-tse-candidaturas-ingest",
+    # IBGE / Public data
     "ibge_sync": "spepe-ibge-sync",
+    "datasus_ingest": "spepe-datasus-ingest",
+    "security_ingest": "spepe-security-ingest",
+    "cetic_ingest": "spepe-cetic-ingest",
+    "dieese_ingest": "spepe-dieese-ingest",
+    "endividamento_ingest": "spepe-endividamento-ingest",
+    "cadunico_ingest": "spepe-cadunico-ingest",
+    # Social / Digital
+    "digital_ingest": "spepe-digital-ingest",
+    "social_ingest": "spepe-social-ingest",
+    "reddit_ingest": "spepe-reddit-ingest",
+    # Political / Fiscal
+    "pesquisas_ingest": "spepe-pesquisas-ingest",
+    "camara_senado_ingest": "spepe-camara-senado-ingest",
+    "emendas_ingest": "spepe-emendas-ingest",
+    "sancoes_ingest": "spepe-sancoes-ingest",
+    # Pipeline
     "silver_transform": "spepe-silver-transform",
     "gold_build": "spepe-gold-build",
-    "digital_ingest": "spepe-digital-ingest",
+    # Discovery
+    "candidatos_discovery": "spepe-candidatos-discovery",
 }
 
 

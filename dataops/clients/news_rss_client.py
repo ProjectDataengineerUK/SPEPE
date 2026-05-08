@@ -57,6 +57,26 @@ FEED_REGISTRY: dict[str, dict[str, str]] = {
         "url": "https://apublica.org/feed/",
         "nome": "Agência Pública",
     },
+    "uol_noticias": {
+        "url": "https://rss.uol.com.br/feed/noticias.xml",
+        "nome": "UOL Notícias",
+    },
+    "veja": {
+        "url": "https://veja.abril.com.br/feed/",
+        "nome": "Veja",
+    },
+    "exame": {
+        "url": "https://exame.com/feed/",
+        "nome": "Exame",
+    },
+    "brasil_247": {
+        "url": "https://brasil247.com/rss",
+        "nome": "Brasil 247",
+    },
+    "metropoles_politica": {
+        "url": "https://www.metropoles.com/politica/feed",
+        "nome": "Metrópoles Política",
+    },
 }
 
 # ── Sentiment — shared lexicon ────────────────────────────────────────────────

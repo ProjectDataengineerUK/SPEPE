@@ -144,6 +144,26 @@ resource "google_secret_manager_secret_iam_member" "dataops_reddit_secret" {
   member    = "serviceAccount:${google_service_account.dataops_jobs.email}"
 }
 
+# ── Google Maps API Key ───────────────────────────────────────────────────────
+resource "google_secret_manager_secret" "google_maps_api_key" {
+  secret_id = "GOOGLE_MAPS_API_KEY"
+  project   = var.project_id
+  replication { auto {} }
+  labels = local.labels
+}
+
+resource "google_secret_manager_secret_version" "google_maps_api_key_placeholder" {
+  secret      = google_secret_manager_secret.google_maps_api_key.id
+  secret_data = "placeholder"
+  lifecycle { ignore_changes = [secret_data] }
+}
+
+resource "google_secret_manager_secret_iam_member" "cloud_run_google_maps" {
+  secret_id = google_secret_manager_secret.google_maps_api_key.id
+  role      = "roles/secretmanager.secretAccessor"
+  member    = "serviceAccount:${google_service_account.cloud_run.email}"
+}
+
 # ── Portal Transparência API Key — CadÚnico, Emendas, Sanções ────────────────
 # Secret created out-of-band; managed here for IAM only.
 data "google_secret_manager_secret" "transparencia_api_key" {

@@ -18,9 +18,10 @@ from contextlib import asynccontextmanager
 from enum import Enum
 from typing import Any
 
-from fastapi import FastAPI, Header, HTTPException, Query, Request, WebSocket, WebSocketDisconnect
+from fastapi import Depends, FastAPI, Header, HTTPException, Query, Request, Security, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, JSONResponse, RedirectResponse
+from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 
 from agents.supervisor import Supervisor
 from config.logging_config import setup_logging
@@ -47,6 +48,38 @@ app.add_middleware(
 logger = logging.getLogger("spepe.dashboard_api")
 
 _LOCAL_SILVER_DIR = Path(os.environ.get("DATA_DIR", "data")) / "silver"
+
+# ── Admin authentication ───────────────────────────────────────────────────
+
+_bearer = HTTPBearer(auto_error=False)
+
+
+async def require_auth(
+    credentials: HTTPAuthorizationCredentials = Security(_bearer),
+) -> dict:
+    """Validate Bearer token for admin API routes.
+
+    In local dev (no GCP_PROJECT_ID or set to 'local') auth is skipped.
+    In GCP the token must be a valid Google OAuth2 ID token.
+    """
+    if not settings.gcp_project_id or settings.gcp_project_id in ("", "local"):
+        return {"email": "dev@local", "sub": "dev"}
+    if credentials is None:
+        raise HTTPException(status_code=401, detail="Authorization required")
+    try:
+        from google.auth.transport import requests as grequests
+        from google.oauth2 import id_token
+
+        info = id_token.verify_oauth2_token(
+            credentials.credentials,
+            grequests.Request(),
+            audience=None,
+            clock_skew_in_seconds=10,
+        )
+        return info
+    except Exception:
+        raise HTTPException(status_code=401, detail="Invalid or expired token")
+
 
 _HELP_TEXT = """\
 ## SPEPE — Comandos disponíveis
@@ -1460,6 +1493,297 @@ async def _bq_mapa_secao(
     ]
 
 
+# ── UFs ───────────────────────────────────────────────────────────────────────
+
+_UFSALL = ["AC","AL","AM","AP","BA","CE","DF","ES","GO","MA","MG","MS","MT","PA","PB","PE","PI","PR","RJ","RN","RO","RR","RS","SC","SE","SP","TO"]
+
+
+@app.get("/api/ufs")
+async def get_ufs() -> JSONResponse:
+    return JSONResponse({"ufs": _UFSALL})
+
+
+# ── Mesorregiões ──────────────────────────────────────────────────────────────
+
+
+_UF_TO_IBGE_ID = {
+    "AC": "12", "AL": "27", "AM": "13", "AP": "16", "BA": "29", "CE": "23",
+    "DF": "53", "ES": "32", "GO": "52", "MA": "21", "MG": "31", "MS": "50",
+    "MT": "51", "PA": "15", "PB": "25", "PE": "26", "PI": "22", "PR": "41",
+    "RJ": "33", "RN": "24", "RO": "11", "RR": "14", "RS": "43", "SC": "42",
+    "SE": "28", "SP": "35", "TO": "17",
+}
+
+
+@app.get("/api/mesorregioes")
+async def get_mesorregioes(uf: str = "SP") -> JSONResponse:
+    import httpx
+
+    ibge_id = _UF_TO_IBGE_ID.get(uf.upper(), "35")
+    try:
+        async with httpx.AsyncClient() as client:
+            resp = await client.get(
+                f"https://servicodados.ibge.gov.br/api/v1/localidades/estados/{ibge_id}/mesorregioes",
+                timeout=10,
+            )
+            data = resp.json() if resp.status_code == 200 else []
+    except Exception as exc:
+        logger.warning("IBGE mesorregioes falhou: %s", exc)
+        data = []
+    return JSONResponse({"mesorregioes": [{"id": m["id"], "nome": m["nome"]} for m in data]})
+
+
+# ── Social: Sentimento ────────────────────────────────────────────────────────
+
+
+@app.get("/api/social/sentimento")
+async def get_social_sentimento(
+    cargo: str = "",
+    uf: str = "",
+    ano: int = 2026,
+) -> JSONResponse:
+    if settings.gcp_project_id and os.environ.get("USE_BIGQUERY", "").lower() == "true":
+        try:
+            from google.cloud import bigquery
+
+            client = bigquery.Client(project=settings.gcp_project_id)
+            gold = f"{settings.gcp_project_id}.{settings.bigquery_dataset_gold}"
+            params = []
+            where_clauses = ["data_ref >= DATE_SUB(CURRENT_DATE(), INTERVAL 12 WEEK)"]
+            if uf:
+                where_clauses.append("sg_uf = @uf")
+                params.append(bigquery.ScalarQueryParameter("uf", "STRING", uf.upper()))
+            where_sql = " AND ".join(where_clauses)
+            query = f"""
+                SELECT candidato, semana, sentimento_score_medio,
+                       total_mencoes, engajamento_total
+                FROM `{gold}.vw_social_candidato_sentimento`
+                WHERE {where_sql}
+                ORDER BY semana DESC, total_mencoes DESC
+                LIMIT 200
+            """
+            job_config = bigquery.QueryJobConfig(query_parameters=params)
+            rows = list(client.query(query, job_config=job_config).result())
+            return JSONResponse({"data": [dict(r) for r in rows]})
+        except Exception as exc:
+            logger.warning("BigQuery social sentimento falhou: %s", exc)
+    return JSONResponse({"data": []})
+
+
+# ── Social: Google Trends por UF ─────────────────────────────────────────────
+
+
+@app.get("/api/social/trends")
+async def get_social_trends(uf: str = "SP", ano: int = 2026) -> JSONResponse:
+    if settings.gcp_project_id and os.environ.get("USE_BIGQUERY", "").lower() == "true":
+        try:
+            from google.cloud import bigquery
+
+            client = bigquery.Client(project=settings.gcp_project_id)
+            gold = f"{settings.gcp_project_id}.{settings.bigquery_dataset_gold}"
+            query = f"""
+                SELECT candidato, mes, interesse
+                FROM `{gold}.fact_google_trends_uf`
+                WHERE sg_uf = @uf AND EXTRACT(YEAR FROM mes) = @ano
+                ORDER BY mes, candidato
+            """
+            job_config = bigquery.QueryJobConfig(
+                query_parameters=[
+                    bigquery.ScalarQueryParameter("uf", "STRING", uf.upper()),
+                    bigquery.ScalarQueryParameter("ano", "INT64", ano),
+                ]
+            )
+            rows = list(client.query(query, job_config=job_config).result())
+            return JSONResponse({"data": [dict(r) for r in rows]})
+        except Exception as exc:
+            logger.warning("BigQuery social trends falhou: %s", exc)
+    return JSONResponse({"data": []})
+
+
+# ── Social: Plataformas ───────────────────────────────────────────────────────
+
+
+@app.get("/api/social/plataformas")
+async def get_social_plataformas(uf: str = "SP", ano: int = 2026) -> JSONResponse:
+    if settings.gcp_project_id and os.environ.get("USE_BIGQUERY", "").lower() == "true":
+        try:
+            from google.cloud import bigquery
+
+            client = bigquery.Client(project=settings.gcp_project_id)
+            gold = f"{settings.gcp_project_id}.{settings.bigquery_dataset_gold}"
+            try:
+                query = f"""
+                    SELECT fonte, total_posts, total_likes, sentimento_medio
+                    FROM `{gold}.vw_social_plataforma_uf`
+                    WHERE sg_uf = @uf AND EXTRACT(YEAR FROM data_ref) = @ano
+                    ORDER BY total_posts DESC
+                """
+                job_config = bigquery.QueryJobConfig(
+                    query_parameters=[
+                        bigquery.ScalarQueryParameter("uf", "STRING", uf.upper()),
+                        bigquery.ScalarQueryParameter("ano", "INT64", ano),
+                    ]
+                )
+                rows = list(client.query(query, job_config=job_config).result())
+            except Exception:
+                silver = f"{settings.gcp_project_id}.{settings.bigquery_dataset_silver}"
+                query = f"""
+                    SELECT fonte,
+                           COUNT(*) AS total_posts,
+                           SUM(qt_likes) AS total_likes,
+                           AVG(sentimento_score) AS sentimento_medio
+                    FROM `{silver}.social_mencoes_br`
+                    WHERE sg_uf = @uf AND EXTRACT(YEAR FROM data_ref) = @ano
+                    GROUP BY fonte
+                    ORDER BY total_posts DESC
+                """
+                job_config = bigquery.QueryJobConfig(
+                    query_parameters=[
+                        bigquery.ScalarQueryParameter("uf", "STRING", uf.upper()),
+                        bigquery.ScalarQueryParameter("ano", "INT64", ano),
+                    ]
+                )
+                rows = list(client.query(query, job_config=job_config).result())
+            return JSONResponse({"data": [dict(r) for r in rows]})
+        except Exception as exc:
+            logger.warning("BigQuery social plataformas falhou: %s", exc)
+    return JSONResponse({"data": []})
+
+
+# ── Social: Detector de crise ─────────────────────────────────────────────────
+
+
+@app.get("/api/social/crise")
+async def get_social_crise(uf: str = "SP") -> JSONResponse:
+    if settings.gcp_project_id and os.environ.get("USE_BIGQUERY", "").lower() == "true":
+        try:
+            from google.cloud import bigquery
+
+            client = bigquery.Client(project=settings.gcp_project_id)
+            gold = f"{settings.gcp_project_id}.{settings.bigquery_dataset_gold}"
+            query = f"""
+                SELECT candidato, sg_uf, fonte, data_ref, ratio_vs_baseline
+                FROM `{gold}.vw_social_crise_detector`
+                WHERE crise_detectada = TRUE AND sg_uf = @uf
+                ORDER BY ratio_vs_baseline DESC
+                LIMIT 20
+            """
+            job_config = bigquery.QueryJobConfig(
+                query_parameters=[
+                    bigquery.ScalarQueryParameter("uf", "STRING", uf.upper()),
+                ]
+            )
+            rows = list(client.query(query, job_config=job_config).result())
+            return JSONResponse({"data": [dict(r) for r in rows]})
+        except Exception as exc:
+            logger.warning("BigQuery social crise falhou: %s", exc)
+    return JSONResponse({"data": []})
+
+
+# ── Digital: Meta Ads por UF ──────────────────────────────────────────────────
+
+
+@app.get("/api/digital/meta")
+async def get_digital_meta(uf: str = "SP", ano: int = 2026) -> JSONResponse:
+    if settings.gcp_project_id and os.environ.get("USE_BIGQUERY", "").lower() == "true":
+        try:
+            from google.cloud import bigquery
+
+            client = bigquery.Client(project=settings.gcp_project_id)
+            gold = f"{settings.gcp_project_id}.{settings.bigquery_dataset_gold}"
+            query = f"""
+                SELECT candidato, total_spend_r, total_impressions
+                FROM `{gold}.fact_meta_ads_uf`
+                WHERE sg_uf = @uf AND ano = @ano
+                ORDER BY total_spend_r DESC
+            """
+            job_config = bigquery.QueryJobConfig(
+                query_parameters=[
+                    bigquery.ScalarQueryParameter("uf", "STRING", uf.upper()),
+                    bigquery.ScalarQueryParameter("ano", "INT64", ano),
+                ]
+            )
+            rows = list(client.query(query, job_config=job_config).result())
+            return JSONResponse({"data": [dict(r) for r in rows]})
+        except Exception as exc:
+            logger.warning("BigQuery digital meta falhou: %s", exc)
+    return JSONResponse({"data": []})
+
+
+# ── Previsão ──────────────────────────────────────────────────────────────────
+
+
+@app.get("/api/previsao")
+async def get_previsao(
+    cargo: str = "Governador",
+    uf: str = "SP",
+    ano: int = 2026,
+) -> JSONResponse:
+    if settings.gcp_project_id and os.environ.get("USE_BIGQUERY", "").lower() == "true":
+        try:
+            from google.cloud import bigquery
+
+            client = bigquery.Client(project=settings.gcp_project_id)
+            mlops = f"{settings.gcp_project_id}.{settings.bigquery_dataset_mlops}"
+            cd_cargo = _CARGO_CD.get(cargo, 3)
+            try:
+                query = f"""
+                    SELECT candidato, prob_vitoria, intervalo_inferior, intervalo_superior
+                    FROM `{mlops}.fact_predictions`
+                    WHERE sg_uf = @uf AND cd_cargo = @cd_cargo AND ano_eleicao = @ano
+                    ORDER BY prob_vitoria DESC
+                    LIMIT 10
+                """
+                job_config = bigquery.QueryJobConfig(
+                    query_parameters=[
+                        bigquery.ScalarQueryParameter("uf", "STRING", uf.upper()),
+                        bigquery.ScalarQueryParameter("cd_cargo", "INT64", cd_cargo),
+                        bigquery.ScalarQueryParameter("ano", "INT64", ano),
+                    ]
+                )
+                rows = list(client.query(query, job_config=job_config).result())
+                if rows:
+                    return JSONResponse({"data": [dict(r) for r in rows]})
+            except Exception:
+                pass
+            gold = f"{settings.gcp_project_id}.{settings.bigquery_dataset_gold}"
+            query = f"""
+                SELECT candidato,
+                       AVG(intencao_ajustada) / 100.0 AS prob_vitoria,
+                       NULL AS intervalo_inferior,
+                       NULL AS intervalo_superior
+                FROM `{gold}.vw_intencao_voto_uf`
+                WHERE sg_uf = @uf AND cd_cargo = @cd_cargo
+                  AND EXTRACT(YEAR FROM data_pesquisa_inicio) = @ano
+                GROUP BY candidato
+                ORDER BY prob_vitoria DESC
+                LIMIT 10
+            """
+            job_config = bigquery.QueryJobConfig(
+                query_parameters=[
+                    bigquery.ScalarQueryParameter("uf", "STRING", uf.upper()),
+                    bigquery.ScalarQueryParameter("cd_cargo", "INT64", cd_cargo),
+                    bigquery.ScalarQueryParameter("ano", "INT64", ano),
+                ]
+            )
+            rows = list(client.query(query, job_config=job_config).result())
+            return JSONResponse({"data": [dict(r) for r in rows]})
+        except Exception as exc:
+            logger.warning("BigQuery previsao falhou: %s", exc)
+    return JSONResponse({"data": []})
+
+
+# ── Config: Google Maps Key ───────────────────────────────────────────────────
+
+
+@app.get("/api/config/maps-key")
+async def get_maps_key() -> JSONResponse:
+    from security.secret_manager import get_secret
+
+    key = get_secret("GOOGLE_MAPS_API_KEY") or settings.google_maps_api_key
+    return JSONResponse({"key": key})
+
+
 # ── WebSocket Chat → Supervisor ────────────────────────────────────────────
 
 
@@ -1595,7 +1919,7 @@ def _fs_client():
         return None
 
 
-@app.get("/admin/api/users")
+@app.get("/admin/api/users", dependencies=[Depends(require_auth)])
 async def admin_list_users() -> JSONResponse:
     db = _fs_client()
     if db:
@@ -1608,7 +1932,7 @@ async def admin_list_users() -> JSONResponse:
     return JSONResponse({"users": _USER_STORE})
 
 
-@app.post("/admin/api/users")
+@app.post("/admin/api/users", dependencies=[Depends(require_auth)])
 async def admin_create_user(request: Request) -> JSONResponse:
     import uuid
     from datetime import date
@@ -1626,7 +1950,7 @@ async def admin_create_user(request: Request) -> JSONResponse:
     return JSONResponse({"ok": True, "user": user})
 
 
-@app.put("/admin/api/users/{user_id}")
+@app.put("/admin/api/users/{user_id}", dependencies=[Depends(require_auth)])
 async def admin_update_user(user_id: str, request: Request) -> JSONResponse:
     body = await request.json()
     db = _fs_client()
@@ -1647,7 +1971,7 @@ async def admin_update_user(user_id: str, request: Request) -> JSONResponse:
     return JSONResponse({"ok": False, "error": "not found"}, status_code=404)
 
 
-@app.delete("/admin/api/users/{user_id}")
+@app.delete("/admin/api/users/{user_id}", dependencies=[Depends(require_auth)])
 async def admin_delete_user(user_id: str) -> JSONResponse:
     global _USER_STORE
     db = _fs_client()
@@ -1661,7 +1985,7 @@ async def admin_delete_user(user_id: str) -> JSONResponse:
     return JSONResponse({"ok": True})
 
 
-@app.get("/admin/api/access")
+@app.get("/admin/api/access", dependencies=[Depends(require_auth)])
 async def admin_get_access() -> JSONResponse:
     db = _fs_client()
     if db:
@@ -1674,7 +1998,7 @@ async def admin_get_access() -> JSONResponse:
     return JSONResponse({"matrix": _ACCESS_MATRIX})
 
 
-@app.post("/admin/api/access")
+@app.post("/admin/api/access", dependencies=[Depends(require_auth)])
 async def admin_save_access(request: Request) -> JSONResponse:
     global _ACCESS_MATRIX
     data = await request.json()
@@ -1689,7 +2013,7 @@ async def admin_save_access(request: Request) -> JSONResponse:
     return JSONResponse({"ok": True})
 
 
-@app.get("/admin/api/jobs")
+@app.get("/admin/api/jobs", dependencies=[Depends(require_auth)])
 async def admin_list_jobs() -> JSONResponse:
     """List Cloud Run Jobs with last execution status."""
     jobs_config = [
@@ -1732,7 +2056,7 @@ async def admin_list_jobs() -> JSONResponse:
     return JSONResponse({"jobs": jobs_config})
 
 
-@app.post("/admin/api/jobs/{job_name}/run")
+@app.post("/admin/api/jobs/{job_name}/run", dependencies=[Depends(require_auth)])
 async def admin_run_job(job_name: str, uf: str = "SP", year: int = 2022) -> JSONResponse:
     """Trigger a Cloud Run Job execution (admin only)."""
     from agents.tools import RunJobArgs, run_dataops_job
@@ -1754,7 +2078,7 @@ async def admin_run_job(job_name: str, uf: str = "SP", year: int = 2022) -> JSON
     return JSONResponse(result)
 
 
-@app.get("/admin/api/sentinel/status")
+@app.get("/admin/api/sentinel/status", dependencies=[Depends(require_auth)])
 async def admin_sentinel_status() -> JSONResponse:
     """Return snapshot of all Sentinel resource statuses."""
     if settings.gcp_project_id and os.environ.get("USE_BIGQUERY", "").lower() == "true":
@@ -1876,7 +2200,7 @@ async def admin_sentinel_status() -> JSONResponse:
     return JSONResponse({"resources": stub, "source": "stub"})
 
 
-@app.get("/admin/api/catalog")
+@app.get("/admin/api/catalog", dependencies=[Depends(require_auth)])
 async def admin_catalog() -> JSONResponse:
     """Return BigQuery table metadata for all SPEPE datasets."""
     datasets = ["spepe_silver", "spepe_gold", "spepe_mlops"]

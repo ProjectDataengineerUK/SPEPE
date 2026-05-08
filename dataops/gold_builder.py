@@ -202,6 +202,7 @@ def _build_gold_via_bigquery_sql() -> dict:
                 AVG(COALESCE(score_confiabilidade, 5.0))    AS score_medio_confiabilidade,
                 CURRENT_TIMESTAMP()                         AS ingested_at
             FROM `{silver}.social_mencoes_br`
+            WHERE (confianca_nlp >= 0.70 OR confianca_nlp IS NULL)
             GROUP BY
                 sg_uf, candidato, fonte, tipo_fonte, vies_politico,
                 ano_semana, semana, ano, DATE(created_at)
@@ -785,6 +786,9 @@ def _build_fact_social() -> pd.DataFrame:
 
     frames = [pd.read_parquet(f) for f in files]
     df = pd.concat(frames, ignore_index=True)
+
+    if "confianca_nlp" in df.columns:
+        df = df[(df["confianca_nlp"].isna()) | (df["confianca_nlp"] >= 0.70)]
 
     if "candidato" not in df.columns:
         df["candidato"] = "desconhecido"

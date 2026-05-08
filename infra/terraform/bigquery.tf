@@ -356,6 +356,33 @@ resource "google_bigquery_table" "fact_saude_municipio" {
 }
 
 
+# ─── Silver: Dimensão páginas sociais dos candidatos ─────────────────────────
+resource "google_bigquery_table" "dim_candidato_social_pages" {
+  dataset_id = google_bigquery_dataset.spepe_silver.dataset_id
+  table_id   = "dim_candidato_social_pages"
+  project    = var.project_id
+
+  time_partitioning {
+    type  = "DAY"
+    field = "dt_atualizacao"
+  }
+
+  schema = jsonencode([
+    { name = "candidato_id",       type = "STRING", mode = "REQUIRED" },
+    { name = "nome_candidato",     type = "STRING", mode = "REQUIRED" },
+    { name = "facebook_page_id",   type = "STRING", mode = "NULLABLE" },
+    { name = "instagram_handle",   type = "STRING", mode = "NULLABLE" },
+    { name = "youtube_channel_id", type = "STRING", mode = "NULLABLE" },
+    { name = "twitter_handle",     type = "STRING", mode = "NULLABLE" },
+    { name = "tiktok_handle",      type = "STRING", mode = "NULLABLE" },
+    { name = "followers_fb",       type = "INT64",  mode = "NULLABLE" },
+    { name = "is_verified",        type = "BOOL",   mode = "NULLABLE" },
+    { name = "dt_atualizacao",     type = "DATE",   mode = "REQUIRED" }
+  ])
+
+  deletion_protection = false
+}
+
 # ─── Silver: Social ───────────────────────────────────────────────────────────
 resource "google_bigquery_table" "silver_social_mencoes_br" {
   dataset_id          = google_bigquery_dataset.spepe_silver.dataset_id

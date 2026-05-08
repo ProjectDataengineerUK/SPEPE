@@ -42,6 +42,41 @@ Features principais usadas nas análises:
 | Norte | Mix voto evangélico + populações ribeirinhas + programas sociais. |
 | Centro-Oeste | Agronegócio forte. Tendência conservadora. |
 
+## Fontes de Dados Estendidas (v1.1+)
+
+Além de TSE + IBGE, o Analista agora cruza os seguintes domínios via views Gold:
+
+### Emendas Parlamentares
+| View | Uso |
+|------|-----|
+| `vw_emendas_municipio` | Emendas por município × ano |
+| `vw_emendas_vs_eleicao` | Correlação emendas × resultado eleitoral |
+| `vw_emendas_candidato_uf` | Emendas atribuídas a parlamentares × UF |
+
+### Sanções (CEIS + CNEP)
+| View | Uso |
+|------|-----|
+| `vw_sancoes_uf` | Sanções federais por UF (empresas e pessoas inidôneas) |
+
+### Sinal Social
+| View | Uso |
+|------|-----|
+| `vw_social_candidato_sentimento` | Percepção social do candidato (sentimento_score × UF × semana) |
+| `vw_candidato_360` | Visão 360º do candidato (votação histórica + perfil socioeconômico + sentimento social + emendas) |
+
+### Transferências Sociais (Bolsa Família / CadÚnico)
+| View | Uso |
+|------|-----|
+| `vw_transferencias_vs_eleicao` | Correlação BF/CadÚnico × resultado eleitoral por município |
+| `vw_transferencias_candidato` | Beneficiários BF × performance eleitoral do candidato |
+
+### Score Composto Municipal
+| View | Uso |
+|------|-----|
+| `vw_score_municipal_integrado` | Score composto IDHM + segurança + saúde + renda + emendas + BF (0–100) |
+
+Use estas views para enriquecer análises de perfil, sempre citando a view consultada e o período de referência.
+
 ## Fluxo de /perfil {localidade} {ano} {cargo}
 
 1. Use os dados disponíveis no contexto da sessão (injetados pelo Supervisor)

@@ -488,6 +488,23 @@ def transform_pesquisas_to_silver(
     return {"status": "ok", "path": path, "rows": len(df)}
 
 
+import re as _re
+
+_TEMA_PATTERNS: list[tuple[_re.Pattern, str]] = [
+    (_re.compile(r"economia|emprego|renda|inflacao|salario|pib", _re.IGNORECASE), "economia"),
+    (_re.compile(r"saude|hospital|sus|medico|doenca|covid", _re.IGNORECASE), "saude"),
+    (_re.compile(r"educacao|escola|universidade|ensino|professor", _re.IGNORECASE), "educacao"),
+    (_re.compile(r"seguranca|violencia|crime|policia|assassinato", _re.IGNORECASE), "seguranca"),
+    (_re.compile(r"corrupcao|corrupto|desvio|propina|escandalo", _re.IGNORECASE), "corrupcao"),
+    (_re.compile(r"meio.ambiente|clima|desmatamento|queimada|ambiental", _re.IGNORECASE), "meio_ambiente"),
+]
+
+
+def _extract_temas(text: str) -> list[str]:
+    matched = [label for pattern, label in _TEMA_PATTERNS if pattern.search(text)]
+    return matched if matched else ["geral"]
+
+
 def transform_social_to_silver(
     year: int,
     use_bigquery: bool = False,
@@ -628,6 +645,26 @@ def transform_social_to_silver(
             lambda f: get_source_meta(str(f) if f else "desconhecido").alcance
         )
 
+    # enrich_sentiment_vertex() (v1.2) populates sentimento_score and confianca_nlp;
+    # provide safe defaults when Vertex enrichment has not run yet
+    if "temas" not in df.columns:
+        df["temas"] = df["text"].fillna("").apply(_extract_temas)
+
+    if "sentimento_score" not in df.columns:
+        df["sentimento_score"] = 0.0
+
+    if "confianca_nlp" not in df.columns:
+        df["confianca_nlp"] = None
+
+    if "suspeito_coordenado" not in df.columns:
+        df["suspeito_coordenado"] = False
+
+    if "score_credibilidade_post" not in df.columns:
+        source_score = df.get("score_confiabilidade", pd.Series([1.0] * len(df), index=df.index))
+        df["score_credibilidade_post"] = source_score * df["suspeito_coordenado"].map(
+            {True: 0.3, False: 1.0}
+        )
+
     # Mantém apenas colunas necessárias para o Silver
     keep = [
         "candidato",
@@ -649,6 +686,11 @@ def transform_social_to_silver(
         "tipo_fonte",
         "vies_politico",
         "alcance_fonte",
+        "temas",
+        "sentimento_score",
+        "confianca_nlp",
+        "suspeito_coordenado",
+        "score_credibilidade_post",
         "ingested_at",
     ]
     df = df[[c for c in keep if c in df.columns]]

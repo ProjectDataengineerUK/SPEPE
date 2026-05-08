@@ -23,6 +23,7 @@ locals {
     cadunico_ingest       = { timeout = "3600s", memory = "512Mi", cpu = "1", args = [] }
     emendas_ingest        = { timeout = "3600s", memory = "512Mi", cpu = "1", args = [] }
     sancoes_ingest        = { timeout = "3600s", memory = "512Mi", cpu = "1", args = [] }
+    candidatos_discovery  = { timeout = "1800s", memory = "1Gi",   cpu = "1", args = [] }
   }
 
   # Env vars adicionais por job (além das compartilhadas)
@@ -66,8 +67,9 @@ locals {
       ENDIVIDAMENTO_YEAR_END   = "2026"
     }
     cadunico_ingest = { CADUNICO_YEAR = "2018,2022,2024,2025" }
-    emendas_ingest  = { EMENDAS_YEAR = "2018,2022,2025" }
-    sancoes_ingest  = { SANCOES_YEAR = "2026" }
+    emendas_ingest       = { EMENDAS_YEAR = "2018,2022,2025" }
+    sancoes_ingest       = { SANCOES_YEAR = "2026" }
+    candidatos_discovery = {}
   }
 
   job_entrypoints = {
@@ -90,6 +92,7 @@ locals {
     cadunico_ingest         = ["python", "-m", "dataops.jobs.cadunico_ingest_job"]
     emendas_ingest          = ["python", "-m", "dataops.jobs.emendas_ingest_job"]
     sancoes_ingest          = ["python", "-m", "dataops.jobs.sancoes_ingest_job"]
+    candidatos_discovery    = ["python", "-m", "dataops.jobs.candidatos_discovery_job"]
   }
 }
 

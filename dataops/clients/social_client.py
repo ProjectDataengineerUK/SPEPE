@@ -13,11 +13,15 @@ from __future__ import annotations
 import logging
 import os
 import time
+from collections import defaultdict
 from datetime import datetime, timedelta, timezone
 from typing import Any
 
+import pandas as pd
 import requests
 from tenacity import retry, stop_after_attempt, wait_exponential
+
+from security.secret_manager import get_secret
 
 logger = logging.getLogger("spepe.clients.social")
 
@@ -28,7 +32,6 @@ _X_SEARCH_URL = f"{_X_BASE}/tweets/search/recent"
 _X_MAX_RESULTS = 100  # max per request on free tier
 
 # ── Facebook Graph API ──────────────────────────────────────────────────────
-_FB_TOKEN = os.environ.get("META_APP_TOKEN", "")
 _FB_BASE = "https://graph.facebook.com/v19.0"
 
 # ── YouTube Data API v3 ─────────────────────────────────────────────────────
@@ -181,8 +184,6 @@ def aggregate_x_sentiment(
     Retorna: [{candidato, total, positivo, negativo, neutro, score_liquido}]
     score_liquido = (positivo - negativo) / total * 100
     """
-    from collections import defaultdict
-
     buckets: dict[str, dict[str, int]] = defaultdict(
         lambda: {"total": 0, "positivo": 0, "negativo": 0, "neutro": 0}
     )
@@ -210,11 +211,17 @@ def aggregate_x_sentiment(
 # ── Facebook Graph API ───────────────────────────────────────────────────────
 
 
+def _get_fb_token() -> str:
+    # Prefer Secret Manager so prod never falls back to env alone
+    return get_secret("META_APP_TOKEN") or os.environ.get("META_APP_TOKEN", "")
+
+
 @retry(stop=stop_after_attempt(3), wait=wait_exponential(min=2, max=20))
 def _fb_get(path: str, params: dict[str, Any]) -> dict:
-    if not _FB_TOKEN:
+    token = _get_fb_token()
+    if not token:
         raise RuntimeError("META_APP_TOKEN não configurado")
-    params = {"access_token": _FB_TOKEN, **params}
+    params = {"access_token": token, **params}
     resp = requests.get(f"{_FB_BASE}/{path}", params=params, timeout=30)
     resp.raise_for_status()
     return resp.json()
@@ -229,7 +236,8 @@ def fetch_fb_page_posts(
     Retorna lista de dicts com: page_id, post_id, message, created_time,
     likes, comments, shares, sentiment.
     """
-    if not _FB_TOKEN:
+    token = _get_fb_token()
+    if not token:
         logger.warning("META_APP_TOKEN ausente — retornando lista vazia")
         return []
 
@@ -268,6 +276,64 @@ def fetch_fb_page_posts(
 
     logger.info("Facebook: %d posts coletados de %d páginas", len(results), len(page_ids))
     return results
+
+
+def fetch_instagram_posts(
+    instagram_handle: str,
+    days_back: int = 30,
+) -> pd.DataFrame:
+    token = _get_fb_token()
+    if not token:
+        logger.warning("META_APP_TOKEN ausente — retornando DataFrame vazio para Instagram")
+        return pd.DataFrame(
+            columns=["text", "like_count", "comment_count", "created_at", "fonte", "platform_post_id"]
+        )
+
+    cutoff = datetime.now(timezone.utc) - timedelta(days=days_back)
+
+    try:
+        # Instagram Business accounts are addressed by handle via the Graph API
+        resp = requests.get(
+            f"{_FB_BASE}/{instagram_handle}/media",
+            params={
+                "fields": "id,caption,like_count,comments_count,timestamp",
+                "access_token": token,
+            },
+            timeout=30,
+        )
+        resp.raise_for_status()
+        data = resp.json()
+    except Exception as exc:
+        logger.warning("Instagram fetch falhou para '%s': %s", instagram_handle, exc)
+        return pd.DataFrame(
+            columns=["text", "like_count", "comment_count", "created_at", "fonte", "platform_post_id"]
+        )
+
+    rows: list[dict] = []
+    for item in data.get("data", []):
+        ts_str = item.get("timestamp", "")
+        try:
+            created_at = datetime.fromisoformat(ts_str.replace("Z", "+00:00"))
+        except (ValueError, AttributeError):
+            continue
+
+        if created_at < cutoff:
+            continue
+
+        rows.append(
+            {
+                # caption is optional — Instagram allows image-only posts
+                "text": item.get("caption", "") or "",
+                "like_count": item.get("like_count", 0),
+                "comment_count": item.get("comments_count", 0),
+                "created_at": created_at,
+                "fonte": "instagram",
+                "platform_post_id": item.get("id", ""),
+            }
+        )
+
+    logger.info("Instagram: %d posts coletados para handle '%s'", len(rows), instagram_handle)
+    return pd.DataFrame(rows)
 
 
 # ── YouTube Data API v3 ───────────────────────────────────────────────────────
@@ -381,17 +447,30 @@ def fetch_youtube_videos(
     return results
 
 
-def _call_vertex_nlp(texts: list[str], project: str, location: str = "us-central1") -> list[str]:
+# ── Vertex AI NLP ────────────────────────────────────────────────────────────
+
+
+def _call_vertex_nlp(
+    texts: list[str],
+    project: str,
+    location: str = "us-central1",
+) -> tuple[list[str], list[float], list[float | None]]:
     """Classify sentiment via Vertex AI text-multilingual-v1 in batches of 25.
 
-    Returns list of sentiment labels (positivo | negativo | neutro) aligned with input texts.
+    Returns (labels, scores, confidences) aligned with input texts.
+    - labels: positivo | negativo | neutro
+    - scores: float -1.0 to +1.0 (document_sentiment.score)
+    - confidences: float 0.0-1.0 from abs(magnitude) capped at 1.0, or None on fallback
     Falls back to _simple_sentiment if Vertex AI unavailable.
     """
     try:
         from google.cloud import language_v2
 
         client = language_v2.LanguageServiceClient()
-        sentiments: list[str] = []
+        labels: list[str] = []
+        scores: list[float] = []
+        confidences: list[float | None] = []
+
         for text in texts:
             doc = language_v2.Document(
                 content=text[:1000],
@@ -401,37 +480,150 @@ def _call_vertex_nlp(texts: list[str], project: str, location: str = "us-central
             try:
                 result = client.analyze_sentiment(request={"document": doc})
                 score = result.document_sentiment.score
+                magnitude = result.document_sentiment.magnitude
+
                 if score >= 0.15:
-                    sentiments.append("positivo")
+                    labels.append("positivo")
                 elif score <= -0.15:
-                    sentiments.append("negativo")
+                    labels.append("negativo")
                 else:
-                    sentiments.append("neutro")
+                    labels.append("neutro")
+
+                scores.append(float(score))
+                # normalize magnitude 0-3 → 0-1 per spec (magnitude rarely exceeds 3)
+                confidences.append(min(abs(float(magnitude)) / 3.0, 1.0))
+
             except Exception:
-                sentiments.append(_simple_sentiment(text))
-        return sentiments
+                labels.append(_simple_sentiment(text))
+                scores.append(0.0)
+                confidences.append(None)
+
+        return labels, scores, confidences
+
     except ImportError:
         logger.debug("google-cloud-language indisponível — usando sentiment rule-based")
-        return [_simple_sentiment(t) for t in texts]
+        fallback_labels = [_simple_sentiment(t) for t in texts]
+        fallback_scores = [0.0] * len(texts)
+        fallback_confidences: list[float | None] = [None] * len(texts)
+        return fallback_labels, fallback_scores, fallback_confidences
 
 
 def enrich_sentiment_vertex(
-    records: list[dict],
+    df: pd.DataFrame,
     text_field: str = "text",
     project: str = "",
-) -> list[dict]:
-    """Replace rule-based sentiment with Vertex AI NLP for a list of social records.
+) -> pd.DataFrame:
+    """Enrich a DataFrame with Vertex AI NLP sentiment columns.
 
-    Replaces the 'sentiment' field in-place. Falls back to rule-based if Vertex fails.
-    Only called when GCP_PROJECT_ID is set — avoids unnecessary API calls locally.
+    Adds/replaces:
+      - sentiment       (str)   positivo | negativo | neutro
+      - sentimento_score (float) -1.0 to +1.0
+      - confianca_nlp   (float) 0.0-1.0, NULL when GCP unavailable
+
+    Falls back to rule-based sentiment when GCP_PROJECT_ID is unset.
     """
     if not project:
         project = os.environ.get("GCP_PROJECT_ID", "")
-    if not project:
-        return records
 
-    texts = [r.get(text_field, "") or "" for r in records]
-    sentiments = _call_vertex_nlp(texts, project)
-    for rec, sent in zip(records, sentiments):
-        rec["sentiment"] = sent
-    return records
+    texts = df[text_field].fillna("").tolist() if text_field in df.columns else [""] * len(df)
+
+    if not project:
+        # No GCP context — use rule-based labels and neutral float defaults
+        df = df.copy()
+        df["sentiment"] = [_simple_sentiment(t) for t in texts]
+        df["sentimento_score"] = 0.0
+        df["confianca_nlp"] = None
+        return df
+
+    labels, scores, confidences = _call_vertex_nlp(texts, project)
+
+    df = df.copy()
+    df["sentiment"] = labels
+    df["sentimento_score"] = scores
+    df["confianca_nlp"] = confidences
+
+    return df
+
+
+# ── BigQuery helpers ─────────────────────────────────────────────────────────
+
+
+def load_candidate_pages_from_bq(
+    project_id: str,
+    bq_table: str = "spepe_silver.dim_candidato_social_pages",
+) -> dict[str, list[str]]:
+    empty: dict[str, list[str]] = {"facebook": [], "instagram": [], "youtube": []}
+
+    try:
+        from google.cloud import bigquery
+
+        client = bigquery.Client(project=project_id)
+        query = (
+            f"SELECT facebook_page_id, instagram_handle, youtube_channel_id "
+            f"FROM `{project_id}.{bq_table}` "
+            f"WHERE facebook_page_id IS NOT NULL OR instagram_handle IS NOT NULL OR youtube_channel_id IS NOT NULL"
+        )
+        rows = client.query(query).result()
+
+        result: dict[str, list[str]] = {"facebook": [], "instagram": [], "youtube": []}
+        for row in rows:
+            if row.facebook_page_id:
+                result["facebook"].append(row.facebook_page_id)
+            if row.instagram_handle:
+                result["instagram"].append(row.instagram_handle)
+            if row.youtube_channel_id:
+                result["youtube"].append(row.youtube_channel_id)
+
+        return result
+
+    except Exception as exc:
+        logger.warning("load_candidate_pages_from_bq falhou — retornando listas vazias: %s", exc)
+        return empty
+
+
+# ── Credibility and coordination heuristics ───────────────────────────────────
+
+
+def compute_score_credibilidade(df: pd.DataFrame) -> pd.Series:
+    base = df["score_confiabilidade"] if "score_confiabilidade" in df.columns else pd.Series(1.0, index=df.index)
+    suspeito = df["suspeito_coordenado"] if "suspeito_coordenado" in df.columns else pd.Series(False, index=df.index)
+    # coordinated posts receive a 70% penalty on source trust score
+    penalty = suspeito.map({True: 0.3, False: 1.0}).fillna(1.0)
+    return (base * penalty).astype(float)
+
+
+def detect_suspeito_coordenado(df: pd.DataFrame) -> pd.DataFrame:
+    """Add boolean column `suspeito_coordenado` to a social DataFrame.
+
+    A post is flagged when the exact same lowercased+stripped text appears
+    >= 5 times within a 1-hour window for the same candidato.
+    This catches copy-paste brigading campaigns that inflate apparent organic reach.
+    """
+    df = df.copy()
+    df["suspeito_coordenado"] = False
+
+    if df.empty:
+        return df
+
+    required = {"text", "created_at", "candidato"}
+    if not required.issubset(df.columns):
+        logger.warning(
+            "detect_suspeito_coordenado: colunas ausentes %s", required - set(df.columns)
+        )
+        return df
+
+    df["_text_norm"] = df["text"].str.lower().str.strip()
+    df["_created_at"] = pd.to_datetime(df["created_at"], utc=True, errors="coerce")
+
+    # Round to 1-hour bins per candidato+text to count occurrences
+    df["_hour_bin"] = df["_created_at"].dt.floor("h")
+
+    counts = (
+        df.groupby(["candidato", "_text_norm", "_hour_bin"])["_text_norm"]
+        .transform("count")
+    )
+    # Posts with text that appears >= 5 times in the same hour+candidato window
+    df["suspeito_coordenado"] = counts >= 5
+
+    df.drop(columns=["_text_norm", "_created_at", "_hour_bin"], inplace=True)
+    return df

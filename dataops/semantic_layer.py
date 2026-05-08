@@ -482,6 +482,167 @@ _VIEWS: dict[str, str] = {
         LEFT JOIN transferencias_acum t USING (cd_municipio_ibge)
         LEFT JOIN emendas_acum em USING (cd_municipio_ibge)
     """,
+    # ── Sentimento social por candidato × UF × semana ────────────────────
+    "vw_social_candidato_sentimento": f"""
+        SELECT
+            candidato,
+            sg_uf,
+            DATE_TRUNC(data_referencia, WEEK)                               AS semana,
+            AVG(sentimento_score)                                           AS sentimento_score_medio,
+            STDDEV(sentimento_score)                                        AS sentimento_score_stddev,
+            AVG(confianca_nlp)                                              AS confianca_nlp_media,
+            COUNT(*)                                                        AS total_mencoes,
+            SUM(like_count + COALESCE(retweet_count, 0)
+                + COALESCE(comment_count, 0))                               AS engajamento_total
+        FROM `{_PROJECT}.{_SILVER}.social_mencoes_br`
+        WHERE confianca_nlp >= 0.70 OR confianca_nlp IS NULL
+        GROUP BY 1, 2, 3
+    """,
+    # ── Volume e sentimento por tema × UF × semana ───────────────────────
+    "vw_social_temas_uf": f"""
+        SELECT
+            sg_uf,
+            DATE_TRUNC(data_referencia, WEEK)                               AS semana,
+            tema,
+            COUNT(*)                                                        AS volume_mencoes,
+            AVG(sentimento_score)                                           AS sentimento_medio,
+            ROUND(
+                COUNT(*) / SUM(COUNT(*)) OVER (
+                    PARTITION BY sg_uf, DATE_TRUNC(data_referencia, WEEK)
+                ), 4
+            )                                                               AS share_tema
+        FROM `{_PROJECT}.{_SILVER}.social_mencoes_br`,
+        UNNEST(temas) AS tema
+        WHERE temas IS NOT NULL
+        GROUP BY 1, 2, 3
+    """,
+    # ── Engajamento por plataforma × UF × dia ────────────────────────────
+    "vw_social_plataforma_uf": f"""
+        SELECT
+            fonte,
+            sg_uf,
+            data_referencia,
+            COUNT(*)                                                        AS total_posts,
+            SUM(like_count)                                                 AS total_likes,
+            SUM(COALESCE(retweet_count, 0)
+                + COALESCE(comment_count, 0))                               AS total_interacoes,
+            AVG(sentimento_score)                                           AS sentimento_medio,
+            COUNTIF(suspeito_coordenado = TRUE)                             AS posts_suspeitos
+        FROM `{_PROJECT}.{_SILVER}.social_mencoes_br`
+        GROUP BY 1, 2, 3
+    """,
+    # ── Detector de crises: volume diário vs. baseline 7d ─────────────────
+    "vw_social_crise_detector": f"""
+        WITH daily_volume AS (
+            SELECT
+                candidato, sg_uf, fonte,
+                DATE(data_referencia)                                       AS data_ref,
+                COUNT(*)                                                    AS volume_dia
+            FROM `{_PROJECT}.{_SILVER}.social_mencoes_br`
+            GROUP BY 1, 2, 3, 4
+        ),
+        baseline AS (
+            SELECT *,
+                AVG(volume_dia) OVER (
+                    PARTITION BY candidato, sg_uf, fonte
+                    ORDER BY data_ref
+                    ROWS BETWEEN 7 PRECEDING AND 1 PRECEDING
+                )                                                           AS avg_7d
+            FROM daily_volume
+        )
+        SELECT
+            candidato, sg_uf, fonte, data_ref,
+            volume_dia,
+            ROUND(avg_7d, 2)                                                AS baseline_avg_7d,
+            ROUND(SAFE_DIVIDE(volume_dia, avg_7d), 2)                       AS ratio_vs_baseline,
+            volume_dia > 2 * avg_7d                                         AS crise_detectada,
+            CURRENT_TIMESTAMP()                                             AS avaliado_em
+        FROM baseline
+        WHERE avg_7d IS NOT NULL
+    """,
+    # ── Score de credibilidade e posts suspeitos por plataforma × UF ──────
+    "vw_social_credibilidade": f"""
+        SELECT
+            fonte,
+            sg_uf,
+            DATE_TRUNC(data_referencia, WEEK)                               AS semana,
+            ROUND(AVG(score_credibilidade_post), 3)                         AS score_credibilidade_medio,
+            COUNTIF(suspeito_coordenado = TRUE)                             AS posts_suspeitos,
+            COUNT(*)                                                        AS total_posts,
+            ROUND(COUNTIF(suspeito_coordenado = TRUE) / COUNT(*), 4)        AS ratio_suspeitos,
+            AVG(confianca_nlp)                                              AS confianca_nlp_media
+        FROM `{_PROJECT}.{_SILVER}.social_mencoes_br`
+        GROUP BY 1, 2, 3
+    """,
+    # ── Visão 360: perfil de candidato × métricas sociais semanais ────────
+    "vw_candidato_360": f"""
+        SELECT
+            d.candidato_id,
+            d.nome_candidato,
+            d.facebook_page_id,
+            d.instagram_handle,
+            d.youtube_channel_id,
+            d.is_verified,
+            d.followers_fb,
+            s.sg_uf,
+            s.sentimento_score_medio,
+            s.total_mencoes                                                 AS mencoes_sociais_semana,
+            s.engajamento_total,
+            s.semana
+        FROM `{_PROJECT}.{_SILVER}.dim_candidato_social_pages` d
+        LEFT JOIN `{_PROJECT}.{_GOLD}.vw_social_candidato_sentimento` s
+            ON LOWER(d.nome_candidato) = LOWER(s.candidato)
+    """,
+    # ── Transferências sociais × candidato vencedor por município ─────────
+    "vw_transferencias_candidato": f"""
+        SELECT
+            t.sg_uf,
+            t.cd_municipio_ibge,
+            t.nm_municipio,
+            t.ano,
+            t.qtd_beneficiarios_bolsa_familia                               AS total_beneficiarios_bf,
+            t.valor_total_bolsa_familia_reais                               AS valor_medio_bf,
+            ROUND(
+                SAFE_DIVIDE(t.valor_total_bolsa_familia_reais,
+                    NULLIF(t.qtd_beneficiarios_bolsa_familia, 0)),
+                2
+            )                                                               AS per_capita_bf,
+            e.candidato                                                     AS candidato_vencedor,
+            e.pct_votos_validos                                             AS pct_votos_vencedor,
+            e.partido                                                       AS partido_vencedor
+        FROM `{_PROJECT}.{_GOLD}.vw_transferencias_municipio` t
+        LEFT JOIN (
+            SELECT
+                cod_municipio_ibge, sg_uf, ano_eleicao,
+                candidato, pct_votos_validos, partido
+            FROM `{_PROJECT}.{_GOLD}.fact_municipio_eleicao`
+            WHERE turno = 1
+            QUALIFY ROW_NUMBER() OVER (
+                PARTITION BY cod_municipio_ibge, ano_eleicao
+                ORDER BY pct_votos_validos DESC
+            ) = 1
+        ) e ON t.cd_municipio_ibge = e.cod_municipio_ibge
+           AND t.ano = e.ano_eleicao
+    """,
+    # ── Share de emendas por candidato × UF × ciclo eleitoral ────────────
+    "vw_emendas_candidato_uf": f"""
+        SELECT
+            e.sg_uf,
+            e.ano_eleicao,
+            e.autor_emenda                                                  AS candidato,
+            e.partido,
+            SUM(e.valor_emenda)                                             AS total_emendas_r,
+            COUNT(*)                                                        AS num_emendas,
+            ROUND(
+                SUM(e.valor_emenda) / NULLIF(
+                    SUM(SUM(e.valor_emenda)) OVER (
+                        PARTITION BY e.sg_uf, e.ano_eleicao
+                    ), 0
+                ), 4
+            )                                                               AS share_emendas_uf
+        FROM `{_PROJECT}.{_GOLD}.fact_emendas_parlamentar` e
+        GROUP BY 1, 2, 3, 4
+    """,
     # ── Mapa de prioridade de campanha: municípios por competitividade ─────
     "vw_mapa_prioridade_campanha": f"""
         WITH top2 AS (

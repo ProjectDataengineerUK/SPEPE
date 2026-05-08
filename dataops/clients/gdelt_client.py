@@ -12,28 +12,113 @@ API DOC 2.0: https://blog.gdeltproject.org/gdelt-doc-2-0-api-debuts/
 
 from __future__ import annotations
 
+import io
 import logging
+import os
 import time
 from datetime import datetime, timedelta, timezone
 from typing import Any
+
+import pandas as pd
 import requests
-from tenacity import retry, stop_after_attempt, wait_exponential
+from tenacity import retry, retry_if_exception_type, stop_after_attempt, wait_exponential
 
 logger = logging.getLogger("spepe.clients.gdelt")
 
 _GDELT_DOC_BASE = "https://api.gdeltproject.org/api/v2/doc/doc"
-_MAX_RECORDS = 250  # API hard limit
+_MAX_RECORDS = 250
+_CACHE_MAX_AGE_SECONDS = 30 * 60  # 30 minutes
 
 
-@retry(stop=stop_after_attempt(3), wait=wait_exponential(min=10, max=60))
-def _gdelt_get(params: dict[str, Any]) -> dict:
-    resp = requests.get(_GDELT_DOC_BASE, params=params, timeout=60)
-    if resp.status_code == 429:
-        logger.warning("GDELT rate limit — aguardando 30s")
-        time.sleep(30)
-        resp = requests.get(_GDELT_DOC_BASE, params=params, timeout=60)
+@retry(
+    stop=stop_after_attempt(5),
+    wait=wait_exponential(multiplier=1, min=4, max=60),
+    retry=retry_if_exception_type((requests.HTTPError, requests.ConnectionError)),
+    reraise=False,
+)
+def _fetch_with_retry(url: str, params: dict) -> dict:
+    resp = requests.get(url, params=params, timeout=30)
     resp.raise_for_status()
     return resp.json()
+
+
+def _gcs_cache_path(date_str: str) -> str:
+    bucket = os.environ.get("GCS_BUCKET", "")
+    return f"gs://{bucket}/cache/gdelt/{date_str}.parquet"
+
+
+def _read_gcs_cache(date_str: str) -> pd.DataFrame | None:
+    bucket = os.environ.get("GCS_BUCKET", "")
+    if not bucket:
+        return None
+    try:
+        from google.cloud import storage
+
+        gcs = storage.Client()
+        blob_path = f"cache/gdelt/{date_str}.parquet"
+        bucket_obj = gcs.bucket(bucket)
+        blob = bucket_obj.blob(blob_path)
+        if not blob.exists():
+            return None
+        blob.reload()
+        age = (datetime.now(timezone.utc) - blob.updated).total_seconds()
+        if age > _CACHE_MAX_AGE_SECONDS:
+            return None
+        data = blob.download_as_bytes()
+        df = pd.read_parquet(io.BytesIO(data))
+        logger.info("GDELT cache hit: %s (%d rows, age=%.0fs)", blob_path, len(df), age)
+        return df
+    except Exception as exc:
+        logger.warning("GDELT cache read failed — proceeding without cache: %s", exc)
+        return None
+
+
+def _write_gcs_cache(date_str: str, df: pd.DataFrame) -> None:
+    bucket = os.environ.get("GCS_BUCKET", "")
+    if not bucket:
+        return
+    try:
+        from google.cloud import storage
+
+        buf = io.BytesIO()
+        df.to_parquet(buf, index=False)
+        buf.seek(0)
+        gcs = storage.Client()
+        blob_path = f"cache/gdelt/{date_str}.parquet"
+        gcs.bucket(bucket).blob(blob_path).upload_from_file(buf, content_type="application/octet-stream")
+        logger.info("GDELT cache written: %s (%d rows)", blob_path, len(df))
+    except Exception as exc:
+        logger.warning("GDELT cache write failed — continuing: %s", exc)
+
+
+def fetch_gdelt_events(
+    candidatos: list[str],
+    dias: int = 7,
+    max_por_candidato: int = 250,
+    lang: str = "Portuguese",
+    domain_filter: str = ".br",
+) -> pd.DataFrame:
+    """Alias returning DataFrame — used by social_ingest_job."""
+    if os.environ.get("GDELT_ENABLED", "true").lower() != "true":
+        logger.info("GDELT desabilitado via GDELT_ENABLED=false — retornando DataFrame vazio")
+        return pd.DataFrame()
+
+    date_str = datetime.now(timezone.utc).strftime("%Y%m%d")
+    cached = _read_gcs_cache(date_str)
+    if cached is not None:
+        return cached
+
+    records = fetch_gdelt_mentions(
+        candidatos=candidatos,
+        dias=dias,
+        max_por_candidato=max_por_candidato,
+        lang=lang,
+        domain_filter=domain_filter,
+    )
+    df = pd.DataFrame(records) if records else pd.DataFrame()
+    if not df.empty:
+        _write_gcs_cache(date_str, df)
+    return df
 
 
 def fetch_gdelt_mentions(
@@ -49,14 +134,11 @@ def fetch_gdelt_mentions(
       candidato, titulo, url, dominio, data_publicacao, resumo,
       sentiment (positivo|negativo|neutro), avg_tone, fonte="gdelt",
       pais="BR", lang="pt"
-
-    Args:
-        candidatos: nomes a buscar
-        dias: janela em dias (max 3 meses na API gratuita)
-        max_por_candidato: até 250 (limite da API)
-        lang: idioma de filtragem GDELT
-        domain_filter: sufixo de domínio (default ".br" → imprensa BR)
     """
+    if os.environ.get("GDELT_ENABLED", "true").lower() != "true":
+        logger.info("GDELT desabilitado via GDELT_ENABLED=false — retornando lista vazia")
+        return []
+
     since_dt = datetime.now(timezone.utc) - timedelta(days=dias)
     since_str = since_dt.strftime("%Y%m%d%H%M%S")
 
@@ -80,9 +162,13 @@ def fetch_gdelt_mentions(
         }
 
         try:
-            data = _gdelt_get(params)
+            data = _fetch_with_retry(_GDELT_DOC_BASE, params)
         except Exception as exc:
             logger.warning("GDELT falhou para '%s': %s", candidato, exc)
+            continue
+
+        if data is None:
+            logger.warning("GDELT retornou None para '%s' — pulando", candidato)
             continue
 
         articles = data.get("articles", [])
@@ -103,7 +189,7 @@ def fetch_gdelt_mentions(
                     "url": art.get("url", ""),
                     "dominio": dominio,
                     "data_publicacao": _parse_gdelt_date(art.get("seendate", "")),
-                    "resumo": (art.get("socialimage") or "")[:10],  # GDELT artlist não tem resumo
+                    "resumo": (art.get("socialimage") or "")[:10],
                     "avg_tone": round(tone, 3),
                     "sentiment": sentiment,
                     "fonte": "gdelt",
@@ -115,7 +201,7 @@ def fetch_gdelt_mentions(
             )
 
         logger.info("GDELT: %d artigos para '%s'", len(articles), candidato)
-        time.sleep(1)  # rate limit polite
+        time.sleep(1)
 
     logger.info("GDELT total: %d artigos para %d candidatos", len(results), len(candidatos))
     return results
@@ -125,11 +211,7 @@ def fetch_gdelt_timeline_sentiment(
     candidato: str,
     dias: int = 30,
 ) -> list[dict]:
-    """Retorna timeline de volume + sentimento médio por dia para um candidato.
-
-    Útil para plotar evolução do sentimento ao longo do tempo.
-    Retorna: [{data, volume, avg_tone, candidato}]
-    """
+    """Retorna timeline de volume + sentimento médio por dia para um candidato."""
     since_dt = datetime.now(timezone.utc) - timedelta(days=dias)
     since_str = since_dt.strftime("%Y%m%d%H%M%S")
 
@@ -142,9 +224,12 @@ def fetch_gdelt_timeline_sentiment(
     }
 
     try:
-        data = _gdelt_get(params)
+        data = _fetch_with_retry(_GDELT_DOC_BASE, params)
     except Exception as exc:
         logger.warning("GDELT timeline falhou para '%s': %s", candidato, exc)
+        return []
+
+    if data is None:
         return []
 
     results = []
@@ -174,7 +259,6 @@ def _tone_to_sentiment(tone: float) -> str:
 
 
 def _parse_gdelt_date(seendate: str) -> str:
-    """Convert GDELT seendate '20260506T120000Z' → ISO '2026-05-06T12:00:00Z'."""
     if not seendate:
         return ""
     try:
@@ -195,7 +279,6 @@ def _extract_domain(url: str) -> str:
 
 
 def _domain_to_fonte_key(domain: str) -> str:
-    """Map known Brazilian news domains to source registry keys."""
     mapping = {
         "g1.globo.com": "g1_globo",
         "globo.com": "g1_globo",

@@ -21,6 +21,8 @@ class SPEPESettings(BaseSettings):
     vertex_claude_location: str = "us-east5"
     firestore_collection: str = "spepe_sessions"
 
+    google_maps_api_key: str = ""
+
     log_level: str = "INFO"
     agent_permission_mode: str = "bypassPermissions"
 
