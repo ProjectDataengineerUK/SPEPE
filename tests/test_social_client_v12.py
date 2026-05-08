@@ -254,7 +254,7 @@ class TestDetectSuspeitoCoordenado:
     def test_case_insensitive_deduplication(self):
         from dataops.clients.social_client import detect_suspeito_coordenado
 
-        now = datetime.now(timezone.utc)
+        now = datetime.now(timezone.utc).replace(minute=0, second=0, microsecond=0)
         texts = ["TEXTO EXATO", "texto exato", "Texto Exato", "TEXTO exato", "texto EXATO"]
         df = pd.DataFrame(
             {

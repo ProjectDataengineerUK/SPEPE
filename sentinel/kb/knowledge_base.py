@@ -30,6 +30,8 @@ class KnowledgeBase:
         }
 
     def _init_firestore(self):
+        if not self.project_id:
+            return None
         try:
             from google.cloud import firestore
 
