@@ -52,7 +52,7 @@ class GeminiAgent:
             self._client = genai.Client(
                 vertexai=True,
                 project=settings.gcp_project_id or "spepe-dev",
-                location="southamerica-east1",
+                location=settings.vertex_location,
             )
         return self._client
 

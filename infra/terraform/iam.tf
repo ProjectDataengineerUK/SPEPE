@@ -68,6 +68,18 @@ resource "google_project_iam_member" "dataops_bq_job_user" {
   member  = "serviceAccount:${google_service_account.dataops_jobs.email}"
 }
 
+resource "google_project_iam_member" "dataops_vertex_user" {
+  project = var.project_id
+  role    = "roles/aiplatform.user"
+  member  = "serviceAccount:${google_service_account.dataops_jobs.email}"
+}
+
+resource "google_project_iam_member" "dataops_language_user" {
+  project = var.project_id
+  role    = "roles/cloudlanguage.serviceAgent"
+  member  = "serviceAccount:${google_service_account.dataops_jobs.email}"
+}
+
 # ── IAM — GitHub Actions SA ───────────────────────────────────────────────────
 
 resource "google_project_iam_member" "github_run_admin" {
