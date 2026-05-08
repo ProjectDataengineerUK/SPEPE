@@ -705,10 +705,15 @@ def transform_social_to_silver(
         from google.cloud import bigquery
         from google.cloud.bigquery import SchemaUpdateOption, WriteDisposition
 
+        from google.api_core.exceptions import NotFound
+
         client = bigquery.Client(project=project)
-        client.query(
-            f"DELETE FROM `{table_id}` WHERE ano = {year}", job_config=bigquery.QueryJobConfig()
-        ).result()
+        try:
+            client.query(
+                f"DELETE FROM `{table_id}` WHERE ano = {year}", job_config=bigquery.QueryJobConfig()
+            ).result()
+        except NotFound:
+            pass
         job_config = bigquery.LoadJobConfig(
             write_disposition=WriteDisposition.WRITE_APPEND,
             autodetect=True,
