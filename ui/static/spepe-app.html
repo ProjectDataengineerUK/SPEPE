@@ -5,10 +5,11 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>SPEPE — Análise Eleitoral</title>
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<script src="https://accounts.google.com/gsi/client" async defer></script>
 <script>
 async function initGoogleMaps() {
   try {
-    const res = await fetch('/api/config/maps-key');
+    const res = await apiFetch('/api/config/maps-key');
     const { key } = await res.json();
     if (!key) { initMapFallback(); return; }
     const s = document.createElement('script');
@@ -310,12 +311,13 @@ tr.rhl td{background:rgba(0,200,83,.07)!important}
       <div class="wordmark">SP<span>E</span>PE</div>
       <div class="tagline">Análise Eleitoral Brasileira · IA</div>
     </div>
-    <div class="form-group"><label>E-mail</label>
-      <input type="email" id="inp-email" value="jonalic@gmail.com"></div>
-    <div class="form-group"><label>Senha</label>
-      <input type="password" value="••••••••"></div>
-    <button class="btn-login" onclick="doLogin()">Entrar</button>
-    <div class="login-hint">Demo: <span>jonalic@gmail.com</span></div>
+    <div id="g_id_onload"
+      data-client_id="1055426323388-j97gohht800s7v447f2v8fg6lskacv37.apps.googleusercontent.com"
+      data-callback="handleGoogleCredential"
+      data-auto_prompt="true">
+    </div>
+    <div class="g_id_signin" data-type="standard" data-theme="filled_black" data-size="large" data-text="signin_with" data-shape="rectangular" data-logo_alignment="left" style="margin-top:16px"></div>
+    <div class="login-hint" style="margin-top:12px">Acesso via conta Google</div>
   </div>
 </div>
 
@@ -943,20 +945,31 @@ let activeCargo='Presidente';
 // ══════════════════════════════════════════════════════
 // LOGIN
 // ══════════════════════════════════════════════════════
-function doLogin(){
-  const email=document.getElementById('inp-email').value;
-  if(!email)return;
-  const nm=email.split('@')[0];
-  document.getElementById('unm').textContent=nm.charAt(0).toUpperCase()+nm.slice(1);
-  document.getElementById('uav').textContent=nm.slice(0,2).toUpperCase();
-  document.getElementById('login').style.display='none';
+let _idToken = null;
+const _nativeFetch = window.fetch.bind(window);
+function authHeaders() { return _idToken ? { 'Authorization': 'Bearer ' + _idToken } : {}; }
+async function apiFetch(url, opts = {}) {
+  const res = await _nativeFetch(url, { ...opts, headers: { ...authHeaders(), ...(opts.headers || {}) } });
+  if (res.status === 401) { doLogout(); return null; }
+  return res;
+}
+function handleGoogleCredential(response) {
+  _idToken = response.credential;
+  const payload = JSON.parse(atob(_idToken.split('.')[1]));
+  const name = payload.name || payload.email || 'Usuário';
+  document.getElementById('unm').textContent = name.split(' ')[0];
+  const initials = name.split(' ').map(w => w[0]).join('').slice(0,2).toUpperCase();
+  document.getElementById('uav').textContent = initials;
+  document.getElementById('login').style.display = 'none';
   document.getElementById('app').classList.add('visible');
   initCharts(); renderCargoView('Presidente');
   loadUFOptions();
 }
-function doLogout(){
+function doLogin() { /* replaced by Google Sign-In */ }
+function doLogout() {
+  _idToken = null;
   document.getElementById('app').classList.remove('visible');
-  document.getElementById('login').style.display='flex';
+  document.getElementById('login').style.display = 'flex';
 }
 
 // ══════════════════════════════════════════════════════
@@ -1042,7 +1055,7 @@ function _mkChart(id, type, labels, datasets, opts={}){
 async function _loadSocio(uf, ano){
   const badge = document.getElementById('socio-uf-badge');
   if(badge) badge.textContent = `${uf} ${ano}`;
-  const data = await fetch(`/api/socioeconomico?uf=${uf}&ano=${ano}&limit=10`).then(r=>r.json()).catch(()=>({municipios:[]}));
+  const data = await apiFetch(`/api/socioeconomico?uf=${uf}&ano=${ano}&limit=10`).then(r=>r.json()).catch(()=>({municipios:[]}));
   const muns = data.municipios || [];
   const labels = muns.map(m=>m.nm);
   _mkChart('chart-idhm','bar',labels,[{
@@ -1071,7 +1084,7 @@ async function _loadSocio(uf, ano){
 async function _loadSeguranca(uf, ano){
   const badge = document.getElementById('seg-uf-badge');
   if(badge) badge.textContent = `${uf} ${ano}`;
-  const data = await fetch(`/api/seguranca?uf=${uf}&ano=${ano}&limit=10`).then(r=>r.json()).catch(()=>({municipios:[]}));
+  const data = await apiFetch(`/api/seguranca?uf=${uf}&ano=${ano}&limit=10`).then(r=>r.json()).catch(()=>({municipios:[]}));
   const muns = (data.municipios || []).slice().sort((a,b)=>b.taxa_homicidio-a.taxa_homicidio);
   const labels = muns.map(m=>m.nm);
   _mkChart('chart-homicidio','bar',labels,[{
@@ -1100,7 +1113,7 @@ async function _loadSeguranca(uf, ano){
 async function _loadSaude(uf, ano){
   const badge = document.getElementById('saude-uf-badge');
   if(badge) badge.textContent = `${uf} ${ano}`;
-  const data = await fetch(`/api/saude?uf=${uf}&ano=${ano}&limit=10`).then(r=>r.json()).catch(()=>({municipios:[]}));
+  const data = await apiFetch(`/api/saude?uf=${uf}&ano=${ano}&limit=10`).then(r=>r.json()).catch(()=>({municipios:[]}));
   const muns = data.municipios || [];
   const labels = muns.map(m=>m.nm);
   _mkChart('chart-mortalidade','bar',labels,[{
@@ -1131,7 +1144,7 @@ const CAND_COLORS_POLL = {
 async function _loadPesquisas(ano){
   const badge = document.getElementById('pesq-cargo-badge');
   if(badge) badge.textContent = `Presidente ${ano}`;
-  const data = await fetch(`/api/pesquisas?cargo=Presidente&sg_uf=BR&ano=${ano}`).then(r=>r.json()).catch(()=>({series:[],house_effects:[]}));
+  const data = await apiFetch(`/api/pesquisas?cargo=Presidente&sg_uf=BR&ano=${ano}`).then(r=>r.json()).catch(()=>({series:[],house_effects:[]}));
   const series = data.series || [];
   const allDates = [...new Set(series.flatMap(s=>s.pontos.map(p=>p.data)))].sort();
   const pollDatasets = series.map(s=>({
@@ -1174,7 +1187,7 @@ async function _loadPesquisas(ano){
 async function _loadPerfis(uf, ano){
   const badge = document.getElementById('perfis-uf-badge');
   if(badge) badge.textContent = `${uf} ${ano}`;
-  const data = await fetch(`/api/perfis?uf=${uf}&ano=${ano}`).then(r=>r.json()).catch(()=>({genero:[],faixa_etaria:[],escolaridade:[]}));
+  const data = await apiFetch(`/api/perfis?uf=${uf}&ano=${ano}`).then(r=>r.json()).catch(()=>({genero:[],faixa_etaria:[],escolaridade:[]}));
   const fa = data.faixa_etaria || [];
   _mkChart('chart-faixa-etaria','bar',fa.map(x=>x.label),[{
     label:'Eleitores',
@@ -1861,7 +1874,7 @@ async function reloadMap(){
   if(_mapCtx.nr_zona) url += `&nr_zona=${_mapCtx.nr_zona}`;
 
   const [apiRes, geoRes] = await Promise.all([
-    fetch(url).then(r=>r.json()).catch(()=>({features:[],fonte:'indisponivel'})),
+    apiFetch(url).then(r=>r?r.json():({features:[],fonte:'indisponivel'})).catch(()=>({features:[],fonte:'indisponivel'})),
     _loadGeoJSON(_mapLevel),
   ]);
 
@@ -1887,7 +1900,7 @@ async function _loadGeoJSON(level){
   const url = geoUrls[level];
   if(!url) return null;
   try {
-    const r = await fetch(url);
+    const r = await apiFetch(url);
     return await r.json();
   } catch { return null; }
 }
@@ -2064,7 +2077,7 @@ function _drillFromCard(id, nr_zona, nr_secao, level){
 // ══════════════════════════════════════════════════════
 async function loadUFOptions() {
   try {
-    const res = await fetch('/api/ufs');
+    const res = await apiFetch('/api/ufs');
     const { ufs } = await res.json();
     const sel = document.getElementById('f-uf');
     if (!sel || !ufs || !ufs.length) return;
@@ -2085,7 +2098,7 @@ document.addEventListener('DOMContentLoaded', () => {
       if (!mesoSel) return;
       if (!uf) { mesoSel.innerHTML = '<option value="">Todas</option>'; return; }
       try {
-        const res = await fetch(`/api/mesorregioes?uf=${uf}`);
+        const res = await apiFetch(`/api/mesorregioes?uf=${uf}`);
         const { mesorregioes } = await res.json();
         mesoSel.innerHTML = '<option value="">Todas</option>' +
           (mesorregioes||[]).map(m=>`<option value="${m.id}">${m.nome}</option>`).join('');
@@ -2113,7 +2126,7 @@ const CHART_COLORS = ['#6366f1','#22d3ee','#f59e0b','#10b981','#ef4444','#a855f7
 // ══════════════════════════════════════════════════════
 async function refreshSocioChart(uf, ano) {
   try {
-    const res = await fetch(`/api/socioeconomico?uf=${uf||'SP'}&ano=${ano||2022}&limit=1`);
+    const res = await apiFetch(`/api/socioeconomico?uf=${uf||'SP'}&ano=${ano||2022}&limit=1`);
     const d = await res.json();
     const m = (d.municipios||[])[0];
     if (!m || !CH.socio) return;
@@ -2132,7 +2145,7 @@ async function refreshSocioChart(uf, ano) {
 
 async function refreshTrendsChart(uf, ano) {
   try {
-    const res = await fetch(`/api/social/trends?uf=${uf}&ano=${ano}`);
+    const res = await apiFetch(`/api/social/trends?uf=${uf}&ano=${ano}`);
     const {data=[]} = await res.json();
     if (!data.length || !CH.trends) return;
     const candidatos = [...new Set(data.map(d=>d.candidato))].slice(0,5);
@@ -2148,7 +2161,7 @@ async function refreshTrendsChart(uf, ano) {
 
 async function refreshMetaChart(uf, ano) {
   try {
-    const res = await fetch(`/api/digital/meta?uf=${uf}&ano=${ano}`);
+    const res = await apiFetch(`/api/digital/meta?uf=${uf}&ano=${ano}`);
     const {data=[]} = await res.json();
     if (!data.length || !CH.meta) return;
     CH.meta.data.labels = data.map(d=>d.candidato);
@@ -2159,7 +2172,7 @@ async function refreshMetaChart(uf, ano) {
 
 async function refreshPrevisaoChart(cargo, uf, ano) {
   try {
-    const res = await fetch(`/api/previsao?cargo=${cargo||'Governador'}&uf=${uf||'SP'}&ano=${ano||2022}`);
+    const res = await apiFetch(`/api/previsao?cargo=${cargo||'Governador'}&uf=${uf||'SP'}&ano=${ano||2022}`);
     const {data=[]} = await res.json();
     if (!data.length || !CH.previsao) return;
     CH.previsao.data.labels = data.map(d=>d.candidato);
@@ -2170,7 +2183,7 @@ async function refreshPrevisaoChart(cargo, uf, ano) {
 
 async function refreshSentimentChart(uf, ano) {
   try {
-    const res = await fetch(`/api/social/sentimento?uf=${uf}&ano=${ano}`);
+    const res = await apiFetch(`/api/social/sentimento?uf=${uf}&ano=${ano}`);
     const {data=[]} = await res.json();
     if (!data.length || !CH.sentiment) return;
     let pos=0, neg=0, neu=0;
@@ -2187,7 +2200,7 @@ async function refreshSentimentChart(uf, ano) {
 
 async function refreshResultadosChart(cargo, uf, ano, turno) {
   try {
-    const res = await fetch(`/api/resultados/${encodeURIComponent(cargo||'Governador')}?uf=${uf||'SP'}&ano=${ano||2022}&turno=${turno||1}`);
+    const res = await apiFetch(`/api/resultados/${encodeURIComponent(cargo||'Governador')}?uf=${uf||'SP'}&ano=${ano||2022}&turno=${turno||1}`);
     const d = await res.json();
     const items = d.candidatos || d.resultados || d.data || [];
     if (!items.length || !CH.resultado) return;
@@ -2255,7 +2268,7 @@ async function refreshSocialTab(uf, ano) {
 
   // Sentimento timeline
   try {
-    const res = await fetch(`/api/social/sentimento?uf=${uf}&ano=${ano}`);
+    const res = await apiFetch(`/api/social/sentimento?uf=${uf}&ano=${ano}`);
     const {data=[]} = await res.json();
     if (data.length && chSentTimeline) {
       const candidatos = [...new Set(data.map(d=>d.candidato))].slice(0,5);
@@ -2272,7 +2285,7 @@ async function refreshSocialTab(uf, ano) {
 
   // Plataformas
   try {
-    const res = await fetch(`/api/social/plataformas?uf=${uf}&ano=${ano}`);
+    const res = await apiFetch(`/api/social/plataformas?uf=${uf}&ano=${ano}`);
     const {data=[]} = await res.json();
     if (data.length && chPlataformas) {
       chPlataformas.data.labels = data.map(d=>d.fonte);
@@ -2283,7 +2296,7 @@ async function refreshSocialTab(uf, ano) {
 
   // Temas (reuse sentimento data grouped by tema if plataformas not available)
   try {
-    const res = await fetch(`/api/social/temas?uf=${uf}&ano=${ano}`);
+    const res = await apiFetch(`/api/social/temas?uf=${uf}&ano=${ano}`);
     const {data=[]} = await res.json();
     if (data.length && chTemas) {
       chTemas.data.labels = data.map(d=>d.tema||d.label);
@@ -2294,7 +2307,7 @@ async function refreshSocialTab(uf, ano) {
 
   // Alertas de crise
   try {
-    const res = await fetch(`/api/social/crise?uf=${uf}`);
+    const res = await apiFetch(`/api/social/crise?uf=${uf}`);
     const {data=[]} = await res.json();
     const el = document.getElementById('crisis-list');
     if (el) {

@@ -49,6 +49,33 @@ logger = logging.getLogger("spepe.dashboard_api")
 
 _LOCAL_SILVER_DIR = Path(os.environ.get("DATA_DIR", "data")) / "silver"
 
+# ── Dashboard auth middleware (Google ID token) ───────────────────────────
+
+_PUBLIC_API_PATHS = {"/api/auth/me", "/api/config/maps-key"}
+
+
+@app.middleware("http")
+async def dashboard_auth_middleware(request: Request, call_next):
+    path = request.url.path
+    if not path.startswith("/api/") or path in _PUBLIC_API_PATHS:
+        return await call_next(request)
+    if not settings.gcp_project_id or settings.gcp_project_id in ("", "local"):
+        return await call_next(request)
+    auth = request.headers.get("authorization", "")
+    if not auth.startswith("Bearer "):
+        return JSONResponse({"detail": "Authorization required"}, status_code=401)
+    try:
+        from google.auth.transport import requests as grequests
+        from google.oauth2 import id_token as gid
+
+        gid.verify_oauth2_token(
+            auth[7:], grequests.Request(), audience=None, clock_skew_in_seconds=10
+        )
+    except Exception:
+        return JSONResponse({"detail": "Invalid or expired token"}, status_code=401)
+    return await call_next(request)
+
+
 # ── Admin authentication ───────────────────────────────────────────────────
 
 _bearer = HTTPBearer(auto_error=False)
