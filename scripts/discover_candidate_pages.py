@@ -12,12 +12,12 @@ from google.cloud import bigquery
 logger = logging.getLogger(__name__)
 
 QUERY_CANDIDATOS = """
-    SELECT DISTINCT candidato, COUNT(*) as mencoes
-    FROM `{project}.spepe_silver.fact_pesquisa`
-    WHERE ano >= 2026
-    GROUP BY candidato
-    HAVING mencoes >= 3
+    SELECT nm_candidato AS candidato, SUM(total_votos) AS mencoes
+    FROM `{project}.spepe_gold.fact_candidato_eleicao`
+    WHERE ano_eleicao >= 2022
+    GROUP BY nm_candidato
     ORDER BY mencoes DESC
+    LIMIT 150
 """
 
 
