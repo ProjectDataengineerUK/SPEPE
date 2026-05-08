@@ -8,7 +8,6 @@ import os
 
 import pandas as pd
 import requests
-from google.cloud import bigquery
 
 logger = logging.getLogger(__name__)
 
@@ -75,6 +74,8 @@ def main() -> None:
     if not token:
         logger.error("META_APP_TOKEN not set")
         return
+
+    from google.cloud import bigquery  # lazy — não disponível em CI sem GCP SDK
 
     client = bigquery.Client(project=args.project)
     df_candidatos = client.query(QUERY_CANDIDATOS.format(project=args.project)).to_dataframe()

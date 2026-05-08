@@ -1,5 +1,6 @@
 """Unit tests for SPEPE v1.2 Social Module — social_client.py new functions."""
 
+import sys
 from datetime import datetime, timedelta, timezone
 from unittest.mock import MagicMock, patch
 
@@ -115,18 +116,9 @@ class TestEnrichSentimentVertex:
         mock_lv2.Document.Type.PLAIN_TEXT = "PLAIN_TEXT"
 
         with patch.dict("sys.modules", {"google.cloud.language_v2": mock_lv2}):
-            import dataops.clients.social_client as sc
-
-            original = sc.__dict__.get("language_v2")
-            sc.__dict__["language_v2"] = mock_lv2
-            try:
-                labels, scores, confidences = _call_vertex_nlp(["Incrível!"], "spepe-test")
-                assert confidences[0] == pytest.approx(1.0)
-            finally:
-                if original is not None:
-                    sc.__dict__["language_v2"] = original
-                elif "language_v2" in sc.__dict__:
-                    del sc.__dict__["language_v2"]
+            sys.modules["google.cloud"].language_v2 = mock_lv2
+            labels, scores, confidences = _call_vertex_nlp(["Incrível!"], "spepe-test")
+            assert confidences[0] == pytest.approx(1.0)
 
     def test_magnitude_normalization_half(self):
         from dataops.clients.social_client import _call_vertex_nlp
@@ -146,18 +138,9 @@ class TestEnrichSentimentVertex:
         mock_lv2.Document.Type.PLAIN_TEXT = "PLAIN_TEXT"
 
         with patch.dict("sys.modules", {"google.cloud.language_v2": mock_lv2}):
-            import dataops.clients.social_client as sc
-
-            original = sc.__dict__.get("language_v2")
-            sc.__dict__["language_v2"] = mock_lv2
-            try:
-                labels, scores, confidences = _call_vertex_nlp(["Médio."], "spepe-test")
-                assert confidences[0] == pytest.approx(0.5)
-            finally:
-                if original is not None:
-                    sc.__dict__["language_v2"] = original
-                elif "language_v2" in sc.__dict__:
-                    del sc.__dict__["language_v2"]
+            sys.modules["google.cloud"].language_v2 = mock_lv2
+            labels, scores, confidences = _call_vertex_nlp(["Médio."], "spepe-test")
+            assert confidences[0] == pytest.approx(0.5)
 
     def test_confianca_nlp_in_zero_one_range_when_vertex_returns(self):
         from dataops.clients.social_client import _call_vertex_nlp
