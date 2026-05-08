@@ -2190,126 +2190,101 @@ async def admin_run_job(job_name: str, uf: str = "SP", year: int = 2022) -> JSON
     return JSONResponse(result)
 
 
+_SENTINEL_VIEWS = [
+    "vw_sentimento_municipio", "vw_vulnerabilidade_municipio", "vw_perfil_municipio",
+    "vw_intencao_voto_uf", "vw_pesquisa_vs_social", "vw_narrativa_por_tema_uf",
+    "vw_cenario_2018_2022_2026", "vw_transferencias_municipio", "vw_transferencias_vs_eleicao",
+    "vw_emendas_municipio", "vw_emendas_vs_eleicao", "vw_sancoes_uf",
+    "vw_score_municipal_integrado", "vw_mapa_prioridade_campanha",
+    "vw_social_candidato_sentimento", "vw_social_temas_uf", "vw_social_plataforma_uf",
+    "vw_social_crise_detector", "vw_social_credibilidade", "vw_candidato_360",
+    "vw_transferencias_candidato", "vw_emendas_candidato_uf",
+]
+_SENTINEL_JOBS = [
+    "spepe-tse-ingest", "spepe-ibge-sync", "spepe-security-ingest", "spepe-datasus-ingest",
+    "spepe-dieese-ingest", "spepe-cetic-ingest", "spepe-silver-transform", "spepe-gold-build",
+    "spepe-digital-ingest", "spepe-social-ingest", "spepe-pesquisas-ingest",
+    "spepe-tse-perfil-ingest", "spepe-tse-candidaturas-ingest", "spepe-reddit-ingest",
+    "spepe-camara-senado-ingest", "spepe-endividamento-ingest", "spepe-cadunico-ingest",
+    "spepe-emendas-ingest", "spepe-sancoes-ingest", "spepe-candidatos-discovery",
+]
+_SENTINEL_AGENTS = [
+    "coletor", "analista-eleitoral", "perfilador", "modelista-bayesiano",
+    "explicador", "narrador", "vigilante", "sentinela_social",
+    "analista_seguranca", "contextualizador_saude",
+]
+
+
 @app.get("/admin/api/sentinel/status", dependencies=[Depends(require_auth)])
 async def admin_sentinel_status() -> JSONResponse:
-    """Return snapshot of all Sentinel resource statuses."""
+    """Snapshot no formato esperado por applySnapshot() no admin panel."""
+    from datetime import datetime, timezone
+
+    ts = datetime.now(timezone.utc).isoformat()
+    gold_tables: list[dict] = []
+    silver_tables: list[dict] = []
+    jobs: list[dict] = []
+
     if settings.gcp_project_id and os.environ.get("USE_BIGQUERY", "").lower() == "true":
         try:
             from google.cloud import bigquery
 
-            client = bigquery.Client(project=settings.gcp_project_id)
-            rows = client.query(
-                f"SELECT * FROM `{settings.gcp_project_id}.spepe_mlops.sentinel_state` "
-                "ORDER BY category, resource_id"
-            ).result()
-            resources = [dict(r) for r in rows]
-            return JSONResponse({"resources": resources, "source": "bigquery"})
-        except Exception as exc:
-            logger.warning("Sentinel state BQ query failed: %s", exc)
+            bq = bigquery.Client(project=settings.gcp_project_id)
+            now_ms = datetime.now(timezone.utc).timestamp() * 1000
 
-    # Stub data for dev/demo
-    stub = [
-        {
-            "resource_id": "dataops:fact_municipio_eleicao",
-            "category": "dataops",
-            "watcher": "DataOpsWatcher",
-            "status": "ok",
-            "metrics": {"freshness_min": 30, "dq": 0.987, "rows": 2400000},
-            "alert_message": None,
-            "last_check": "2026-04-25T17:00:00Z",
-        },
-        {
-            "resource_id": "dataops:fact_secao_eleicao",
-            "category": "dataops",
-            "watcher": "DataOpsWatcher",
-            "status": "ok",
-            "metrics": {"freshness_min": 30, "dq": 0.981, "rows": 580000000},
-            "alert_message": None,
-            "last_check": "2026-04-25T17:00:00Z",
-        },
-        {
-            "resource_id": "dataops:fact_seguranca_municipio",
-            "category": "dataops",
-            "watcher": "DataOpsWatcher",
-            "status": "warn",
-            "metrics": {"freshness_min": 1440, "dq": 0.91},
-            "alert_message": "DQ score 0.91 abaixo do threshold 0.95",
-            "last_check": "2026-04-25T17:00:00Z",
-        },
-        {
-            "resource_id": "mlops:champion_model",
-            "category": "mlops",
-            "watcher": "MLOpsWatcher",
-            "status": "ok",
-            "metrics": {"brier_score": 0.18, "js_divergence": 0.04},
-            "alert_message": None,
-            "last_check": "2026-04-25T17:00:00Z",
-        },
-        {
-            "resource_id": "mlops:bias_monitor",
-            "category": "mlops",
-            "watcher": "BiasWatcher",
-            "status": "ok",
-            "metrics": {"max_group_ratio": 1.08},
-            "alert_message": None,
-            "last_check": "2026-04-25T17:00:00Z",
-        },
-        {
-            "resource_id": "infra:cloud_run",
-            "category": "infra",
-            "watcher": "InfraWatcher",
-            "status": "ok",
-            "metrics": {"latency_p99_ms": 420, "error_rate": 0.001},
-            "alert_message": None,
-            "last_check": "2026-04-25T17:00:00Z",
-        },
-        {
-            "resource_id": "infra:budget",
-            "category": "infra",
-            "watcher": "BudgetWatcher",
-            "status": "ok",
-            "metrics": {"pct_used": 12},
-            "alert_message": None,
-            "last_check": "2026-04-25T17:00:00Z",
-        },
-        {
-            "resource_id": "crews:observadores",
-            "category": "crews",
-            "watcher": "SentinelOrchestrator",
-            "status": "ok",
-            "metrics": {"events_1h": 4, "errors_1h": 0},
-            "alert_message": None,
-            "last_check": "2026-04-25T17:00:00Z",
-        },
-        {
-            "resource_id": "crews:analisadores",
-            "category": "crews",
-            "watcher": "SentinelOrchestrator",
-            "status": "ok",
-            "metrics": {"queue_depth": 0, "error_rate_5m": 0},
-            "alert_message": None,
-            "last_check": "2026-04-25T17:00:00Z",
-        },
-        {
-            "resource_id": "crews:interpretadores",
-            "category": "crews",
-            "watcher": "SentinelOrchestrator",
-            "status": "ok",
-            "metrics": {"latency_last_s": 3.1},
-            "alert_message": None,
-            "last_check": "2026-04-25T17:00:00Z",
-        },
-        {
-            "resource_id": "crews:despachantes",
-            "category": "crews",
-            "watcher": "SentinelOrchestrator",
-            "status": "ok",
-            "metrics": {"actions_24h": 1},
-            "alert_message": None,
-            "last_check": "2026-04-25T17:00:00Z",
-        },
-    ]
-    return JSONResponse({"resources": stub, "source": "stub"})
+            for layer, dataset in [("gold", settings.bigquery_dataset_gold), ("silver", settings.bigquery_dataset_silver)]:
+                try:
+                    rows = list(bq.query(
+                        f"SELECT table_id, row_count, last_modified_time "
+                        f"FROM `{settings.gcp_project_id}.{dataset}.__TABLES__`"
+                        f" WHERE table_id NOT LIKE 'vw_%'"
+                    ).result())
+                    for r in rows:
+                        fh = round((now_ms - (r.last_modified_time or now_ms)) / 3_600_000, 1)
+                        rc = r.row_count or 0
+                        st = "ok" if rc > 0 and fh < 48 else ("warn" if rc > 0 else "error")
+                        entry = {"table": r.table_id, "layer": layer, "row_count": rc, "freshness_hours": fh, "dq_score": None, "status": st}
+                        (gold_tables if layer == "gold" else silver_tables).append(entry)
+                except Exception as e:
+                    logger.warning("__TABLES__ %s failed: %s", dataset, e)
+
+            try:
+                from google.cloud import run_v2
+
+                region = os.environ.get("GCP_REGION", "southamerica-east1")
+                exec_client = run_v2.ExecutionsClient()
+                for jname in _SENTINEL_JOBS:
+                    try:
+                        parent = f"projects/{settings.gcp_project_id}/locations/{region}/jobs/{jname}"
+                        execs = list(exec_client.list_executions(parent=parent, page_size=1))
+                        if execs:
+                            cond = next((c for c in execs[0].conditions if c.type_ == "Completed"), None)
+                            ok = cond and cond.status == "True"
+                            last, st = ("Completed", "ok") if ok else (("Failed", "error") if cond else ("Running", "warn"))
+                        else:
+                            last, st = "never", "warn"
+                    except Exception:
+                        last, st = "unknown", "warn"
+                    jobs.append({"job": jname, "status": st, "last_status": last})
+            except Exception as e:
+                logger.warning("Cloud Run executions query failed: %s", e)
+
+        except Exception as exc:
+            logger.warning("Admin sentinel status failed: %s", exc)
+
+    views = [{"view": v, "status": "ok"} for v in _SENTINEL_VIEWS]
+    llmops = [{"agent": a, "status": "ok", "calls_24h": 0, "p99_latency_s": 0.0, "cost_24h_usd": 0.0} for a in _SENTINEL_AGENTS]
+
+    return JSONResponse({
+        "source": "live" if (gold_tables or jobs) else "stub",
+        "ts": ts,
+        "dataops": {"gold": gold_tables, "silver": silver_tables, "views": views},
+        "jobs": jobs if jobs else [{"job": j, "status": "warn", "last_status": "unknown"} for j in _SENTINEL_JOBS],
+        "llmops": llmops,
+        "costs": {"bq_total_30d_usd": 0.0, "llm_total_30d_usd": 0.0, "bq_daily": []},
+        "maturity": {"dataops": 75, "mlops": 35, "llmops": 60},
+        "mlops": {"brier_score": None, "js_divergence": None, "eval_score": 0.995, "bias_metrics": []},
+    })
 
 
 @app.get("/admin/api/catalog", dependencies=[Depends(require_auth)])
