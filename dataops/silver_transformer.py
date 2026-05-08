@@ -712,7 +712,10 @@ def transform_social_to_silver(
         job_config = bigquery.LoadJobConfig(
             write_disposition=WriteDisposition.WRITE_APPEND,
             autodetect=True,
-            schema_update_options=[SchemaUpdateOption.ALLOW_FIELD_ADDITION],
+            schema_update_options=[
+                SchemaUpdateOption.ALLOW_FIELD_ADDITION,
+                SchemaUpdateOption.ALLOW_FIELD_RELAXATION,
+            ],
         )
         client.load_table_from_dataframe(df, table_id, job_config=job_config).result()
         path = table_id
