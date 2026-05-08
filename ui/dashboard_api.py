@@ -9,9 +9,11 @@ SPEPE Dashboard API — FastAPI standalone (uvicorn).
 
 from __future__ import annotations
 
+import asyncio
 import json
 import logging
 import os
+import time
 import uuid
 from pathlib import Path
 from contextlib import asynccontextmanager
@@ -30,7 +32,12 @@ from fastapi import (
     WebSocketDisconnect,
 )
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import FileResponse, JSONResponse, RedirectResponse
+from fastapi.responses import (
+    FileResponse,
+    JSONResponse,
+    RedirectResponse,
+    StreamingResponse,
+)
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 
 from agents.supervisor import Supervisor
@@ -41,10 +48,28 @@ from dataops.clients.digital_client import fetch_meta_ads, fetch_trends
 from security.output_validators import validate_input_injection
 
 
+# ── Sentinel SSE — fan-out queues for /admin/api/sentinel/stream ──────────
+_sentinel_subscribers: list[asyncio.Queue] = []
+
+
 @asynccontextmanager
 async def lifespan(application: FastAPI):
     setup_logging(log_level=settings.log_level, console_log_level="WARNING")
-    yield
+    poller_tasks: list[asyncio.Task] = [
+        asyncio.create_task(_poll_table_freshness(interval=15)),
+        asyncio.create_task(_poll_costs(interval=60)),
+        asyncio.create_task(_consume_sentinel_pubsub()),
+    ]
+    try:
+        yield
+    finally:
+        for t in poller_tasks:
+            t.cancel()
+        for t in poller_tasks:
+            try:
+                await t
+            except (asyncio.CancelledError, Exception):
+                pass
 
 
 app = FastAPI(title="SPEPE", version="1.0.0", lifespan=lifespan)
@@ -2418,6 +2443,183 @@ async def ws_sentinel(websocket: WebSocket) -> None:
     finally:
         if websocket in _sentinel_ws_clients:
             _sentinel_ws_clients.remove(websocket)
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Sentinel SSE — Server-Sent Events real-time stream for /admin
+# ─────────────────────────────────────────────────────────────────────────────
+
+
+def _format_sse(event_type: str, data: dict) -> str:
+    """Format a dict as an SSE message frame."""
+    return f"event: {event_type}\ndata: {json.dumps(data, default=str)}\n\n"
+
+
+async def _sentinel_broadcast(event_type: str, payload: dict) -> None:
+    """Fan-out a single event to every connected SSE subscriber."""
+    msg = (event_type, payload)
+    dead: list[asyncio.Queue] = []
+    for q in _sentinel_subscribers:
+        try:
+            q.put_nowait(msg)
+        except asyncio.QueueFull:
+            dead.append(q)
+    for q in dead:
+        try:
+            _sentinel_subscribers.remove(q)
+        except ValueError:
+            pass
+
+
+async def _build_full_snapshot() -> dict:
+    """Collect a full snapshot for the initial SSE event."""
+    use_bq = settings.gcp_project_id and os.environ.get("USE_BIGQUERY", "").lower() == "true"
+    if not use_bq:
+        return {
+            "dataops": {"gold": [], "silver": [], "views": []},
+            "jobs": [],
+            "mlops": {},
+            "llmops": [],
+            "costs": {},
+            "maturity": {"dataops": 0, "mlops": 0, "llmops": 0},
+            "source": "stub",
+            "ts": time.time(),
+        }
+    try:
+        from ui.sentinel_queries import (
+            compute_maturity_score,
+            query_agents_telemetry,
+            query_costs,
+            query_gold_storage,
+            query_jobs_executions,
+            query_mlops_metrics,
+            query_silver_storage,
+            query_views_existence,
+        )
+
+        gold = await asyncio.to_thread(query_gold_storage)
+        silver = await asyncio.to_thread(query_silver_storage)
+        views = await asyncio.to_thread(query_views_existence)
+        jobs = await asyncio.to_thread(query_jobs_executions)
+        mlops = await asyncio.to_thread(query_mlops_metrics)
+        costs = await asyncio.to_thread(query_costs)
+        agents = await asyncio.to_thread(query_agents_telemetry)
+        maturity = compute_maturity_score(jobs, gold, silver, mlops, agents)
+        return {
+            "dataops": {"gold": gold, "silver": silver, "views": views},
+            "jobs": jobs,
+            "mlops": mlops,
+            "llmops": agents,
+            "costs": costs,
+            "maturity": maturity,
+            "source": "bigquery",
+            "ts": time.time(),
+        }
+    except Exception as exc:
+        logger.warning("snapshot build failed: %s", exc)
+        return {
+            "dataops": {"gold": [], "silver": [], "views": []},
+            "jobs": [],
+            "mlops": {},
+            "llmops": [],
+            "costs": {},
+            "maturity": {"dataops": 0, "mlops": 0, "llmops": 0},
+            "source": "stub",
+            "error": str(exc),
+            "ts": time.time(),
+        }
+
+
+async def _poll_table_freshness(interval: int) -> None:
+    """Background task: poll BQ INFORMATION_SCHEMA every `interval` seconds."""
+    use_bq = settings.gcp_project_id and os.environ.get("USE_BIGQUERY", "").lower() == "true"
+    if not use_bq:
+        return
+    from ui.sentinel_queries import (
+        query_gold_storage,
+        query_silver_storage,
+        query_views_existence,
+    )
+
+    while True:
+        try:
+            gold = await asyncio.to_thread(query_gold_storage)
+            silver = await asyncio.to_thread(query_silver_storage)
+            views = await asyncio.to_thread(query_views_existence)
+            await _sentinel_broadcast(
+                "table_freshness_updated",
+                {"gold": gold, "silver": silver, "views": views},
+            )
+        except asyncio.CancelledError:
+            raise
+        except Exception as exc:
+            logger.warning("table freshness poll failed: %s", exc)
+        await asyncio.sleep(interval)
+
+
+async def _poll_costs(interval: int) -> None:
+    """Background task: poll BQ JOBS_BY_PROJECT every `interval` seconds."""
+    use_bq = settings.gcp_project_id and os.environ.get("USE_BIGQUERY", "").lower() == "true"
+    if not use_bq:
+        return
+    from ui.sentinel_queries import query_costs
+
+    while True:
+        try:
+            costs = await asyncio.to_thread(query_costs)
+            await _sentinel_broadcast("cost_updated", costs)
+        except asyncio.CancelledError:
+            raise
+        except Exception as exc:
+            logger.warning("cost poll failed: %s", exc)
+        await asyncio.sleep(interval)
+
+
+async def _consume_sentinel_pubsub() -> None:
+    """Background task: pull spepe-sentinel-events and re-broadcast as SSE."""
+    try:
+        from ui.sentinel_pubsub import consume_sentinel_pubsub
+
+        await consume_sentinel_pubsub(_sentinel_broadcast)
+    except asyncio.CancelledError:
+        raise
+    except Exception as exc:
+        logger.warning("sentinel pubsub consumer crashed: %s", exc)
+
+
+@app.get("/admin/api/sentinel/stream", dependencies=[Depends(require_auth)])
+async def admin_sentinel_stream() -> StreamingResponse:
+    """SSE endpoint streaming sentinel events to the admin panel."""
+    queue: asyncio.Queue = asyncio.Queue(maxsize=128)
+    _sentinel_subscribers.append(queue)
+
+    async def event_generator():
+        try:
+            snapshot = await _build_full_snapshot()
+            yield _format_sse("snapshot", snapshot)
+            while True:
+                try:
+                    event_type, payload = await asyncio.wait_for(queue.get(), timeout=30.0)
+                    yield _format_sse(event_type, payload)
+                except asyncio.TimeoutError:
+                    yield _format_sse("heartbeat", {"ts": time.time()})
+        except asyncio.CancelledError:
+            pass
+        finally:
+            try:
+                _sentinel_subscribers.remove(queue)
+            except ValueError:
+                pass
+
+    return StreamingResponse(
+        event_generator(),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache",
+            "X-Accel-Buffering": "no",
+            "Connection": "keep-alive",
+        },
+    )
 
 
 def _extract_dashboard_update(response_text: str, query: str) -> dict[str, Any]:

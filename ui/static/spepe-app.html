@@ -2329,6 +2329,373 @@ async function refreshSocialTab(uf, ano) {
 
 // Pre-connect WS on page load so it's OPEN when user sends first message
 window.addEventListener('load', _ensureChatWs);
+
+// ============================================================
+// ADMIN SENTINEL — SSE real-time stream + 8 tabs (ADMIN_PANEL_V2)
+// ============================================================
+(function () {
+  const POLL_FALLBACK_MS = 30000;
+  let es = null;
+  let pollTimer = null;
+  let failureCount = 0;
+
+  const TABS = ['sentinel','dataops','validdados','validmodelo','llmops','custos','maturidade','arquitetura'];
+
+  function ensureAdminPanel() {
+    if (document.getElementById('admin-sentinel-root')) return;
+    const root = document.createElement('div');
+    root.id = 'admin-sentinel-root';
+    root.style.cssText = 'display:none;position:fixed;right:12px;bottom:12px;width:560px;max-height:80vh;overflow-y:auto;background:rgba(15,23,42,.96);border:1px solid #334155;border-radius:12px;padding:14px;color:#e2e8f0;font-size:.78rem;z-index:9999;font-family:Inter,sans-serif';
+    root.innerHTML = `
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
+        <strong style="font-size:.86rem">SPEPE Admin · Sentinel v2</strong>
+        <button onclick="toggleAdminSentinel()" style="background:transparent;border:1px solid #475569;color:#94a3b8;border-radius:4px;padding:2px 8px;cursor:pointer">×</button>
+      </div>
+      <div id="admin-tabs" style="display:flex;gap:4px;flex-wrap:wrap;margin-bottom:10px">
+        ${TABS.map((t,i)=>`<button class="admin-tab ${i===0?'active':''}" data-tab="${t}" onclick="switchAdminTab('${t}')" style="padding:4px 10px;font-size:.7rem;border-radius:14px;border:1px solid #475569;background:${i===0?'rgba(34,197,94,.18)':'transparent'};color:${i===0?'#22c55e':'#94a3b8'};cursor:pointer">${t}</button>`).join('')}
+      </div>
+      ${TABS.map(t=>`<div id="admin-pane-${t}" class="admin-pane" style="display:${t==='sentinel'?'block':'none'}">
+        <div id="admin-content-${t}" style="font-size:.74rem;color:#cbd5e1">Aguardando dados…</div>
+      </div>`).join('')}
+      <div style="position:absolute;top:14px;left:170px;font-size:.66rem;color:#64748b" id="sse-state">conectando…</div>
+      <canvas id="chart-maturity" style="display:none;max-width:100%"></canvas>`;
+    document.body.appendChild(root);
+  }
+
+  window.switchAdminTab = function (name) {
+    TABS.forEach(t => {
+      const pane = document.getElementById('admin-pane-' + t);
+      const btn = document.querySelector(`.admin-tab[data-tab="${t}"]`);
+      if (pane) pane.style.display = (t === name ? 'block' : 'none');
+      if (btn) {
+        btn.style.background = (t === name ? 'rgba(34,197,94,.18)' : 'transparent');
+        btn.style.color = (t === name ? '#22c55e' : '#94a3b8');
+      }
+    });
+    if (name === 'maturidade') {
+      const c = document.getElementById('chart-maturity');
+      if (c) c.style.display = 'block';
+    } else {
+      const c = document.getElementById('chart-maturity');
+      if (c) c.style.display = 'none';
+    }
+  };
+
+  window.toggleAdminSentinel = function () {
+    ensureAdminPanel();
+    const root = document.getElementById('admin-sentinel-root');
+    const wasHidden = root.style.display === 'none';
+    root.style.display = wasHidden ? 'block' : 'none';
+    if (wasHidden) startSentinelStream();
+  };
+
+  function authHeadersAdmin() {
+    try {
+      const tok = window._idToken || (typeof getIdToken === 'function' ? getIdToken() : null);
+      return tok ? { 'Authorization': 'Bearer ' + tok } : {};
+    } catch { return {}; }
+  }
+
+  function setSseState(label, color) {
+    const el = document.getElementById('sse-state');
+    if (el) { el.textContent = label; el.style.color = color || '#64748b'; }
+  }
+
+  function startSentinelStream() {
+    ensureAdminPanel();
+    if (es) return;
+    try {
+      es = new EventSource('/admin/api/sentinel/stream');
+    } catch (e) {
+      console.warn('EventSource indisponível', e);
+      startPollingFallback();
+      return;
+    }
+
+    es.addEventListener('snapshot',                e => applySnapshot(JSON.parse(e.data)));
+    es.addEventListener('table_freshness_updated', e => updateDataOpsTab(JSON.parse(e.data)));
+    es.addEventListener('job_status_changed',      e => updateJobsTab([JSON.parse(e.data)]));
+    es.addEventListener('agent_execution_done',    e => updateLLMOpsTab([JSON.parse(e.data)]));
+    es.addEventListener('cost_updated',            e => updateCostsTab(JSON.parse(e.data)));
+    es.addEventListener('heartbeat',               () => { failureCount = 0; setSseState('ao vivo','#22c55e'); });
+
+    es.onopen = () => { failureCount = 0; setSseState('ao vivo','#22c55e'); };
+    es.onerror = () => {
+      failureCount++;
+      try { es.close(); } catch(_){}
+      es = null;
+      setSseState(`reconectando… (${failureCount}/3)`, '#f59e0b');
+      if (failureCount >= 3) {
+        console.warn('SSE falhou 3x — fallback para polling 30s');
+        setSseState('polling 30s', '#f59e0b');
+        startPollingFallback();
+      } else {
+        setTimeout(startSentinelStream, 1000 * failureCount);
+      }
+    };
+  }
+
+  function startPollingFallback() {
+    if (pollTimer) return;
+    const tick = async () => {
+      try {
+        const r = await fetch('/admin/api/sentinel/status', { headers: authHeadersAdmin() });
+        if (r.ok) applySnapshot(await r.json());
+      } catch (_) {}
+    };
+    tick();
+    pollTimer = setInterval(tick, POLL_FALLBACK_MS);
+  }
+
+  function applySnapshot(s) {
+    updateSentinelTab(s);
+    updateDataOpsTab(s.dataops || {});
+    updateJobsTab(s.jobs || []);
+    updateLLMOpsTab(s.llmops || []);
+    updateCostsTab(s.costs || {});
+    updateMaturityRadar(s.maturity || {});
+    updateValidacaoDados(s.dataops || {});
+    updateValidacaoModelo(s.mlops || {});
+    updateArquiteturaHealthMap(s);
+  }
+
+  function escapeHtml(str) {
+    return String(str == null ? '' : str)
+      .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+  }
+
+  function statusBadge(status) {
+    const map = { ok:'#22c55e', warn:'#f59e0b', error:'#ef4444' };
+    const c = map[status] || '#64748b';
+    return `<span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:${c};margin-right:6px"></span>`;
+  }
+
+  // ── Tab updaters ────────────────────────────────────────────────
+  function updateSentinelTab(s) {
+    const el = document.getElementById('admin-content-sentinel');
+    if (!el) return;
+    const counts = { ok:0, warn:0, error:0 };
+    const all = []
+      .concat((s.dataops?.gold)||[])
+      .concat((s.dataops?.silver)||[])
+      .concat((s.dataops?.views)||[])
+      .concat(s.jobs || []);
+    all.forEach(r => { if (counts[r.status] != null) counts[r.status]++; });
+    el.innerHTML = `
+      <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:8px">
+        <div style="background:rgba(34,197,94,.1);border:1px solid #22c55e;border-radius:6px;padding:8px;text-align:center">
+          <div style="font-size:1.2rem;font-weight:700;color:#22c55e">${counts.ok}</div><div style="font-size:.66rem">OK</div>
+        </div>
+        <div style="background:rgba(245,158,11,.1);border:1px solid #f59e0b;border-radius:6px;padding:8px;text-align:center">
+          <div style="font-size:1.2rem;font-weight:700;color:#f59e0b">${counts.warn}</div><div style="font-size:.66rem">WARN</div>
+        </div>
+        <div style="background:rgba(239,68,68,.1);border:1px solid #ef4444;border-radius:6px;padding:8px;text-align:center">
+          <div style="font-size:1.2rem;font-weight:700;color:#ef4444">${counts.error}</div><div style="font-size:.66rem">ERROR</div>
+        </div>
+      </div>
+      <div style="font-size:.66rem;color:#64748b">fonte: ${escapeHtml(s.source || '')} · ts: ${escapeHtml(s.ts || '')}</div>`;
+  }
+
+  function updateDataOpsTab(d) {
+    const el = document.getElementById('admin-content-dataops');
+    if (!el) return;
+    const gold = (d && d.gold) || [];
+    const silver = (d && d.silver) || [];
+    const views = (d && d.views) || [];
+    const tableRows = (rows, key) => rows.map(r => `
+      <tr>
+        <td style="padding:3px 6px">${statusBadge(r.status)}${escapeHtml(r[key])}</td>
+        <td style="padding:3px 6px;text-align:right">${r.row_count != null ? r.row_count.toLocaleString('pt-BR') : '—'}</td>
+        <td style="padding:3px 6px;text-align:right">${r.freshness_hours != null ? r.freshness_hours.toFixed(1) + 'h' : '—'}</td>
+      </tr>`).join('');
+    el.innerHTML = `
+      <div style="font-weight:600;margin-bottom:4px">Gold (${gold.length})</div>
+      <table style="width:100%;border-collapse:collapse;font-size:.7rem;margin-bottom:8px">
+        <thead><tr style="color:#94a3b8"><th style="text-align:left;padding:3px 6px">tabela</th><th style="text-align:right;padding:3px 6px">rows</th><th style="text-align:right;padding:3px 6px">fresh</th></tr></thead>
+        <tbody>${tableRows(gold,'table')}</tbody>
+      </table>
+      <div style="font-weight:600;margin-bottom:4px">Silver (${silver.length})</div>
+      <table style="width:100%;border-collapse:collapse;font-size:.7rem;margin-bottom:8px">
+        <thead><tr style="color:#94a3b8"><th style="text-align:left;padding:3px 6px">tabela</th><th style="text-align:right;padding:3px 6px">rows</th><th style="text-align:right;padding:3px 6px">fresh</th></tr></thead>
+        <tbody>${tableRows(silver,'table')}</tbody>
+      </table>
+      <div style="font-weight:600;margin-bottom:4px">Views (${views.length})</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:4px;font-size:.66rem">
+        ${views.map(v => `<div>${statusBadge(v.status)}${escapeHtml(v.view)}</div>`).join('')}
+      </div>`;
+  }
+
+  function updateJobsTab(jobs) {
+    const el = document.getElementById('admin-content-dataops');
+    // Jobs share dataops pane: render a separate jobs block at the bottom
+    if (!el) return;
+    if (!Array.isArray(jobs) || jobs.length === 0) return;
+    let block = document.getElementById('admin-jobs-block');
+    if (!block) {
+      block = document.createElement('div');
+      block.id = 'admin-jobs-block';
+      block.style.marginTop = '8px';
+      el.appendChild(block);
+    }
+    block.innerHTML = `
+      <div style="font-weight:600;margin-bottom:4px">Jobs (${jobs.length})</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:4px;font-size:.66rem">
+        ${jobs.map(j => `<div>${statusBadge(j.status)}${escapeHtml(j.job)} <span style="color:#64748b">${escapeHtml(j.last_status||'')}</span></div>`).join('')}
+      </div>`;
+  }
+
+  function updateLLMOpsTab(agents) {
+    const el = document.getElementById('admin-content-llmops');
+    if (!el) return;
+    const list = Array.isArray(agents) ? agents : [];
+    el.innerHTML = `
+      <div style="font-weight:600;margin-bottom:4px">Agentes (${list.length})</div>
+      <table style="width:100%;border-collapse:collapse;font-size:.68rem">
+        <thead><tr style="color:#94a3b8">
+          <th style="text-align:left;padding:3px 6px">agente</th>
+          <th style="text-align:right;padding:3px 6px">calls 24h</th>
+          <th style="text-align:right;padding:3px 6px">p99 (s)</th>
+          <th style="text-align:right;padding:3px 6px">$ 24h</th>
+        </tr></thead>
+        <tbody>
+        ${list.map(a => `<tr>
+          <td style="padding:3px 6px">${statusBadge(a.status)}${escapeHtml(a.agent)}</td>
+          <td style="text-align:right;padding:3px 6px">${a.calls_24h ?? 0}</td>
+          <td style="text-align:right;padding:3px 6px">${(a.p99_latency_s||0).toFixed(2)}</td>
+          <td style="text-align:right;padding:3px 6px">$${(a.cost_24h_usd||0).toFixed(3)}</td>
+        </tr>`).join('')}
+        </tbody>
+      </table>`;
+  }
+
+  function updateCostsTab(c) {
+    const el = document.getElementById('admin-content-custos');
+    if (!el) return;
+    const daily = (c && c.bq_daily) || [];
+    el.innerHTML = `
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px">
+        <div style="background:rgba(99,102,241,.1);border:1px solid #6366f1;border-radius:6px;padding:8px">
+          <div style="font-size:.66rem;color:#94a3b8">BQ 30d</div>
+          <div style="font-size:1.1rem;font-weight:700;color:#a5b4fc">$${(c.bq_total_30d_usd||0).toFixed(2)}</div>
+        </div>
+        <div style="background:rgba(168,85,247,.1);border:1px solid #a855f7;border-radius:6px;padding:8px">
+          <div style="font-size:.66rem;color:#94a3b8">LLM 30d</div>
+          <div style="font-size:1.1rem;font-weight:700;color:#c4b5fd">$${(c.llm_total_30d_usd||0).toFixed(2)}</div>
+        </div>
+      </div>
+      <div style="font-weight:600;margin-bottom:4px">BQ por dia (top 7)</div>
+      <table style="width:100%;border-collapse:collapse;font-size:.68rem">
+        <thead><tr style="color:#94a3b8"><th style="text-align:left;padding:3px 6px">dia</th><th style="text-align:right;padding:3px 6px">$ BQ</th></tr></thead>
+        <tbody>${daily.slice(0,7).map(r => `<tr><td style="padding:3px 6px">${escapeHtml(r.day)}</td><td style="text-align:right;padding:3px 6px">$${(+r.bq_cost_usd||0).toFixed(3)}</td></tr>`).join('')}</tbody>
+      </table>`;
+  }
+
+  function updateMaturityRadar(m) {
+    const el = document.getElementById('admin-content-maturidade');
+    if (!el) return;
+    el.innerHTML = `
+      <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:6px;margin-bottom:8px">
+        <div style="background:rgba(34,197,94,.1);border:1px solid #22c55e;border-radius:6px;padding:8px;text-align:center">
+          <div style="font-size:.66rem;color:#94a3b8">DataOps</div>
+          <div style="font-size:1.4rem;font-weight:700;color:#22c55e">${m.dataops||0}</div>
+        </div>
+        <div style="background:rgba(99,102,241,.1);border:1px solid #6366f1;border-radius:6px;padding:8px;text-align:center">
+          <div style="font-size:.66rem;color:#94a3b8">MLOps</div>
+          <div style="font-size:1.4rem;font-weight:700;color:#a5b4fc">${m.mlops||0}</div>
+        </div>
+        <div style="background:rgba(168,85,247,.1);border:1px solid #a855f7;border-radius:6px;padding:8px;text-align:center">
+          <div style="font-size:.66rem;color:#94a3b8">LLMOps</div>
+          <div style="font-size:1.4rem;font-weight:700;color:#c4b5fd">${m.llmops||0}</div>
+        </div>
+      </div>`;
+    const ctxEl = document.getElementById('chart-maturity');
+    if (!ctxEl || typeof Chart === 'undefined') return;
+    const ctx = ctxEl.getContext('2d');
+    const data = [m.dataops || 0, m.mlops || 0, m.llmops || 0];
+    if (!window._maturityChart) {
+      window._maturityChart = new Chart(ctx, {
+        type: 'radar',
+        data: { labels: ['DataOps', 'MLOps', 'LLMOps'],
+                datasets: [{ label: 'Score 0-100', data,
+                  backgroundColor: 'rgba(54,162,235,0.2)',
+                  borderColor: 'rgba(54,162,235,1)' }] },
+        options: { scales: { r: { min: 0, max: 100 } } }
+      });
+    } else {
+      window._maturityChart.data.datasets[0].data = data;
+      window._maturityChart.update();
+    }
+  }
+
+  function updateValidacaoDados(d) {
+    const el = document.getElementById('admin-content-validdados');
+    if (!el) return;
+    const all = ((d && d.gold) || []).concat((d && d.silver) || []);
+    el.innerHTML = `
+      <div style="font-weight:600;margin-bottom:4px">DQ por tabela</div>
+      <table style="width:100%;border-collapse:collapse;font-size:.68rem">
+        <thead><tr style="color:#94a3b8">
+          <th style="text-align:left;padding:3px 6px">tabela</th>
+          <th style="text-align:right;padding:3px 6px">layer</th>
+          <th style="text-align:right;padding:3px 6px">DQ</th>
+        </tr></thead>
+        <tbody>
+        ${all.map(r => `<tr>
+          <td style="padding:3px 6px">${statusBadge(r.status)}${escapeHtml(r.table)}</td>
+          <td style="text-align:right;padding:3px 6px">${escapeHtml(r.layer)}</td>
+          <td style="text-align:right;padding:3px 6px">${r.dq_score != null ? r.dq_score.toFixed(2) : '—'}</td>
+        </tr>`).join('')}
+        </tbody>
+      </table>`;
+  }
+
+  function updateValidacaoModelo(m) {
+    const el = document.getElementById('admin-content-validmodelo');
+    if (!el) return;
+    const bias = (m && m.bias_metrics) || [];
+    el.innerHTML = `
+      <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:6px;margin-bottom:8px">
+        <div style="background:rgba(34,197,94,.1);border:1px solid #22c55e;border-radius:6px;padding:8px">
+          <div style="font-size:.66rem;color:#94a3b8">Brier</div>
+          <div style="font-size:1.0rem;font-weight:700;color:#22c55e">${m.brier_score != null ? Number(m.brier_score).toFixed(3) : '—'}</div>
+        </div>
+        <div style="background:rgba(245,158,11,.1);border:1px solid #f59e0b;border-radius:6px;padding:8px">
+          <div style="font-size:.66rem;color:#94a3b8">JS divergence</div>
+          <div style="font-size:1.0rem;font-weight:700;color:#fbbf24">${m.js_divergence != null ? Number(m.js_divergence).toFixed(3) : '—'}</div>
+        </div>
+        <div style="background:rgba(99,102,241,.1);border:1px solid #6366f1;border-radius:6px;padding:8px">
+          <div style="font-size:.66rem;color:#94a3b8">eval</div>
+          <div style="font-size:1.0rem;font-weight:700;color:#a5b4fc">${m.eval_score != null ? Number(m.eval_score).toFixed(2) : '—'}</div>
+        </div>
+      </div>
+      <div style="font-weight:600;margin-bottom:4px">Bias por UF (${bias.length})</div>
+      <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:4px;font-size:.66rem">
+        ${bias.slice(0,12).map(b => `<div>${escapeHtml(b.sg_uf)}: ${(b.bias_score||0).toFixed(2)}</div>`).join('')}
+      </div>`;
+  }
+
+  function updateArquiteturaHealthMap(s) {
+    const el = document.getElementById('admin-content-arquitetura');
+    if (!el) return;
+    const lines = [
+      'Bronze   → GCS raw/{source}/{year}/{UF}/',
+      'Silver   → BigQuery spepe_silver',
+      'Gold     → BigQuery spepe_gold',
+      'MLOps    → BigQuery spepe_mlops',
+      'Agents   → 10 (LLM via Vertex/Anthropic)',
+      'Jobs     → ' + ((s.jobs||[]).length) + ' Cloud Run Jobs',
+      'Views    → ' + ((s.dataops?.views||[]).length) + ' semantic views',
+    ];
+    el.innerHTML = `<pre style="font-family:'JetBrains Mono',monospace;font-size:.7rem;color:#cbd5e1;background:#0f172a;border:1px solid #334155;border-radius:6px;padding:8px;overflow-x:auto">${lines.map(escapeHtml).join('\n')}</pre>`;
+  }
+
+  // Expose a global to start the stream — typical entrypoint when admin tab opens
+  window.startSentinelStream = startSentinelStream;
+  window.stopSentinelStream = function () {
+    if (es) { try { es.close(); } catch(_){} es = null; }
+    if (pollTimer) { clearInterval(pollTimer); pollTimer = null; }
+  };
+})();
 </script>
 </body>
 </html>
