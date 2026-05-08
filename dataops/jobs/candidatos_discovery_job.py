@@ -66,7 +66,7 @@ def search_facebook_page(nome: str, token: str) -> dict | None:
         "type": "page",
         "fields": "id,name,fan_count,verification_status,about",
         "access_token": token,
-        "limit": 5,
+        "limit": "5",
     }
     try:
         resp = requests.get(_FB_SEARCH_URL, params=params, timeout=10)

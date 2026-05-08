@@ -24,12 +24,12 @@ QUERY_CANDIDATOS = """
 
 def search_facebook_page(nome: str, token: str) -> dict | None:
     url = "https://graph.facebook.com/v19.0/search"
-    params = {
+    params: dict[str, str] = {
         "q": nome,
         "type": "page",
         "fields": "id,name,fan_count,verification_status,about",
         "access_token": token,
-        "limit": 5,
+        "limit": "5",
     }
     try:
         resp = requests.get(url, params=params, timeout=10)
