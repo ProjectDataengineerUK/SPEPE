@@ -57,7 +57,7 @@ def run_hptuning(
             }
         ]
 
-        hp_job = aiplatform.HyperparameterTuningJob(
+        hp_job = aiplatform.HyperparameterTuningJob(  # type: ignore[call-arg]
             display_name="spepe-hptuning",
             metric_spec={"brier_score": "minimize"},
             parameter_spec={

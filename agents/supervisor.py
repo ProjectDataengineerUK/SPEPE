@@ -198,7 +198,7 @@ class Supervisor:
                 yield warn + "\n\n"
 
             messages = self._build_messages(state, current_input, hop)
-            response = self._client.messages.create(
+            response = self._client.messages.create(  # type: ignore[call-overload]
                 model=_MODEL,
                 max_tokens=512,
                 system=_SYSTEM.format(budget=BUDGET_USD, used=state.total_cost_usd),

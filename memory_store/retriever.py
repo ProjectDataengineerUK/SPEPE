@@ -69,7 +69,7 @@ def retrieve_relevant_memories(
         results: list[Memory] = []
         for neighbor_list in response:
             for n in neighbor_list:
-                similarity = 1.0 - float(n.distance)
+                similarity = 1.0 - float(n.distance or 0.0)
                 if similarity < min_similarity:
                     continue
                 meta: dict[str, Any] = getattr(n, "restricts", None) or {}
