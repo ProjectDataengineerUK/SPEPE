@@ -10,6 +10,7 @@ from dataops.semantic_layer import _VIEWS, _MV_ZONA_SQL
 # ── Registry ──────────────────────────────────────────────────────────────────
 
 EXPECTED_VIEWS = {
+    # Original 14 views
     "vw_sentimento_municipio",
     "vw_vulnerabilidade_municipio",
     "vw_perfil_municipio",
@@ -24,6 +25,15 @@ EXPECTED_VIEWS = {
     "vw_emendas_vs_eleicao",
     "vw_sancoes_uf",
     "vw_score_municipal_integrado",
+    # Social module v1.2 — 8 new views
+    "vw_social_candidato_sentimento",
+    "vw_social_temas_uf",
+    "vw_social_plataforma_uf",
+    "vw_social_crise_detector",
+    "vw_social_credibilidade",
+    "vw_candidato_360",
+    "vw_transferencias_candidato",
+    "vw_emendas_candidato_uf",
 }
 
 

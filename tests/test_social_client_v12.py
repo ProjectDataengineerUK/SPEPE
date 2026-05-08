@@ -224,7 +224,8 @@ class TestDetectSuspeitoCoordenado:
     def test_five_identical_within_hour_flagged(self):
         from dataops.clients.social_client import detect_suspeito_coordenado
 
-        now = datetime.now(timezone.utc)
+        # Anchor to start of hour so 5-min intervals never cross hour boundary
+        now = datetime.now(timezone.utc).replace(minute=0, second=0, microsecond=0)
         df = self._make_df(5, "mensagem idêntica", "Lula", now, 5)
         result = detect_suspeito_coordenado(df)
 
@@ -413,10 +414,8 @@ class TestLoadCandidatePagesFromBq:
         mock_client_instance = MagicMock()
         mock_client_instance.query.return_value.result.return_value = mock_query_result
 
-        mock_bq = MagicMock()
-        mock_bq.Client.return_value = mock_client_instance
-
-        with patch.dict("sys.modules", {"google.cloud.bigquery": mock_bq}):
+        # Patch at the class level so it works whether bigquery was already imported or not
+        with patch("google.cloud.bigquery.Client", return_value=mock_client_instance):
             result = load_candidate_pages_from_bq("spepe-test")
 
         assert result["facebook"] == ["page_123"]
