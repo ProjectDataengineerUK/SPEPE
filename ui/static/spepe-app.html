@@ -358,12 +358,33 @@ tr.rhl td{background:rgba(0,200,83,.07)!important}
         <h4>Geográfico</h4>
         <div class="filt"><label>Estado (UF)</label>
           <select id="f-uf" onchange="applyFilters()">
-            <option value="SP">São Paulo — SP</option>
-            <option value="MG">Minas Gerais — MG</option>
-            <option value="RJ">Rio de Janeiro — RJ</option>
+            <option value="AC">Acre — AC</option>
+            <option value="AL">Alagoas — AL</option>
+            <option value="AM">Amazonas — AM</option>
+            <option value="AP">Amapá — AP</option>
             <option value="BA">Bahia — BA</option>
-            <option value="RS">Rio Grande do Sul — RS</option>
+            <option value="CE">Ceará — CE</option>
+            <option value="DF">Distrito Federal — DF</option>
+            <option value="ES">Espírito Santo — ES</option>
+            <option value="GO">Goiás — GO</option>
+            <option value="MA">Maranhão — MA</option>
+            <option value="MG">Minas Gerais — MG</option>
+            <option value="MS">Mato Grosso do Sul — MS</option>
+            <option value="MT">Mato Grosso — MT</option>
+            <option value="PA">Pará — PA</option>
+            <option value="PB">Paraíba — PB</option>
+            <option value="PE">Pernambuco — PE</option>
+            <option value="PI">Piauí — PI</option>
             <option value="PR">Paraná — PR</option>
+            <option value="RJ">Rio de Janeiro — RJ</option>
+            <option value="RN">Rio Grande do Norte — RN</option>
+            <option value="RO">Rondônia — RO</option>
+            <option value="RR">Roraima — RR</option>
+            <option value="RS">Rio Grande do Sul — RS</option>
+            <option value="SC">Santa Catarina — SC</option>
+            <option value="SE">Sergipe — SE</option>
+            <option value="SP" selected>São Paulo — SP</option>
+            <option value="TO">Tocantins — TO</option>
             <option value="BR">Brasil (todos)</option>
           </select>
         </div>
@@ -1222,6 +1243,27 @@ function applyFilters(){
   refreshPrevisaoChart(cargo, uf, ano);
   refreshSentimentChart(uf, ano);
   refreshResultadosChart(cargo, uf, ano, turnoNum);
+  (async () => {
+    try {
+      const [resCands, resKpi] = await Promise.all([
+        apiFetch(`/api/candidatos?cargo=${encodeURIComponent(cargo)}&uf=${uf}&ano=${ano}`).then(r=>r.json()).catch(()=>null),
+        apiFetch(`/api/kpi?cargo=${encodeURIComponent(cargo)}&uf=${uf}&ano=${ano}`).then(r=>r.json()).catch(()=>null),
+      ]);
+      const cands = resCands?.candidatos || [];
+      if (cands.length) {
+        if (resKpi?.vencedor) {
+          setKpi(0, resKpi.vencedor, `${resKpi.vencedor_partido||'—'} · 1º Turno`, (resKpi.vencedor_pct||0).toFixed(1)+'%');
+          setKpi(1, resKpi.segundo||'—', `${resKpi.segundo_partido||'—'} · 1º Turno`, (resKpi.segundo_pct||0).toFixed(1)+'%');
+          document.getElementById('kv2').textContent = (resKpi.margem||0).toFixed(1)+'pp';
+        }
+        const candsNorm = cands.map(c=>({nm:c.nm||c.nm_candidato||'?', partido:c.partido||c.sg_partido||'—', pct:parseFloat(c.pct_t1||0)}));
+        renderCandCards(candsNorm, cargo);
+        document.getElementById('cands-title').textContent=`Candidatos — ${cargo} · ${uf} ${ano}`;
+        document.getElementById('tbl-title').textContent=`Municípios · ${cargo} · ${uf} ${ano}`;
+        document.getElementById('res-sub').textContent=`% votos válidos · ${uf} ${ano}`;
+      }
+    } catch(e) {}
+  })();
 }
 function onCargoSelect(val){
   const tab=[...document.querySelectorAll('.cargo-tab')].find(t=>t.textContent.includes(val.split('.')[0].trim()));
@@ -1277,10 +1319,12 @@ function renderCargoView(cargo){
   renderTable(cargo,cands);
 
   // Sub labels
+  const _uf = document.getElementById('f-uf')?.value || 'SP';
+  const _ano = document.getElementById('f-ano')?.value || '2022';
   document.getElementById('res-title').textContent=`Resultado — ${cargo} · ${turno}`;
-  document.getElementById('res-sub').textContent=`% votos válidos · São Paulo 2022`;
-  document.getElementById('cands-title').textContent=`Candidatos — ${cargo} · SP 2022`;
-  document.getElementById('tbl-title').textContent=`Municípios · ${cargo} · SP 2022`;
+  document.getElementById('res-sub').textContent=`% votos válidos · ${_uf} ${_ano}`;
+  document.getElementById('cands-title').textContent=`Candidatos — ${cargo} · ${_uf} ${_ano}`;
+  document.getElementById('tbl-title').textContent=`Municípios · ${cargo} · ${_uf} ${_ano}`;
 
   hlCard('card-cands'); hlCard('card-resultado'); hlCard('card-trends');
   markUpd('upd-res'); markUpd('upd-trends'); markUpd('upd-meta');

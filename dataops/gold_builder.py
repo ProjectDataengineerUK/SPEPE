@@ -131,6 +131,63 @@ def _build_gold_via_bigquery_sql() -> dict:
             WHERE cd_municipio_ibge IS NOT NULL
             GROUP BY cd_municipio_ibge, sg_uf
         """,
+        "dim_territorio": f"""
+            CREATE OR REPLACE TABLE `{gold}.dim_territorio` AS
+            WITH uf_meta AS (
+                SELECT sg_uf, nm_uf, sg_regiao, nm_regiao FROM UNNEST([
+                    STRUCT('AC','Acre','N','Norte'),
+                    STRUCT('AL','Alagoas','NE','Nordeste'),
+                    STRUCT('AM','Amazonas','N','Norte'),
+                    STRUCT('AP','Amapá','N','Norte'),
+                    STRUCT('BA','Bahia','NE','Nordeste'),
+                    STRUCT('CE','Ceará','NE','Nordeste'),
+                    STRUCT('DF','Distrito Federal','CO','Centro-Oeste'),
+                    STRUCT('ES','Espírito Santo','SE','Sudeste'),
+                    STRUCT('GO','Goiás','CO','Centro-Oeste'),
+                    STRUCT('MA','Maranhão','NE','Nordeste'),
+                    STRUCT('MG','Minas Gerais','SE','Sudeste'),
+                    STRUCT('MS','Mato Grosso do Sul','CO','Centro-Oeste'),
+                    STRUCT('MT','Mato Grosso','CO','Centro-Oeste'),
+                    STRUCT('PA','Pará','N','Norte'),
+                    STRUCT('PB','Paraíba','NE','Nordeste'),
+                    STRUCT('PE','Pernambuco','NE','Nordeste'),
+                    STRUCT('PI','Piauí','NE','Nordeste'),
+                    STRUCT('PR','Paraná','S','Sul'),
+                    STRUCT('RJ','Rio de Janeiro','SE','Sudeste'),
+                    STRUCT('RN','Rio Grande do Norte','NE','Nordeste'),
+                    STRUCT('RO','Rondônia','N','Norte'),
+                    STRUCT('RR','Roraima','N','Norte'),
+                    STRUCT('RS','Rio Grande do Sul','S','Sul'),
+                    STRUCT('SC','Santa Catarina','S','Sul'),
+                    STRUCT('SE','Sergipe','NE','Nordeste'),
+                    STRUCT('SP','São Paulo','SE','Sudeste'),
+                    STRUCT('TO','Tocantins','N','Norte')
+                ] AS t(sg_uf STRING, nm_uf STRING, sg_regiao STRING, nm_regiao STRING))
+            ),
+            base AS (
+                SELECT
+                    CAST(cd_municipio AS INT64)         AS cd_municipio,
+                    ANY_VALUE(nm_municipio)              AS nm_municipio,
+                    CAST(ANY_VALUE(cd_municipio_ibge) AS INT64) AS cd_ibge,
+                    sg_uf
+                FROM `{gold}.fact_municipio_candidato_eleicao`
+                WHERE cd_municipio IS NOT NULL
+                GROUP BY cd_municipio, sg_uf
+            )
+            SELECT
+                b.cd_municipio,
+                b.nm_municipio,
+                b.cd_ibge,
+                b.sg_uf,
+                r.nm_uf,
+                r.sg_regiao,
+                r.nm_regiao,
+                CAST(NULL AS FLOAT64) AS latitude,
+                CAST(NULL AS FLOAT64) AS longitude,
+                CURRENT_TIMESTAMP()   AS ingested_at
+            FROM base b
+            JOIN uf_meta r USING (sg_uf)
+        """,
         "fact_seguranca_municipio": f"""
             CREATE OR REPLACE TABLE `{gold}.fact_seguranca_municipio` AS
             SELECT
