@@ -57,7 +57,7 @@ class TestEnrichSentimentVertex:
         doc_type_mock = MagicMock()
         mock_language.Document.Type.PLAIN_TEXT = doc_type_mock
 
-        df = pd.DataFrame({"text": ["Ótimo candidato!"]})
+        _ = pd.DataFrame({"text": ["Ótimo candidato!"]})
 
         with patch.dict("sys.modules", {"google.cloud": MagicMock(), "google.cloud.language_v2": mock_language}):
             from dataops.clients.social_client import _call_vertex_nlp
@@ -111,7 +111,6 @@ class TestEnrichSentimentVertex:
         mock_lv2.Document.Type.PLAIN_TEXT = "PLAIN_TEXT"
 
         with patch.dict("sys.modules", {"google.cloud.language_v2": mock_lv2}):
-            import importlib
             import dataops.clients.social_client as sc
             original = sc.__dict__.get("language_v2")
             sc.__dict__["language_v2"] = mock_lv2

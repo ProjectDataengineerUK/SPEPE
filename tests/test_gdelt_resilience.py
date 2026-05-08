@@ -1,10 +1,9 @@
 """Unit tests for GDELT client resilience — backoff, GCS cache, and GDELT_ENABLED flag."""
 
 from datetime import datetime, timedelta, timezone
-from unittest.mock import MagicMock, call, patch
+from unittest.mock import MagicMock, patch
 
 import pandas as pd
-import pytest
 import requests
 
 
@@ -34,7 +33,7 @@ class TestFetchWithRetry:
         with patch("dataops.clients.gdelt_client.requests.get", side_effect=flaky_get):
             # Expect raise on 3rd attempt since we call the unwrapped version once
             try:
-                result = inner("http://x.com", {})
+                inner("http://x.com", {})
             except requests.HTTPError:
                 pass
 

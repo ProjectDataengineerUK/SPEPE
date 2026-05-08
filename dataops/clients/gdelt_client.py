@@ -17,8 +17,6 @@ import logging
 import os
 import time
 from datetime import datetime, timedelta, timezone
-from typing import Any
-
 import pandas as pd
 import requests
 from tenacity import retry, retry_if_exception_type, stop_after_attempt, wait_exponential

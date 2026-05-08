@@ -488,7 +488,7 @@ def transform_pesquisas_to_silver(
     return {"status": "ok", "path": path, "rows": len(df)}
 
 
-import re as _re
+import re as _re  # noqa: E402
 
 _TEMA_PATTERNS: list[tuple[_re.Pattern, str]] = [
     (_re.compile(r"economia|emprego|renda|inflacao|salario|pib", _re.IGNORECASE), "economia"),
