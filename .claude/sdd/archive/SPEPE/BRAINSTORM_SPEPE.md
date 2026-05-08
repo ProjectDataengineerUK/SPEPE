@@ -1,8 +1,8 @@
 # BRAINSTORM — SPEPE
 **Sistema de Perfilamento do Eleitorado e Previsão Eleitoral**
 
-> Phase 0 — Atualizado em: 2026-04-25
-> Versão: 3.0 — 10 módulos completos: +DataSUS, +DIEESE, +CETIC, +Segurança; Gold expandido para ~240 variáveis
+> Phase 0 — Atualizado em: 2026-05-06
+> Versão: 4.0 — 13 módulos completos: +CadÚnico/BF, +Emendas Parlamentares, +CEIS+CNEP Sanções; total 19 Cloud Run Jobs
 > Próximo passo: `/iterate .claude/sdd/features/DEFINE_SPEPE.md`
 
 ---
@@ -78,6 +78,9 @@ O SPEPE é um **sistema conversacional multi-agente com pipeline de ML/estatíst
 | 8 | **Social — Sinal Digital** | 🔶 Fase 2 | Twitter/X, YouTube, Meta Ads, Google Trends | `fato_social`, `fact_candidato_dia` | coletor (digital) |
 | 9 | **MLOps** | 🔶 Fase 3 | Vertex AI, modelos PyMC | `fact_predictions` | modelista_bayesiano |
 | 10 | **Geoespacial** | 🔶 Fase 2 | IBGE malha municipal, IBGE RM | `dim_territorio` (atualizar) | analista |
+| 11 | **Transferências Sociais** | ✅ Fase 1 | Portal da Transparência — CadÚnico + Bolsa Família | `fact_transferencias_sociais` | analista |
+| 12 | **Emendas Parlamentares** | ✅ Fase 1 | Portal da Transparência — `/emendas-parlamentares` | `fact_emendas_parlamentar + fact_emendas_municipio` | analista |
+| 13 | **Ficha Suja (CEIS+CNEP)** | ✅ Fase 1 | Portal da Transparência — CEIS + CNEP | `fact_sancoes_uf` | analista |
 
 ---
 
@@ -117,6 +120,9 @@ Cada módulo grava os arquivos brutos exatamente como vieram da fonte:
 | **Reddit** | r/brasil, r/politica | API/pushshift | Post × comentário |
 | **Google Trends** | Buscas por candidato/partido por UF | CSV/API | UF × semana |
 | **Portal Câmara/Senado** | Votações, presença, gastos de gabinete | API REST | Parlamentar × sessão |
+| **CadÚnico / Bolsa Família** | Famílias cadastradas, beneficiários BF, extrema pobreza | Portal da Transparência API | Município × ano |
+| **Emendas Parlamentares** | Valor empenhado/liquidado/pago por parlamentar × município × área temática | Portal da Transparência API | Município × parlamentar × ano |
+| **CEIS + CNEP (Sanções)** | Cadastro de Empresas Inidôneas/Suspensas + Empresas Punidas — PF e PJ | Portal da Transparência API | Nacional (sem recorte temporal) |
 
 #### Silver — Curated (limpo, padronizado, joinable)
 
@@ -132,6 +138,9 @@ Cada módulo grava os arquivos brutos exatamente como vieram da fonte:
 | `fact_municipio_eleicao` | Município × eleição | ~200 (censo + TSE + IDH + digital agregado) | Clusterização + modelo |
 | `fact_candidato_dia` | Candidato × dia | ~40 (digital: mentions, sentiment, ad spend, trends) | Sinal digital |
 | `fact_pesquisa` | Pesquisa × rodada | ~20 (house effect, margem, erro observado pós-eleição) | Agregação bayesiana |
+| `fact_transferencias_sociais` | Município × ano | BF beneficiários/valor, CadÚnico famílias, extrema pobreza | Feature matrix social |
+| `fact_emendas_parlamentar + fact_emendas_municipio` | Município × parlamentar × ano | Valor empenhado/liquidado/pago, área temática, tipo emenda | Clientelismo × voto |
+| `fact_sancoes_uf` | Sancionado × registro | CEIS+CNEP, PF+PJ, uf, tipo sanção, datas | "Eleitores punem ficha suja?" |
 
 ---
 

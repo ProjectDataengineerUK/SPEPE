@@ -1,8 +1,8 @@
-# BUILD REPORT: SPEPE v4.6
+# BUILD REPORT: SPEPE v5.0
 
 **Project:** Sistema de Perfilamento do Eleitorado e Previsão Eleitoral
 **Phase:** 3 — BUILD (Implementation)
-**Date:** 2026-04-30 (v3 — Sentinel implementado, BLOQUEADOR 1 resolvido)
+**Date:** 2026-05-07 (v5 — reconciliação estado real: 190 testes, 20 clientes, 23 .tf, 16 tabelas Gold, 14 views semânticas; emendas+sancoes Bronze ingeridos em prod; fixes DIEESE/deploy)
 **Original BUILD Date:** 2026-04-24 (v1 — cobria DESIGN v4.2)
 **Status:** 🟠 PARCIALMENTE COMPLETO — 1 bloqueador restante (Vertex AI Vector Search — depende de GCP)
 
@@ -14,13 +14,16 @@ O BUILD v1 (2026-04-24) foi escrito com DESIGN v4.2. O DESIGN evoluiu para v4.6 
 substanciais em v4.3–v4.6 que foram implementadas no código mas não rastreadas formalmente.
 Este BUILD REPORT v2 corrige o registro e documenta o estado real.
 
-| Métrica | BUILD v1 (2026-04-24) | BUILD v3 (2026-04-30) |
-|---------|----------------------|----------------------|
-| DESIGN de referência | v4.2 | v4.6 |
-| Testes passando | 29/73 (40%) | **110/110 (100%)** |
-| Arquivos implementados | ~52 | **~145+** (Sentinel 25 arquivos + v4.3–v4.6) |
-| Infrastructure (Terraform) | 15 módulos | **22 arquivos .tf** |
-| Bloqueadores SHIP | 0 declarados | **1 restante (Vertex AI — requer GCP)** |
+| Métrica | BUILD v1 (2026-04-24) | BUILD v3 (2026-04-30) | BUILD v4 (2026-05-06) | BUILD v5 (2026-05-07) |
+|---------|----------------------|----------------------|----------------------|----------------------|
+| DESIGN de referência | v4.2 | v4.6 | v5.0 | v5.0 |
+| Testes passando | 29/73 (40%) | **110/110 (100%)** | **172/172 (100%)** | **190/190 (100%)** |
+| Clientes dataops | ~6 | **9** | **12** | **20** |
+| Cloud Run Jobs | 5 | 12 | **19** | **19** |
+| Infrastructure (Terraform) | 15 módulos | **22 arquivos .tf** | **22 arquivos .tf** | **23 arquivos .tf** |
+| Tabelas Gold (fact_*) | 3 | 8 | 12 | **16** |
+| Views semânticas | 0 | 6 | 8 | **14** |
+| Bloqueadores SHIP | 0 declarados | **1 restante (Vertex AI — requer GCP)** | **1 restante (Vertex AI — requer GCP)** | **1 restante (Vertex AI — requer GCP)** |
 
 ---
 
@@ -42,7 +45,7 @@ Este BUILD REPORT v2 corrige o registro e documenta o estado real.
 | Sentinela Social | `agents/registry/sentinela_social.md` | ✅ (monitoring social) |
 | **Sentinel multi-crew** | `sentinel/` (25 arquivos) | ✅ **(2026-04-30)** |
 
-### Cloud Run Jobs (12 total — vs. 9 originais no DESIGN metadata)
+### Cloud Run Jobs (19 total)
 
 | Job | Arquivo | Status |
 |-----|---------|--------|
@@ -55,11 +58,18 @@ Este BUILD REPORT v2 corrige o registro e documenta o estado real.
 | datasus_ingest | `dataops/jobs/datasus_ingest_job.py` | ✅ (v4.6) |
 | dieese_ingest | `dataops/jobs/dieese_ingest_job.py` | ✅ (v4.6) |
 | security_ingest | `dataops/jobs/security_ingest_job.py` | ✅ (v4.6) |
+| tse_perfil_ingest | `dataops/jobs/tse_perfil_ingest_job.py` | ✅ |
+| tse_candidaturas_ingest | `dataops/jobs/tse_candidaturas_ingest_job.py` | ✅ |
+| reddit_ingest | `dataops/jobs/reddit_ingest_job.py` | ✅ |
+| camara_senado_ingest | `dataops/jobs/camara_senado_ingest_job.py` | ✅ |
+| endividamento_ingest | `dataops/jobs/endividamento_ingest_job.py` | ✅ |
+| cadunico_ingest | `dataops/jobs/cadunico_ingest_job.py` | ✅ (v5.0) |
+| emendas_ingest | `dataops/jobs/emendas_ingest_job.py` | ✅ (v5.0) |
+| sancoes_ingest | `dataops/jobs/sancoes_ingest_job.py` | ✅ (v5.0) |
 | silver_transform | `dataops/jobs/silver_transform_job.py` | ✅ |
 | gold_build | `dataops/jobs/gold_build_job.py` | ✅ |
-| retrain_trigger | `dataops/jobs/retrain_trigger_job.py` | ✅ |
 
-### Clientes de Dados (9 total)
+### Clientes de Dados (20 total)
 
 | Cliente | Arquivo | Status |
 |---------|---------|--------|
@@ -72,6 +82,17 @@ Este BUILD REPORT v2 corrige o registro e documenta o estado real.
 | DataSUS | `dataops/clients/datasus_client.py` | ✅ (v4.6) |
 | DIEESE | `dataops/clients/dieese_client.py` | ✅ (v4.6) |
 | Segurança | `dataops/clients/seguranca_client.py` | ✅ (v4.6) |
+| CadÚnico | `dataops/clients/cadunico_client.py` | ✅ (v5.0) |
+| Emendas | `dataops/clients/emendas_client.py` | ✅ (v5.0) |
+| Sanções | `dataops/clients/sancoes_client.py` | ✅ (v5.0) |
+| TSE Perfil | `dataops/clients/tse_perfil_client.py` | ✅ (v4.6) |
+| TSE Candidaturas | `dataops/clients/tse_candidaturas_client.py` | ✅ (v4.6) |
+| Reddit | `dataops/clients/reddit_client.py` | ✅ (v4.6) |
+| Câmara/Senado | `dataops/clients/camara_senado_client.py` | ✅ (v4.6) |
+| Endividamento (BCB) | `dataops/clients/bacen_client.py` | ✅ (v4.6) |
+| Bluesky | `dataops/clients/bluesky_client.py` | ✅ (v5.0 — social alternativo) |
+| GDELT | `dataops/clients/gdelt_client.py` | ⚠️ (v5.0 — desabilitado: rate limit severo) |
+| News RSS | `dataops/clients/news_rss_client.py` | ✅ (v5.0 — social alternativo) |
 
 ### DataOps Nível 5 (adicionado v4.3)
 
@@ -142,9 +163,10 @@ Este BUILD REPORT v2 corrige o registro e documenta o estado real.
 | `security/column_security.yaml` | ✅ |
 | `security/secret_manager.py` | ✅ |
 
-### Infraestrutura Terraform (20 arquivos .tf)
+### Infraestrutura Terraform (23 arquivos .tf)
 
 ✅ Todos os módulos escritos e validados localmente. **Não aplicados em GCP.**
+Arquivos adicionais confirmados: `scheduler.tf`, `wif.tf`, `iam.tf` (vs. 20 declarados em BUILD v4).
 
 ---
 
@@ -152,9 +174,39 @@ Este BUILD REPORT v2 corrige o registro e documenta o estado real.
 
 | Suíte | Resultado |
 |-------|-----------|
-| Todos os testes | **82/82 passando (100%)** |
+| Todos os testes | **190/190 passando (100%)** |
 | Warnings | 1 (mark pytest desconhecido — não bloqueador) |
-| Última execução | 2026-04-30 |
+| Última execução | 2026-05-07 |
+
++18 novos testes adicionados desde BUILD v4: vw_cenario Phase 1 (no pesquisa UNION ALL), emendas Silver/Gold, sancoes Silver/Gold, DQ contracts cadunico, semantic layer views 9-14.
+
+---
+
+## Estado de Produção (2026-05-07)
+
+### Ingestões Bronze executadas em spepe-prod
+
+| Job | Execução | Duração | Status |
+|-----|----------|---------|--------|
+| spepe-emendas-ingest | `spepe-emendas-ingest-twm9m` | 24s | ✅ Bronze OK |
+| spepe-sancoes-ingest | `spepe-sancoes-ingest-v6gq5` | 14s | ✅ Bronze OK |
+| spepe-silver-transform | `spepe-silver-transform-5vhbv` | em andamento (--uf ALL) | ⏳ Running |
+| spepe-gold-build | — | aguarda Silver | ⏳ Pendente |
+
+### Fixes aplicados nesta sessão
+
+| Fix | Arquivo | Descrição |
+|-----|---------|-----------|
+| DIEESE DEFAULT_ANO | `infra/terraform/cloud_run_jobs.tf` | Corrigido `dieese_ingest = {}` → `{ DEFAULT_ANO = "2025" }` — job buscava 2022 |
+| deploy-prod create-or-update | `.github/workflows/deploy.yml` | jobs novos (emendas, sancoes) serão criados se inexistentes |
+
+### Mudanças de fonte social (2026-05-07)
+
+| Fonte | Status | Motivo |
+|-------|--------|--------|
+| GDELT | ❌ Desabilitado | Rate limiting severo bloqueia job completo |
+| Bluesky | ✅ Ativo | Substituiu GDELT como fonte de menções políticas |
+| News RSS | ✅ Ativo | Substituiu GDELT como fonte de notícias |
 
 ---
 
@@ -204,11 +256,11 @@ a arquitetura projetada.
 
 ## Próximos Passos
 
-1. **Implementar Sentinel multi-crew** — desbloqueador principal para SHIP
-2. **Executar `/ship SPEPE`** — após Sentinel implementado
-3. **Deploy GCP** — desbloqueador para Vertex AI Vector Search e ingestão real
-4. **Migrar memory_store → Vertex AI Vector Search** — após GCP ativo
-5. **Tag v1.0.0** — após smoke test GCP com SP (1 UF)
+1. **Disparar ** após Silver transform  concluir — materializa fact_emendas + fact_sancoes
+2. **Tag v1.1.0** — após Gold confirmado em BigQuery
+3. **Redes Sociais v1.2** —  social_ingest + Twitter/X + YouTube sentiment pipeline
+4. **Migrar memory_store → Vertex AI Vector Search** — requer GCP Vertex AI ativo
+5. **IAP provisionado** — Terraform escrito, não aplicado
 
 ---
 
@@ -219,3 +271,5 @@ a arquitetura projetada.
 | 1.0 | 2026-04-24 | build-agent | BUILD inicial cobrindo DESIGN v4.2 — 52 arquivos, 29/73 testes |
 | 2.0 | 2026-04-30 | claude-sonnet-4-6 | Análise completa pós-ciclo: DESIGN evoluiu v4.2→v4.6; 82/82 testes; 120+ arquivos reais; 2 bloqueadores SHIP documentados; tabelas completas por domínio |
 | 3.0 | 2026-04-30 | claude-sonnet-4-6 | Sentinel implementado (25 arquivos, 4 crews, KB, GenAI, Terraform); 110/110 testes; BLOQUEADOR 1 resolvido; 1 bloqueador restante (Vertex AI Vector Search — GCP) |
+| 4.0 | 2026-05-06 | claude-sonnet-4-6 | CadÚnico/BF Bronze 4 anos em prod; emendas/sancoes adicionados (Silver+Gold); 172/172 testes; 12 tabelas Gold; 8 views semânticas; 22 .tf |
+| 5.0 | 2026-05-07 | claude-sonnet-4-6 | 190/190 testes; 20 clientes; 23 .tf; 16 tabelas Gold; 14 views semânticas; emendas+sancoes Bronze ingeridos em prod; Silver transform em andamento; GDELT desabilitado (Bluesky+RSS ativos); DIEESE DEFAULT_ANO=2025 fix; deploy.yml create-or-update pattern |
