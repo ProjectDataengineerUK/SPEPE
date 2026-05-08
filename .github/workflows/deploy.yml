@@ -110,8 +110,8 @@ jobs:
           gcloud run deploy spepe-staging \
             --image "${{ needs.build-push.outputs.image_tag }}" \
             --service-account "spepe-cloud-run@${{ vars.GCP_PROJECT_ID }}.iam.gserviceaccount.com" \
-            --set-env-vars "GCP_PROJECT_ID=${{ vars.GCP_PROJECT_ID }},USE_BIGQUERY=true,DEFAULT_UF=SP,DEFAULT_ANO=2022,ENVIRONMENT=staging" \
-            --set-secrets "ANTHROPIC_API_KEY=ANTHROPIC_API_KEY:latest" \
+            --set-env-vars "GCP_PROJECT_ID=${{ vars.GCP_PROJECT_ID }},USE_BIGQUERY=true,DEFAULT_UF=SP,DEFAULT_ANO=2022,ENVIRONMENT=staging,GOOGLE_CLIENT_ID=1055426323388-j97gohht800s7v447f2v8fg6lskacv37.apps.googleusercontent.com" \
+            --set-secrets "ANTHROPIC_API_KEY=ANTHROPIC_API_KEY:latest,GOOGLE_MAPS_API_KEY=GOOGLE_MAPS_API_KEY:latest" \
             --allow-unauthenticated \
             --port 8080 \
             --memory 2Gi \
@@ -189,8 +189,8 @@ jobs:
           gcloud run deploy spepe-prod \
             --image "${{ needs.build-push.outputs.image_tag }}" \
             --service-account "spepe-cloud-run@spepe-prod.iam.gserviceaccount.com" \
-            --set-env-vars "GCP_PROJECT_ID=spepe-prod,USE_BIGQUERY=true,DEFAULT_UF=SP,DEFAULT_ANO=2022,ENVIRONMENT=prod" \
-            --set-secrets "ANTHROPIC_API_KEY=ANTHROPIC_API_KEY:latest" \
+            --set-env-vars "GCP_PROJECT_ID=spepe-prod,USE_BIGQUERY=true,DEFAULT_UF=SP,DEFAULT_ANO=2022,ENVIRONMENT=prod,GOOGLE_CLIENT_ID=1055426323388-j97gohht800s7v447f2v8fg6lskacv37.apps.googleusercontent.com" \
+            --set-secrets "ANTHROPIC_API_KEY=ANTHROPIC_API_KEY:latest,GOOGLE_MAPS_API_KEY=GOOGLE_MAPS_API_KEY:latest" \
             --allow-unauthenticated \
             --port 8080 \
             --memory 2Gi \
