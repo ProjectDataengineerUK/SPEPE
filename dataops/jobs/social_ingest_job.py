@@ -112,7 +112,9 @@ def main(candidatos: list[str], dias: int, year: int) -> None:
             if gcp_project:
                 mentions = enrich_sentiment_vertex(mentions, text_field="text", project=gcp_project)
             enrich_with_source_meta(mentions)
-            _write(pd.DataFrame(mentions), "social", year, f"twitter_mencoes_{year}.parquet", use_gcs)
+            _write(
+                pd.DataFrame(mentions), "social", year, f"twitter_mencoes_{year}.parquet", use_gcs
+            )
 
             sentimento = aggregate_x_sentiment(mentions)
             _write(

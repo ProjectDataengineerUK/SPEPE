@@ -19,7 +19,9 @@ class TestSearchFacebookPageScript:
     def test_api_returns_empty_returns_none(self):
         from scripts.discover_candidate_pages import search_facebook_page
 
-        with patch("scripts.discover_candidate_pages.requests.get", return_value=self._make_resp([])):
+        with patch(
+            "scripts.discover_candidate_pages.requests.get", return_value=self._make_resp([])
+        ):
             result = search_facebook_page("Candidato X", "tok")
 
         assert result is None
@@ -43,7 +45,9 @@ class TestSearchFacebookPageScript:
                 "about": "",
             },
         ]
-        with patch("scripts.discover_candidate_pages.requests.get", return_value=self._make_resp(pages)):
+        with patch(
+            "scripts.discover_candidate_pages.requests.get", return_value=self._make_resp(pages)
+        ):
             result = search_facebook_page("Candidato Y", "tok")
 
         assert result is not None
@@ -68,7 +72,9 @@ class TestSearchFacebookPageScript:
                 "about": "",
             },
         ]
-        with patch("scripts.discover_candidate_pages.requests.get", return_value=self._make_resp(pages)):
+        with patch(
+            "scripts.discover_candidate_pages.requests.get", return_value=self._make_resp(pages)
+        ):
             result = search_facebook_page("Candidato Z", "tok")
 
         assert result is not None
@@ -77,7 +83,10 @@ class TestSearchFacebookPageScript:
     def test_requests_exception_returns_none_no_raise(self):
         from scripts.discover_candidate_pages import search_facebook_page
 
-        with patch("scripts.discover_candidate_pages.requests.get", side_effect=requests.ConnectionError("timeout")):
+        with patch(
+            "scripts.discover_candidate_pages.requests.get",
+            side_effect=requests.ConnectionError("timeout"),
+        ):
             result = search_facebook_page("Candidato Erro", "tok")
 
         assert result is None
@@ -113,7 +122,9 @@ class TestSearchFacebookPageScript:
         ]
         # fan_count score: 2000^0.3 ≈ 12, 1000^0.3 ≈ 8
         # about bonus: +20 for with_about → total 28 vs 12
-        with patch("scripts.discover_candidate_pages.requests.get", return_value=self._make_resp(pages)):
+        with patch(
+            "scripts.discover_candidate_pages.requests.get", return_value=self._make_resp(pages)
+        ):
             result = search_facebook_page("Silva", "tok")
 
         assert result is not None
@@ -133,7 +144,9 @@ class TestSearchFacebookPageJob:
     def test_api_returns_empty_returns_none(self):
         from dataops.jobs.candidatos_discovery_job import search_facebook_page
 
-        with patch("dataops.jobs.candidatos_discovery_job.requests.get", return_value=self._make_resp([])):
+        with patch(
+            "dataops.jobs.candidatos_discovery_job.requests.get", return_value=self._make_resp([])
+        ):
             result = search_facebook_page("Candidato X", "tok")
 
         assert result is None
@@ -157,7 +170,10 @@ class TestSearchFacebookPageJob:
                 "about": "",
             },
         ]
-        with patch("dataops.jobs.candidatos_discovery_job.requests.get", return_value=self._make_resp(pages)):
+        with patch(
+            "dataops.jobs.candidatos_discovery_job.requests.get",
+            return_value=self._make_resp(pages),
+        ):
             result = search_facebook_page("Cand A", "tok")
 
         assert result is not None
@@ -166,8 +182,13 @@ class TestSearchFacebookPageJob:
     def test_requests_exception_returns_none_logs_warning(self):
         from dataops.jobs.candidatos_discovery_job import search_facebook_page
 
-        with patch("dataops.jobs.candidatos_discovery_job.requests.get", side_effect=requests.Timeout("timeout")), \
-             patch("dataops.jobs.candidatos_discovery_job.logger") as mock_logger:
+        with (
+            patch(
+                "dataops.jobs.candidatos_discovery_job.requests.get",
+                side_effect=requests.Timeout("timeout"),
+            ),
+            patch("dataops.jobs.candidatos_discovery_job.logger") as mock_logger,
+        ):
             result = search_facebook_page("Cand Erro", "tok")
 
         assert result is None
@@ -192,9 +213,13 @@ class TestCandidatosDiscoveryJobIntegration:
         empty_df = pd.DataFrame(columns=["candidato", "mencoes"])
         mock_bq_client = self._make_bq_client(empty_df)
 
-        with patch.dict("os.environ", {"GCP_PROJECT_ID": "spepe-test", "META_APP_TOKEN": "fake_tok"}), \
-             patch("dataops.jobs.candidatos_discovery_job.get_secret", return_value="fake_tok"), \
-             patch("google.cloud.bigquery.Client", return_value=mock_bq_client):
+        with (
+            patch.dict(
+                "os.environ", {"GCP_PROJECT_ID": "spepe-test", "META_APP_TOKEN": "fake_tok"}
+            ),
+            patch("dataops.jobs.candidatos_discovery_job.get_secret", return_value="fake_tok"),
+            patch("google.cloud.bigquery.Client", return_value=mock_bq_client),
+        ):
             main()
 
         mock_bq_client.load_table_from_dataframe.assert_not_called()
@@ -205,9 +230,13 @@ class TestCandidatosDiscoveryJobIntegration:
         empty_df = pd.DataFrame(columns=["candidato", "mencoes"])
         mock_bq_client = self._make_bq_client(empty_df)
 
-        with patch.dict("os.environ", {"GCP_PROJECT_ID": "spepe-test", "META_APP_TOKEN": "fake_tok"}), \
-             patch("dataops.jobs.candidatos_discovery_job.get_secret", return_value="fake_tok"), \
-             patch("google.cloud.bigquery.Client", return_value=mock_bq_client):
+        with (
+            patch.dict(
+                "os.environ", {"GCP_PROJECT_ID": "spepe-test", "META_APP_TOKEN": "fake_tok"}
+            ),
+            patch("dataops.jobs.candidatos_discovery_job.get_secret", return_value="fake_tok"),
+            patch("google.cloud.bigquery.Client", return_value=mock_bq_client),
+        ):
             main()
 
         assert len(mock_bq_client.load_table_from_dataframe.call_args_list) == 0
@@ -218,10 +247,14 @@ class TestCandidatosDiscoveryJobIntegration:
         candidatos_df = pd.DataFrame({"candidato": ["Lula", "Bolsonaro"], "mencoes": [10, 8]})
         mock_bq_client = self._make_bq_client(candidatos_df)
 
-        with patch.dict("os.environ", {"GCP_PROJECT_ID": "spepe-test", "META_APP_TOKEN": "fake_tok"}), \
-             patch("dataops.jobs.candidatos_discovery_job.get_secret", return_value="fake_tok"), \
-             patch("dataops.jobs.candidatos_discovery_job.search_facebook_page", return_value=None), \
-             patch("google.cloud.bigquery.Client", return_value=mock_bq_client):
+        with (
+            patch.dict(
+                "os.environ", {"GCP_PROJECT_ID": "spepe-test", "META_APP_TOKEN": "fake_tok"}
+            ),
+            patch("dataops.jobs.candidatos_discovery_job.get_secret", return_value="fake_tok"),
+            patch("dataops.jobs.candidatos_discovery_job.search_facebook_page", return_value=None),
+            patch("google.cloud.bigquery.Client", return_value=mock_bq_client),
+        ):
             main()
 
         assert mock_bq_client.load_table_from_dataframe.called
@@ -248,10 +281,14 @@ class TestCandidatosDiscoveryJobIntegration:
         candidatos_df = pd.DataFrame({"candidato": ["Ciro"], "mencoes": [5]})
         mock_bq_client = self._make_bq_client(candidatos_df)
 
-        with patch.dict("os.environ", {"GCP_PROJECT_ID": "spepe-prod", "META_APP_TOKEN": "fake_tok"}), \
-             patch("dataops.jobs.candidatos_discovery_job.get_secret", return_value="fake_tok"), \
-             patch("dataops.jobs.candidatos_discovery_job.search_facebook_page", return_value=None), \
-             patch("google.cloud.bigquery.Client", return_value=mock_bq_client):
+        with (
+            patch.dict(
+                "os.environ", {"GCP_PROJECT_ID": "spepe-prod", "META_APP_TOKEN": "fake_tok"}
+            ),
+            patch("dataops.jobs.candidatos_discovery_job.get_secret", return_value="fake_tok"),
+            patch("dataops.jobs.candidatos_discovery_job.search_facebook_page", return_value=None),
+            patch("google.cloud.bigquery.Client", return_value=mock_bq_client),
+        ):
             main()
 
         assert mock_bq_client.load_table_from_dataframe.called
@@ -265,10 +302,14 @@ class TestCandidatosDiscoveryJobIntegration:
         candidatos_df = pd.DataFrame({"candidato": ["Candidato Sem Página"], "mencoes": [4]})
         mock_bq_client = self._make_bq_client(candidatos_df)
 
-        with patch.dict("os.environ", {"GCP_PROJECT_ID": "spepe-test", "META_APP_TOKEN": "fake_tok"}), \
-             patch("dataops.jobs.candidatos_discovery_job.get_secret", return_value="fake_tok"), \
-             patch("dataops.jobs.candidatos_discovery_job.search_facebook_page", return_value=None), \
-             patch("google.cloud.bigquery.Client", return_value=mock_bq_client):
+        with (
+            patch.dict(
+                "os.environ", {"GCP_PROJECT_ID": "spepe-test", "META_APP_TOKEN": "fake_tok"}
+            ),
+            patch("dataops.jobs.candidatos_discovery_job.get_secret", return_value="fake_tok"),
+            patch("dataops.jobs.candidatos_discovery_job.search_facebook_page", return_value=None),
+            patch("google.cloud.bigquery.Client", return_value=mock_bq_client),
+        ):
             main()
 
         df_arg = mock_bq_client.load_table_from_dataframe.call_args[0][0]

@@ -83,7 +83,9 @@ def _write_gcs_cache(date_str: str, df: pd.DataFrame) -> None:
         buf.seek(0)
         gcs = storage.Client()
         blob_path = f"cache/gdelt/{date_str}.parquet"
-        gcs.bucket(bucket).blob(blob_path).upload_from_file(buf, content_type="application/octet-stream")
+        gcs.bucket(bucket).blob(blob_path).upload_from_file(
+            buf, content_type="application/octet-stream"
+        )
         logger.info("GDELT cache written: %s (%d rows)", blob_path, len(df))
     except Exception as exc:
         logger.warning("GDELT cache write failed — continuing: %s", exc)

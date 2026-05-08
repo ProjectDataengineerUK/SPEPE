@@ -496,7 +496,10 @@ _TEMA_PATTERNS: list[tuple[_re.Pattern, str]] = [
     (_re.compile(r"educacao|escola|universidade|ensino|professor", _re.IGNORECASE), "educacao"),
     (_re.compile(r"seguranca|violencia|crime|policia|assassinato", _re.IGNORECASE), "seguranca"),
     (_re.compile(r"corrupcao|corrupto|desvio|propina|escandalo", _re.IGNORECASE), "corrupcao"),
-    (_re.compile(r"meio.ambiente|clima|desmatamento|queimada|ambiental", _re.IGNORECASE), "meio_ambiente"),
+    (
+        _re.compile(r"meio.ambiente|clima|desmatamento|queimada|ambiental", _re.IGNORECASE),
+        "meio_ambiente",
+    ),
 ]
 
 

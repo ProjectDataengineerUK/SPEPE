@@ -286,7 +286,14 @@ def fetch_instagram_posts(
     if not token:
         logger.warning("META_APP_TOKEN ausente — retornando DataFrame vazio para Instagram")
         return pd.DataFrame(
-            columns=["text", "like_count", "comment_count", "created_at", "fonte", "platform_post_id"]
+            columns=[
+                "text",
+                "like_count",
+                "comment_count",
+                "created_at",
+                "fonte",
+                "platform_post_id",
+            ]
         )
 
     cutoff = datetime.now(timezone.utc) - timedelta(days=days_back)
@@ -306,7 +313,14 @@ def fetch_instagram_posts(
     except Exception as exc:
         logger.warning("Instagram fetch falhou para '%s': %s", instagram_handle, exc)
         return pd.DataFrame(
-            columns=["text", "like_count", "comment_count", "created_at", "fonte", "platform_post_id"]
+            columns=[
+                "text",
+                "like_count",
+                "comment_count",
+                "created_at",
+                "fonte",
+                "platform_post_id",
+            ]
         )
 
     rows: list[dict] = []
@@ -585,8 +599,16 @@ def load_candidate_pages_from_bq(
 
 
 def compute_score_credibilidade(df: pd.DataFrame) -> pd.Series:
-    base = df["score_confiabilidade"] if "score_confiabilidade" in df.columns else pd.Series(1.0, index=df.index)
-    suspeito = df["suspeito_coordenado"] if "suspeito_coordenado" in df.columns else pd.Series(False, index=df.index)
+    base = (
+        df["score_confiabilidade"]
+        if "score_confiabilidade" in df.columns
+        else pd.Series(1.0, index=df.index)
+    )
+    suspeito = (
+        df["suspeito_coordenado"]
+        if "suspeito_coordenado" in df.columns
+        else pd.Series(False, index=df.index)
+    )
     # coordinated posts receive a 70% penalty on source trust score
     penalty = suspeito.map({True: 0.3, False: 1.0}).fillna(1.0)
     return (base * penalty).astype(float)
@@ -618,10 +640,7 @@ def detect_suspeito_coordenado(df: pd.DataFrame) -> pd.DataFrame:
     # Round to 1-hour bins per candidato+text to count occurrences
     df["_hour_bin"] = df["_created_at"].dt.floor("h")
 
-    counts = (
-        df.groupby(["candidato", "_text_norm", "_hour_bin"])["_text_norm"]
-        .transform("count")
-    )
+    counts = df.groupby(["candidato", "_text_norm", "_hour_bin"])["_text_norm"].transform("count")
     # Posts with text that appears >= 5 times in the same hour+candidato window
     df["suspeito_coordenado"] = counts >= 5
 

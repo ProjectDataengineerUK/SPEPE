@@ -79,10 +79,21 @@ def search_facebook_page(nome: str, token: str) -> dict | None:
             s = 100 if page.get("verification_status") == "blue_verified" else 0
             s += min(int(page.get("fan_count", 0) ** 0.3), 50)
             about = (page.get("about") or "").lower()
-            s += 20 if any(
-                kw in about
-                for kw in ["candidato", "deputado", "senador", "governador", "prefeito", "vereador"]
-            ) else 0
+            s += (
+                20
+                if any(
+                    kw in about
+                    for kw in [
+                        "candidato",
+                        "deputado",
+                        "senador",
+                        "governador",
+                        "prefeito",
+                        "vereador",
+                    ]
+                )
+                else 0
+            )
             return s
 
         return max(data, key=score)
@@ -169,9 +180,7 @@ def main() -> None:
     try:
         load_job = bq_client.load_table_from_dataframe(df_rows, table_ref, job_config=job_config)
         load_job.result()
-        logger.info(
-            "dim_candidato_social_pages: %d rows upserted to %s", len(df_rows), table_ref
-        )
+        logger.info("dim_candidato_social_pages: %d rows upserted to %s", len(df_rows), table_ref)
     except Exception as exc:
         logger.error("BQ load failed: %s", exc)
         sys.exit(1)

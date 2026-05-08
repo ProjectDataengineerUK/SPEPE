@@ -9,7 +9,7 @@
 | **Feature** | SPEPE |
 | **Date** | 2026-04-17 |
 | **Author** | define-agent |
-| **Updated** | 2026-04-25 (iterate-agent — v4.1: +4 módulos Group B: DataSUS/DIEESE/CETIC/Segurança; +IBGE expandido 10 domínios; +3 tabelas Gold; +3 Cloud Run Jobs; Source Inventory atualizado; Open Question 2 resolvida) |
+| **Updated** | 2026-05-06 (iterate-agent — v5.0: +3 módulos Portal da Transparência: CadÚnico/BF, Emendas Parlamentares, CEIS+CNEP Sanções; +7 Cloud Run Jobs totalizando 19; +3 clientes dataops; TRANSPARENCIA_API_KEY wired) |
 | **Status** | ✅ Shipped — 2026-04-30 |
 | **Clarity Score** | 15/15 |
 
@@ -38,7 +38,11 @@ As ferramentas existentes são dashboards estáticos (sem ML), modelos caixa-pre
 
 | Priority | Goal |
 |----------|------|
-| **MUST** | Pipeline Medallion Bronze→Silver→Gold para 13 fontes de dados, 5.570 municípios |
+| **MUST** | Pipeline Medallion Bronze→Silver→Gold para 16 fontes de dados, 5.570 municípios |
+| **MUST** | `fact_transferencias_sociais` (CadÚnico + Bolsa Família) — beneficiários, valor BF, famílias extrema pobreza, por município × ano | 
+| **MUST** | `fact_emendas_parlamentares` — valor empenhado/liquidado/pago por parlamentar × município × área temática, join com TSE para análise clientelismo × voto |
+| **MUST** | `fact_sancoes_federais` (CEIS + CNEP) — sancionados PF+PJ com sg_uf para cruzamento "eleitores punem ficha suja?" via join nm_sancionado × nm_candidato TSE |
+| **MUST** | TRANSPARENCIA_API_KEY em Secret Manager para todos os clientes Portal da Transparência (CadÚnico, Emendas, CEIS/CNEP) |
 | **MUST** | `fact_municipio_eleicao` com ≥ 200 features por município × eleição (2018/2022) — inclui IBGE expandido + CETIC + DIEESE |
 | **MUST** | `fact_saude_municipio` (DataSUS SIM + ANS) e `fact_economico_municipio` (DIEESE + PIB) como tabelas Gold dedicadas |
 | **MUST** | `fact_seguranca_municipio` (IVS + Atlas da Violência + SINESP) com agente dedicado `analista_seguranca` |

@@ -13,17 +13,29 @@ logger = logging.getLogger("spepe.agents.tools")
 
 JobName = Literal[
     # TSE
-    "tse_ingest", "tse_perfil_ingest", "tse_candidaturas_ingest",
+    "tse_ingest",
+    "tse_perfil_ingest",
+    "tse_candidaturas_ingest",
     # IBGE / Public data
-    "ibge_sync", "datasus_ingest", "security_ingest", "cetic_ingest",
-    "dieese_ingest", "endividamento_ingest", "cadunico_ingest",
+    "ibge_sync",
+    "datasus_ingest",
+    "security_ingest",
+    "cetic_ingest",
+    "dieese_ingest",
+    "endividamento_ingest",
+    "cadunico_ingest",
     # Social / Digital
-    "digital_ingest", "social_ingest", "reddit_ingest",
+    "digital_ingest",
+    "social_ingest",
+    "reddit_ingest",
     # Political / Fiscal
-    "pesquisas_ingest", "camara_senado_ingest",
-    "emendas_ingest", "sancoes_ingest",
+    "pesquisas_ingest",
+    "camara_senado_ingest",
+    "emendas_ingest",
+    "sancoes_ingest",
     # Pipeline
-    "silver_transform", "gold_build",
+    "silver_transform",
+    "gold_build",
     # Discovery
     "candidatos_discovery",
 ]

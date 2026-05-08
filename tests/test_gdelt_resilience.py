@@ -28,7 +28,11 @@ class TestFetchWithRetry:
                 mock_resp.json.return_value = good_response
             return mock_resp
 
-        inner = _fetch_with_retry.__wrapped__ if hasattr(_fetch_with_retry, "__wrapped__") else _fetch_with_retry
+        inner = (
+            _fetch_with_retry.__wrapped__
+            if hasattr(_fetch_with_retry, "__wrapped__")
+            else _fetch_with_retry
+        )
 
         with patch("dataops.clients.gdelt_client.requests.get", side_effect=flaky_get):
             # Expect raise on 3rd attempt since we call the unwrapped version once
@@ -42,9 +46,13 @@ class TestFetchWithRetry:
     def test_returns_empty_df_when_all_retries_exhausted(self):
         from dataops.clients.gdelt_client import fetch_gdelt_events
 
-        with patch.dict("os.environ", {"GDELT_ENABLED": "true", "GCS_BUCKET": ""}), \
-             patch("dataops.clients.gdelt_client._read_gcs_cache", return_value=None), \
-             patch("dataops.clients.gdelt_client._fetch_with_retry", side_effect=Exception("timeout")):
+        with (
+            patch.dict("os.environ", {"GDELT_ENABLED": "true", "GCS_BUCKET": ""}),
+            patch("dataops.clients.gdelt_client._read_gcs_cache", return_value=None),
+            patch(
+                "dataops.clients.gdelt_client._fetch_with_retry", side_effect=Exception("timeout")
+            ),
+        ):
             result = fetch_gdelt_events(["Lula"], dias=1)
 
         assert isinstance(result, pd.DataFrame)
@@ -53,8 +61,13 @@ class TestFetchWithRetry:
     def test_fetch_mentions_returns_empty_list_on_exhausted_retries(self):
         from dataops.clients.gdelt_client import fetch_gdelt_mentions
 
-        with patch.dict("os.environ", {"GDELT_ENABLED": "true"}), \
-             patch("dataops.clients.gdelt_client._fetch_with_retry", side_effect=Exception("all retries failed")):
+        with (
+            patch.dict("os.environ", {"GDELT_ENABLED": "true"}),
+            patch(
+                "dataops.clients.gdelt_client._fetch_with_retry",
+                side_effect=Exception("all retries failed"),
+            ),
+        ):
             result = fetch_gdelt_mentions(["Bolsonaro"], dias=3)
 
         assert result == []
@@ -64,7 +77,9 @@ class TestFetchWithRetry:
 
 
 class TestGCSCache:
-    def _make_mock_blob(self, exists: bool = True, age_seconds: float = 60.0, data: bytes = b"") -> MagicMock:
+    def _make_mock_blob(
+        self, exists: bool = True, age_seconds: float = 60.0, data: bytes = b""
+    ) -> MagicMock:
         blob = MagicMock()
         blob.exists.return_value = exists
         blob.updated = datetime.now(timezone.utc) - timedelta(seconds=age_seconds)
@@ -76,9 +91,13 @@ class TestGCSCache:
 
         cached_df = pd.DataFrame({"candidato": ["Lula"], "titulo": ["Teste"]})
 
-        with patch.dict("os.environ", {"GDELT_ENABLED": "true", "GCS_BUCKET": "spepe-data"}), \
-             patch("dataops.clients.gdelt_client._read_gcs_cache", return_value=cached_df) as mock_cache, \
-             patch("dataops.clients.gdelt_client._fetch_with_retry") as mock_api:
+        with (
+            patch.dict("os.environ", {"GDELT_ENABLED": "true", "GCS_BUCKET": "spepe-data"}),
+            patch(
+                "dataops.clients.gdelt_client._read_gcs_cache", return_value=cached_df
+            ) as mock_cache,
+            patch("dataops.clients.gdelt_client._fetch_with_retry") as mock_api,
+        ):
             result = fetch_gdelt_events(["Lula"], dias=1)
 
         mock_cache.assert_called_once()
@@ -100,11 +119,13 @@ class TestGCSCache:
             ]
         }
 
-        with patch.dict("os.environ", {"GDELT_ENABLED": "true", "GCS_BUCKET": "spepe-data"}), \
-             patch("dataops.clients.gdelt_client._read_gcs_cache", return_value=None), \
-             patch("dataops.clients.gdelt_client._fetch_with_retry", return_value=api_response), \
-             patch("dataops.clients.gdelt_client._write_gcs_cache") as mock_write, \
-             patch("dataops.clients.gdelt_client.time.sleep"):
+        with (
+            patch.dict("os.environ", {"GDELT_ENABLED": "true", "GCS_BUCKET": "spepe-data"}),
+            patch("dataops.clients.gdelt_client._read_gcs_cache", return_value=None),
+            patch("dataops.clients.gdelt_client._fetch_with_retry", return_value=api_response),
+            patch("dataops.clients.gdelt_client._write_gcs_cache") as mock_write,
+            patch("dataops.clients.gdelt_client.time.sleep"),
+        ):
             result = fetch_gdelt_events(["Lula"], dias=1)
 
         mock_write.assert_called_once()
@@ -113,11 +134,13 @@ class TestGCSCache:
     def test_cache_miss_no_api_results_does_not_write_cache(self):
         from dataops.clients.gdelt_client import fetch_gdelt_events
 
-        with patch.dict("os.environ", {"GDELT_ENABLED": "true", "GCS_BUCKET": "spepe-data"}), \
-             patch("dataops.clients.gdelt_client._read_gcs_cache", return_value=None), \
-             patch("dataops.clients.gdelt_client._fetch_with_retry", return_value={"articles": []}), \
-             patch("dataops.clients.gdelt_client._write_gcs_cache") as mock_write, \
-             patch("dataops.clients.gdelt_client.time.sleep"):
+        with (
+            patch.dict("os.environ", {"GDELT_ENABLED": "true", "GCS_BUCKET": "spepe-data"}),
+            patch("dataops.clients.gdelt_client._read_gcs_cache", return_value=None),
+            patch("dataops.clients.gdelt_client._fetch_with_retry", return_value={"articles": []}),
+            patch("dataops.clients.gdelt_client._write_gcs_cache") as mock_write,
+            patch("dataops.clients.gdelt_client.time.sleep"),
+        ):
             result = fetch_gdelt_events(["Ciro"], dias=1)
 
         mock_write.assert_not_called()
@@ -129,8 +152,10 @@ class TestGCSCache:
         mock_storage = MagicMock()
         mock_storage.Client.side_effect = Exception("GCS unavailable")
 
-        with patch.dict("os.environ", {"GCS_BUCKET": "spepe-data"}), \
-             patch.dict("sys.modules", {"google.cloud.storage": mock_storage}):
+        with (
+            patch.dict("os.environ", {"GCS_BUCKET": "spepe-data"}),
+            patch.dict("sys.modules", {"google.cloud.storage": mock_storage}),
+        ):
             result = _read_gcs_cache("20260508")
 
         assert result is None
@@ -157,8 +182,10 @@ class TestGCSCache:
         mock_storage = MagicMock()
         mock_storage.Client.return_value = mock_client
 
-        with patch.dict("os.environ", {"GCS_BUCKET": "spepe-data"}), \
-             patch.dict("sys.modules", {"google.cloud.storage": mock_storage}):
+        with (
+            patch.dict("os.environ", {"GCS_BUCKET": "spepe-data"}),
+            patch.dict("sys.modules", {"google.cloud.storage": mock_storage}),
+        ):
             result = _read_gcs_cache("20260508")
 
         assert result is None
@@ -175,8 +202,10 @@ class TestGCSCache:
         mock_storage = MagicMock()
         mock_storage.Client.return_value = mock_client
 
-        with patch.dict("os.environ", {"GCS_BUCKET": "spepe-data"}), \
-             patch.dict("sys.modules", {"google.cloud.storage": mock_storage}):
+        with (
+            patch.dict("os.environ", {"GCS_BUCKET": "spepe-data"}),
+            patch.dict("sys.modules", {"google.cloud.storage": mock_storage}),
+        ):
             result = _read_gcs_cache("20260508")
 
         assert result is None
@@ -216,9 +245,13 @@ class TestGdeltEnabledFlag:
         from dataops.clients.gdelt_client import fetch_gdelt_mentions
 
         env = {"GDELT_ENABLED": "true"}
-        with patch.dict("os.environ", env), \
-             patch("dataops.clients.gdelt_client._fetch_with_retry", return_value={"articles": []}) as mock_api, \
-             patch("dataops.clients.gdelt_client.time.sleep"):
+        with (
+            patch.dict("os.environ", env),
+            patch(
+                "dataops.clients.gdelt_client._fetch_with_retry", return_value={"articles": []}
+            ) as mock_api,
+            patch("dataops.clients.gdelt_client.time.sleep"),
+        ):
             fetch_gdelt_mentions(["Lula"], dias=1)
 
         mock_api.assert_called_once()

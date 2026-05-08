@@ -1,6 +1,7 @@
 """
 Usage: python scripts/discover_candidate_pages.py --project spepe-prod --output candidates.csv
 """
+
 import argparse
 import logging
 import os
@@ -41,10 +42,21 @@ def search_facebook_page(nome: str, token: str) -> dict | None:
             s = 100 if page.get("verification_status") == "blue_verified" else 0
             s += min(int(page.get("fan_count", 0) ** 0.3), 50)
             about = (page.get("about") or "").lower()
-            s += 20 if any(
-                kw in about
-                for kw in ["candidato", "deputado", "senador", "governador", "prefeito", "vereador"]
-            ) else 0
+            s += (
+                20
+                if any(
+                    kw in about
+                    for kw in [
+                        "candidato",
+                        "deputado",
+                        "senador",
+                        "governador",
+                        "prefeito",
+                        "vereador",
+                    ]
+                )
+                else 0
+            )
             return s
 
         return max(data, key=score)
@@ -91,9 +103,7 @@ def main() -> None:
 
     df_out = pd.DataFrame(results)
     df_out.to_csv(args.output, index=False)
-    logger.info(
-        "Output: %s — review and set 'aprovado=TRUE' before loading to BQ", args.output
-    )
+    logger.info("Output: %s — review and set 'aprovado=TRUE' before loading to BQ", args.output)
 
 
 if __name__ == "__main__":

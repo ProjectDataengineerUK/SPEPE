@@ -33,9 +33,7 @@ def df_identical_texts():
     return pd.DataFrame(
         {
             "text": ["texto exato"] * 5,
-            "created_at": [
-                (now - timedelta(minutes=i * 5)).isoformat() for i in range(5)
-            ],
+            "created_at": [(now - timedelta(minutes=i * 5)).isoformat() for i in range(5)],
             "candidato": ["Lula"] * 5,
         }
     )
@@ -59,11 +57,17 @@ class TestEnrichSentimentVertex:
 
         _ = pd.DataFrame({"text": ["Ótimo candidato!"]})
 
-        with patch.dict("sys.modules", {"google.cloud": MagicMock(), "google.cloud.language_v2": mock_language}):
+        with patch.dict(
+            "sys.modules", {"google.cloud": MagicMock(), "google.cloud.language_v2": mock_language}
+        ):
             from dataops.clients.social_client import _call_vertex_nlp
 
             with patch("dataops.clients.social_client.language_v2", mock_language, create=True):
-                labels, scores, confidences = _call_vertex_nlp.__wrapped__(["Ótimo candidato!"], "spepe-test") if hasattr(_call_vertex_nlp, "__wrapped__") else (["positivo"], [0.7], [0.5])
+                labels, scores, confidences = (
+                    _call_vertex_nlp.__wrapped__(["Ótimo candidato!"], "spepe-test")
+                    if hasattr(_call_vertex_nlp, "__wrapped__")
+                    else (["positivo"], [0.7], [0.5])
+                )
 
         for score in scores:
             assert -1.0 <= score <= 1.0
@@ -112,6 +116,7 @@ class TestEnrichSentimentVertex:
 
         with patch.dict("sys.modules", {"google.cloud.language_v2": mock_lv2}):
             import dataops.clients.social_client as sc
+
             original = sc.__dict__.get("language_v2")
             sc.__dict__["language_v2"] = mock_lv2
             try:
@@ -142,6 +147,7 @@ class TestEnrichSentimentVertex:
 
         with patch.dict("sys.modules", {"google.cloud.language_v2": mock_lv2}):
             import dataops.clients.social_client as sc
+
             original = sc.__dict__.get("language_v2")
             sc.__dict__["language_v2"] = mock_lv2
             try:
@@ -171,6 +177,7 @@ class TestEnrichSentimentVertex:
         mock_lv2.Document.Type.PLAIN_TEXT = "PLAIN_TEXT"
 
         import dataops.clients.social_client as sc
+
         original = sc.__dict__.get("language_v2")
         sc.__dict__["language_v2"] = mock_lv2
         try:
@@ -188,11 +195,14 @@ class TestEnrichSentimentVertex:
         from dataops.clients.social_client import _call_vertex_nlp
 
         import sys
+
         saved = sys.modules.pop("google.cloud.language_v2", None)
         saved_gcloud = sys.modules.pop("google.cloud", None)
 
         try:
-            with patch.dict("sys.modules", {"google.cloud.language_v2": None, "google.cloud": None}):
+            with patch.dict(
+                "sys.modules", {"google.cloud.language_v2": None, "google.cloud": None}
+            ):
                 labels, scores, confidences = _call_vertex_nlp(["texto"], "spepe-test")
 
             assert scores == [0.0]
@@ -213,8 +223,7 @@ class TestDetectSuspeitoCoordenado:
             {
                 "text": [text] * n,
                 "created_at": [
-                    (start + timedelta(minutes=i * interval_minutes)).isoformat()
-                    for i in range(n)
+                    (start + timedelta(minutes=i * interval_minutes)).isoformat() for i in range(n)
                 ],
                 "candidato": [candidato] * n,
             }
@@ -434,13 +443,22 @@ class TestLoadCandidatePagesFromBq:
 
 
 class TestFetchInstagramPosts:
-    _EXPECTED_COLS = {"text", "like_count", "comment_count", "created_at", "fonte", "platform_post_id"}
+    _EXPECTED_COLS = {
+        "text",
+        "like_count",
+        "comment_count",
+        "created_at",
+        "fonte",
+        "platform_post_id",
+    }
 
     def test_api_error_returns_empty_with_correct_columns(self):
         from dataops.clients.social_client import fetch_instagram_posts
 
-        with patch("dataops.clients.social_client._get_fb_token", return_value="tok"), \
-             patch("dataops.clients.social_client.requests.get") as mock_get:
+        with (
+            patch("dataops.clients.social_client._get_fb_token", return_value="tok"),
+            patch("dataops.clients.social_client.requests.get") as mock_get,
+        ):
             mock_get.side_effect = Exception("API error")
             result = fetch_instagram_posts("some_handle", days_back=7)
 
@@ -478,8 +496,10 @@ class TestFetchInstagramPosts:
         mock_resp.raise_for_status = MagicMock()
         mock_resp.json.return_value = api_response
 
-        with patch("dataops.clients.social_client._get_fb_token", return_value="tok"), \
-             patch("dataops.clients.social_client.requests.get", return_value=mock_resp):
+        with (
+            patch("dataops.clients.social_client._get_fb_token", return_value="tok"),
+            patch("dataops.clients.social_client.requests.get", return_value=mock_resp),
+        ):
             result = fetch_instagram_posts("handle_x", days_back=7)
 
         assert len(result) == 1
@@ -515,8 +535,10 @@ class TestFetchInstagramPosts:
         mock_resp.raise_for_status = MagicMock()
         mock_resp.json.return_value = api_response
 
-        with patch("dataops.clients.social_client._get_fb_token", return_value="tok"), \
-             patch("dataops.clients.social_client.requests.get", return_value=mock_resp):
+        with (
+            patch("dataops.clients.social_client._get_fb_token", return_value="tok"),
+            patch("dataops.clients.social_client.requests.get", return_value=mock_resp),
+        ):
             result = fetch_instagram_posts("handle_x", days_back=7)
 
         assert len(result) == 1
@@ -542,8 +564,10 @@ class TestFetchInstagramPosts:
         mock_resp.raise_for_status = MagicMock()
         mock_resp.json.return_value = api_response
 
-        with patch("dataops.clients.social_client._get_fb_token", return_value="tok"), \
-             patch("dataops.clients.social_client.requests.get", return_value=mock_resp):
+        with (
+            patch("dataops.clients.social_client._get_fb_token", return_value="tok"),
+            patch("dataops.clients.social_client.requests.get", return_value=mock_resp),
+        ):
             result = fetch_instagram_posts("handle_x", days_back=7)
 
         assert (result["fonte"] == "instagram").all()
