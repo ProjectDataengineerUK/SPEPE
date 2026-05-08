@@ -368,7 +368,7 @@ class TestComputeScoreCredibilidade:
         df = pd.DataFrame({"other_col": [1, 2, 3]})
         result = compute_score_credibilidade(df)
 
-        assert (result == pytest.approx(1.0)).all()
+        assert list(result) == pytest.approx([1.0, 1.0, 1.0])
 
 
 # ── load_candidate_pages_from_bq ──────────────────────────────────────────────

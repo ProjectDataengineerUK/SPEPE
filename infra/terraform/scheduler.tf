@@ -182,7 +182,7 @@ resource "google_cloud_scheduler_job" "ml_retrain_monthly" {
   description      = "Trigger gold_build Cloud Run Job on the 1st of each month at 02:00 UTC with RUN_ML_PIPELINE=true"
   schedule         = "0 2 1 * *"
   time_zone        = "UTC"
-  attempt_deadline = "3600s"
+  attempt_deadline = "1800s"
   region           = var.region
 
   http_target {
