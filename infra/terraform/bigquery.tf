@@ -47,6 +47,8 @@ resource "google_bigquery_table" "fact_municipio_eleicao" {
   deletion_protection      = var.environment == "prod"
   require_partition_filter = true
 
+  lifecycle { ignore_changes = [schema] }
+
   range_partitioning {
     field = "ano_eleicao"
     range {
@@ -111,6 +113,8 @@ resource "google_bigquery_table" "fact_candidato_dia" {
   deletion_protection      = var.environment == "prod"
   require_partition_filter = true
 
+  lifecycle { ignore_changes = [schema] }
+
   time_partitioning {
     type  = "DAY"
     field = "data"
@@ -140,6 +144,8 @@ resource "google_bigquery_table" "fact_pesquisa" {
   labels                   = local.labels
   deletion_protection      = var.environment == "prod"
   require_partition_filter = false # volume < 10GB — full scan custa < $0.075
+
+  lifecycle { ignore_changes = [schema] }
 
   time_partitioning {
     type  = "DAY"
@@ -171,6 +177,8 @@ resource "google_bigquery_table" "fact_secao_eleicao" {
   labels                   = local.labels
   deletion_protection      = var.environment == "prod"
   require_partition_filter = true
+
+  lifecycle { ignore_changes = [schema] }
 
   range_partitioning {
     field = "ano_eleicao"
@@ -207,6 +215,8 @@ resource "google_bigquery_table" "dim_territorio" {
   description         = "Dimensão geográfica: município × estado × região — 5570 linhas"
   labels              = local.labels
   deletion_protection = var.environment == "prod"
+
+  lifecycle { ignore_changes = [schema] }
 
   clustering = ["sg_uf", "cd_municipio"]
 
@@ -275,6 +285,8 @@ resource "google_bigquery_table" "fact_seguranca_municipio" {
   deletion_protection      = var.environment == "prod"
   require_partition_filter = true
 
+  lifecycle { ignore_changes = [schema] }
+
   range_partitioning {
     field = "ano"
     range {
@@ -319,6 +331,8 @@ resource "google_bigquery_table" "fact_saude_municipio" {
   labels                   = local.labels
   deletion_protection      = var.environment == "prod"
   require_partition_filter = true
+
+  lifecycle { ignore_changes = [schema] }
 
   range_partitioning {
     field = "ano"
@@ -424,6 +438,8 @@ resource "google_bigquery_table" "fact_social_municipio" {
   deletion_protection      = var.environment == "prod"
   require_partition_filter = false
 
+  lifecycle { ignore_changes = [schema] }
+
   time_partitioning {
     type  = "DAY"
     field = "data_referencia"
@@ -454,6 +470,8 @@ resource "google_bigquery_table" "fact_ibge_municipio" {
   labels                   = local.labels
   deletion_protection      = var.environment == "prod"
   require_partition_filter = false
+
+  lifecycle { ignore_changes = [schema] }
 
   range_partitioning {
     field = "ano"
@@ -498,6 +516,8 @@ resource "google_bigquery_table" "fact_economico_municipio" {
   description         = "Indicadores econômicos municipais — DIEESE cesta básica + CETIC + PIB IBGE"
   labels              = local.labels
   deletion_protection = var.environment == "prod"
+
+  lifecycle { ignore_changes = [schema] }
 
   range_partitioning {
     field = "ano"

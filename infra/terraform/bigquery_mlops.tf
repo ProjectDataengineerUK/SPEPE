@@ -26,6 +26,8 @@ resource "google_bigquery_table" "fact_predictions" {
   deletion_protection      = var.environment == "prod"
   require_partition_filter = true
 
+  lifecycle { ignore_changes = [schema] }
+
   time_partitioning {
     type  = "DAY"
     field = "prediction_date"
@@ -56,6 +58,8 @@ resource "google_bigquery_table" "model_evaluations" {
   description         = "Backtest and canary evaluation results per model version"
   labels              = local.labels
   deletion_protection = false
+
+  lifecycle { ignore_changes = [schema] }
   expiration_time     = 1893456000000 # ~2030-01-01 — retain evaluations for 4+ years
 
   time_partitioning {
@@ -85,6 +89,8 @@ resource "google_bigquery_table" "sentinel_state" {
   labels              = local.labels
   deletion_protection = false
 
+  lifecycle { ignore_changes = [schema] }
+
   clustering = ["category", "status"]
 
   schema = jsonencode([
@@ -106,6 +112,8 @@ resource "google_bigquery_table" "bias_metrics" {
   description         = "Fairness metrics per sg_uf, income quintile, and rural pct"
   labels              = local.labels
   deletion_protection = false
+
+  lifecycle { ignore_changes = [schema] }
   expiration_time     = 1893456000000 # ~2030-01-01 — retain evaluations for 4+ years
 
   time_partitioning {

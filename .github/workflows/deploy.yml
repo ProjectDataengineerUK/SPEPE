@@ -162,8 +162,13 @@ jobs:
   deploy-prod:
     runs-on: ubuntu-latest
     needs: [build-push, deploy-staging]
-    # Only run when explicitly targeting prod via workflow_dispatch
-    if: github.event.inputs.environment == 'prod'
+    # Run when:
+    #   - workflow_run (auto): CI passed on main → staging smoke test passed → promote to prod
+    #   - workflow_dispatch with environment=prod: manual promotion
+    # github.event.inputs is null for workflow_run, so the first condition covers auto triggers.
+    if: >
+      (github.event_name == 'workflow_run' && github.event.workflow_run.conclusion == 'success') ||
+      (github.event_name == 'workflow_dispatch' && github.event.inputs.environment == 'prod')
     # Use staging environment credentials — same WIF SA, granted run.developer on spepe-prod
     environment: staging
     permissions:
