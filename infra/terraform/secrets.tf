@@ -148,7 +148,9 @@ resource "google_secret_manager_secret_iam_member" "dataops_reddit_secret" {
 resource "google_secret_manager_secret" "google_maps_api_key" {
   secret_id = "GOOGLE_MAPS_API_KEY"
   project   = var.project_id
-  replication { auto {} }
+  replication {
+    auto {}
+  }
   labels = local.labels
 }
 
