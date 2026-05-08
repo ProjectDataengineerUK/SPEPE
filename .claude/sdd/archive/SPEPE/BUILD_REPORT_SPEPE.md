@@ -2,7 +2,7 @@
 
 **Project:** Sistema de Perfilamento do Eleitorado e Previsão Eleitoral
 **Phase:** 3 — BUILD (Implementation)
-**Date:** 2026-05-07 (v5 — reconciliação estado real: 190 testes, 20 clientes, 23 .tf, 16 tabelas Gold, 14 views semânticas; emendas+sancoes Bronze ingeridos em prod; fixes DIEESE/deploy)
+**Date:** 2026-05-08 (v6 — Social Module v1.2: 272 testes, 10 agentes, 20 jobs, 18 Gold tables, 22 views; batch Bronze 27 UFs; Terraform sentinel.tf/pubsub_sentinel.tf deletados; dashboard fixes; roles/run.viewer IAM)
 **Original BUILD Date:** 2026-04-24 (v1 — cobria DESIGN v4.2)
 **Status:** 🟠 PARCIALMENTE COMPLETO — 1 bloqueador restante (Vertex AI Vector Search — depende de GCP)
 
@@ -273,3 +273,4 @@ a arquitetura projetada.
 | 3.0 | 2026-04-30 | claude-sonnet-4-6 | Sentinel implementado (25 arquivos, 4 crews, KB, GenAI, Terraform); 110/110 testes; BLOQUEADOR 1 resolvido; 1 bloqueador restante (Vertex AI Vector Search — GCP) |
 | 4.0 | 2026-05-06 | claude-sonnet-4-6 | CadÚnico/BF Bronze 4 anos em prod; emendas/sancoes adicionados (Silver+Gold); 172/172 testes; 12 tabelas Gold; 8 views semânticas; 22 .tf |
 | 5.0 | 2026-05-07 | claude-sonnet-4-6 | 190/190 testes; 20 clientes; 23 .tf; 16 tabelas Gold; 14 views semânticas; emendas+sancoes Bronze ingeridos em prod; Silver transform em andamento; GDELT desabilitado (Bluesky+RSS ativos); DIEESE DEFAULT_ANO=2025 fix; deploy.yml create-or-update pattern |
+| 6.0 | 2026-05-08 | claude-sonnet-4-6 | **Social Module v1.2**: 272/272 testes; 10 agentes (+sentinela_social, analista-eleitoral, contextualizador_saude); 20 Cloud Run Jobs (+candidatos_discovery); 18 Gold tables (+dim_territorio, +fact_municipio_candidato_eleicao); 22 views semânticas (+8 sociais); social_client NLP float + confianca_nlp 0.70 gate; candidatos_discovery_job + discover_candidate_pages.py; 5 Cloud Schedulers; Terraform: sentinel.tf + pubsub_sentinel.tf DELETADOS (Sentinel integrado ao spepe-prod); IAM +roles/run.viewer; deploy.yml: GOOGLE_MAPS_API_KEY removido staging; dashboard: Admin button + 27 UFs + applyFilters() real API; dim_territorio gold_builder.py; batch ingestão 27 UFs Bronze em prod (Silver+Gold pendentes) |

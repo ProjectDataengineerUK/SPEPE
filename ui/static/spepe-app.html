@@ -854,113 +854,8 @@ const PARTIDO_COLORS = {
 const pColor = p => PARTIDO_COLORS[p]||'rgba(100,100,100,.7)';
 const avatarBg = p => ({PT:'#b91c1c',PL:'#1565c0',MDB:'#b45309',PDT:'#6d28d9',PSDB:'#0277bd',Rep:'#c2410c',PSB:'#059669',PSD:'#4338ca'}[p]||'#374151');
 
-const CARGOS = {
-  "Presidente": {
-    turno1: [
-      {nm:"Lula",        partido:"PT",   pct:43.8, votos:"14,2M", avatar:"LU"},
-      {nm:"Bolsonaro",   partido:"PL",   pct:43.0, votos:"13,9M", avatar:"BO"},
-      {nm:"Tebet",       partido:"MDB",  pct:7.4,  votos:"2,4M",  avatar:"TE"},
-      {nm:"Ciro Gomes",  partido:"PDT",  pct:3.7,  votos:"1,2M",  avatar:"CI"},
-      {nm:"Outros",      partido:"PSD",  pct:2.1,  votos:"0,7M",  avatar:"OU"},
-    ],
-    turno2:[
-      {nm:"Lula",      partido:"PT", pct:50.9, votos:"16,5M",avatar:"LU"},
-      {nm:"Bolsonaro", partido:"PL", pct:49.1, votos:"15,9M",avatar:"BO"},
-    ],
-    meta:[14200,22800,4100,1900],
-    trends:[[42,48,55,62,80],[58,62,60,65,72],[15,22,30,35,28]],
-    polls:{labs:['Datafolha','Ipespe','XP','Quaest','TSE Real'],lula:[44,43,42,45,43.8],bolso:[40,41,43,39,43.0]},
-  },
-  "Governador": {
-    turno1:[
-      {nm:"Tarcísio",       partido:"Rep",  pct:42.3, votos:"13,7M", avatar:"TA"},
-      {nm:"Haddad",         partido:"PT",   pct:35.7, votos:"11,6M", avatar:"HA"},
-      {nm:"Rodrigo Garcia", partido:"PSDB", pct:18.4, votos:"5,9M",  avatar:"RG"},
-      {nm:"Outros",         partido:"PSD",  pct:3.6,  votos:"1,2M",  avatar:"OU"},
-    ],
-    turno2:[
-      {nm:"Tarcísio", partido:"Rep", pct:56.1, votos:"17,8M", avatar:"TA"},
-      {nm:"Haddad",   partido:"PT",  pct:43.9, votos:"13,9M", avatar:"HA"},
-    ],
-    meta:[8100,12400,3200,0],
-    trends:[[35,42,48,55,70],[40,45,50,52,62],[20,25,30,28,22]],
-    polls:{labs:['Datafolha','Ipespe','XP','Quaest','TSE Real'],lula:[36,35,34,37,35.7],bolso:[40,41,43,42,42.3]},
-  },
-  "Senador": {
-    turno1:[
-      {nm:"Marcos Pontes", partido:"PL",   pct:36.5, votos:"11,8M", avatar:"MP"},
-      {nm:"Marta Suplicy", partido:"PT",   pct:22.1, votos:"7,1M",  avatar:"MS"},
-      {nm:"José Aníbal",   partido:"PSDB", pct:15.3, votos:"4,9M",  avatar:"JA"},
-      {nm:"Styvenson",     partido:"PSB",  pct:10.2, votos:"3,3M",  avatar:"ST"},
-      {nm:"Outros",        partido:"PSD",  pct:15.9, votos:"5,1M",  avatar:"OU"},
-    ],
-    turno2:null,
-    meta:[5800,9200,1200,800],
-    trends:[[20,28,35,40,55],[18,22,28,32,45],[8,12,16,18,20]],
-    polls:{labs:['Datafolha','Ipespe','XP','TSE Real'],lula:[22,21,20,22.1],bolso:[34,35,37,36.5]},
-  },
-  "Dep. Federal": {
-    turno1:[
-      {nm:"Eduardo Bolsonaro", partido:"PL",   pct:3.8,  votos:"1.243k", avatar:"EB"},
-      {nm:"Guilherme Boulos",  partido:"PSB",  pct:1.1,  votos:"349k",   avatar:"GB"},
-      {nm:"Tabata Amaral",     partido:"PSB",  pct:0.9,  votos:"288k",   avatar:"TA"},
-      {nm:"Paulo Teixeira",    partido:"PT",   pct:0.8,  votos:"254k",   avatar:"PT"},
-      {nm:"Kim Kataguiri",     partido:"MDB",  pct:0.7,  votos:"213k",   avatar:"KK"},
-    ],
-    turno2:null,
-    meta:[800,1200,400,300],
-    trends:[[10,15,22,28,35],[8,11,14,18,22],[5,8,10,12,15]],
-    polls:{labs:['Datafolha','Quaest','TSE Real'],lula:[1.1,1.0,1.1],bolso:[3.5,3.6,3.8]},
-  },
-  "Dep. Estadual": {
-    turno1:[
-      {nm:"Douglas Garcia",      partido:"PL",   pct:1.8, votos:"581k",   avatar:"DG"},
-      {nm:"Analice Fernandes",   partido:"PSDB", pct:1.4, votos:"451k",   avatar:"AF"},
-      {nm:"Donato",              partido:"PT",   pct:1.1, votos:"356k",   avatar:"DO"},
-      {nm:"Frederico D'Avila",   partido:"PL",   pct:0.9, votos:"295k",   avatar:"FD"},
-      {nm:"Marcia Lia",          partido:"PT",   pct:0.8, votos:"259k",   avatar:"ML"},
-    ],
-    turno2:null,
-    meta:[400,800,200,150],
-    trends:[[8,10,14,18,25],[6,8,11,13,18],[4,6,8,10,12]],
-    polls:{labs:['Datafolha','TSE Real'],lula:[1.0,1.1],bolso:[1.7,1.8]},
-  },
-};
-
-const MUN_DATA = {
-  "Presidente": [
-    {nm:"São Paulo",    votos:"6.842k", c1:44.1, c2:43.2, c3:7.9,  c4:3.7,  w:0},
-    {nm:"Guarulhos",    votos:"984k",   c1:52.3, c2:37.4, c3:6.1,  c4:2.8,  w:0},
-    {nm:"Campinas",     votos:"733k",   c1:40.8, c2:47.2, c3:8.2,  c4:3.1,  w:1},
-    {nm:"S. Bernardo",  votos:"541k",   c1:55.1, c2:34.6, c3:6.5,  c4:2.9,  w:0},
-    {nm:"Santo André",  votos:"482k",   c1:53.8, c2:35.9, c3:7.0,  c4:2.8,  w:0},
-    {nm:"Ribeirão Pr.", votos:"422k",   c1:38.2, c2:49.8, c3:8.1,  c4:3.0,  w:1},
-    {nm:"Sorocaba",     votos:"389k",   c1:41.5, c2:45.9, c3:8.4,  c4:3.2,  w:1},
-    {nm:"Osasco",       votos:"375k",   c1:58.2, c2:30.8, c3:6.7,  c4:2.4,  w:0},
-  ],
-  "Governador": [
-    {nm:"São Paulo",    votos:"6.842k", c1:38.1, c2:32.5, c3:25.8, c4:3.6,  w:1},
-    {nm:"Guarulhos",    votos:"984k",   c1:45.2, c2:38.3, c3:13.8, c4:2.7,  w:0},
-    {nm:"Campinas",     votos:"733k",   c1:50.1, c2:29.5, c3:18.0, c4:2.4,  w:0},
-    {nm:"S. Bernardo",  votos:"541k",   c1:29.0, c2:47.1, c3:21.5, c4:2.4,  w:1},
-    {nm:"Santo André",  votos:"482k",   c1:30.2, c2:46.0, c3:21.8, c4:2.0,  w:1},
-    {nm:"Ribeirão Pr.", votos:"422k",   c1:52.3, c2:27.4, c3:18.0, c4:2.3,  w:0},
-    {nm:"Sorocaba",     votos:"389k",   c1:48.0, c2:30.5, c3:18.9, c4:2.6,  w:0},
-    {nm:"Osasco",       votos:"375k",   c1:28.5, c2:47.8, c3:21.2, c4:2.5,  w:1},
-  ],
-  "Senador": [
-    {nm:"São Paulo",    votos:"6.842k", c1:28.4, c2:24.1, c3:17.2, c4:12.0, w:1},
-    {nm:"Guarulhos",    votos:"984k",   c1:40.2, c2:20.1, c3:12.8, c4:9.5,  w:1},
-    {nm:"Campinas",     votos:"733k",   c1:42.1, c2:18.5, c3:13.2, c4:9.8,  w:1},
-    {nm:"S. Bernardo",  votos:"541k",   c1:28.8, c2:28.5, c3:14.1, c4:11.2, w:1},
-    {nm:"Santo André",  votos:"482k",   c1:30.1, c2:28.0, c3:14.8, c4:11.0, w:1},
-    {nm:"Ribeirão Pr.", votos:"422k",   c1:44.8, c2:18.1, c3:14.8, c4:9.2,  w:1},
-    {nm:"Sorocaba",     votos:"389k",   c1:42.5, c2:19.0, c3:15.2, c4:9.8,  w:1},
-    {nm:"Osasco",       votos:"375k",   c1:32.0, c2:25.8, c3:14.0, c4:10.8, w:1},
-  ],
-};
-// Use Presidente data as fallback
-['Dep. Federal','Dep. Estadual'].forEach(c=>MUN_DATA[c]=MUN_DATA['Presidente']);
+let _lastMuns = [];
+let _lastCands = [];
 
 let activeCargo='Presidente';
 
@@ -1236,34 +1131,13 @@ function applyFilters(){
   const turnoNum=turno.includes('2')?2:1;
   document.getElementById('bc').innerHTML=`<strong>Dashboard</strong> · ${uf} · ${ano}`;
   toast(`Filtros aplicados — ${uf} ${ano}`);
-  setTimeout(()=>renderCargoView(activeCargo),400);
+  renderCargoView(activeCargo);
   refreshSocioChart(uf, ano);
   refreshTrendsChart(uf, ano);
   refreshMetaChart(uf, ano);
   refreshPrevisaoChart(cargo, uf, ano);
   refreshSentimentChart(uf, ano);
   refreshResultadosChart(cargo, uf, ano, turnoNum);
-  (async () => {
-    try {
-      const [resCands, resKpi] = await Promise.all([
-        apiFetch(`/api/candidatos?cargo=${encodeURIComponent(cargo)}&uf=${uf}&ano=${ano}`).then(r=>r.json()).catch(()=>null),
-        apiFetch(`/api/kpi?cargo=${encodeURIComponent(cargo)}&uf=${uf}&ano=${ano}`).then(r=>r.json()).catch(()=>null),
-      ]);
-      const cands = resCands?.candidatos || [];
-      if (cands.length) {
-        if (resKpi?.vencedor) {
-          setKpi(0, resKpi.vencedor, `${resKpi.vencedor_partido||'—'} · 1º Turno`, (resKpi.vencedor_pct||0).toFixed(1)+'%');
-          setKpi(1, resKpi.segundo||'—', `${resKpi.segundo_partido||'—'} · 1º Turno`, (resKpi.segundo_pct||0).toFixed(1)+'%');
-          document.getElementById('kv2').textContent = (resKpi.margem||0).toFixed(1)+'pp';
-        }
-        const candsNorm = cands.map(c=>({nm:c.nm||c.nm_candidato||'?', partido:c.partido||c.sg_partido||'—', pct:parseFloat(c.pct_t1||0)}));
-        renderCandCards(candsNorm, cargo);
-        document.getElementById('cands-title').textContent=`Candidatos — ${cargo} · ${uf} ${ano}`;
-        document.getElementById('tbl-title').textContent=`Municípios · ${cargo} · ${uf} ${ano}`;
-        document.getElementById('res-sub').textContent=`% votos válidos · ${uf} ${ano}`;
-      }
-    } catch(e) {}
-  })();
 }
 function onCargoSelect(val){
   const tab=[...document.querySelectorAll('.cargo-tab')].find(t=>t.textContent.includes(val.split('.')[0].trim()));
@@ -1286,48 +1160,58 @@ function switchCargo(el,cargo){
   renderCargoView(cargo);
 }
 
-function renderCargoView(cargo){
-  const d=CARGOS[cargo]; if(!d) return;
-  const turno=document.getElementById('f-turno').value;
-  const cands=turno==='2º Turno'&&d.turno2?d.turno2:d.turno1;
-
-  // KPIs
-  const w=cands[0],r=cands[1];
-  setKpi(0,w.nm.toUpperCase(),`${w.partido} · ${turno}`,w.pct+'%');
-  setKpi(1,r.nm.toUpperCase(),`${r.partido} · ${turno}`,r.pct+'%');
-  document.getElementById('kv2').textContent=Math.abs(cands[0].pct-cands[1].pct).toFixed(1)+'pp';
-  const mun=MUN_DATA[cargo]||MUN_DATA['Presidente'];
-  document.getElementById('kv3').textContent=mun.length+'+';
-  document.getElementById('ks3').textContent='municípios amostrados';
-
-  // Candidate cards
-  renderCandCards(cands,cargo);
-
-  // Resultado chart
-  updateResultado(cands,cargo);
-
-  // Trends
-  updateTrends(cands,d.trends,cargo);
-
-  // Meta
-  updateMeta(cands,d.meta);
-
-  // Polls
-  updatePolls(d.polls,cands);
-
-  // Table
-  renderTable(cargo,cands);
-
-  // Sub labels
-  const _uf = document.getElementById('f-uf')?.value || 'SP';
-  const _ano = document.getElementById('f-ano')?.value || '2022';
-  document.getElementById('res-title').textContent=`Resultado — ${cargo} · ${turno}`;
-  document.getElementById('res-sub').textContent=`% votos válidos · ${_uf} ${_ano}`;
-  document.getElementById('cands-title').textContent=`Candidatos — ${cargo} · ${_uf} ${_ano}`;
-  document.getElementById('tbl-title').textContent=`Municípios · ${cargo} · ${_uf} ${_ano}`;
-
-  hlCard('card-cands'); hlCard('card-resultado'); hlCard('card-trends');
-  markUpd('upd-res'); markUpd('upd-trends'); markUpd('upd-meta');
+async function renderCargoView(cargo){
+  const uf = document.getElementById('f-uf')?.value || 'SP';
+  const ano = document.getElementById('f-ano')?.value || '2022';
+  const turno = document.getElementById('f-turno')?.value || '1º Turno';
+  document.getElementById('cands-title').textContent = `Candidatos — ${cargo} · ${uf} ${ano}`;
+  document.getElementById('cand-grid').innerHTML = '<div style="color:#8d96a0;padding:1rem;grid-column:1/-1">Carregando…</div>';
+  document.getElementById('tbl-body').innerHTML = '<tr><td colspan="7" style="color:#8d96a0;text-align:center;padding:.75rem">Carregando…</td></tr>';
+  try {
+    const [resCands, resKpi, resMun] = await Promise.all([
+      apiFetch(`/api/candidatos?cargo=${encodeURIComponent(cargo)}&uf=${uf}&ano=${ano}`).then(r=>r?.json()).catch(()=>null),
+      apiFetch(`/api/kpi?cargo=${encodeURIComponent(cargo)}&uf=${uf}&ano=${ano}`).then(r=>r?.json()).catch(()=>null),
+      apiFetch(`/api/municipios?cargo=${encodeURIComponent(cargo)}&uf=${uf}&ano=${ano}&limit=10`).then(r=>r?.json()).catch(()=>null),
+    ]);
+    const cands = resCands?.candidatos || [];
+    const muns = resMun?.municipios || [];
+    _lastMuns = muns;
+    if (cands.length) {
+      if (resKpi?.vencedor) {
+        setKpi(0, resKpi.vencedor, `${resKpi.vencedor_partido||'—'} · ${turno}`, (resKpi.vencedor_pct||0).toFixed(1)+'%');
+        setKpi(1, resKpi.segundo||'—', `${resKpi.segundo_partido||'—'} · ${turno}`, (resKpi.segundo_pct||0).toFixed(1)+'%');
+        document.getElementById('kv2').textContent = (resKpi.margem||0).toFixed(1)+'pp';
+      }
+      const candsNorm = cands.map(c=>({
+        nm: c.nm||c.nm_candidato||'?',
+        partido: c.partido||c.sg_partido||'—',
+        pct: parseFloat(c.pct_t1||0),
+        votos: c.votos||'—',
+        avatar: (c.nm||c.nm_candidato||'??').split(' ').map(w=>w[0]).join('').slice(0,2).toUpperCase(),
+      }));
+      _lastCands = candsNorm;
+      renderCandCards(candsNorm, cargo);
+      renderTableBQ(muns, candsNorm);
+      document.getElementById('kv3').textContent = muns.length+'+';
+      document.getElementById('ks3').textContent = 'municípios carregados';
+      document.getElementById('res-title').textContent = `Resultado — ${cargo} · ${turno}`;
+      document.getElementById('res-sub').textContent = `% votos válidos · ${uf} ${ano}`;
+      document.getElementById('cands-title').textContent = `Candidatos — ${cargo} · ${uf} ${ano}`;
+      document.getElementById('tbl-title').textContent = `Municípios · ${cargo} · ${uf} ${ano}`;
+    } else {
+      _lastCands = [];
+      document.getElementById('cand-grid').innerHTML = `<div style="color:#8d96a0;padding:1.5rem;text-align:center;grid-column:1/-1">Sem dados para <strong>${uf}</strong> ${ano}.<br><small>Execute o pipeline Silver→Gold para ver dados reais.</small></div>`;
+      renderTableBQ([], []);
+      document.getElementById('res-sub').textContent = `% votos válidos · ${uf} ${ano}`;
+      document.getElementById('cands-title').textContent = `Candidatos — ${cargo} · ${uf} ${ano}`;
+      document.getElementById('tbl-title').textContent = `Municípios · ${cargo} · ${uf} ${ano}`;
+    }
+    if (CH.polls) { CH.polls.data.labels=[]; CH.polls.data.datasets=[]; CH.polls.update(); }
+  } catch(e) {
+    document.getElementById('cands-title').textContent = `Candidatos — ${cargo} · erro ao carregar`;
+  }
+  hlCard('card-cands'); hlCard('card-resultado');
+  markUpd('upd-res');
 }
 
 // ══════════════════════════════════════════════════════
@@ -1350,11 +1234,9 @@ function renderCandCards(cands,cargo){
 function selectCand(el,nm,cargo){
   document.querySelectorAll('.cand-card').forEach(c=>c.classList.remove('selected'));
   el.classList.add('selected');
-  const d=CARGOS[cargo];
-  const cand=d.turno1.find(c=>c.nm===nm);
+  const cand=_lastCands.find(c=>c.nm===nm);
   if(!cand)return;
-  // Highlight that candidate in trends chart if present
-  const idx=d.turno1.indexOf(cand);
+  const idx=_lastCands.indexOf(cand);
   if(CH.trends&&idx<CH.trends.data.datasets.length){
     CH.trends.data.datasets.forEach((ds,i)=>{
       ds.borderWidth=i===idx?3:1;
@@ -1398,79 +1280,38 @@ function showCompare(){
 // ══════════════════════════════════════════════════════
 // CHART UPDATES
 // ══════════════════════════════════════════════════════
-function updateResultado(cands,cargo){
-  CH.resultado.data.labels=cands.map(c=>c.nm);
-  CH.resultado.data.datasets=[{
-    data:cands.map(c=>c.pct),
-    backgroundColor:cands.map(c=>pColor(c.partido)),borderRadius:6
-  }];
-  CH.resultado.update();
-}
-function updateTrends(cands,trendData,cargo){
-  const months=['Jun','Jul','Ago','Set','Out'];
-  CH.trends.data.labels=months;
-  CH.trends.data.datasets=cands.slice(0,Math.min(3,trendData.length)).map((c,i)=>({
-    label:c.nm,data:trendData[i]||[0,0,0,0,0],
-    borderColor:pColor(c.partido),backgroundColor:pColor(c.partido).replace('.85','.1').replace('.8','.1'),
-    tension:.4,fill:true,pointRadius:3,borderWidth:2
-  }));
-  CH.trends.update();
-  document.getElementById('trends-title').textContent=`Google Trends — ${cargo}`;
-}
-function updateMeta(cands,metaData){
-  CH.meta.data.labels=cands.slice(0,metaData.length).map(c=>c.nm);
-  CH.meta.data.datasets=[{
-    label:'R$ mil',data:metaData,
-    backgroundColor:cands.map(c=>pColor(c.partido)),borderRadius:6
-  }];
-  CH.meta.update();
-  document.getElementById('meta-sub').textContent=`R$ mil · ${activeCargo} 2022`;
-}
-function updatePolls(polls,cands){
-  CH.polls.data.labels=polls.labs;
-  CH.polls.data.datasets=[
-    {label:cands[0].nm,data:polls.lula,backgroundColor:pColor(cands[0].partido),borderRadius:4},
-    {label:cands[1]?.nm||'2º',data:polls.bolso,backgroundColor:pColor(cands[1]?.partido||'PL'),borderRadius:4},
-  ];
-  CH.polls.update();
-}
-
 // ══════════════════════════════════════════════════════
-// TABLE
+// TABLE (BQ data)
 // ══════════════════════════════════════════════════════
-function renderTable(cargo,cands){
-  const mun=MUN_DATA[cargo]||MUN_DATA['Presidente'];
-  const c0=cands[0]||{nm:'C1',partido:'PT'};
-  const c1=cands[1]||{nm:'C2',partido:'PL'};
-  const c2=cands[2]||{nm:'C3',partido:'MDB'};
-
+function renderTableBQ(muns, cands){
+  const c0=cands[0]||{nm:'1º',partido:'—'};
+  const c1=cands[1]||{nm:'2º',partido:'—'};
+  const c2=cands[2]||{nm:'3º',partido:'—'};
   document.getElementById('tbl-head').innerHTML=`
     <th>#</th><th>Município</th><th>Votos</th>
-    <th>${c0.nm}</th><th>${c1.nm}</th><th>${c2.nm}</th><th>Resultado</th>`;
-  document.getElementById('tbl-body').innerHTML=mun.map((m,i)=>`
-    <tr>
+    <th>${c0.nm}</th><th>${c1.nm}</th><th>${c2.nm}</th><th>Vencedor</th>`;
+  if(!muns.length){
+    document.getElementById('tbl-body').innerHTML='<tr><td colspan="7" style="color:#8d96a0;text-align:center;padding:.75rem">Sem dados</td></tr>';
+    return;
+  }
+  document.getElementById('tbl-body').innerHTML=muns.map((m,i)=>{
+    const w=(m.c1||0)>=(m.c2||0)?0:1;
+    const wNm=w===0?(m.nm_c1||c0.nm):(m.nm_c2||c1.nm);
+    return `<tr>
       <td style="color:var(--text3)">${i+1}</td>
       <td><strong>${m.nm}</strong></td>
       <td style="font-family:'JetBrains Mono',monospace;font-size:.71rem">${m.votos}</td>
-      <td><div class="vbar"><div class="vb vc" style="width:${(m.c1*0.85).toFixed(0)}px"></div><span class="pct">${m.c1}%</span></div></td>
-      <td><div class="vbar"><div class="vb vb2" style="width:${(m.c2*0.85).toFixed(0)}px"></div><span class="pct">${m.c2}%</span></div></td>
-      <td><div class="vbar"><div class="vb vb3" style="width:${(m.c3*0.85).toFixed(0)}px"></div><span class="pct">${m.c3}%</span></div></td>
-      <td><span class="wchip w${m.w}">${cands[m.w]?.nm||'C'+(m.w+1)}</span></td>
-    </tr>`).join('');
+      <td><div class="vbar"><div class="vb vc" style="width:${((m.c1||0)*0.85).toFixed(0)}px"></div><span class="pct">${m.c1||0}%</span></div></td>
+      <td><div class="vbar"><div class="vb vb2" style="width:${((m.c2||0)*0.85).toFixed(0)}px"></div><span class="pct">${m.c2||0}%</span></div></td>
+      <td><div class="vbar"><div class="vb vb3" style="width:${((m.c3||0)*0.85).toFixed(0)}px"></div><span class="pct">${m.c3||0}%</span></div></td>
+      <td><span class="wchip w${w}">${wNm}</span></td>
+    </tr>`;
+  }).join('');
 }
 function filterTable(q){
-  const cargo=activeCargo;
-  const cands=CARGOS[cargo]?.turno1||[];
-  const mun=(MUN_DATA[cargo]||MUN_DATA['Presidente']).filter(m=>m.nm.toLowerCase().includes(q.toLowerCase()));
-  if(!q)renderTable(cargo,cands);
-  else document.getElementById('tbl-body').innerHTML=mun.map((m,i)=>`
-    <tr><td style="color:var(--text3)">${i+1}</td><td><strong>${m.nm}</strong></td>
-    <td style="font-family:'JetBrains Mono',monospace;font-size:.71rem">${m.votos}</td>
-    <td><div class="vbar"><div class="vb vc" style="width:${(m.c1*0.85).toFixed(0)}px"></div><span class="pct">${m.c1}%</span></div></td>
-    <td><div class="vbar"><div class="vb vb2" style="width:${(m.c2*0.85).toFixed(0)}px"></div><span class="pct">${m.c2}%</span></div></td>
-    <td><div class="vbar"><div class="vb vb3" style="width:${(m.c3*0.85).toFixed(0)}px"></div><span class="pct">${m.c3}%</span></div></td>
-    <td><span class="wchip w${m.w}">${cands[m.w]?.nm||'C'+(m.w+1)}</span></td>
-    </tr>`).join('');
+  if(!q){ renderTableBQ(_lastMuns, _lastCands); return; }
+  const filtered=_lastMuns.filter(m=>m.nm.toLowerCase().includes(q.toLowerCase()));
+  renderTableBQ(filtered, _lastCands);
 }
 
 // ══════════════════════════════════════════════════════
@@ -1564,7 +1405,7 @@ const AI_RESP={
 };
 const DEF=[
   `Com base em <strong>SP 2022</strong> — compare cargos usando os tabs acima ou pergunte sobre candidatos específicos.`,
-  `Os dados de <span class="s">${Object.keys(CARGOS).length} cargos</span> estão carregados. Posso detalhar qualquer um.`,
+  `Os dados de <span class="s">5 cargos</span> estão disponíveis. Posso detalhar qualquer um.`,
   `Boa pergunta! O padrão eleitoral varia significativamente por cargo em SP.`,
 ];
 
@@ -1913,7 +1754,10 @@ async function reloadMap(){
   const turnoRaw = document.getElementById('f-turno')?.value || '1º Turno';
   const turno = turnoRaw.includes('2') ? 2 : 1;
 
-  let url = `/api/mapa/${_mapLevel}?cargo=${encodeURIComponent(cargo)}&ano=2022&turno=${turno}&layer=${layer}`;
+  const ano = document.getElementById('f-ano')?.value || '2022';
+  const ufSel = document.getElementById('f-uf')?.value || 'SP';
+  if(_mapLevel === 'municipio' && !_mapCtx.uf) _mapCtx.uf = ufSel;
+  let url = `/api/mapa/${_mapLevel}?cargo=${encodeURIComponent(cargo)}&ano=${ano}&turno=${turno}&layer=${layer}`;
   if(_mapCtx.uf) url += `&uf=${_mapCtx.uf}`;
   if(_mapCtx.cd_municipio) url += `&cd_municipio=${_mapCtx.cd_municipio}`;
   if(_mapCtx.nr_zona) url += `&nr_zona=${_mapCtx.nr_zona}`;
@@ -1945,7 +1789,7 @@ async function _loadGeoJSON(level){
   const url = geoUrls[level];
   if(!url) return null;
   try {
-    const r = await apiFetch(url);
+    const r = await _nativeFetch(url);
     return await r.json();
   } catch { return null; }
 }
