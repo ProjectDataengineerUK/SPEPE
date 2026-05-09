@@ -225,7 +225,7 @@ def discover_youtube_channel(nome: str) -> str | None:
             params={
                 "q": f"{nome} oficial",
                 "type": "channel",
-                "maxResults": 3,
+                "maxResults": "3",
                 "part": "snippet",
                 "relevanceLanguage": "pt",
                 "regionCode": "BR",
