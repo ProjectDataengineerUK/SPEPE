@@ -1893,14 +1893,12 @@ async def get_previsao(
                 pass
             gold = f"{settings.gcp_project_id}.{settings.bigquery_dataset_gold}"
             query = f"""
-                SELECT candidato,
-                       AVG(intencao_ajustada) / 100.0 AS prob_vitoria,
+                SELECT nm_candidato AS candidato,
+                       ROUND(pct_uf / 100.0, 4) AS prob_vitoria,
                        NULL AS intervalo_inferior,
                        NULL AS intervalo_superior
                 FROM `{gold}.vw_intencao_voto_uf`
-                WHERE sg_uf = @uf AND cd_cargo = @cd_cargo
-                  AND EXTRACT(YEAR FROM data_pesquisa_inicio) = @ano
-                GROUP BY candidato
+                WHERE sg_uf = @uf AND cd_cargo = @cd_cargo AND ano_eleicao = @ano
                 ORDER BY prob_vitoria DESC
                 LIMIT 10
             """
