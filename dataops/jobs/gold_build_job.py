@@ -26,6 +26,7 @@ def main() -> None:
     if gold_path.exists():
         try:
             from dataops.dq.runner import run_suite
+
             df_gold = pd.read_parquet(gold_path)
             dq_result = run_suite(df_gold, "gold")
             logger.info(

@@ -16,7 +16,9 @@ logging.basicConfig(
 )
 logger = logging.getLogger("spepe.jobs.emendas_ingest")
 
-_YEARS_ENV = os.environ.get("EMENDAS_YEARS", os.environ.get("EMENDAS_YEAR", os.environ.get("DEFAULT_ANO", "2022")))
+_YEARS_ENV = os.environ.get(
+    "EMENDAS_YEARS", os.environ.get("EMENDAS_YEAR", os.environ.get("DEFAULT_ANO", "2022"))
+)
 DEFAULT_YEARS = [int(y.strip()) for y in _YEARS_ENV.split(",") if y.strip()]
 
 

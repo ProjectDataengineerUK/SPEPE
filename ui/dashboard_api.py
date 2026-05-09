@@ -501,11 +501,15 @@ async def get_trends(
                 f" WHERE cd_cargo = @cd_cargo AND ano_eleicao = @ano"
                 f" ORDER BY total_votos DESC LIMIT 3"
             )
-            _job_cfg = _bq_mod.QueryJobConfig(query_parameters=[
-                _bq_mod.ScalarQueryParameter("cd_cargo", "INT64", _cd_cargo),
-                _bq_mod.ScalarQueryParameter("ano", "INT64", ano),
-            ])
-            keywords = [r["nm_candidato"] for r in _bq_client.query(_q, job_config=_job_cfg).result()]
+            _job_cfg = _bq_mod.QueryJobConfig(
+                query_parameters=[
+                    _bq_mod.ScalarQueryParameter("cd_cargo", "INT64", _cd_cargo),
+                    _bq_mod.ScalarQueryParameter("ano", "INT64", ano),
+                ]
+            )
+            keywords = [
+                r["nm_candidato"] for r in _bq_client.query(_q, job_config=_job_cfg).result()
+            ]
         except Exception:
             pass
     if not keywords:
@@ -553,11 +557,15 @@ async def get_meta(
                 f" WHERE cd_cargo = @cd_cargo AND ano_eleicao = @ano"
                 f" ORDER BY total_votos DESC LIMIT 4"
             )
-            _job_cfg = _bq_mod.QueryJobConfig(query_parameters=[
-                _bq_mod.ScalarQueryParameter("cd_cargo", "INT64", _cd_cargo),
-                _bq_mod.ScalarQueryParameter("ano", "INT64", ano),
-            ])
-            candidatos_nm = [r["nm_candidato"] for r in _bq_client.query(_q, job_config=_job_cfg).result()]
+            _job_cfg = _bq_mod.QueryJobConfig(
+                query_parameters=[
+                    _bq_mod.ScalarQueryParameter("cd_cargo", "INT64", _cd_cargo),
+                    _bq_mod.ScalarQueryParameter("ano", "INT64", ano),
+                ]
+            )
+            candidatos_nm = [
+                r["nm_candidato"] for r in _bq_client.query(_q, job_config=_job_cfg).result()
+            ]
         except Exception:
             pass
     if not candidatos_nm:
