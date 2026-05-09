@@ -145,11 +145,11 @@ def _classify(
 def query_gold_storage() -> list[dict[str, Any]]:
     """Return one dict per declared Gold table, including missing ones."""
     sql = f"""
-    SELECT table_name, total_rows, total_logical_bytes,
-           TIMESTAMP_DIFF(CURRENT_TIMESTAMP(), storage_last_modified_time, HOUR) AS freshness_hours,
-           storage_last_modified_time
-    FROM `{_PROJECT}.{_GOLD}.INFORMATION_SCHEMA.TABLE_STORAGE`
-    WHERE table_type = 'BASE TABLE'
+    SELECT table_id AS table_name, row_count AS total_rows, size_bytes AS total_logical_bytes,
+           TIMESTAMP_DIFF(CURRENT_TIMESTAMP(), TIMESTAMP_MILLIS(last_modified_time), HOUR) AS freshness_hours,
+           TIMESTAMP_MILLIS(last_modified_time) AS storage_last_modified_time
+    FROM `{_PROJECT}.{_GOLD}.__TABLES__`
+    WHERE type = 1
     """
     found: dict[str, dict[str, Any]] = {r["table_name"]: dict(r) for r in _bq().query(sql).result()}
     out: list[dict[str, Any]] = []
@@ -188,11 +188,11 @@ def query_gold_storage() -> list[dict[str, Any]]:
 def query_silver_storage() -> list[dict[str, Any]]:
     """Return one dict per existing Silver table (discovered, not declared)."""
     sql = f"""
-    SELECT table_name, total_rows, total_logical_bytes,
-           TIMESTAMP_DIFF(CURRENT_TIMESTAMP(), storage_last_modified_time, HOUR) AS freshness_hours,
-           storage_last_modified_time
-    FROM `{_PROJECT}.{_SILVER}.INFORMATION_SCHEMA.TABLE_STORAGE`
-    WHERE table_type = 'BASE TABLE'
+    SELECT table_id AS table_name, row_count AS total_rows, size_bytes AS total_logical_bytes,
+           TIMESTAMP_DIFF(CURRENT_TIMESTAMP(), TIMESTAMP_MILLIS(last_modified_time), HOUR) AS freshness_hours,
+           TIMESTAMP_MILLIS(last_modified_time) AS storage_last_modified_time
+    FROM `{_PROJECT}.{_SILVER}.__TABLES__`
+    WHERE type = 1
     ORDER BY table_name
     """
     out: list[dict[str, Any]] = []
@@ -216,7 +216,8 @@ def query_silver_storage() -> list[dict[str, Any]]:
 def query_views_existence() -> list[dict[str, Any]]:
     """For each declared semantic view, check if it exists in spepe_gold."""
     sql = f"""
-    SELECT table_name FROM `{_PROJECT}.{_GOLD}.INFORMATION_SCHEMA.VIEWS`
+    SELECT table_id AS table_name FROM `{_PROJECT}.{_GOLD}.__TABLES__`
+    WHERE type = 2
     """
     found = {r["table_name"] for r in _bq().query(sql).result()}
     out: list[dict[str, Any]] = []

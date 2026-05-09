@@ -96,7 +96,7 @@ def _build_gold_via_bigquery_sql() -> dict:
                     nm_municipio_x                           AS nm_municipio,
                     SAFE_CAST(cd_municipio_ibge AS INT64)   AS cd_municipio_ibge,
                     nm_candidato,
-                    CAST(NULL AS STRING)                     AS sg_partido,
+                    sg_partido,
                     SAFE_CAST(cd_cargo AS INT64)             AS cd_cargo,
                     ds_cargo,
                     SAFE_CAST(nr_turno AS INT64)             AS nr_turno,
@@ -105,7 +105,7 @@ def _build_gold_via_bigquery_sql() -> dict:
                     CURRENT_TIMESTAMP()                      AS ingested_at
                 FROM {silver_wc}
                 GROUP BY sg_uf, cd_municipio, nm_municipio_x, cd_municipio_ibge,
-                         nm_candidato, cd_cargo, ds_cargo, nr_turno, ano_eleicao
+                         nm_candidato, sg_partido, cd_cargo, ds_cargo, nr_turno, ano_eleicao
             )
         """,
         "fact_ibge_municipio": f"""
