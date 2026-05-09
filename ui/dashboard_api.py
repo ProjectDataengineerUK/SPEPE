@@ -1379,9 +1379,9 @@ async def _bq_mapa_uf(cargo: str, ano: int, turno: int) -> list[dict]:
     query = f"""
         WITH ranked AS (
             SELECT sg_uf, nm_candidato, sg_partido,
-                   SUM(qt_votos) AS votos,
-                   RANK() OVER (PARTITION BY sg_uf ORDER BY SUM(qt_votos) DESC) AS rnk
-            FROM `{settings.gcp_project_id}.{settings.bigquery_dataset_gold}.fact_municipio_eleicao`
+                   SUM(total_votos) AS votos,
+                   RANK() OVER (PARTITION BY sg_uf ORDER BY SUM(total_votos) DESC) AS rnk
+            FROM `{settings.gcp_project_id}.{settings.bigquery_dataset_gold}.fact_municipio_candidato_eleicao`
             WHERE ano_eleicao = @ano AND cd_cargo = @cd_cargo AND nr_turno = @turno
             GROUP BY sg_uf, nm_candidato, sg_partido
         ),
@@ -1431,9 +1431,9 @@ async def _bq_mapa_municipio(uf: str, cargo: str, ano: int, turno: int) -> list[
     query = f"""
         WITH ranked AS (
             SELECT cd_municipio, nm_municipio, nm_candidato, sg_partido,
-                   SUM(qt_votos) AS votos,
-                   RANK() OVER (PARTITION BY cd_municipio ORDER BY SUM(qt_votos) DESC) AS rnk
-            FROM `{settings.gcp_project_id}.{settings.bigquery_dataset_gold}.fact_municipio_eleicao`
+                   SUM(total_votos) AS votos,
+                   RANK() OVER (PARTITION BY cd_municipio ORDER BY SUM(total_votos) DESC) AS rnk
+            FROM `{settings.gcp_project_id}.{settings.bigquery_dataset_gold}.fact_municipio_candidato_eleicao`
             WHERE sg_uf = @uf AND ano_eleicao = @ano AND cd_cargo = @cd_cargo AND nr_turno = @turno
             GROUP BY cd_municipio, nm_municipio, nm_candidato, sg_partido
         ),
@@ -1485,12 +1485,12 @@ async def _bq_mapa_zona(uf: str, cd_municipio: str, cargo: str, ano: int, turno:
     cd_cargo = _CARGO_CD.get(cargo, 1)
     query = f"""
         WITH ranked AS (
-            SELECT nr_zona, nm_candidato, sg_partido,
+            SELECT nr_zona, nm_candidato, CAST(NULL AS STRING) AS sg_partido,
                    SUM(qt_votos) AS votos,
                    RANK() OVER (PARTITION BY nr_zona ORDER BY SUM(qt_votos) DESC) AS rnk
             FROM `{settings.gcp_project_id}.spepe_silver.tse_{uf.lower()}_{ano}`
             WHERE cd_municipio = @cd_municipio AND cd_cargo = @cd_cargo AND nr_turno = @turno
-            GROUP BY nr_zona, nm_candidato, sg_partido
+            GROUP BY nr_zona, nm_candidato
         ),
         totais AS (
             SELECT nr_zona, SUM(votos) AS total_votos FROM ranked GROUP BY nr_zona
@@ -1540,13 +1540,13 @@ async def _bq_mapa_secao(
     cd_cargo = _CARGO_CD.get(cargo, 1)
     query = f"""
         WITH ranked AS (
-            SELECT nr_secao, nm_candidato, sg_partido,
+            SELECT nr_secao, nm_candidato, CAST(NULL AS STRING) AS sg_partido,
                    SUM(qt_votos) AS votos,
                    RANK() OVER (PARTITION BY nr_secao ORDER BY SUM(qt_votos) DESC) AS rnk
             FROM `{settings.gcp_project_id}.spepe_silver.tse_{uf.lower()}_{ano}`
             WHERE cd_municipio = @cd_municipio AND nr_zona = @nr_zona
               AND cd_cargo = @cd_cargo AND nr_turno = @turno
-            GROUP BY nr_secao, nm_candidato, sg_partido
+            GROUP BY nr_secao, nm_candidato
         ),
         totais AS (
             SELECT nr_secao, SUM(votos) AS total_votos FROM ranked GROUP BY nr_secao
