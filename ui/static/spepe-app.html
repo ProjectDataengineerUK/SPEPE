@@ -403,8 +403,8 @@ tr.rhl td{background:rgba(0,200,83,.07)!important}
         </div>
         <div class="filt"><label>Cargo</label>
           <select id="f-cargo" onchange="onCargoSelect(this.value)">
-            <option>Presidente</option><option>Governador</option><option>Senador</option>
-            <option>Dep. Federal</option><option>Dep. Estadual</option><option>Prefeito</option>
+            <option>Governador</option><option>Senador</option>
+            <option>Dep. Federal</option><option>Dep. Estadual</option><option>Presidente</option><option>Prefeito</option>
           </select>
         </div>
         <div class="filt"><label>Turno</label>
@@ -435,8 +435,8 @@ tr.rhl td{background:rgba(0,200,83,.07)!important}
 
       <!-- Cargo sub-tabs -->
       <div class="cargo-tabs" id="cargo-tabs">
-        <span class="cargo-tab active" onclick="switchCargo(this,'Presidente')">🏛 Presidente</span>
-        <span class="cargo-tab" onclick="switchCargo(this,'Governador')">🏟 Governador</span>
+        <span class="cargo-tab active" onclick="switchCargo(this,'Governador')">🏟 Governador</span>
+        <span class="cargo-tab" onclick="switchCargo(this,'Presidente')">🏛 Presidente</span>
         <span class="cargo-tab" onclick="switchCargo(this,'Senador')">⚖️ Senador</span>
         <span class="cargo-tab" onclick="switchCargo(this,'Dep. Federal')">📜 Dep. Federal</span>
         <span class="cargo-tab" onclick="switchCargo(this,'Dep. Estadual')">🗳 Dep. Estadual</span>
@@ -857,7 +857,7 @@ const avatarBg = p => ({PT:'#b91c1c',PL:'#1565c0',MDB:'#b45309',PDT:'#6d28d9',PS
 let _lastMuns = [];
 let _lastCands = [];
 
-let activeCargo='Presidente';
+let activeCargo='Governador';
 
 // ══════════════════════════════════════════════════════
 // LOGIN
@@ -879,7 +879,7 @@ function handleGoogleCredential(response) {
   document.getElementById('uav').textContent = initials;
   document.getElementById('login').style.display = 'none';
   document.getElementById('app').classList.add('visible');
-  initCharts(); renderCargoView('Presidente');
+  initCharts(); renderCargoView('Governador');
   loadUFOptions();
 }
 function doLogin() { /* replaced by Google Sign-In */ }
