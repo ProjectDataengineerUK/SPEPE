@@ -22,6 +22,7 @@ class SPEPESettings(BaseSettings):
     firestore_collection: str = "spepe_sessions"
 
     google_maps_api_key: str = ""
+    google_client_id: str = ""
 
     log_level: str = "INFO"
     agent_permission_mode: str = "bypassPermissions"

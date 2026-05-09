@@ -2275,7 +2275,16 @@ window.addEventListener('load', _ensureChatWs);
     const root = document.getElementById('admin-sentinel-root');
     const wasHidden = root.style.display === 'none';
     root.style.display = wasHidden ? 'block' : 'none';
-    if (wasHidden) startSentinelStream();
+    if (wasHidden) {
+      startSentinelStream();
+      // Poll imediato — SSE conecta mas pode nunca enviar snapshot (Pub/Sub inativo)
+      setTimeout(async () => {
+        try {
+          const r = await fetch('/admin/api/sentinel/status', { headers: authHeadersAdmin() });
+          if (r.ok) applySnapshot(await r.json());
+        } catch (_) {}
+      }, 200);
+    }
   };
 
   function authHeadersAdmin() {

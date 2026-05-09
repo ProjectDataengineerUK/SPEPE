@@ -613,30 +613,30 @@ _VIEWS: dict[str, str] = {
         FROM `{_PROJECT}.{_GOLD}.vw_transferencias_municipio` t
         LEFT JOIN (
             SELECT
-                cod_municipio_ibge, sg_uf, ano_eleicao,
-                candidato, pct_votos_validos, partido
-            FROM `{_PROJECT}.{_GOLD}.fact_municipio_eleicao`
-            WHERE turno = 1
+                cd_municipio_ibge, sg_uf, ano_eleicao,
+                nm_candidato AS candidato, pct_votos_municipio AS pct_votos_validos, sg_partido AS partido
+            FROM `{_PROJECT}.{_GOLD}.fact_municipio_candidato_eleicao`
+            WHERE nr_turno = 1
             QUALIFY ROW_NUMBER() OVER (
-                PARTITION BY cod_municipio_ibge, ano_eleicao
-                ORDER BY pct_votos_validos DESC
+                PARTITION BY cd_municipio_ibge, ano_eleicao
+                ORDER BY pct_votos_municipio DESC
             ) = 1
-        ) e ON t.cd_municipio_ibge = e.cod_municipio_ibge
+        ) e ON t.cd_municipio_ibge = e.cd_municipio_ibge
            AND t.ano = e.ano_eleicao
     """,
     # ── Share de emendas por candidato × UF × ciclo eleitoral ────────────
     "vw_emendas_candidato_uf": f"""
         SELECT
             e.sg_uf,
-            e.ano_eleicao,
-            e.autor_emenda                                                  AS candidato,
-            e.partido,
-            SUM(e.valor_emenda)                                             AS total_emendas_r,
-            COUNT(*)                                                        AS num_emendas,
+            e.ano,
+            e.nm_parlamentar                                                AS candidato,
+            e.sg_partido                                                    AS partido,
+            SUM(e.vl_pago_total)                                            AS total_emendas_r,
+            SUM(e.qt_emendas)                                               AS num_emendas,
             ROUND(
-                SUM(e.valor_emenda) / NULLIF(
-                    SUM(SUM(e.valor_emenda)) OVER (
-                        PARTITION BY e.sg_uf, e.ano_eleicao
+                SUM(e.vl_pago_total) / NULLIF(
+                    SUM(SUM(e.vl_pago_total)) OVER (
+                        PARTITION BY e.sg_uf, e.ano
                     ), 0
                 ), 4
             )                                                               AS share_emendas_uf

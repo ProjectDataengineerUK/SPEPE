@@ -12,7 +12,6 @@ logger = logging.getLogger("spepe.jobs.gold_build")
 
 def main() -> None:
     from dataops.gold_builder import build_gold
-    from dataops.dq.runner import run_suite
     from pathlib import Path
     import pandas as pd
 
@@ -25,11 +24,15 @@ def main() -> None:
 
     gold_path = Path("data/gold/fact_municipio_eleicao.parquet")
     if gold_path.exists():
-        df_gold = pd.read_parquet(gold_path)
-        dq_result = run_suite(df_gold, "gold")
-        logger.info(
-            f"Gold DQ: score={dq_result['score']:.1f}% passed={dq_result['passed']}/{dq_result['total']}"
-        )
+        try:
+            from dataops.dq.runner import run_suite
+            df_gold = pd.read_parquet(gold_path)
+            dq_result = run_suite(df_gold, "gold")
+            logger.info(
+                f"Gold DQ: score={dq_result['score']:.1f}% passed={dq_result['passed']}/{dq_result['total']}"
+            )
+        except ImportError:
+            logger.info("DQ runner não disponível — pulando validação local")
 
     logger.info(f"Gold build concluído: {result.get('tables')}")
 

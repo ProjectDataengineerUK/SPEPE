@@ -105,7 +105,10 @@ async def dashboard_auth_middleware(request: Request, call_next):
         from google.oauth2 import id_token as gid
 
         gid.verify_oauth2_token(
-            auth[7:], grequests.Request(), audience=None, clock_skew_in_seconds=10
+            auth[7:],
+            grequests.Request(),
+            audience=settings.google_client_id or None,
+            clock_skew_in_seconds=10,
         )
     except Exception:
         return JSONResponse({"detail": "Invalid or expired token"}, status_code=401)
@@ -136,7 +139,7 @@ async def require_auth(
         info = id_token.verify_oauth2_token(
             credentials.credentials,
             grequests.Request(),
-            audience=None,
+            audience=settings.google_client_id or None,
             clock_skew_in_seconds=10,
         )
         return info
@@ -495,10 +498,14 @@ async def get_trends(
             _q = (
                 f"SELECT nm_candidato FROM "
                 f"`{settings.gcp_project_id}.{settings.bigquery_dataset_gold}.fact_candidato_eleicao`"
-                f" WHERE cd_cargo = {_cd_cargo} AND ano_eleicao = {ano}"
+                f" WHERE cd_cargo = @cd_cargo AND ano_eleicao = @ano"
                 f" ORDER BY total_votos DESC LIMIT 3"
             )
-            keywords = [r["nm_candidato"] for r in _bq_client.query(_q).result()]
+            _job_cfg = _bq_mod.QueryJobConfig(query_parameters=[
+                _bq_mod.ScalarQueryParameter("cd_cargo", "INT64", _cd_cargo),
+                _bq_mod.ScalarQueryParameter("ano", "INT64", ano),
+            ])
+            keywords = [r["nm_candidato"] for r in _bq_client.query(_q, job_config=_job_cfg).result()]
         except Exception:
             pass
     if not keywords:
@@ -543,10 +550,14 @@ async def get_meta(
             _q = (
                 f"SELECT nm_candidato FROM "
                 f"`{settings.gcp_project_id}.{settings.bigquery_dataset_gold}.fact_candidato_eleicao`"
-                f" WHERE cd_cargo = {_cd_cargo} AND ano_eleicao = {ano}"
+                f" WHERE cd_cargo = @cd_cargo AND ano_eleicao = @ano"
                 f" ORDER BY total_votos DESC LIMIT 4"
             )
-            candidatos_nm = [r["nm_candidato"] for r in _bq_client.query(_q).result()]
+            _job_cfg = _bq_mod.QueryJobConfig(query_parameters=[
+                _bq_mod.ScalarQueryParameter("cd_cargo", "INT64", _cd_cargo),
+                _bq_mod.ScalarQueryParameter("ano", "INT64", ano),
+            ])
+            candidatos_nm = [r["nm_candidato"] for r in _bq_client.query(_q, job_config=_job_cfg).result()]
         except Exception:
             pass
     if not candidatos_nm:
@@ -1221,9 +1232,9 @@ async def _bq_mapa_nacional(cargo: str, ano: int, turno: int) -> list[dict]:
     query = f"""
         WITH ranked AS (
             SELECT nm_candidato, sg_partido,
-                   SUM(qt_votos) AS votos,
-                   RANK() OVER (ORDER BY SUM(qt_votos) DESC) AS rnk
-            FROM `{settings.gcp_project_id}.{settings.bigquery_dataset_gold}.fact_municipio_eleicao`
+                   SUM(total_votos) AS votos,
+                   RANK() OVER (ORDER BY SUM(total_votos) DESC) AS rnk
+            FROM `{settings.gcp_project_id}.{settings.bigquery_dataset_gold}.fact_municipio_candidato_eleicao`
             WHERE ano_eleicao = @ano AND cd_cargo = @cd_cargo AND nr_turno = @turno
             GROUP BY nm_candidato, sg_partido
         ),
@@ -1304,16 +1315,29 @@ async def _bq_mapa_regiao(cargo: str, ano: int, turno: int) -> list[dict]:
         + " ELSE 'Outro' END"
     )
     query = f"""
-        SELECT
-            {case_expr} AS regiao,
-            APPROX_TOP_COUNT(nm_candidato, 1)[OFFSET(0)].value AS lider,
-            APPROX_TOP_COUNT(sg_partido, 1)[OFFSET(0)].value AS partido,
-            ROUND(MAX(CASE WHEN RANK() OVER (PARTITION BY {case_expr} ORDER BY SUM(qt_votos) DESC) = 1 THEN SUM(qt_votos) END) /
-                  SUM(SUM(qt_votos)) OVER (PARTITION BY {case_expr}) * 100, 1) AS pct,
-            SUM(qt_votos) AS total_votos
-        FROM `{settings.gcp_project_id}.{settings.bigquery_dataset_gold}.fact_municipio_eleicao`
-        WHERE ano_eleicao = @ano AND cd_cargo = @cd_cargo AND nr_turno = @turno
-        GROUP BY regiao
+        WITH candidatos AS (
+            SELECT
+                {case_expr} AS regiao,
+                nm_candidato,
+                sg_partido,
+                SUM(total_votos) AS votos
+            FROM `{settings.gcp_project_id}.{settings.bigquery_dataset_gold}.fact_municipio_candidato_eleicao`
+            WHERE ano_eleicao = @ano AND cd_cargo = @cd_cargo AND nr_turno = @turno
+            GROUP BY regiao, nm_candidato, sg_partido
+        ),
+        totais AS (
+            SELECT regiao, SUM(votos) AS total_votos
+            FROM candidatos GROUP BY regiao
+        ),
+        ranked AS (
+            SELECT c.regiao, c.nm_candidato, c.sg_partido, c.votos, t.total_votos,
+                   ROW_NUMBER() OVER (PARTITION BY c.regiao ORDER BY c.votos DESC) AS rn
+            FROM candidatos c JOIN totais t USING (regiao)
+        )
+        SELECT regiao, nm_candidato AS lider, sg_partido AS partido,
+               ROUND(votos / total_votos * 100, 1) AS pct,
+               total_votos
+        FROM ranked WHERE rn = 1
     """
     job_config = bigquery.QueryJobConfig(
         query_parameters=[

@@ -58,8 +58,10 @@ DEFAULT_INDICADORES = [
 ]
 
 
-def main(uf: str) -> None:
-    logger.info("IBGE sync job: UF=%s", uf)
+def main(uf: str, year: int | None = None) -> None:
+    if year is None:
+        year = int(os.environ.get("IBGE_YEAR", os.environ.get("DEFAULT_ANO", "2022")))
+    logger.info("IBGE sync job: UF=%s year=%d", uf, year)
     cache_dir = Path("data/bronze/ibge")
     uf_code = UF_CODES.get(uf.upper(), "35")
 
@@ -70,9 +72,9 @@ def main(uf: str) -> None:
         out_path = write_bronze(
             df=df,
             source="ibge",
-            year=2022,
+            year=year,
             uf=uf,
-            filename=f"indicadores_{uf.upper()}_2022.parquet",
+            filename=f"indicadores_{uf.upper()}_{year}.parquet",
             use_gcs=bool(os.environ.get("GCS_BUCKET")),
         )
         logger.info("IBGE SIDRA Bronze: %s (%d rows)", out_path, len(df))
@@ -84,7 +86,7 @@ def main(uf: str) -> None:
         out_path = write_bronze(
             df=df_mun,
             source="ibge",
-            year=2022,
+            year=year,
             uf=uf,
             filename=f"municipios_{uf.upper()}.parquet",
             use_gcs=bool(os.environ.get("GCS_BUCKET")),
@@ -97,7 +99,8 @@ if __name__ == "__main__":
 
     parser = argparse.ArgumentParser()
     parser.add_argument("--uf", default=os.environ.get("DEFAULT_UF", "SP"))
+    parser.add_argument("--year", type=int, default=None)
     args = parser.parse_args()
     ufs = list(UF_CODES.keys()) if args.uf.upper() == "ALL" else [args.uf.upper()]
     for uf in ufs:
-        main(uf)
+        main(uf, year=args.year)
