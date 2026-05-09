@@ -134,7 +134,7 @@ jobs:
                      spepe-social-ingest spepe-pesquisas-ingest spepe-security-ingest spepe-datasus-ingest \
                      spepe-dieese-ingest spepe-cetic-ingest spepe-reddit-ingest spepe-camara-senado-ingest \
                      spepe-endividamento-ingest spepe-cadunico-ingest spepe-emendas-ingest \
-                     spepe-sancoes-ingest; do
+                     spepe-sancoes-ingest spepe-candidatos-discovery; do
             gcloud run jobs update "${JOB}" \
               --image "${IMAGE}" \
               --region "${{ env.GCP_REGION }}" \
@@ -169,8 +169,9 @@ jobs:
     if: >
       (github.event_name == 'workflow_run' && github.event.workflow_run.conclusion == 'success') ||
       (github.event_name == 'workflow_dispatch' && github.event.inputs.environment == 'prod')
-    # Use staging environment credentials — same WIF SA, granted run.developer on spepe-prod
-    environment: staging
+    # "production" environment requires manual approval in GitHub Settings → Environments.
+    # Same WIF SA as staging — SA must have run.developer on spepe-prod.
+    environment: production
     permissions:
       contents: read
       id-token: write
@@ -210,7 +211,7 @@ jobs:
                      spepe-social-ingest spepe-pesquisas-ingest spepe-security-ingest spepe-datasus-ingest \
                      spepe-dieese-ingest spepe-cetic-ingest spepe-reddit-ingest spepe-camara-senado-ingest \
                      spepe-endividamento-ingest spepe-cadunico-ingest spepe-emendas-ingest \
-                     spepe-sancoes-ingest; do
+                     spepe-sancoes-ingest spepe-candidatos-discovery; do
             if gcloud run jobs describe "${JOB}" --region "${REGION}" --project spepe-prod &>/dev/null; then
               gcloud run jobs update "${JOB}" \
                 --image "${IMAGE}" \
@@ -229,10 +230,16 @@ jobs:
 
       - name: Smoke test — prod health check
         run: |
+          REGION="${{ env.GCP_REGION }}"
+          # Capture the stable revision before this deploy so we can roll back if needed
+          PREV_REVISION=$(gcloud run services describe spepe-prod \
+            --region "${REGION}" --project spepe-prod \
+            --format "value(status.latestReadyRevisionName)" 2>/dev/null || echo "")
+          echo "Previous stable revision: ${PREV_REVISION}"
           echo "Smoke test: checking spepe-prod service readiness"
           for i in $(seq 1 10); do
             READY=$(gcloud run services describe spepe-prod \
-              --region "${{ env.GCP_REGION }}" \
+              --region "${REGION}" \
               --project spepe-prod \
               --format "value(status.conditions[0].status)" 2>/dev/null || echo "False")
             echo "Attempt ${i}: Cloud Run Ready=${READY}"
@@ -243,8 +250,11 @@ jobs:
             sleep 15
           done
           echo "Smoke test failed — service not ready after 150s. Rolling back."
-          gcloud run services update-traffic spepe-prod \
-            --to-revisions=LATEST=0 \
-            --region="${{ env.GCP_REGION }}" \
-            --project=spepe-prod || true
+          if [ -n "${PREV_REVISION}" ]; then
+            gcloud run services update-traffic spepe-prod \
+              --to-revisions="${PREV_REVISION}=100" \
+              --region="${REGION}" \
+              --project=spepe-prod || true
+            echo "Traffic restored to ${PREV_REVISION}"
+          fi
           exit 1

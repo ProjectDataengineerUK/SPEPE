@@ -37,7 +37,7 @@ jobs:
     needs: lint
     env:
       ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY_TEST }}
-      GCP_PROJECT_ID: spepe-test
+      GCP_PROJECT_ID: spepe-dev
       GCS_BUCKET: spepe-test-data
       BIGQUERY_DATASET_SILVER: spepe_silver
       BIGQUERY_DATASET_GOLD: spepe_gold
