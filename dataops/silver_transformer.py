@@ -365,6 +365,48 @@ def _write_bigquery(df: pd.DataFrame, table_name: str) -> str:
         return _write_local_silver(df, "BR", 2022)
 
 
+def _write_bigquery_uf_year(df: pd.DataFrame, table_name: str, uf: str, year: int) -> str:
+    """WRITE_APPEND com pre-delete por uf+ano — preserva outras UFs/anos na mesma tabela."""
+    project = os.environ.get("GCP_PROJECT_ID", "spepe-dev")
+    dataset = os.environ.get("BIGQUERY_DATASET_SILVER", "spepe_silver")
+    try:
+        from google.cloud import bigquery
+
+        client = bigquery.Client(project=project)
+        table_id = f"{project}.{dataset}.{table_name}"
+        df = _normalize_for_bq(df)
+
+        if "ingested_at" not in df.columns:
+            df = df.copy()
+            df["ingested_at"] = pd.Timestamp.utcnow()
+
+        # Apaga linhas desta UF+ano antes de inserir (evita duplicatas em re-runs)
+        try:
+            client.query(
+                f"DELETE FROM `{table_id}` WHERE sg_uf = '{uf.upper()}' AND ano = {year}",
+                job_config=bigquery.QueryJobConfig(),
+            ).result()
+        except Exception:
+            pass  # tabela pode não existir ainda — cria na carga abaixo
+
+        job_config = bigquery.LoadJobConfig(
+            write_disposition="WRITE_APPEND",
+            create_disposition="CREATE_IF_NEEDED",
+            autodetect=False,
+            schema=_dataframe_to_bq_schema(df),
+        )
+        job = client.load_table_from_dataframe(df, table_id, job_config=job_config)
+        job.result()
+        logger.info("Silver BQ append: %s %s/%d (%d rows)", table_id, uf.upper(), year, len(df))
+        return table_id
+    except ImportError:
+        logger.warning("google-cloud-bigquery não disponível. Usando local.")
+        parts = table_name.rsplit("_", 2)
+        if len(parts) == 3:
+            return _write_local_silver(df, parts[1], int(parts[2]))
+        return _write_local_silver(df, uf, year)
+
+
 def _write_bigquery_pesquisas(df: pd.DataFrame, year: int) -> str:
     """WRITE_APPEND com pre-delete por ano — preserva dados de outros anos."""
     project = os.environ.get("GCP_PROJECT_ID", "spepe-dev")
@@ -783,7 +825,7 @@ def transform_seguranca_to_silver(
 
     table_name = f"seguranca_municipal_{uf.lower()}_{year}"
     if use_bigquery:
-        path = _write_bigquery(df, "seguranca_municipal")
+        path = _write_bigquery_uf_year(df, "seguranca_municipal", uf, year)
     else:
         path_local = LOCAL_SILVER_DIR / f"{table_name}.parquet"
         df.to_parquet(path_local, index=False, compression="zstd")
@@ -840,7 +882,7 @@ def transform_saude_to_silver(
 
     table_name = f"saude_municipal_{uf.lower()}_{year}"
     if use_bigquery:
-        path = _write_bigquery(df, "saude_municipal")
+        path = _write_bigquery_uf_year(df, "saude_municipal", uf, year)
     else:
         path_local = LOCAL_SILVER_DIR / f"{table_name}.parquet"
         df.to_parquet(path_local, index=False, compression="zstd")
@@ -929,7 +971,7 @@ def transform_economia_to_silver(
 
     table_name = f"economia_municipal_{uf.lower()}_{year}"
     if use_bigquery:
-        path = _write_bigquery(df, "economia_municipal")
+        path = _write_bigquery_uf_year(df, "economia_municipal", uf, year)
     else:
         path_local = LOCAL_SILVER_DIR / f"{table_name}.parquet"
         df.to_parquet(path_local, index=False, compression="zstd")
