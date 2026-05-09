@@ -129,7 +129,7 @@ class RunJobArgs(BaseModel):
 def run_dataops_job(args: RunJobArgs) -> dict:
     """Execute a dataops job. In GCP: triggers Cloud Run Job via API. Locally: subprocess."""
     project = os.environ.get("GCP_PROJECT_ID", "")
-    region = os.environ.get("VERTEX_LOCATION", "us-central1")
+    region = os.environ.get("GCP_REGION", "southamerica-east1")
 
     if project:
         return _run_cloud_run_job(args, project, region)

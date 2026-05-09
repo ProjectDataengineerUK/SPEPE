@@ -36,6 +36,7 @@ from fastapi.responses import (
     FileResponse,
     JSONResponse,
     RedirectResponse,
+    Response,
     StreamingResponse,
 )
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
@@ -2173,21 +2174,20 @@ async def admin_run_job(job_name: str, uf: str = "SP", year: int = 2022) -> JSON
     """Trigger a Cloud Run Job execution (admin only)."""
     from agents.tools import RunJobArgs, run_dataops_job
 
-    # Map Cloud Run job name → internal job id
-    name_map = {
-        "spepe-tse-ingest": "tse_ingest",
-        "spepe-ibge-sync": "ibge_sync",
-        "spepe-security-ingest": "security_ingest",
-        "spepe-datasus-ingest": "datasus_ingest",
-        "spepe-dieese-ingest": "dieese_ingest",
-        "spepe-cetic-ingest": "cetic_ingest",
-        "spepe-silver-transform": "silver_transform",
-        "spepe-gold-build": "gold_build",
-        "spepe-digital-ingest": "digital_ingest",
-    }
-    job_id = name_map.get(job_name, job_name.replace("spepe-", "").replace("-", "_"))
+    job_id = job_name.replace("spepe-", "").replace("-", "_")
     result = run_dataops_job(RunJobArgs(job=job_id, uf=uf, year=year))
     return JSONResponse(result)
+
+
+@app.post("/jobs/retrain-trigger")
+async def retrain_trigger(request: Request) -> Response:
+    """Eventarc (Pub/Sub drift-detected) → submit Vertex AI Pipeline for retraining."""
+    from dataops.jobs.retrain_trigger_job import handle_pubsub_event
+
+    envelope = await request.json()
+    message = envelope.get("message", {})
+    exit_code = handle_pubsub_event(message)
+    return Response(status_code=204 if exit_code == 0 else 500)
 
 
 _SENTINEL_VIEWS = [
