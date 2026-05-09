@@ -1465,6 +1465,98 @@ def transform_sancoes_to_silver(use_bigquery: bool = False) -> dict:
     return {"status": "ok", "path": str(path_local), "rows": len(df)}
 
 
+def transform_candidaturas_to_silver(
+    years: list[int] | None = None,
+    use_bigquery: bool = False,
+) -> dict:
+    """Load Bronze tse_candidaturas → Silver dim_candidato (partido lookup table).
+
+    Reads all UF parquet files for the given years from GCS and writes a
+    deduplicated dim_candidato to spepe_silver.dim_candidato.
+    Key columns: sq_candidato, nr_candidato, sg_uf, sg_partido, nm_partido,
+                 nm_candidato, nm_urna, cd_cargo, ds_cargo, ano.
+    Called by silver_transform_job and used by gold_builder to populate sg_partido.
+    """
+    import io as _io
+
+    _years = years or [2018, 2022]
+    project = os.environ.get("GCP_PROJECT_ID", "spepe-dev")
+    dataset = os.environ.get("BIGQUERY_DATASET_SILVER", "spepe_silver")
+    bucket = GCS_BUCKET
+
+    _COLS = [
+        "sq_candidato",
+        "nr_candidato",
+        "sg_uf",
+        "sg_partido",
+        "nm_partido",
+        "nm_candidato",
+        "nm_urna",
+        "cd_cargo",
+        "ds_cargo",
+        "ano",
+    ]
+
+    if not bucket:
+        return {"status": "skipped", "message": "GCS_BUCKET não configurado"}
+
+    try:
+        from google.cloud import storage as _gcs
+    except ImportError:
+        return {"status": "skipped", "message": "google-cloud-storage não disponível"}
+
+    gcs_client = _gcs.Client()
+    bucket_obj = gcs_client.bucket(bucket)
+
+    frames: list[pd.DataFrame] = []
+    for year in _years:
+        prefix = f"raw/tse_candidaturas/{year}/"
+        blobs = list(bucket_obj.list_blobs(prefix=prefix))
+        for blob in blobs:
+            if not blob.name.endswith(".parquet"):
+                continue
+            try:
+                raw = blob.download_as_bytes()
+                df_blob = pd.read_parquet(_io.BytesIO(raw))
+                available = [c for c in _COLS if c in df_blob.columns]
+                df_blob = df_blob[available].copy()
+                if "ano" not in df_blob.columns:
+                    df_blob["ano"] = year
+                frames.append(df_blob)
+            except Exception as exc:
+                logger.warning("Candidaturas parquet falhou %s: %s", blob.name, exc)
+
+    if not frames:
+        return {"status": "skipped", "message": "Bronze tse_candidaturas vazio no GCS"}
+
+    df_all = pd.concat(frames, ignore_index=True)
+    if "sq_candidato" in df_all.columns and "ano" in df_all.columns:
+        df_all = df_all.drop_duplicates(subset=["sq_candidato", "ano"])
+
+    if not use_bigquery or not project:
+        out = LOCAL_SILVER_DIR / "dim_candidato.parquet"
+        LOCAL_SILVER_DIR.mkdir(parents=True, exist_ok=True)
+        df_all.to_parquet(out, index=False)
+        return {"status": "ok", "rows": len(df_all), "path": str(out)}
+
+    table_id = f"{project}.{dataset}.dim_candidato"
+    try:
+        from google.cloud import bigquery as _bq
+
+        bq_client = _bq.Client(project=project)
+        job_config = _bq.LoadJobConfig(
+            write_disposition=_bq.WriteDisposition.WRITE_TRUNCATE,
+            create_disposition="CREATE_IF_NEEDED",
+            autodetect=True,
+        )
+        bq_client.load_table_from_dataframe(df_all, table_id, job_config=job_config).result()
+        logger.info("dim_candidato Silver: %d rows → %s", len(df_all), table_id)
+        return {"status": "ok", "rows": len(df_all), "table": table_id}
+    except Exception as exc:
+        logger.error("dim_candidato Silver BQ falhou: %s", exc)
+        return {"status": "error", "message": str(exc)}
+
+
 def _dataframe_to_bq_schema(df: pd.DataFrame) -> list:
     from google.cloud import bigquery
 

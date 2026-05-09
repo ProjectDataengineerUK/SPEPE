@@ -24,8 +24,34 @@ def _build_gold_via_bigquery_sql() -> dict:
     _BQ_GOLD_DATASET = os.environ.get("BIGQUERY_DATASET_GOLD", "spepe_gold")
     silver_wc = f"`{_GCP_PROJECT}.{_BQ_SILVER_DATASET}.tse_*`"
     gold = f"{_GCP_PROJECT}.{_BQ_GOLD_DATASET}"
-
     silver = f"{_GCP_PROJECT}.{_BQ_SILVER_DATASET}"
+
+    # Check if dim_candidato is available in Silver → enables sg_partido JOIN
+    try:
+        client.get_table(f"{_GCP_PROJECT}.{_BQ_SILVER_DATASET}.dim_candidato")
+        _has_dim_cand = True
+        logger.info("Silver dim_candidato encontrado — sg_partido via JOIN")
+    except Exception:
+        _has_dim_cand = False
+        logger.info("Silver dim_candidato ausente — sg_partido=NULL (rode silver_transform)")
+
+    if _has_dim_cand:
+        _partido_cols = f"""c.sg_partido              AS sg_partido,
+                    c.nm_partido               AS nm_partido,"""
+        _partido_join = f"""LEFT JOIN `{silver}.dim_candidato` c
+                ON s.sq_candidato = c.sq_candidato
+                AND SAFE_CAST(s.ano_eleicao AS INT64) = c.ano"""
+        _s = "s."
+        _from_tse_s = f"{silver_wc} s"
+        _partido_grp = "c.sg_partido, c.nm_partido,"
+    else:
+        _partido_cols = """CAST(NULL AS STRING)       AS sg_partido,
+                    CAST(NULL AS STRING)       AS nm_partido,"""
+        _partido_join = ""
+        _s = ""
+        _from_tse_s = silver_wc
+        _partido_grp = ""
+
     sqls = {
         "fact_municipio_eleicao": f"""
             CREATE OR REPLACE TABLE `{gold}.fact_municipio_eleicao` AS
@@ -43,38 +69,43 @@ def _build_gold_via_bigquery_sql() -> dict:
         "fact_secao_eleicao": f"""
             CREATE OR REPLACE TABLE `{gold}.fact_secao_eleicao` AS
             SELECT
-                sg_uf,
-                SAFE_CAST(cd_municipio AS INT64)    AS cd_municipio,
-                nm_municipio_x                       AS nm_municipio,
-                SAFE_CAST(nr_zona AS INT64)          AS nr_zona,
-                SAFE_CAST(nr_secao AS INT64)         AS nr_secao,
-                nm_candidato,
-                CAST(NULL AS STRING)                 AS sg_partido,
-                SAFE_CAST(cd_cargo AS INT64)         AS cd_cargo,
-                ds_cargo,
-                SAFE_CAST(nr_turno AS INT64)         AS nr_turno,
-                SAFE_CAST(ano_eleicao AS INT64)      AS ano_eleicao,
-                SAFE_CAST(SUM(qt_votos) AS INT64)    AS total_votos,
-                CURRENT_TIMESTAMP()                  AS ingested_at
-            FROM {silver_wc}
-            GROUP BY sg_uf, cd_municipio, nm_municipio_x, nr_zona, nr_secao,
-                     nm_candidato, cd_cargo, ds_cargo, nr_turno, ano_eleicao
+                {_s}sg_uf,
+                SAFE_CAST({_s}cd_municipio AS INT64)    AS cd_municipio,
+                {_s}nm_municipio_x                       AS nm_municipio,
+                SAFE_CAST({_s}nr_zona AS INT64)          AS nr_zona,
+                SAFE_CAST({_s}nr_secao AS INT64)         AS nr_secao,
+                {_s}nm_candidato,
+                {_partido_cols}
+                SAFE_CAST({_s}cd_cargo AS INT64)         AS cd_cargo,
+                {_s}ds_cargo,
+                SAFE_CAST({_s}nr_turno AS INT64)         AS nr_turno,
+                SAFE_CAST({_s}ano_eleicao AS INT64)      AS ano_eleicao,
+                SAFE_CAST(SUM({_s}qt_votos) AS INT64)    AS total_votos,
+                CURRENT_TIMESTAMP()                      AS ingested_at
+            FROM {_from_tse_s}
+            {_partido_join}
+            GROUP BY {_s}sg_uf, {_s}cd_municipio, {_s}nm_municipio_x, {_s}nr_zona, {_s}nr_secao,
+                     {_s}nm_candidato, {_partido_grp}
+                     {_s}cd_cargo, {_s}ds_cargo, {_s}nr_turno, {_s}ano_eleicao
         """,
         "fact_candidato_eleicao": f"""
             CREATE OR REPLACE TABLE `{gold}.fact_candidato_eleicao` AS
             SELECT
-                sg_uf,
-                SAFE_CAST(nr_candidato AS INT64)    AS nr_candidato,
-                nm_candidato,
-                CAST(NULL AS STRING)                AS sg_partido,
-                SAFE_CAST(cd_cargo AS INT64)        AS cd_cargo,
-                ds_cargo,
-                SAFE_CAST(ano_eleicao AS INT64)     AS ano_eleicao,
-                SAFE_CAST(SUM(qt_votos) AS INT64)   AS total_votos,
-                COUNT(DISTINCT cd_municipio)        AS n_municipios,
-                CURRENT_TIMESTAMP()                 AS ingested_at
-            FROM {silver_wc}
-            GROUP BY sg_uf, nr_candidato, nm_candidato, cd_cargo, ds_cargo, ano_eleicao
+                {_s}sg_uf,
+                SAFE_CAST({_s}nr_candidato AS INT64)    AS nr_candidato,
+                {_s}nm_candidato,
+                {_partido_cols}
+                SAFE_CAST({_s}cd_cargo AS INT64)        AS cd_cargo,
+                {_s}ds_cargo,
+                SAFE_CAST({_s}ano_eleicao AS INT64)     AS ano_eleicao,
+                SAFE_CAST(SUM({_s}qt_votos) AS INT64)   AS total_votos,
+                COUNT(DISTINCT {_s}cd_municipio)        AS n_municipios,
+                CURRENT_TIMESTAMP()                     AS ingested_at
+            FROM {_from_tse_s}
+            {_partido_join}
+            GROUP BY {_s}sg_uf, {_s}nr_candidato, {_s}nm_candidato,
+                     {_partido_grp}
+                     {_s}cd_cargo, {_s}ds_cargo, {_s}ano_eleicao
         """,
         "fact_municipio_candidato_eleicao": f"""
             CREATE OR REPLACE TABLE `{gold}.fact_municipio_candidato_eleicao` AS
@@ -91,21 +122,23 @@ def _build_gold_via_bigquery_sql() -> dict:
                 )                                   AS rn_municipio
             FROM (
                 SELECT
-                    sg_uf,
-                    SAFE_CAST(cd_municipio AS INT64)        AS cd_municipio,
-                    nm_municipio_x                           AS nm_municipio,
-                    SAFE_CAST(cd_municipio_ibge AS INT64)   AS cd_municipio_ibge,
-                    nm_candidato,
-                    CAST(NULL AS STRING)                     AS sg_partido,
-                    SAFE_CAST(cd_cargo AS INT64)             AS cd_cargo,
-                    ds_cargo,
-                    SAFE_CAST(nr_turno AS INT64)             AS nr_turno,
-                    SAFE_CAST(ano_eleicao AS INT64)          AS ano_eleicao,
-                    SAFE_CAST(SUM(qt_votos) AS INT64)        AS total_votos,
-                    CURRENT_TIMESTAMP()                      AS ingested_at
-                FROM {silver_wc}
-                GROUP BY sg_uf, cd_municipio, nm_municipio_x, cd_municipio_ibge,
-                         nm_candidato, cd_cargo, ds_cargo, nr_turno, ano_eleicao
+                    {_s}sg_uf,
+                    SAFE_CAST({_s}cd_municipio AS INT64)        AS cd_municipio,
+                    {_s}nm_municipio_x                           AS nm_municipio,
+                    SAFE_CAST({_s}cd_municipio_ibge AS INT64)   AS cd_municipio_ibge,
+                    {_s}nm_candidato,
+                    {_partido_cols}
+                    SAFE_CAST({_s}cd_cargo AS INT64)             AS cd_cargo,
+                    {_s}ds_cargo,
+                    SAFE_CAST({_s}nr_turno AS INT64)             AS nr_turno,
+                    SAFE_CAST({_s}ano_eleicao AS INT64)          AS ano_eleicao,
+                    SAFE_CAST(SUM({_s}qt_votos) AS INT64)        AS total_votos,
+                    CURRENT_TIMESTAMP()                          AS ingested_at
+                FROM {_from_tse_s}
+                {_partido_join}
+                GROUP BY {_s}sg_uf, {_s}cd_municipio, {_s}nm_municipio_x, {_s}cd_municipio_ibge,
+                         {_s}nm_candidato, {_partido_grp}
+                         {_s}cd_cargo, {_s}ds_cargo, {_s}nr_turno, {_s}ano_eleicao
             )
         """,
         "fact_ibge_municipio": f"""

@@ -16,6 +16,7 @@ DQ_THRESHOLD = float(os.environ.get("DQ_SCORE_THRESHOLD", "95.0"))
 def main(uf: str, years: list[int] | None = None, include_social: bool = True) -> None:
     from dataops.silver_transformer import (
         transform_cadunico_to_silver,
+        transform_candidaturas_to_silver,
         transform_digital_to_silver,
         transform_economia_to_silver,
         transform_emendas_to_silver,
@@ -159,6 +160,19 @@ def main(uf: str, years: list[int] | None = None, include_social: bool = True) -
         logger.info("Sanções Silver OK: %d rows", r.get("rows", 0))
     else:
         logger.warning("Sanções Silver: %s (Bronze pode estar vazio)", r.get("message"))
+
+    # ── Candidaturas TSE (dim_candidato — partido lookup para Gold JOIN) ────
+    _cand_years_env = os.environ.get("CANDIDATURAS_YEARS", "2018,2022")
+    cand_years = [int(y.strip()) for y in _cand_years_env.split(",") if y.strip()]
+    logger.info("Silver candidaturas → dim_candidato: anos=%s", cand_years)
+    r = transform_candidaturas_to_silver(cand_years, use_bigquery=use_bq)
+    if r.get("status") == "ok":
+        logger.info("dim_candidato Silver OK: %d rows", r.get("rows", 0))
+    else:
+        logger.warning(
+            "dim_candidato Silver: %s (Bronze tse_candidaturas pode estar vazio)",
+            r.get("message"),
+        )
 
     if not all_ok:
         sys.exit(1)
