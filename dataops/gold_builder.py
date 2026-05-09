@@ -36,7 +36,7 @@ def _build_gold_via_bigquery_sql() -> dict:
         logger.info("Silver dim_candidato ausente — sg_partido=NULL (rode silver_transform)")
 
     if _has_dim_cand:
-        _partido_cols = f"""c.sg_partido              AS sg_partido,
+        _partido_cols = """c.sg_partido              AS sg_partido,
                     c.nm_partido               AS nm_partido,"""
         _partido_join = f"""LEFT JOIN `{silver}.dim_candidato` c
                 ON s.sq_candidato = c.sq_candidato
