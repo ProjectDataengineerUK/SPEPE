@@ -35,6 +35,8 @@ def build_pipeline():
         project_id: str,
         gold_dataset: str,
         gold_table: str,
+        cd_cargo: int,
+        ano_eleicao: int,
         output_dataset: Output[Dataset],
     ) -> None:
         import re
@@ -52,8 +54,35 @@ def build_pipeline():
             raise ValueError(f"nome de tabela inválido: {gold_table}")
 
         client = bigquery.Client(project=project_id)
-        query = "SELECT * FROM `{}.{}.{}`".format(project_id, gold_dataset, gold_table)
-        df = client.query(query).to_dataframe()
+        query = """
+            SELECT
+                f.sg_uf,
+                f.cd_municipio,
+                f.nm_candidato,
+                f.sg_partido,
+                f.cd_cargo,
+                f.ano_eleicao,
+                f.pct_votos_municipio,
+                i.populacao_total,
+                i.taxa_alfabetizacao,
+                i.idhm,
+                i.renda_per_capita,
+                i.taxa_analfabetismo
+            FROM `{project}.{dataset}.{table}` f
+            LEFT JOIN `{project}.spepe_gold.fact_ibge_municipio` i
+                ON f.cd_municipio_ibge = i.cd_municipio_ibge
+            WHERE f.cd_cargo = @cd_cargo
+              AND f.ano_eleicao = @ano_eleicao
+              AND f.pct_votos_municipio IS NOT NULL
+        """.format(project=project_id, dataset=gold_dataset, table=gold_table)
+
+        job_config = bigquery.QueryJobConfig(
+            query_parameters=[
+                bigquery.ScalarQueryParameter("cd_cargo", "INT64", cd_cargo),
+                bigquery.ScalarQueryParameter("ano_eleicao", "INT64", ano_eleicao),
+            ]
+        )
+        df = client.query(query, job_config=job_config).to_dataframe()
         df.to_parquet(output_dataset.path, index=False)
 
     @component(
@@ -69,35 +98,42 @@ def build_pipeline():
     def train_bootstrap_component(
         input_dataset: Input[Dataset],
         n_bootstrap: int,
-        target_candidate: str,
         output_model: Output[Model],
         output_metrics: Output[Metrics],
     ) -> None:
         import pandas as pd
         import pickle
-        from sklearn.linear_model import LogisticRegression
+        from sklearn.linear_model import Ridge
+        from sklearn.metrics import r2_score, mean_absolute_error
+
+        TARGET_COL = "pct_votos_municipio"
+        FEATURE_COLS = [
+            "populacao_total",
+            "taxa_alfabetizacao",
+            "idhm",
+            "renda_per_capita",
+            "taxa_analfabetismo",
+        ]
 
         df = pd.read_parquet(input_dataset.path)
-        feature_cols = [
-            c for c in df.columns if any(ind in c for ind in ["idhm", "renda", "estudo", "pct"])
-        ]
-        target_col = f"pct_votos_{target_candidate.lower().replace(' ', '_')}_2022"
+        feature_cols = [c for c in FEATURE_COLS if c in df.columns]
 
-        if target_col not in df.columns or not feature_cols:
+        if TARGET_COL not in df.columns or not feature_cols:
             return
 
         X = df[feature_cols].fillna(0).values
-        y = (df[target_col] > 0.5).astype(int).values
+        y = df[TARGET_COL].values
 
-        model = LogisticRegression(max_iter=500, random_state=42)
+        model = Ridge(alpha=1.0)
         model.fit(X, y)
 
         with open(output_model.path, "wb") as f:
-            pickle.dump({"model": model, "feature_cols": feature_cols}, f)
+            pickle.dump(
+                {"model": model, "feature_cols": feature_cols, "target_col": TARGET_COL}, f
+            )
 
-        from sklearn.metrics import accuracy_score
-
-        output_metrics.log_metric("accuracy", float(accuracy_score(y, model.predict(X))))
+        output_metrics.log_metric("r2_score", float(r2_score(y, model.predict(X))))
+        output_metrics.log_metric("mae", float(mean_absolute_error(y, model.predict(X))))
         output_metrics.log_metric("n_train", len(X))
 
     @component(
@@ -109,11 +145,13 @@ def build_pipeline():
         input_model: Input[Model],
         output_metrics: Output[Metrics],
     ) -> None:
+        import logging
         import pandas as pd
         import pickle
-        from sklearn.metrics import accuracy_score, brier_score_loss
-
         from pathlib import Path
+        from sklearn.metrics import r2_score, mean_absolute_error
+
+        _logger = logging.getLogger("spepe.evaluate_component")
 
         df = pd.read_parquet(input_dataset.path)
         raw = Path(input_model.path).read_bytes()
@@ -123,18 +161,29 @@ def build_pipeline():
 
         model = model_dict["model"]
         feature_cols = model_dict["feature_cols"]
+        target_col = model_dict.get("target_col", "pct_votos_municipio")
+
+        if target_col not in df.columns:
+            _logger.error(
+                "target_col %s não encontrado. Colunas: %s", target_col, df.columns.tolist()
+            )
+            output_metrics.log_metric("error", 1.0)
+            output_metrics.log_metric("error_reason", 0.0)  # target_col_missing
+            return
+
         avail = [c for c in feature_cols if c in df.columns]
         if not avail:
+            _logger.error("Nenhuma feature disponível no dataset de avaliação.")
+            output_metrics.log_metric("error", 1.0)
             return
 
         X = df[avail].fillna(0).values
-        y_true = (df[avail[0]] > df[avail[0]].mean()).astype(int).values
+        y_true = df[target_col].values
+        y_pred = model.predict(X)
 
-        y_proba = model.predict_proba(X)[:, 1]
-        output_metrics.log_metric(
-            "eval_accuracy", float(accuracy_score(y_true, (y_proba > 0.5).astype(int)))
-        )
-        output_metrics.log_metric("eval_brier_score", float(brier_score_loss(y_true, y_proba)))
+        output_metrics.log_metric("eval_r2_score", float(r2_score(y_true, y_pred)))
+        output_metrics.log_metric("eval_mae", float(mean_absolute_error(y_true, y_pred)))
+        output_metrics.log_metric("eval_n_samples", float(len(y_true)))
 
     @dsl.pipeline(
         name="spepe-ml-pipeline",
@@ -144,19 +193,21 @@ def build_pipeline():
     def spepe_pipeline(
         project_id: str = GCP_PROJECT,
         gold_dataset: str = "spepe_gold",
-        gold_table: str = "fact_municipio_eleicao",
+        gold_table: str = "fact_municipio_candidato_eleicao",
         n_bootstrap: int = 1000,
-        target_candidate: str = "lula",
+        cd_cargo: int = 3,
+        ano_eleicao: int = 2022,
     ):
         features_task = extract_features_component(
             project_id=project_id,
             gold_dataset=gold_dataset,
             gold_table=gold_table,
+            cd_cargo=cd_cargo,
+            ano_eleicao=ano_eleicao,
         )
         train_task = train_bootstrap_component(
             input_dataset=features_task.outputs["output_dataset"],
             n_bootstrap=n_bootstrap,
-            target_candidate=target_candidate,
         )
         evaluate_component(
             input_dataset=features_task.outputs["output_dataset"],

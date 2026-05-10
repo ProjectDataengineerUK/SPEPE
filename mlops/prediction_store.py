@@ -94,21 +94,32 @@ def evaluate_deferred(
         from google.cloud import bigquery
 
         client = bigquery.Client(project=project_id)
+        table = f"`{project_id}.spepe_mlops.fact_predictions`"
 
-        where_clauses = [f"candidato = '{candidato}'", "actual_result IS NULL"]
+        query_params = [
+            bigquery.ScalarQueryParameter("candidato", "STRING", candidato),
+            bigquery.ScalarQueryParameter("actual_vote_share", "FLOAT64", actual_vote_share),
+        ]
+
+        version_filter = ""
         if model_version:
-            where_clauses.append(f"model_version = '{model_version}'")
+            query_params.append(
+                bigquery.ScalarQueryParameter("model_version", "STRING", model_version)
+            )
+            version_filter = "AND model_version = @model_version"
 
-        brier_expr = f"POWER({actual_vote_share} - p_mean, 2)"
         query = f"""
-            UPDATE `{project_id}.spepe_mlops.fact_predictions`
+            UPDATE {table}
             SET
-                actual_result = {actual_vote_share},
-                brier_score   = {brier_expr},
+                actual_result = @actual_vote_share,
+                brier_score   = POWER(@actual_vote_share - p_mean, 2),
                 evaluated_at  = CURRENT_TIMESTAMP()
-            WHERE {" AND ".join(where_clauses)}
+            WHERE candidato = @candidato
+              AND actual_result IS NULL
+              {version_filter}
         """
-        job = client.query(query)
+        job_config = bigquery.QueryJobConfig(query_parameters=query_params)
+        job = client.query(query, job_config=job_config)
         job.result()
         rows_updated = job.num_dml_affected_rows or 0
         logger.info(
@@ -137,10 +148,15 @@ def load_predictions_for_eval(
         query = f"""
             SELECT prediction_id, candidato, sg_uf, p_mean, actual_result, brier_score
             FROM `{project_id}.spepe_mlops.fact_predictions`
-            WHERE model_version = '{model_version}'
+            WHERE model_version = @model_version
               AND actual_result IS NOT NULL
         """
-        return client.query(query).to_dataframe()
+        job_config = bigquery.QueryJobConfig(
+            query_parameters=[
+                bigquery.ScalarQueryParameter("model_version", "STRING", model_version),
+            ]
+        )
+        return client.query(query, job_config=job_config).to_dataframe()
     except Exception as exc:
         logger.warning("Failed to load predictions: %s", exc)
         return None

@@ -10,25 +10,46 @@ model_monitoring_alert_config:
     user_emails:
       - admin@spepe.example.com
 
+# Features verificadas pelo detect_drift() em drift_monitor.py
+# Nomes correspondem às colunas reais de fact_municipio_candidato_eleicao + fact_ibge_municipio
+js_divergence_threshold: 0.10
+categorical_threshold: 0.05
+
+check_features:
+  - name: idhm
+    type: numeric
+  - name: renda_per_capita
+    type: numeric
+  - name: taxa_analfabetismo
+    type: numeric
+  - name: taxa_alfabetizacao
+    type: numeric
+  - name: populacao_total
+    type: numeric
+  - name: pct_votos_municipio
+    type: numeric
+  - name: sg_uf
+    type: categorical
+
 skew_detection_config:
   data_source:
     bigquery_source:
-      input_uri: bigquery://${GCP_PROJECT_ID}.spepe_gold.fact_municipio_eleicao
+      input_uri: bigquery://${GCP_PROJECT_ID}.spepe_gold.fact_municipio_candidato_eleicao
   feature_thresholds:
-    idhm_2010:
+    idhm:
       jensen_shannon_divergence: 0.1
-    renda_media_domiciliar:
+    renda_per_capita:
       jensen_shannon_divergence: 0.1
-    pct_analfabetos:
+    taxa_analfabetismo:
       jensen_shannon_divergence: 0.1
-    pct_rural:
+    pct_votos_municipio:
       jensen_shannon_divergence: 0.1
 
 drift_detection_config:
   feature_thresholds:
-    idhm_2010:
+    idhm:
       jensen_shannon_divergence: 0.1
-    renda_media_domiciliar:
+    renda_per_capita:
       jensen_shannon_divergence: 0.1
   categorical_threshold_config:
     sg_uf:
