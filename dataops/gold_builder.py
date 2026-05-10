@@ -36,21 +36,23 @@ def _build_gold_via_bigquery_sql() -> dict:
         logger.info("Silver dim_candidato ausente — sg_partido=NULL (rode silver_transform)")
 
     if _has_dim_cand:
-        _partido_cols = """c.sg_partido              AS sg_partido,
-                    c.nm_partido               AS nm_partido,"""
+        # Use Silver's sg_partido directly; dim_candidato as fallback for nm_partido only
+        _partido_cols = """COALESCE(s.sg_partido, c.sg_partido) AS sg_partido,
+                    COALESCE(s.nm_partido, c.nm_partido) AS nm_partido,"""
         _partido_join = f"""LEFT JOIN `{silver}.dim_candidato` c
-                ON s.sq_candidato = c.sq_candidato
+                ON CAST(s.sq_candidato AS STRING) = CAST(c.sq_candidato AS STRING)
                 AND SAFE_CAST(s.ano_eleicao AS INT64) = c.ano"""
         _s = "s."
         _from_tse_s = f"{silver_wc} s"
-        _partido_grp = "c.sg_partido, c.nm_partido,"
+        _partido_grp = "COALESCE(s.sg_partido, c.sg_partido), COALESCE(s.nm_partido, c.nm_partido),"
     else:
-        _partido_cols = """CAST(NULL AS STRING)       AS sg_partido,
-                    CAST(NULL AS STRING)       AS nm_partido,"""
+        # Use sg_partido directly from Silver (populated from TSE data)
+        _partido_cols = """sg_partido              AS sg_partido,
+                    nm_partido              AS nm_partido,"""
         _partido_join = ""
         _s = ""
         _from_tse_s = silver_wc
-        _partido_grp = ""
+        _partido_grp = "sg_partido, nm_partido,"
 
     sqls = {
         "fact_municipio_eleicao": f"""

@@ -260,6 +260,7 @@ tr.rhl td{background:rgba(0,200,83,.07)!important}
 .map-cargo-sel:focus{border-color:var(--green)}
 .map-body{flex:1;display:flex;overflow:hidden;min-height:0}
 #leaflet-map{flex:1;min-height:0;background:#0d1117}
+#zona-panel{width:320px;background:var(--bg2);border-left:1px solid var(--border);overflow-y:auto;flex-shrink:0;display:none}
 .map-legend{width:210px;background:var(--bg2);border-left:1px solid var(--border);padding:14px;overflow-y:auto;flex-shrink:0;display:flex;flex-direction:column;gap:10px}
 .leg-title{font-size:.68rem;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:var(--text2)}
 .leg-item{display:flex;align-items:center;gap:8px;font-size:.74rem}
@@ -603,6 +604,7 @@ tr.rhl td{background:rgba(0,200,83,.07)!important}
       </div>
       <div class="map-body">
         <div id="leaflet-map"></div>
+        <div id="zona-panel"></div>
         <div class="map-legend">
           <div class="leg-title">Legenda</div>
           <div id="map-legend-items"></div>
@@ -1309,7 +1311,7 @@ async function renderCargoView(cargo){
     const [resCands, resKpi, resMun] = await Promise.all([
       apiFetch(`/api/candidatos?cargo=${encodeURIComponent(cargo)}&uf=${uf}&ano=${ano}`).then(r=>r?.json()).catch(()=>null),
       apiFetch(`/api/kpi?cargo=${encodeURIComponent(cargo)}&uf=${uf}&ano=${ano}`).then(r=>r?.json()).catch(()=>null),
-      apiFetch(`/api/municipios?cargo=${encodeURIComponent(cargo)}&uf=${uf}&ano=${ano}&limit=10`).then(r=>r?.json()).catch(()=>null),
+      apiFetch(`/api/municipios?cargo=${encodeURIComponent(cargo)}&uf=${uf}&ano=${ano}&limit=50`).then(r=>r?.json()).catch(()=>null),
     ]);
     const cands = resCands?.candidatos || [];
     const muns = resMun?.municipios || [];
@@ -1848,6 +1850,8 @@ function initMap(){
 
 function renderGeoJSON(geojsonData, colorBy, layer) {
   _clearBubbles();
+  const _zonaPanel = document.getElementById('zona-panel');
+  if(_zonaPanel) _zonaPanel.style.display = 'none';
   if(!dataLayer) return;
   dataLayer.forEach(f => dataLayer.remove(f));
   if(!geojsonData) return;
@@ -2153,7 +2157,9 @@ function _updateStats(d){
 }
 
 function _renderZonaSecaoGrid(features, level){
-  const el = document.getElementById('leaflet-map');
+  const el = document.getElementById('zona-panel');
+  if(!el) return;
+  el.style.display = 'block';
   const isSecao = level === 'secao';
   const noun = isSecao ? 'Seções Eleitorais' : 'Zonas Eleitorais';
   const sorted = [...features].sort((a,b)=>(b.total_votos||0)-(a.total_votos||0));

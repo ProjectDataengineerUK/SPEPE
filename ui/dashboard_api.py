@@ -307,7 +307,7 @@ async def _bq_candidatos(cargo: str, uf: str, ano: int) -> list[dict]:
             bigquery.ScalarQueryParameter("cd_cargo", "INT64", cd_cargo),
         ]
     )
-    rows = client.query(query, job_config=job_config).result()
+    rows = await asyncio.to_thread(lambda: list(client.query(query, job_config=job_config).result()))
     return [dict(row) for row in rows]
 
 
@@ -382,7 +382,7 @@ async def _bq_kpi(cargo: str, uf: str, ano: int) -> dict:
             bigquery.ScalarQueryParameter("cd_cargo", "INT64", cd_cargo),
         ]
     )
-    rows = list(client.query(query, job_config=job_config).result())
+    rows = await asyncio.to_thread(lambda: list(client.query(query, job_config=job_config).result()))
     if not rows:
         raise ValueError("Sem dados no Gold para filtro aplicado")
     r = dict(rows[0])
@@ -465,7 +465,7 @@ async def _bq_municipios(cargo: str, uf: str, ano: int, limit: int) -> list[dict
             bigquery.ScalarQueryParameter("lim", "INT64", limit),
         ]
     )
-    rows = list(client.query(query, job_config=job_config).result())
+    rows = await asyncio.to_thread(lambda: list(client.query(query, job_config=job_config).result()))
     result = []
     for r in rows:
         total = r.get("total") or 0
@@ -1283,7 +1283,7 @@ async def _bq_mapa_nacional(cargo: str, ano: int, turno: int, candidato: str = "
     if candidato:
         params.append(bigquery.ScalarQueryParameter("candidato", "STRING", candidato))
     job_config = bigquery.QueryJobConfig(query_parameters=params)
-    rows = list(client.query(query, job_config=job_config).result())
+    rows = await asyncio.to_thread(lambda: list(client.query(query, job_config=job_config).result()))
     if not rows:
         return []
     r = rows[0]
@@ -1453,7 +1453,7 @@ async def _bq_mapa_uf(cargo: str, ano: int, turno: int, candidato: str = "") -> 
     if candidato:
         params.append(bigquery.ScalarQueryParameter("candidato", "STRING", candidato))
     job_config = bigquery.QueryJobConfig(query_parameters=params)
-    rows = client.query(query, job_config=job_config).result()
+    rows = await asyncio.to_thread(lambda: list(client.query(query, job_config=job_config).result()))
     return [
         {
             "id": r["sg_uf"],
