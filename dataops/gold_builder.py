@@ -240,22 +240,24 @@ def _build_gold_via_bigquery_sql() -> dict:
             FROM `{silver}.seguranca_municipal`
             WHERE cd_municipio_ibge IS NOT NULL
         """,
+        # Silver saude_municipal schema (atual): cd_municipio_ibge, sg_uf, ano, fontes — demais colunas como NULL
         "fact_saude_municipio": f"""
             CREATE OR REPLACE TABLE `{gold}.fact_saude_municipio` AS
             SELECT
                 CAST(cd_municipio_ibge AS INT64)                              AS cd_municipio_ibge,
                 sg_uf,
                 COALESCE(SAFE_CAST(ano AS INT64), 2022)                       AS ano,
-                SAFE_CAST(taxa_mortalidade_infantil_1000 AS FLOAT64)          AS taxa_mortalidade_infantil_1000,
-                SAFE_CAST(taxa_mortalidade_materna_100k AS FLOAT64)           AS taxa_mortalidade_materna_100k,
-                SAFE_CAST(pct_cobertura_plano_saude AS FLOAT64)               AS pct_cobertura_plano_saude,
-                SAFE_CAST(qt_obitos_total AS FLOAT64)                         AS qt_obitos_total,
-                SAFE_CAST(qt_nascimentos AS FLOAT64)                          AS qt_nascimentos,
+                CAST(NULL AS FLOAT64)                                         AS taxa_mortalidade_infantil_1000,
+                CAST(NULL AS FLOAT64)                                         AS taxa_mortalidade_materna_100k,
+                CAST(NULL AS FLOAT64)                                         AS pct_cobertura_plano_saude,
+                CAST(NULL AS FLOAT64)                                         AS qt_obitos_total,
+                CAST(NULL AS FLOAT64)                                         AS qt_nascimentos,
                 CAST(NULL AS FLOAT64)                                         AS idsus_score,
                 CURRENT_TIMESTAMP() AS ingested_at
             FROM `{silver}.saude_municipal`
             WHERE cd_municipio_ibge IS NOT NULL
         """,
+        # Silver social_mencoes_br schema: like_count, view_count, comment_count (sem retweet_count/reply_count)
         "fact_social_municipio": f"""
             CREATE OR REPLACE TABLE `{gold}.fact_social_municipio` AS
             SELECT
@@ -270,11 +272,11 @@ def _build_gold_via_bigquery_sql() -> dict:
                 DATE(created_at)                            AS data_referencia,
                 COUNT(*)                                    AS qt_posts,
                 COALESCE(SUM(like_count), 0)                AS total_likes,
-                COALESCE(SUM(retweet_count), 0)             AS total_retweets,
-                COALESCE(SUM(reply_count), 0)               AS total_comments,
+                CAST(0 AS INT64)                            AS total_retweets,
+                COALESCE(SUM(comment_count), 0)             AS total_comments,
                 COALESCE(SUM(view_count), 0)                AS total_views,
-                COALESCE(SUM(like_count), 0) + COALESCE(SUM(retweet_count), 0)
-                    + COALESCE(SUM(reply_count), 0)         AS total_engajamento,
+                COALESCE(SUM(like_count), 0) + COALESCE(SUM(comment_count), 0)
+                                                            AS total_engajamento,
                 COUNTIF(sentiment = 'positivo')             AS qt_positivo,
                 COUNTIF(sentiment = 'negativo')             AS qt_negativo,
                 COUNTIF(sentiment = 'neutro')               AS qt_neutro,
