@@ -2464,72 +2464,78 @@ async def admin_sentinel_status() -> JSONResponse:
     silver_tables: list[dict] = []
     jobs: list[dict] = []
 
+    def _query_bq_tables() -> tuple[list[dict], list[dict]]:
+        """Blocking BQ call — run in thread to avoid blocking event loop."""
+        from google.cloud import bigquery
+
+        bq = bigquery.Client(project=settings.gcp_project_id)
+        now_ms = datetime.now(timezone.utc).timestamp() * 1000
+        _gold: list[dict] = []
+        _silver: list[dict] = []
+        for layer, dataset in [
+            ("gold", settings.bigquery_dataset_gold),
+            ("silver", settings.bigquery_dataset_silver),
+        ]:
+            try:
+                rows = list(
+                    bq.query(
+                        f"SELECT table_id, row_count, last_modified_time "
+                        f"FROM `{settings.gcp_project_id}.{dataset}.__TABLES__`"
+                        f" WHERE table_id NOT LIKE 'vw_%'"
+                    ).result()
+                )
+                for r in rows:
+                    fh = round((now_ms - (r.last_modified_time or now_ms)) / 3_600_000, 1)
+                    rc = r.row_count or 0
+                    st = "ok" if rc > 0 and fh < 48 else ("warn" if rc > 0 else "error")
+                    entry = {
+                        "table": r.table_id,
+                        "layer": layer,
+                        "row_count": rc,
+                        "freshness_hours": fh,
+                        "dq_score": None,
+                        "status": st,
+                    }
+                    (_gold if layer == "gold" else _silver).append(entry)
+            except Exception as e:
+                logger.warning("__TABLES__ %s failed: %s", dataset, e)
+        return _gold, _silver
+
+    def _query_run_jobs() -> list[dict]:
+        """Blocking Cloud Run API call — run in thread."""
+        from google.cloud import run_v2
+
+        region = os.environ.get("GCP_REGION", "southamerica-east1")
+        exec_client = run_v2.ExecutionsClient()
+        result: list[dict] = []
+        for jname in _SENTINEL_JOBS:
+            try:
+                parent = f"projects/{settings.gcp_project_id}/locations/{region}/jobs/{jname}"
+                execs = list(exec_client.list_executions(parent=parent, page_size=1))
+                if execs:
+                    cond = next((c for c in execs[0].conditions if c.type_ == "Completed"), None)
+                    ok = cond and cond.status == "True"
+                    last, st = (
+                        ("Completed", "ok")
+                        if ok
+                        else (("Failed", "error") if cond else ("Running", "warn"))
+                    )
+                else:
+                    last, st = "never", "warn"
+            except Exception:
+                last, st = "unknown", "warn"
+            result.append({"job": jname, "status": st, "last_status": last})
+        return result
+
     if settings.gcp_project_id and os.environ.get("USE_BIGQUERY", "").lower() == "true":
         try:
-            from google.cloud import bigquery
-
-            bq = bigquery.Client(project=settings.gcp_project_id)
-            now_ms = datetime.now(timezone.utc).timestamp() * 1000
-
-            for layer, dataset in [
-                ("gold", settings.bigquery_dataset_gold),
-                ("silver", settings.bigquery_dataset_silver),
-            ]:
-                try:
-                    rows = list(
-                        bq.query(
-                            f"SELECT table_id, row_count, last_modified_time "
-                            f"FROM `{settings.gcp_project_id}.{dataset}.__TABLES__`"
-                            f" WHERE table_id NOT LIKE 'vw_%'"
-                        ).result()
-                    )
-                    for r in rows:
-                        fh = round((now_ms - (r.last_modified_time or now_ms)) / 3_600_000, 1)
-                        rc = r.row_count or 0
-                        st = "ok" if rc > 0 and fh < 48 else ("warn" if rc > 0 else "error")
-                        entry = {
-                            "table": r.table_id,
-                            "layer": layer,
-                            "row_count": rc,
-                            "freshness_hours": fh,
-                            "dq_score": None,
-                            "status": st,
-                        }
-                        (gold_tables if layer == "gold" else silver_tables).append(entry)
-                except Exception as e:
-                    logger.warning("__TABLES__ %s failed: %s", dataset, e)
-
-            try:
-                from google.cloud import run_v2
-
-                region = os.environ.get("GCP_REGION", "southamerica-east1")
-                exec_client = run_v2.ExecutionsClient()
-                for jname in _SENTINEL_JOBS:
-                    try:
-                        parent = (
-                            f"projects/{settings.gcp_project_id}/locations/{region}/jobs/{jname}"
-                        )
-                        execs = list(exec_client.list_executions(parent=parent, page_size=1))
-                        if execs:
-                            cond = next(
-                                (c for c in execs[0].conditions if c.type_ == "Completed"), None
-                            )
-                            ok = cond and cond.status == "True"
-                            last, st = (
-                                ("Completed", "ok")
-                                if ok
-                                else (("Failed", "error") if cond else ("Running", "warn"))
-                            )
-                        else:
-                            last, st = "never", "warn"
-                    except Exception:
-                        last, st = "unknown", "warn"
-                    jobs.append({"job": jname, "status": st, "last_status": last})
-            except Exception as e:
-                logger.warning("Cloud Run executions query failed: %s", e)
-
+            gold_tables, silver_tables = await asyncio.to_thread(_query_bq_tables)
         except Exception as exc:
-            logger.warning("Admin sentinel status failed: %s", exc)
+            logger.warning("BQ tables query failed: %s", exc)
+        try:
+            jobs = await asyncio.to_thread(_query_run_jobs)
+        except Exception as exc:
+            logger.warning("Cloud Run executions query failed: %s", exc)
 
     views = [{"view": v, "status": "ok"} for v in _SENTINEL_VIEWS]
     llmops = [
@@ -2833,8 +2839,30 @@ async def _consume_sentinel_pubsub() -> None:
         logger.warning("sentinel pubsub consumer crashed: %s", exc)
 
 
-@app.get("/admin/api/sentinel/stream", dependencies=[Depends(require_auth)])
-async def admin_sentinel_stream() -> StreamingResponse:
+@app.get("/admin/api/sentinel/stream")
+async def admin_sentinel_stream(
+    token: str = Query(default=""),
+) -> StreamingResponse:
+    """SSE endpoint streaming sentinel events to the admin panel.
+
+    Auth via ?token=<google_id_token> query param (EventSource can't send headers).
+    In local dev (no GCP_PROJECT_ID) auth is skipped.
+    """
+    if settings.gcp_project_id and settings.gcp_project_id not in ("", "local"):
+        if not token:
+            raise HTTPException(status_code=401, detail="token required")
+        try:
+            from google.auth.transport import requests as grequests
+            from google.oauth2 import id_token as gid
+
+            gid.verify_oauth2_token(
+                token,
+                grequests.Request(),
+                audience=settings.google_client_id or None,
+                clock_skew_in_seconds=10,
+            )
+        except Exception:
+            raise HTTPException(status_code=401, detail="Invalid token")
     """SSE endpoint streaming sentinel events to the admin panel."""
     queue: asyncio.Queue = asyncio.Queue(maxsize=128)
     _sentinel_subscribers.append(queue)

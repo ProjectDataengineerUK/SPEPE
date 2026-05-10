@@ -2542,7 +2542,8 @@ window.addEventListener('load', _ensureChatWs);
     ensureAdminPanel();
     if (es) return;
     try {
-      es = new EventSource('/admin/api/sentinel/stream');
+      const tok = window._idToken || '';
+      es = new EventSource('/admin/api/sentinel/stream?token=' + encodeURIComponent(tok));
     } catch (e) {
       console.warn('EventSource indisponível', e);
       startPollingFallback();
