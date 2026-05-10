@@ -163,3 +163,66 @@ def normalize_columns(df: pd.DataFrame, year: int) -> pd.DataFrame:
         df["nm_municipio"] = df["nm_municipio"].str.strip().str.title()
 
     return df
+
+
+@retry(stop=stop_after_attempt(3), wait=wait_exponential(min=2, max=30))
+def download_br_presidente(year: int) -> str:
+    """Download TSE national voting file (Presidente) and return parquet path."""
+    url = _CDN_BR.format(year=year)
+    logger.info("Baixando TSE BR (presidente): %s", url)
+
+    tmp_fd, tmp_zip = tempfile.mkstemp(suffix=".zip")
+    tmp_parquet = tmp_zip.replace(".zip", ".parquet")
+    try:
+        with requests.get(url, timeout=300, stream=True) as resp:
+            resp.raise_for_status()
+            with os.fdopen(tmp_fd, "wb") as fout:
+                for http_chunk in resp.iter_content(chunk_size=8 * 1024 * 1024):
+                    fout.write(http_chunk)
+        logger.info("ZIP BR baixado: %s (%.1f MB)", tmp_zip, os.path.getsize(tmp_zip) / 1e6)
+
+        _KEEP_COLS = set(_COL_MAP.keys())
+        writer: pq.ParquetWriter | None = None
+        total_rows = 0
+
+        with zipfile.ZipFile(tmp_zip) as zf:
+            csv_files = [n for n in zf.namelist() if n.lower().endswith(".csv")]
+            if not csv_files:
+                raise ValueError(f"ZIP TSE BR vazio para {year}: {zf.namelist()}")
+
+            for name in csv_files:
+                with zf.open(name) as f:
+                    try:
+                        for chunk in pd.read_csv(
+                            f,
+                            sep=";",
+                            encoding="latin-1",
+                            dtype=str,
+                            chunksize=500_000,
+                        ):
+                            keep = [c for c in chunk.columns if c in _KEEP_COLS]
+                            chunk = chunk[keep]
+                            chunk = normalize_columns(chunk, year)
+                            table = pa.Table.from_pandas(chunk, preserve_index=False)
+                            if writer is None:
+                                writer = pq.ParquetWriter(
+                                    tmp_parquet, table.schema, compression="zstd"
+                                )
+                            writer.write_table(table)
+                            total_rows += len(chunk)
+                            del chunk, table
+                    except Exception as exc:
+                        logger.warning("Falha ao ler %s: %s", name, exc)
+
+        if writer:
+            writer.close()
+
+        if total_rows == 0:
+            raise ValueError(f"Nenhuma linha lida do ZIP TSE BR {year}")
+
+        logger.info("TSE BR streaming: %d linhas → %s", total_rows, tmp_parquet)
+        return tmp_parquet
+
+    finally:
+        if os.path.exists(tmp_zip):
+            os.unlink(tmp_zip)
