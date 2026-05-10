@@ -298,7 +298,7 @@ async def _bq_candidatos(cargo: str, uf: str, ano: int) -> list[dict]:
           AND nr_turno = 1
         GROUP BY nm_candidato, sg_partido
         ORDER BY pct_t1 DESC
-        LIMIT 10
+        LIMIT 50
     """
     job_config = bigquery.QueryJobConfig(
         query_parameters=[
@@ -1191,6 +1191,7 @@ async def get_mapa(
     nr_zona: str = Query(None),
     turno: int = Query(1),
     layer: str = Query("electoral"),
+    candidato: str = Query(""),
 ) -> JSONResponse:
     """
     Dados eleitorais por nível geográfico para colorir o choropleth.
@@ -1204,17 +1205,17 @@ async def get_mapa(
     if settings.gcp_project_id and os.environ.get("USE_BIGQUERY", "").lower() == "true":
         try:
             if nivel_str == "nacional":
-                features = await _bq_mapa_nacional(cargo, ano, turno)
+                features = await _bq_mapa_nacional(cargo, ano, turno, candidato)
                 return JSONResponse({"nivel": "nacional", "features": features})
             if nivel_str == "regiao":
-                features = await _bq_mapa_regiao(cargo, ano, turno)
+                features = await _bq_mapa_regiao(cargo, ano, turno, candidato)
                 return JSONResponse({"nivel": "regiao", "features": features})
             if nivel_str == "uf":
-                features = await _bq_mapa_uf(cargo, ano, turno)
+                features = await _bq_mapa_uf(cargo, ano, turno, candidato)
                 return JSONResponse({"nivel": "uf", "features": features})
             if nivel_str == "municipio":
                 uf_upper = (uf or "SP").upper()
-                features = await _bq_mapa_municipio(uf_upper, cargo, ano, turno)
+                features = await _bq_mapa_municipio(uf_upper, cargo, ano, turno, candidato)
                 return JSONResponse({"nivel": "municipio", "uf": uf_upper, "features": features})
             if nivel_str == "zona":
                 uf_upper = (uf or "SP").upper()
@@ -1243,11 +1244,12 @@ async def get_mapa(
     return JSONResponse({"nivel": nivel_str, "features": [], "fonte": "indisponivel"})
 
 
-async def _bq_mapa_nacional(cargo: str, ano: int, turno: int) -> list[dict]:
+async def _bq_mapa_nacional(cargo: str, ano: int, turno: int, candidato: str = "") -> list[dict]:
     from google.cloud import bigquery
 
     client = bigquery.Client(project=settings.gcp_project_id)
     cd_cargo = _CARGO_CD.get(cargo, 1)
+    cand_filter = "AND nm_candidato = @candidato" if candidato else ""
     query = f"""
         WITH ranked AS (
             SELECT nm_candidato, sg_partido,
@@ -1255,6 +1257,7 @@ async def _bq_mapa_nacional(cargo: str, ano: int, turno: int) -> list[dict]:
                    RANK() OVER (ORDER BY SUM(total_votos) DESC) AS rnk
             FROM `{settings.gcp_project_id}.{settings.bigquery_dataset_gold}.fact_municipio_candidato_eleicao`
             WHERE ano_eleicao = @ano AND cd_cargo = @cd_cargo AND nr_turno = @turno
+            {cand_filter}
             GROUP BY nm_candidato, sg_partido
         ),
         totais AS (SELECT SUM(votos) AS total_votos FROM ranked)
@@ -1266,13 +1269,14 @@ async def _bq_mapa_nacional(cargo: str, ano: int, turno: int) -> list[dict]:
         LEFT JOIN ranked r2 ON r2.rnk = 2
         WHERE r1.rnk = 1
     """
-    job_config = bigquery.QueryJobConfig(
-        query_parameters=[
-            bigquery.ScalarQueryParameter("ano", "INT64", ano),
-            bigquery.ScalarQueryParameter("cd_cargo", "INT64", cd_cargo),
-            bigquery.ScalarQueryParameter("turno", "INT64", turno),
-        ]
-    )
+    params = [
+        bigquery.ScalarQueryParameter("ano", "INT64", ano),
+        bigquery.ScalarQueryParameter("cd_cargo", "INT64", cd_cargo),
+        bigquery.ScalarQueryParameter("turno", "INT64", turno),
+    ]
+    if candidato:
+        params.append(bigquery.ScalarQueryParameter("candidato", "STRING", candidato))
+    job_config = bigquery.QueryJobConfig(query_parameters=params)
     rows = list(client.query(query, job_config=job_config).result())
     if not rows:
         return []
@@ -1293,7 +1297,7 @@ async def _bq_mapa_nacional(cargo: str, ano: int, turno: int) -> list[dict]:
     ]
 
 
-async def _bq_mapa_regiao(cargo: str, ano: int, turno: int) -> list[dict]:
+async def _bq_mapa_regiao(cargo: str, ano: int, turno: int, candidato: str = "") -> list[dict]:
     from google.cloud import bigquery
 
     client = bigquery.Client(project=settings.gcp_project_id)
@@ -1333,38 +1337,49 @@ async def _bq_mapa_regiao(cargo: str, ano: int, turno: int) -> list[dict]:
         + " ".join(f"WHEN '{uf}' THEN '{reg}'" for uf, reg in _UF_TO_REGIAO.items())
         + " ELSE 'Outro' END"
     )
-    query = f"""
-        WITH candidatos AS (
-            SELECT
-                {case_expr} AS regiao,
-                nm_candidato,
-                sg_partido,
-                SUM(total_votos) AS votos
-            FROM `{settings.gcp_project_id}.{settings.bigquery_dataset_gold}.fact_municipio_candidato_eleicao`
-            WHERE ano_eleicao = @ano AND cd_cargo = @cd_cargo AND nr_turno = @turno
-            GROUP BY regiao, nm_candidato, sg_partido
-        ),
-        totais AS (
-            SELECT regiao, SUM(votos) AS total_votos
-            FROM candidatos GROUP BY regiao
-        ),
-        ranked AS (
-            SELECT c.regiao, c.nm_candidato, c.sg_partido, c.votos, t.total_votos,
-                   ROW_NUMBER() OVER (PARTITION BY c.regiao ORDER BY c.votos DESC) AS rn
-            FROM candidatos c JOIN totais t USING (regiao)
-        )
-        SELECT regiao, nm_candidato AS lider, sg_partido AS partido,
-               ROUND(votos / total_votos * 100, 1) AS pct,
-               total_votos
-        FROM ranked WHERE rn = 1
-    """
-    job_config = bigquery.QueryJobConfig(
-        query_parameters=[
-            bigquery.ScalarQueryParameter("ano", "INT64", ano),
-            bigquery.ScalarQueryParameter("cd_cargo", "INT64", cd_cargo),
-            bigquery.ScalarQueryParameter("turno", "INT64", turno),
-        ]
-    )
+    base_table = f"`{settings.gcp_project_id}.{settings.bigquery_dataset_gold}.fact_municipio_candidato_eleicao`"
+    base_where = "ano_eleicao = @ano AND cd_cargo = @cd_cargo AND nr_turno = @turno"
+    if candidato:
+        query = f"""
+            WITH base AS (
+                SELECT {case_expr} AS regiao, nm_candidato, sg_partido, SUM(total_votos) AS votos
+                FROM {base_table}
+                WHERE {base_where}
+                GROUP BY regiao, nm_candidato, sg_partido
+            ),
+            totais AS (SELECT regiao, SUM(votos) AS total_votos FROM base GROUP BY regiao)
+            SELECT b.regiao AS regiao, b.nm_candidato AS lider, b.sg_partido AS partido,
+                   ROUND(b.votos / t.total_votos * 100, 1) AS pct,
+                   t.total_votos
+            FROM base b JOIN totais t USING (regiao)
+            WHERE b.nm_candidato = @candidato
+        """
+    else:
+        query = f"""
+            WITH candidatos AS (
+                SELECT {case_expr} AS regiao, nm_candidato, sg_partido, SUM(total_votos) AS votos
+                FROM {base_table}
+                WHERE {base_where}
+                GROUP BY regiao, nm_candidato, sg_partido
+            ),
+            totais AS (SELECT regiao, SUM(votos) AS total_votos FROM candidatos GROUP BY regiao),
+            ranked AS (
+                SELECT c.regiao, c.nm_candidato, c.sg_partido, c.votos, t.total_votos,
+                       ROW_NUMBER() OVER (PARTITION BY c.regiao ORDER BY c.votos DESC) AS rn
+                FROM candidatos c JOIN totais t USING (regiao)
+            )
+            SELECT regiao, nm_candidato AS lider, sg_partido AS partido,
+                   ROUND(votos / total_votos * 100, 1) AS pct, total_votos
+            FROM ranked WHERE rn = 1
+        """
+    params = [
+        bigquery.ScalarQueryParameter("ano", "INT64", ano),
+        bigquery.ScalarQueryParameter("cd_cargo", "INT64", cd_cargo),
+        bigquery.ScalarQueryParameter("turno", "INT64", turno),
+    ]
+    if candidato:
+        params.append(bigquery.ScalarQueryParameter("candidato", "STRING", candidato))
+    job_config = bigquery.QueryJobConfig(query_parameters=params)
     rows = client.query(query, job_config=job_config).result()
     return [
         {
@@ -1382,39 +1397,56 @@ async def _bq_mapa_regiao(cargo: str, ano: int, turno: int) -> list[dict]:
     ]
 
 
-async def _bq_mapa_uf(cargo: str, ano: int, turno: int) -> list[dict]:
+async def _bq_mapa_uf(cargo: str, ano: int, turno: int, candidato: str = "") -> list[dict]:
     from google.cloud import bigquery
 
     client = bigquery.Client(project=settings.gcp_project_id)
     cd_cargo = _CARGO_CD.get(cargo, 1)
-    query = f"""
-        WITH ranked AS (
-            SELECT sg_uf, nm_candidato, sg_partido,
-                   SUM(total_votos) AS votos,
-                   RANK() OVER (PARTITION BY sg_uf ORDER BY SUM(total_votos) DESC) AS rnk
-            FROM `{settings.gcp_project_id}.{settings.bigquery_dataset_gold}.fact_municipio_candidato_eleicao`
-            WHERE ano_eleicao = @ano AND cd_cargo = @cd_cargo AND nr_turno = @turno
-            GROUP BY sg_uf, nm_candidato, sg_partido
-        ),
-        totais AS (
-            SELECT sg_uf, SUM(votos) AS total_votos FROM ranked GROUP BY sg_uf
-        )
-        SELECT r1.sg_uf, r1.nm_candidato AS lider, r1.sg_partido AS partido,
-               ROUND(r1.votos / t.total_votos * 100, 1) AS pct,
-               r2.nm_candidato AS segundo, ROUND(r2.votos / t.total_votos * 100, 1) AS pct2,
-               t.total_votos
-        FROM ranked r1
-        LEFT JOIN ranked r2 ON r1.sg_uf = r2.sg_uf AND r2.rnk = 2
-        JOIN totais t ON r1.sg_uf = t.sg_uf
-        WHERE r1.rnk = 1
-    """
-    job_config = bigquery.QueryJobConfig(
-        query_parameters=[
-            bigquery.ScalarQueryParameter("ano", "INT64", ano),
-            bigquery.ScalarQueryParameter("cd_cargo", "INT64", cd_cargo),
-            bigquery.ScalarQueryParameter("turno", "INT64", turno),
-        ]
-    )
+    base_table = f"`{settings.gcp_project_id}.{settings.bigquery_dataset_gold}.fact_municipio_candidato_eleicao`"
+    base_where = "ano_eleicao = @ano AND cd_cargo = @cd_cargo AND nr_turno = @turno"
+    if candidato:
+        query = f"""
+            WITH base AS (
+                SELECT sg_uf, nm_candidato, sg_partido, SUM(total_votos) AS votos
+                FROM {base_table}
+                WHERE {base_where}
+                GROUP BY sg_uf, nm_candidato, sg_partido
+            ),
+            totais AS (SELECT sg_uf, SUM(votos) AS total_votos FROM base GROUP BY sg_uf)
+            SELECT b.sg_uf, b.nm_candidato AS lider, b.sg_partido AS partido,
+                   ROUND(b.votos / t.total_votos * 100, 1) AS pct,
+                   NULL AS segundo, NULL AS pct2, t.total_votos
+            FROM base b JOIN totais t USING (sg_uf)
+            WHERE b.nm_candidato = @candidato
+        """
+    else:
+        query = f"""
+            WITH ranked AS (
+                SELECT sg_uf, nm_candidato, sg_partido,
+                       SUM(total_votos) AS votos,
+                       RANK() OVER (PARTITION BY sg_uf ORDER BY SUM(total_votos) DESC) AS rnk
+                FROM {base_table}
+                WHERE {base_where}
+                GROUP BY sg_uf, nm_candidato, sg_partido
+            ),
+            totais AS (SELECT sg_uf, SUM(votos) AS total_votos FROM ranked GROUP BY sg_uf)
+            SELECT r1.sg_uf, r1.nm_candidato AS lider, r1.sg_partido AS partido,
+                   ROUND(r1.votos / t.total_votos * 100, 1) AS pct,
+                   r2.nm_candidato AS segundo, ROUND(r2.votos / t.total_votos * 100, 1) AS pct2,
+                   t.total_votos
+            FROM ranked r1
+            LEFT JOIN ranked r2 ON r1.sg_uf = r2.sg_uf AND r2.rnk = 2
+            JOIN totais t ON r1.sg_uf = t.sg_uf
+            WHERE r1.rnk = 1
+        """
+    params = [
+        bigquery.ScalarQueryParameter("ano", "INT64", ano),
+        bigquery.ScalarQueryParameter("cd_cargo", "INT64", cd_cargo),
+        bigquery.ScalarQueryParameter("turno", "INT64", turno),
+    ]
+    if candidato:
+        params.append(bigquery.ScalarQueryParameter("candidato", "STRING", candidato))
+    job_config = bigquery.QueryJobConfig(query_parameters=params)
     rows = client.query(query, job_config=job_config).result()
     return [
         {
@@ -1434,43 +1466,70 @@ async def _bq_mapa_uf(cargo: str, ano: int, turno: int) -> list[dict]:
     ]
 
 
-async def _bq_mapa_municipio(uf: str, cargo: str, ano: int, turno: int) -> list[dict]:
+async def _bq_mapa_municipio(
+    uf: str, cargo: str, ano: int, turno: int, candidato: str = ""
+) -> list[dict]:
     from google.cloud import bigquery
 
     client = bigquery.Client(project=settings.gcp_project_id)
     cd_cargo = _CARGO_CD.get(cargo, 1)
-    query = f"""
-        WITH ranked AS (
-            SELECT cd_municipio, cd_municipio_ibge, nm_municipio, nm_candidato, sg_partido,
-                   SUM(total_votos) AS votos,
-                   RANK() OVER (PARTITION BY cd_municipio ORDER BY SUM(total_votos) DESC) AS rnk
-            FROM `{settings.gcp_project_id}.{settings.bigquery_dataset_gold}.fact_municipio_candidato_eleicao`
-            WHERE sg_uf = @uf AND ano_eleicao = @ano AND cd_cargo = @cd_cargo AND nr_turno = @turno
-            GROUP BY cd_municipio, cd_municipio_ibge, nm_municipio, nm_candidato, sg_partido
-        ),
-        totais AS (
-            SELECT cd_municipio, SUM(votos) AS total_votos FROM ranked GROUP BY cd_municipio
-        )
-        SELECT r1.cd_municipio, r1.cd_municipio_ibge, r1.nm_municipio,
-               r1.nm_candidato AS lider, r1.sg_partido AS partido,
-               ROUND(r1.votos / t.total_votos * 100, 1) AS pct,
-               r2.nm_candidato AS segundo, ROUND(r2.votos / t.total_votos * 100, 1) AS pct2,
-               t.total_votos
-        FROM ranked r1
-        LEFT JOIN ranked r2 ON r1.cd_municipio = r2.cd_municipio AND r2.rnk = 2
-        JOIN totais t ON r1.cd_municipio = t.cd_municipio
-        WHERE r1.rnk = 1
-        ORDER BY t.total_votos DESC
-        LIMIT 50
-    """
-    job_config = bigquery.QueryJobConfig(
-        query_parameters=[
-            bigquery.ScalarQueryParameter("uf", "STRING", uf),
-            bigquery.ScalarQueryParameter("ano", "INT64", ano),
-            bigquery.ScalarQueryParameter("cd_cargo", "INT64", cd_cargo),
-            bigquery.ScalarQueryParameter("turno", "INT64", turno),
-        ]
-    )
+    base_table = f"`{settings.gcp_project_id}.{settings.bigquery_dataset_gold}.fact_municipio_candidato_eleicao`"
+    base_where = "sg_uf = @uf AND ano_eleicao = @ano AND cd_cargo = @cd_cargo AND nr_turno = @turno"
+    if candidato:
+        query = f"""
+            WITH base AS (
+                SELECT cd_municipio, cd_municipio_ibge, nm_municipio, nm_candidato, sg_partido,
+                       SUM(total_votos) AS votos
+                FROM {base_table}
+                WHERE {base_where}
+                GROUP BY cd_municipio, cd_municipio_ibge, nm_municipio, nm_candidato, sg_partido
+            ),
+            totais AS (
+                SELECT cd_municipio, SUM(votos) AS total_votos FROM base GROUP BY cd_municipio
+            )
+            SELECT b.cd_municipio, b.cd_municipio_ibge, b.nm_municipio,
+                   b.nm_candidato AS lider, b.sg_partido AS partido,
+                   ROUND(b.votos / t.total_votos * 100, 1) AS pct,
+                   NULL AS segundo, NULL AS pct2,
+                   t.total_votos
+            FROM base b
+            JOIN totais t ON b.cd_municipio = t.cd_municipio
+            WHERE b.nm_candidato = @candidato
+            ORDER BY b.votos DESC
+        """
+    else:
+        query = f"""
+            WITH ranked AS (
+                SELECT cd_municipio, cd_municipio_ibge, nm_municipio, nm_candidato, sg_partido,
+                       SUM(total_votos) AS votos,
+                       RANK() OVER (PARTITION BY cd_municipio ORDER BY SUM(total_votos) DESC) AS rnk
+                FROM {base_table}
+                WHERE {base_where}
+                GROUP BY cd_municipio, cd_municipio_ibge, nm_municipio, nm_candidato, sg_partido
+            ),
+            totais AS (
+                SELECT cd_municipio, SUM(votos) AS total_votos FROM ranked GROUP BY cd_municipio
+            )
+            SELECT r1.cd_municipio, r1.cd_municipio_ibge, r1.nm_municipio,
+                   r1.nm_candidato AS lider, r1.sg_partido AS partido,
+                   ROUND(r1.votos / t.total_votos * 100, 1) AS pct,
+                   r2.nm_candidato AS segundo, ROUND(r2.votos / t.total_votos * 100, 1) AS pct2,
+                   t.total_votos
+            FROM ranked r1
+            LEFT JOIN ranked r2 ON r1.cd_municipio = r2.cd_municipio AND r2.rnk = 2
+            JOIN totais t ON r1.cd_municipio = t.cd_municipio
+            WHERE r1.rnk = 1
+            ORDER BY t.total_votos DESC
+        """
+    params = [
+        bigquery.ScalarQueryParameter("uf", "STRING", uf),
+        bigquery.ScalarQueryParameter("ano", "INT64", ano),
+        bigquery.ScalarQueryParameter("cd_cargo", "INT64", cd_cargo),
+        bigquery.ScalarQueryParameter("turno", "INT64", turno),
+    ]
+    if candidato:
+        params.append(bigquery.ScalarQueryParameter("candidato", "STRING", candidato))
+    job_config = bigquery.QueryJobConfig(query_parameters=params)
     rows = client.query(query, job_config=job_config).result()
     return [
         {

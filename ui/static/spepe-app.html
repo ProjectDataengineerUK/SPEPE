@@ -580,7 +580,7 @@ tr.rhl td{background:rgba(0,200,83,.07)!important}
           <button class="level-btn disabled" onclick="setMapLevel('secao')" id="btn-secao">📋 Seção</button>
         </div>
         <span class="map-breadcrumb" id="map-breadcrumb">Brasil</span>
-        <select class="map-cargo-sel" id="map-cargo-sel" onchange="reloadMap()">
+        <select class="map-cargo-sel" id="map-cargo-sel" onchange="loadCandidatoList();reloadMap()">
           <option>Governador</option>
           <option>Presidente</option>
           <option>Senador</option>
@@ -594,6 +594,10 @@ tr.rhl td{background:rgba(0,200,83,.07)!important}
           <option value="health">🏥 Saúde</option>
           <option value="economic">💰 Econômico</option>
         </select>
+        <input type="text" id="map-candidato" placeholder="Candidato (opcional)"
+          style="background:var(--bg3);border:1px solid var(--border);border-radius:6px;padding:5px 9px;color:var(--text);font-size:.75rem;outline:none;margin-left:0;width:180px"
+          list="map-candidato-list" autocomplete="off" oninput="reloadMap()">
+        <datalist id="map-candidato-list"></datalist>
       </div>
       <div class="map-body">
         <div id="leaflet-map"></div>
@@ -920,6 +924,7 @@ function switchTab(el,nm){
     if(dash) dash.style.display='none';
     const mapa=document.getElementById('tab-mapa');
     if(mapa){ mapa.style.display='flex'; mapa.classList.add('active'); }
+    loadCandidatoList();
     setTimeout(()=>{ if(!gMap) initGoogleMaps(); else reloadMap(); },50);
   } else if(_TAB_PANEL_MAP[nm]){
     if(dash) dash.style.display='none';
@@ -1138,6 +1143,7 @@ function applyFilters(){
   refreshPrevisaoChart(cargo, uf, ano);
   refreshSentimentChart(uf, ano);
   refreshResultadosChart(cargo, uf, ano, turnoNum);
+  loadCandidatoList();
   if(gMap && document.getElementById('tab-mapa')?.classList.contains('active')) reloadMap();
 }
 function onCargoSelect(val){
@@ -1775,6 +1781,8 @@ async function reloadMap(){
   if(_mapCtx.uf) url += `&uf=${_mapCtx.uf}`;
   if(_mapCtx.cd_municipio) url += `&cd_municipio=${_mapCtx.cd_municipio}`;
   if(_mapCtx.nr_zona) url += `&nr_zona=${_mapCtx.nr_zona}`;
+  const candidato = document.getElementById('map-candidato')?.value?.trim() || '';
+  if(candidato) url += `&candidato=${encodeURIComponent(candidato)}`;
 
   const [apiRes, geoRes] = await Promise.all([
     apiFetch(url).then(r=>r?r.json():({features:[],fonte:'indisponivel'})).catch(()=>({features:[],fonte:'indisponivel'})),
@@ -1791,6 +1799,28 @@ async function reloadMap(){
   _updateBreadcrumb();
   _updateLegend(apiRes.features||[], colorBy, layer);
   _updateLevelButtons();
+}
+
+async function loadCandidatoList(){
+  const ano = document.getElementById('f-ano')?.value || '2022';
+  const uf = document.getElementById('f-uf')?.value || 'SP';
+  const cargo = document.getElementById('map-cargo-sel')?.value || 'Governador';
+  const input = document.getElementById('map-candidato');
+  const dl = document.getElementById('map-candidato-list');
+  if(input) input.value = '';
+  if(!dl) return;
+  dl.innerHTML = '';
+  try {
+    const res = await apiFetch(`/api/candidatos?ano=${ano}&uf=${encodeURIComponent(uf)}&cargo=${encodeURIComponent(cargo)}`);
+    if(!res) return;
+    const data = await res.json();
+    (data.candidatos||[]).forEach(c => {
+      const opt = document.createElement('option');
+      opt.value = c.nm;
+      opt.label = `${c.nm} (${c.partido})`;
+      dl.appendChild(opt);
+    });
+  } catch {}
 }
 
 async function _loadGeoJSON(level){
