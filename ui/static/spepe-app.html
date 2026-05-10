@@ -1720,6 +1720,7 @@ function initMap(){
 }
 
 function renderGeoJSON(geojsonData, colorBy, layer) {
+  _clearBubbles();
   if(!dataLayer) return;
   dataLayer.forEach(f => dataLayer.remove(f));
   if(!geojsonData) return;
@@ -1792,6 +1793,20 @@ async function reloadMap(){
   _mapData = {};
   (apiRes.features||[]).forEach(f=> _mapData[String(f.ibge_code||f.id||f.label)] = f);
 
+  if(_mapLevel === 'zona'){
+    // Zona: bubble map de municípios (sem GeoJSON de zonas eleitorais públicas)
+    // Carregar dados de município para o bubble map
+    const bubbleUrl = `/api/mapa/municipio?cargo=${encodeURIComponent(cargo)}&ano=${ano}&turno=${turno}&layer=${layer}&uf=${_mapCtx.uf||ufSel}`;
+    const munRes = await apiFetch(bubbleUrl).then(r=>r?r.json():({features:[]})).catch(()=>({features:[]}));
+    _mapData = {};
+    (munRes.features||[]).forEach(f=> _mapData[String(f.ibge_code||'')] = f);
+    _renderBubbleMap(geoRes, colorBy);
+    _renderZonaSecaoGrid(apiRes.features||[], _mapLevel);
+    _updateBreadcrumb();
+    _updateLevelButtons();
+    return;
+  }
+
   if(!geoRes) { _renderZonaSecaoGrid(apiRes.features||[], _mapLevel); return; }
 
   renderGeoJSON(geoRes, colorBy, layer);
@@ -1829,6 +1844,7 @@ async function _loadGeoJSON(level){
     regiao:    IBGE_GEO.regiao(),
     uf:        IBGE_GEO.uf(),
     municipio: IBGE_GEO.municipio(_mapCtx.uf||'SP'),
+    zona:      IBGE_GEO.municipio(_mapCtx.uf||'SP'),  // bubble map usa GeoJSON de municípios
   };
   const url = geoUrls[level];
   if(!url) return null;
@@ -1836,6 +1852,58 @@ async function _loadGeoJSON(level){
     const r = await _nativeFetch(url);
     return await r.json();
   } catch { return null; }
+}
+
+function _polygonCentroid(coords){
+  // Compute simple centroid from outer ring of polygon/multipolygon
+  let ring = coords;
+  if(Array.isArray(coords[0][0][0])) ring = coords[0][0]; // MultiPolygon
+  else if(Array.isArray(coords[0][0])) ring = coords[0];  // Polygon outer ring
+  let lat=0, lng=0;
+  ring.forEach(([x,y])=>{ lng+=x; lat+=y; });
+  return {lat: lat/ring.length, lng: lng/ring.length};
+}
+
+let _bubbleOverlays = [];
+function _clearBubbles(){
+  _bubbleOverlays.forEach(o=>o.setMap(null));
+  _bubbleOverlays = [];
+}
+
+function _renderBubbleMap(geoJSON, colorBy){
+  _clearBubbles();
+  if(!gMap || !geoJSON) return;
+  const features = geoJSON.features||[];
+  const maxVotos = Math.max(1, ...Object.values(_mapData).map(d=>d.total_votos||0));
+  features.forEach(feat=>{
+    const props = feat.properties||{};
+    const cod = String(props.codarea||'');
+    const d = _mapData[cod];
+    if(!d) return;
+    const center = _polygonCentroid(feat.geometry.coordinates);
+    const r = 800 + Math.sqrt((d.total_votos||0)/maxVotos) * 25000;
+    const color = d.partido ? (PARTIDO_COR[d.partido]||_candidateColor(d.lider)) : _candidateColor(d.lider);
+    const circle = new google.maps.Circle({
+      map: gMap,
+      center,
+      radius: r,
+      fillColor: color,
+      fillOpacity: 0.72,
+      strokeColor: '#fff',
+      strokeOpacity: 0.4,
+      strokeWeight: 1,
+      clickable: true,
+    });
+    const info = new google.maps.InfoWindow({
+      content: _buildTooltip(d, 'electoral'),
+    });
+    circle.addListener('click', ()=>{
+      info.setPosition(center);
+      info.open(gMap);
+    });
+    _bubbleOverlays.push(circle);
+    _bubbleOverlays.push(info);
+  });
 }
 
 function _getFeatureData(feat){
