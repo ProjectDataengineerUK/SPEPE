@@ -446,36 +446,80 @@ def transform_pesquisas_to_silver(
 ) -> dict:
     """Transform Bronze polls (TSE PesqEle + Atlas) to Silver fact_pesquisa.
 
-    Reads:  bronze/pesquisas/{year}/BR/pesquisas_tse_{year}.parquet
-            bronze/pesquisas/{year}/BR/pesquisas_atlas_{year}.parquet
+    Reads:  bronze/pesquisas/{year}/BR/pesquisas_tse_{year}.parquet  (registro de firmas)
+            bronze/pesquisas/{year}/BR/pesquisas_atlas_{year}.parquet (intenção de voto)
             bronze/pesquisas/{year}/BR/dim_instituto.parquet
     Writes: Silver table `fact_pesquisa` (BigQuery) or local parquet.
+
+    Atlas Político é a fonte primária para intencao_pct (candidato × %).
+    TSE PesqEle fornece metadata de cadastro (n_entrevistados, margem_erro).
+    Rows do TSE sem correspondência no Atlas são marcadas como tipo_registro='cadastro'.
     """
     LOCAL_SILVER_DIR.mkdir(parents=True, exist_ok=True)
 
     bronze_dir = LOCAL_BRONZE_DIR / "pesquisas" / str(year) / "BR"
-    frames: list[pd.DataFrame] = []
-
     gcs_prefix = f"raw/pesquisas/{year}/BR"
-    if GCS_BUCKET:
-        try:
-            df_gcs = _read_gcs_parquet_glob(GCS_BUCKET, gcs_prefix)
-            if not df_gcs.empty:
-                frames.append(df_gcs)
-                logger.info("Pesquisas Bronze GCS: %d rows (prefix=%s)", len(df_gcs), gcs_prefix)
-        except Exception as exc:
-            logger.warning("Falha ao ler pesquisas do GCS: %s", exc)
 
-    if not frames:
-        for pattern in (f"pesquisas_tse_{year}.parquet", f"pesquisas_atlas_{year}.parquet"):
-            f = bronze_dir / pattern
-            if f.exists():
-                try:
-                    df_part = pd.read_parquet(f)
-                    frames.append(df_part)
-                    logger.info("Pesquisas Bronze local: %s (%d rows)", f.name, len(df_part))
-                except Exception as exc:
-                    logger.warning("Falha ao ler %s: %s", f, exc)
+    def _read_named_parquet(filename: str) -> pd.DataFrame:
+        if GCS_BUCKET:
+            try:
+                from google.cloud import storage as _gcs
+
+                _blob = _gcs.Client().bucket(GCS_BUCKET).blob(f"{gcs_prefix}/{filename}")
+                if not _blob.exists():
+                    return pd.DataFrame()
+                return pd.read_parquet(io.BytesIO(_blob.download_as_bytes()))
+            except Exception as exc:
+                logger.warning("Falha GCS %s: %s", filename, exc)
+                return pd.DataFrame()
+        path = bronze_dir / filename
+        if not path.exists():
+            return pd.DataFrame()
+        try:
+            return pd.read_parquet(path)
+        except Exception as exc:
+            logger.warning("Falha local %s: %s", filename, exc)
+            return pd.DataFrame()
+
+    df_tse = _read_named_parquet(f"pesquisas_tse_{year}.parquet")
+    df_atlas = _read_named_parquet(f"pesquisas_atlas_{year}.parquet")
+
+    if not df_tse.empty:
+        logger.info("Pesquisas Bronze TSE: %d rows (cadastro)", len(df_tse))
+    if not df_atlas.empty:
+        logger.info("Pesquisas Bronze Atlas: %d rows (intenção de voto)", len(df_atlas))
+
+    # Atlas é fonte primária — enrich com metadata TSE via poll_id
+    if not df_atlas.empty and not df_tse.empty:
+        _meta = [c for c in ("poll_id", "n_entrevistados", "margem_erro") if c in df_tse.columns]
+        if "poll_id" in _meta and len(_meta) > 1:
+            tse_meta = df_tse[_meta].dropna(subset=["poll_id"])
+            _suffix_map = {c: f"{c}_tse" for c in _meta if c != "poll_id"}
+            df_atlas = df_atlas.merge(
+                tse_meta.rename(columns=_suffix_map),
+                on="poll_id",
+                how="left",
+            )
+            for col, tse_col in _suffix_map.items():
+                if col in df_atlas.columns and tse_col in df_atlas.columns:
+                    df_atlas[col] = df_atlas[col].fillna(df_atlas[tse_col])
+                    df_atlas.drop(columns=[tse_col], inplace=True)
+        df_atlas["tipo_registro"] = "intencao_voto"
+
+    frames: list[pd.DataFrame] = []
+    if not df_atlas.empty:
+        frames.append(df_atlas)
+
+    # Append TSE-only rows (polls not covered by Atlas) as cadastro records
+    if not df_tse.empty:
+        if not df_atlas.empty and "poll_id" in df_tse.columns and "poll_id" in df_atlas.columns:
+            atlas_ids = set(df_atlas["poll_id"].dropna().astype(str))
+            df_tse_only = df_tse[~df_tse["poll_id"].astype(str).isin(atlas_ids)].copy()
+        else:
+            df_tse_only = df_tse.copy()
+        if not df_tse_only.empty:
+            df_tse_only["tipo_registro"] = "cadastro"
+            frames.append(df_tse_only)
 
     if not frames:
         return {"status": "error", "message": f"Bronze pesquisas vazio para {year}"}
@@ -563,17 +607,50 @@ def transform_social_to_silver(
 
     frames: list[pd.DataFrame] = []
 
+    # Files excluded from social_mencoes_br: aggregated sentiment and digital trends
+    # (handled respectively by dedicated transforms or separate aggregation steps)
+    _SOCIAL_EXCLUDE = {"twitter_sentimento", "google_trends_timeline", "google_trends_por_uf"}
+
+    def _is_social_mention_file(name: str) -> bool:
+        base = name.split("/")[-1].replace(".parquet", "")
+        return not any(base.startswith(excl) for excl in _SOCIAL_EXCLUDE)
+
     if GCS_BUCKET:
+        from google.cloud import storage as _gcs_storage
+
         prefix = f"raw/social/{year}/BR/"
-        df_gcs = _read_gcs_parquet_glob(GCS_BUCKET, prefix)
-        if not df_gcs.empty:
-            frames.append(df_gcs)
-            logger.info("Social Bronze GCS: %d registros (ano=%d)", len(df_gcs), year)
+        try:
+            gcs_client = _gcs_storage.Client()
+            bucket_obj = gcs_client.bucket(GCS_BUCKET)
+            blobs = [
+                b
+                for b in bucket_obj.list_blobs(prefix=prefix)
+                if b.name.endswith(".parquet") and _is_social_mention_file(b.name)
+            ]
+            if blobs:
+                import io as _io
+
+                sub_frames = []
+                for blob in blobs:
+                    try:
+                        sub_frames.append(pd.read_parquet(_io.BytesIO(blob.download_as_bytes())))
+                        logger.info("Social Bronze GCS: %s", blob.name.split("/")[-1])
+                    except Exception as exc:
+                        logger.warning("Falha ao ler GCS social %s: %s", blob.name, exc)
+                if sub_frames:
+                    frames.append(pd.concat(sub_frames, ignore_index=True))
+                    logger.info(
+                        "Social Bronze GCS total: %d registros (ano=%d)", len(frames[-1]), year
+                    )
+        except Exception as exc:
+            logger.warning("GCS social read falhou: %s", exc)
     else:
         bronze_social = LOCAL_BRONZE_DIR / "social" / str(year) / "BR"
+        # All social mention sources (individual posts/articles, not aggregated files)
         patterns = [
             "twitter_mencoes_*.parquet",
             "facebook_posts_*.parquet",
+            "instagram_posts_*.parquet",
             "youtube_videos_*.parquet",
             "bluesky_posts_*.parquet",
             "gdelt_noticias_*.parquet",
@@ -869,7 +946,13 @@ def transform_saude_to_silver(
     if "ano" not in df.columns:
         df["ano"] = year
 
-    for col in ("tx_mortalidade_infantil", "cobertura_esf_pct", "leitos_per_1000"):
+    for col in (
+        "taxa_mortalidade_infantil_1000",
+        "taxa_mortalidade_materna_100k",
+        "pct_cobertura_plano_saude",
+        "qt_obitos_total",
+        "qt_nascimentos",
+    ):
         if col in df.columns:
             df[col] = pd.to_numeric(df[col], errors="coerce")
 
@@ -1597,6 +1680,301 @@ def transform_candidaturas_to_silver(
     except Exception as exc:
         logger.error("dim_candidato Silver BQ falhou: %s", exc)
         return {"status": "error", "message": str(exc)}
+
+
+def transform_endividamento_to_silver(
+    year_start: int,
+    year_end: int,
+    use_bigquery: bool = False,
+) -> dict:
+    """Transform Bronze BCB endividamento → Silver endividamento_nacional (national time series).
+
+    Reads:  raw/endividamento/{year_end}/{UF}/endividamento_*_{year_start}_{year_end}.parquet
+    Writes: Silver table `endividamento_nacional` deduplicated by data_referencia.
+    """
+    LOCAL_SILVER_DIR.mkdir(parents=True, exist_ok=True)
+
+    frames: list[pd.DataFrame] = []
+    if GCS_BUCKET:
+        prefix = f"raw/endividamento/{year_end}/"
+        try:
+            df_gcs = _read_gcs_parquet_glob(GCS_BUCKET, prefix)
+            if not df_gcs.empty:
+                frames.append(df_gcs)
+                logger.info("Endividamento Bronze GCS: %d rows (prefix=%s)", len(df_gcs), prefix)
+        except Exception as exc:
+            logger.warning("GCS endividamento read: %s", exc)
+
+    if not frames:
+        bronze_path = LOCAL_BRONZE_DIR / "endividamento" / str(year_end)
+        for f in (
+            bronze_path.rglob(f"endividamento_*_{year_start}_{year_end}.parquet")
+            if bronze_path.exists()
+            else []
+        ):
+            try:
+                frames.append(pd.read_parquet(f))
+            except Exception as exc:
+                logger.warning("Endividamento local read %s: %s", f, exc)
+
+    if not frames:
+        return {
+            "status": "error",
+            "message": f"Bronze endividamento vazio para {year_start}-{year_end}",
+        }
+
+    df = pd.concat(frames, ignore_index=True)
+
+    # Deduplicate — BACEN data is national, same value propagated per municipality
+    # Keep only unique national time series rows (by data_referencia)
+    ts_cols = [
+        "data_referencia",
+        "ano",
+        "mes",
+        "endividamento_familias_pct",
+        "comprometimento_renda_pct",
+        "inadimplencia_pf_pct",
+        "inadimplencia_pf_credito",
+        "fontes",
+        "granularidade",
+    ]
+    avail = [c for c in ts_cols if c in df.columns]
+    if "data_referencia" in avail:
+        df = df[avail].drop_duplicates(subset=["data_referencia"])
+    else:
+        df = df[avail]
+
+    for col in (
+        "endividamento_familias_pct",
+        "comprometimento_renda_pct",
+        "inadimplencia_pf_pct",
+        "inadimplencia_pf_credito",
+    ):
+        if col in df.columns:
+            df[col] = pd.to_numeric(df[col], errors="coerce")
+
+    df["ingested_at"] = pd.Timestamp.utcnow()
+    logger.info("Endividamento Silver: %d períodos mensais", len(df))
+
+    if use_bigquery:
+        project = os.environ.get("GCP_PROJECT_ID", "spepe-dev")
+        dataset = os.environ.get("BIGQUERY_DATASET_SILVER", "spepe_silver")
+        try:
+            from google.cloud import bigquery
+            from google.cloud.bigquery import WriteDisposition
+
+            client = bigquery.Client(project=project)
+            table_id = f"{project}.{dataset}.endividamento_nacional"
+            df_bq = _normalize_for_bq(df)
+            try:
+                client.query(f"TRUNCATE TABLE `{table_id}`").result()
+            except Exception:
+                pass
+            job_config = bigquery.LoadJobConfig(
+                write_disposition=WriteDisposition.WRITE_APPEND,
+                create_disposition="CREATE_IF_NEEDED",
+                autodetect=True,
+            )
+            client.load_table_from_dataframe(df_bq, table_id, job_config=job_config).result()
+            logger.info("Endividamento Silver BQ: %s (%d rows)", table_id, len(df))
+            return {"status": "ok", "path": table_id, "rows": len(df)}
+        except ImportError:
+            pass
+
+    path_local = LOCAL_SILVER_DIR / f"endividamento_nacional_{year_start}_{year_end}.parquet"
+    df.to_parquet(path_local, index=False, compression="zstd")
+    logger.info("Endividamento Silver local: %s (%d rows)", path_local, len(df))
+    return {"status": "ok", "path": str(path_local), "rows": len(df)}
+
+
+def transform_camara_senado_to_silver(
+    years: list[int] | None = None,
+    legislature: int = 57,
+    use_bigquery: bool = False,
+) -> dict:
+    """Transform Bronze câmara/senado → Silver votacoes_parlamentares + parlamentares_federais.
+
+    Reads:  raw/camara_senado/{year}/BR/votacoes_camara_{year}.parquet
+            raw/camara_senado/{year}/BR/votacoes_senado_{year}.parquet
+            raw/camara_senado/{year}/BR/parlamentares_leg{legislature}.parquet
+    Writes: Silver table `votacoes_parlamentares` (WRITE_APPEND pre-delete by ano)
+            Silver table `parlamentares_federais` (WRITE_TRUNCATE)
+    """
+    LOCAL_SILVER_DIR.mkdir(parents=True, exist_ok=True)
+    _years = years or [2023, 2024, 2025]
+    use_bq = use_bigquery
+    project = os.environ.get("GCP_PROJECT_ID", "spepe-dev")
+    dataset = os.environ.get("BIGQUERY_DATASET_SILVER", "spepe_silver")
+    results: dict[str, dict] = {}
+
+    def _read_bronze(source_year: int | None, filename: str) -> pd.DataFrame:
+        yr = source_year or _years[-1]
+        if GCS_BUCKET:
+            prefix = f"raw/camara_senado/{yr}/BR/{filename}"
+            try:
+                from google.cloud import storage as _gcs
+                import io as _io
+
+                blob = _gcs.Client().bucket(GCS_BUCKET).blob(prefix)
+                if blob.exists():
+                    return pd.read_parquet(_io.BytesIO(blob.download_as_bytes()))
+            except Exception as exc:
+                logger.warning("GCS camara_senado read %s: %s", prefix, exc)
+        local = LOCAL_BRONZE_DIR / "camara_senado" / str(yr) / "BR" / filename
+        if local.exists():
+            return pd.read_parquet(local)
+        return pd.DataFrame()
+
+    # ── Parlamentares (base) ──────────────────────────────────────────────────
+    df_parl = _read_bronze(None, f"parlamentares_leg{legislature}.parquet")
+    if not df_parl.empty:
+        df_parl["ingested_at"] = pd.Timestamp.utcnow()
+        if use_bq:
+            try:
+                from google.cloud import bigquery
+
+                client = bigquery.Client(project=project)
+                table_id = f"{project}.{dataset}.parlamentares_federais"
+                df_bq = _normalize_for_bq(df_parl)
+                cfg = bigquery.LoadJobConfig(
+                    write_disposition="WRITE_TRUNCATE",
+                    create_disposition="CREATE_IF_NEEDED",
+                    autodetect=True,
+                )
+                client.load_table_from_dataframe(df_bq, table_id, job_config=cfg).result()
+                results["parlamentares_federais"] = {"path": table_id, "rows": len(df_parl)}
+                logger.info("Parlamentares Silver BQ: %d rows", len(df_parl))
+            except Exception as exc:
+                logger.warning("Parlamentares Silver BQ falhou: %s", exc)
+        else:
+            p = LOCAL_SILVER_DIR / "parlamentares_federais.parquet"
+            df_parl.to_parquet(p, index=False, compression="zstd")
+            results["parlamentares_federais"] = {"path": str(p), "rows": len(df_parl)}
+
+    # ── Votações (câmara + senado por ano) ────────────────────────────────────
+    vot_frames: list[pd.DataFrame] = []
+    for year in _years:
+        for casa, filename in (
+            ("Câmara", f"votacoes_camara_{year}.parquet"),
+            ("Senado", f"votacoes_senado_{year}.parquet"),
+        ):
+            df_v = _read_bronze(year, filename)
+            if df_v.empty:
+                continue
+            if "casa" not in df_v.columns:
+                df_v["casa"] = casa
+            if "ano" not in df_v.columns:
+                df_v["ano"] = year
+            if "mes" not in df_v.columns and "data_votacao" in df_v.columns:
+                df_v["mes"] = pd.to_datetime(df_v["data_votacao"], errors="coerce").dt.month
+            vot_frames.append(df_v)
+
+    if vot_frames:
+        df_vot = pd.concat(vot_frames, ignore_index=True)
+        df_vot["ingested_at"] = pd.Timestamp.utcnow()
+        for col in ("sg_partido", "sg_uf", "tema", "voto", "casa"):
+            if col in df_vot.columns:
+                df_vot[col] = df_vot[col].fillna("").astype(str).str.strip()
+        if use_bq:
+            try:
+                from google.cloud import bigquery
+
+                client = bigquery.Client(project=project)
+                table_id = f"{project}.{dataset}.votacoes_parlamentares"
+                df_bq = _normalize_for_bq(df_vot)
+                for year in _years:
+                    try:
+                        client.query(f"DELETE FROM `{table_id}` WHERE ano = {year}").result()
+                    except Exception:
+                        pass
+                cfg = bigquery.LoadJobConfig(
+                    write_disposition="WRITE_APPEND",
+                    create_disposition="CREATE_IF_NEEDED",
+                    autodetect=True,
+                    schema_update_options=[bigquery.SchemaUpdateOption.ALLOW_FIELD_ADDITION],
+                )
+                client.load_table_from_dataframe(df_bq, table_id, job_config=cfg).result()
+                results["votacoes_parlamentares"] = {"path": table_id, "rows": len(df_vot)}
+                logger.info("Votações Parlamentares Silver BQ: %d rows", len(df_vot))
+            except Exception as exc:
+                logger.warning("Votações Silver BQ falhou: %s", exc)
+        else:
+            p = LOCAL_SILVER_DIR / "votacoes_parlamentares.parquet"
+            df_vot.to_parquet(p, index=False, compression="zstd")
+            results["votacoes_parlamentares"] = {"path": str(p), "rows": len(df_vot)}
+
+    if not results:
+        return {"status": "error", "message": "Bronze câmara/senado vazio"}
+    return {"status": "ok", "tables": results}
+
+
+def transform_tse_perfil_to_silver(
+    uf: str,
+    year: int,
+    use_bigquery: bool = False,
+) -> dict:
+    """Transform Bronze TSE Perfil Eleitorado → Silver perfil_eleitorado.
+
+    Reads:  raw/tse_perfil/{year}/{UF}/perfil_{UF}_{year}.parquet
+    Writes: Silver table `perfil_eleitorado` (WRITE_APPEND pre-delete by sg_uf + ano)
+    """
+    LOCAL_SILVER_DIR.mkdir(parents=True, exist_ok=True)
+
+    df = pd.DataFrame()
+    if GCS_BUCKET:
+        prefix = f"raw/tse_perfil/{year}/{uf.upper()}/"
+        try:
+            df = _read_gcs_parquet_glob(GCS_BUCKET, prefix)
+        except Exception as exc:
+            logger.warning("GCS tse_perfil read %s/%d: %s", uf, year, exc)
+
+    if df.empty:
+        bronze_path = LOCAL_BRONZE_DIR / "tse_perfil" / str(year) / uf.upper()
+        files = (
+            list(bronze_path.glob(f"perfil_{uf.upper()}_{year}.parquet"))
+            if bronze_path.exists()
+            else []
+        )
+        if files:
+            df = pd.concat([pd.read_parquet(f) for f in files], ignore_index=True)
+
+    if df.empty:
+        return {"status": "error", "message": f"Bronze TSE perfil vazio para {uf}/{year}"}
+
+    df = df.copy()
+    if "sg_uf" not in df.columns:
+        df["sg_uf"] = uf.upper()
+    if "ano" not in df.columns:
+        df["ano"] = year
+
+    for col in ("qt_eleitores", "qt_eleitores_deficiencia", "qt_eleitores_biometria"):
+        if col in df.columns:
+            df[col] = pd.to_numeric(df[col], errors="coerce").fillna(0).astype("Int64")
+
+    str_cols = (
+        "ds_genero",
+        "ds_faixa_etaria",
+        "ds_grau_escolaridade",
+        "ds_estado_civil",
+        "nm_municipio",
+        "sg_uf",
+    )
+    for col in str_cols:
+        if col in df.columns:
+            df[col] = df[col].fillna("").astype(str).str.strip()
+
+    df["ingested_at"] = pd.Timestamp.utcnow()
+    logger.info("TSE Perfil Silver %s/%d: %d rows", uf.upper(), year, len(df))
+
+    if use_bigquery:
+        path = _write_bigquery_uf_year(df, "perfil_eleitorado", uf, year)
+    else:
+        path_local = LOCAL_SILVER_DIR / f"perfil_eleitorado_{uf.lower()}_{year}.parquet"
+        df.to_parquet(path_local, index=False, compression="zstd")
+        path = str(path_local)
+        logger.info("TSE Perfil Silver local: %s (%d rows)", path, len(df))
+
+    return {"status": "ok", "path": path, "rows": len(df)}
 
 
 def _dataframe_to_bq_schema(df: pd.DataFrame) -> list:

@@ -16,16 +16,19 @@ DQ_THRESHOLD = float(os.environ.get("DQ_SCORE_THRESHOLD", "95.0"))
 def main(uf: str, years: list[int] | None = None, include_social: bool = True) -> None:
     from dataops.silver_transformer import (
         transform_cadunico_to_silver,
+        transform_camara_senado_to_silver,
         transform_candidaturas_to_silver,
         transform_digital_to_silver,
         transform_economia_to_silver,
         transform_emendas_to_silver,
+        transform_endividamento_to_silver,
         transform_pesquisas_to_silver,
         transform_saude_to_silver,
         transform_sancoes_to_silver,
         transform_seguranca_to_silver,
         transform_social_to_silver,
         transform_to_silver,
+        transform_tse_perfil_to_silver,
     )
 
     use_bq = bool(os.environ.get("GCP_PROJECT_ID"))
@@ -160,6 +163,43 @@ def main(uf: str, years: list[int] | None = None, include_social: bool = True) -
         logger.info("Sanções Silver OK: %d rows", r.get("rows", 0))
     else:
         logger.warning("Sanções Silver: %s (Bronze pode estar vazio)", r.get("message"))
+
+    # ── Endividamento BACEN (nacional, série mensal) ────────────────────────
+    _ey_start = int(os.environ.get("ENDIVIDAMENTO_YEAR_START", "2025"))
+    _ey_end = int(os.environ.get("ENDIVIDAMENTO_YEAR_END", "2026"))
+    logger.info("Silver endividamento: %d-%d", _ey_start, _ey_end)
+    r = transform_endividamento_to_silver(_ey_start, _ey_end, use_bigquery=use_bq)
+    if r.get("status") == "ok":
+        logger.info("Endividamento Silver OK: %d rows", r.get("rows", 0))
+    else:
+        logger.warning("Endividamento Silver: %s (Bronze pode estar vazio)", r.get("message"))
+
+    # ── Câmara + Senado (votações, parlamentares) ────────────────────────────
+    _cam_years_env = os.environ.get("CAMARA_SENADO_YEARS", "2023,2024,2025")
+    cam_years = [int(y.strip()) for y in _cam_years_env.split(",") if y.strip()]
+    _legislature = int(os.environ.get("LEGISLATURE", "57"))
+    logger.info("Silver câmara/senado: anos=%s leg=%d", cam_years, _legislature)
+    r = transform_camara_senado_to_silver(cam_years, _legislature, use_bigquery=use_bq)
+    if r.get("status") == "ok":
+        logger.info("Câmara/Senado Silver OK: %s", r.get("tables", {}).keys())
+    else:
+        logger.warning("Câmara/Senado Silver: %s (Bronze pode estar vazio)", r.get("message"))
+
+    # ── TSE Perfil Eleitorado (por UF × ano) ─────────────────────────────────
+    _perfil_years_env = os.environ.get("PERFIL_YEARS", "2022")
+    perfil_years = [int(y.strip()) for y in _perfil_years_env.split(",") if y.strip()]
+    for perfil_year in perfil_years:
+        logger.info("Silver TSE perfil: %s/%d", uf, perfil_year)
+        r = transform_tse_perfil_to_silver(uf, perfil_year, use_bigquery=use_bq)
+        if r.get("status") == "ok":
+            logger.info("TSE Perfil Silver OK %s/%d: %d rows", uf, perfil_year, r.get("rows", 0))
+        else:
+            logger.warning(
+                "TSE Perfil Silver %s/%d: %s (CDN TSE pode estar em manutenção)",
+                uf,
+                perfil_year,
+                r.get("message"),
+            )
 
     # ── Candidaturas TSE (dim_candidato — partido lookup para Gold JOIN) ────
     _cand_years_env = os.environ.get("CANDIDATURAS_YEARS", "2018,2022")

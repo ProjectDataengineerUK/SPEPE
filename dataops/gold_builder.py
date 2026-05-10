@@ -241,13 +241,15 @@ def _build_gold_via_bigquery_sql() -> dict:
         "fact_saude_municipio": f"""
             CREATE OR REPLACE TABLE `{gold}.fact_saude_municipio` AS
             SELECT
-                CAST(cd_municipio_ibge AS INT64)        AS cd_municipio_ibge,
+                CAST(cd_municipio_ibge AS INT64)                              AS cd_municipio_ibge,
                 sg_uf,
-                COALESCE(SAFE_CAST(ano AS INT64), 2022) AS ano,
-                CAST(NULL AS FLOAT64)                   AS taxa_mortalidade_infantil_1000,
-                CAST(NULL AS FLOAT64)                   AS taxa_mortalidade_materna_100k,
-                CAST(NULL AS FLOAT64)                   AS pct_cobertura_plano_saude,
-                CAST(NULL AS FLOAT64)                   AS idsus_score,
+                COALESCE(SAFE_CAST(ano AS INT64), 2022)                       AS ano,
+                SAFE_CAST(taxa_mortalidade_infantil_1000 AS FLOAT64)          AS taxa_mortalidade_infantil_1000,
+                SAFE_CAST(taxa_mortalidade_materna_100k AS FLOAT64)           AS taxa_mortalidade_materna_100k,
+                SAFE_CAST(pct_cobertura_plano_saude AS FLOAT64)               AS pct_cobertura_plano_saude,
+                SAFE_CAST(qt_obitos_total AS FLOAT64)                         AS qt_obitos_total,
+                SAFE_CAST(qt_nascimentos AS FLOAT64)                          AS qt_nascimentos,
+                CAST(NULL AS FLOAT64)                                         AS idsus_score,
                 CURRENT_TIMESTAMP() AS ingested_at
             FROM `{silver}.saude_municipal`
             WHERE cd_municipio_ibge IS NOT NULL
@@ -455,6 +457,65 @@ def _build_gold_via_bigquery_sql() -> dict:
                 fonte_sistema, sg_uf_sancionador, tp_sancao, tp_pessoa,
                 EXTRACT(YEAR FROM dt_inicio_sancao)
         """,
+        # ── Endividamento familiar BACEN (série nacional mensal) ─────────────────
+        "fact_endividamento_nacional": f"""
+            CREATE OR REPLACE TABLE `{gold}.fact_endividamento_nacional` AS
+            SELECT
+                SAFE_CAST(ano AS INT64)                              AS ano,
+                SAFE_CAST(mes AS INT64)                              AS mes,
+                CAST(data_referencia AS DATE)                        AS data_referencia,
+                SAFE_CAST(endividamento_familias_pct AS FLOAT64)     AS endividamento_familias_pct,
+                SAFE_CAST(comprometimento_renda_pct AS FLOAT64)      AS comprometimento_renda_pct,
+                SAFE_CAST(inadimplencia_pf_pct AS FLOAT64)           AS inadimplencia_pf_pct,
+                SAFE_CAST(inadimplencia_pf_credito AS FLOAT64)       AS inadimplencia_pf_credito,
+                COALESCE(granularidade, 'Nacional')                  AS granularidade,
+                fontes,
+                CURRENT_TIMESTAMP()                                  AS ingested_at
+            FROM `{silver}.endividamento_nacional`
+            WHERE ano IS NOT NULL
+            QUALIFY ROW_NUMBER() OVER (PARTITION BY data_referencia ORDER BY ingested_at DESC) = 1
+        """,
+        # ── Votações parlamentares (Câmara + Senado) ──────────────────────────
+        "fact_votacoes_parlamentar": f"""
+            CREATE OR REPLACE TABLE `{gold}.fact_votacoes_parlamentar` AS
+            SELECT
+                SAFE_CAST(ano AS INT64)              AS ano,
+                SAFE_CAST(mes AS INT64)              AS mes,
+                COALESCE(sg_uf, 'BR')                AS sg_uf,
+                COALESCE(sg_partido, 'N/A')          AS sg_partido,
+                COALESCE(casa, 'Câmara')             AS casa,
+                COALESCE(tema, 'Geral')              AS tema,
+                COUNT(*)                             AS qt_votacoes,
+                COUNTIF(voto = 'Sim')               AS qt_sim,
+                COUNTIF(LOWER(voto) LIKE '%não%' OR LOWER(voto) LIKE '%nao%') AS qt_nao,
+                COUNTIF(LOWER(voto) LIKE '%absten%') AS qt_abstencao,
+                CURRENT_TIMESTAMP()                  AS ingested_at
+            FROM `{silver}.votacoes_parlamentares`
+            WHERE ano IS NOT NULL
+            GROUP BY ano, mes, sg_uf, sg_partido, casa, tema
+        """,
+        # ── Perfil do Eleitorado TSE ──────────────────────────────────────────
+        "fact_perfil_eleitorado": f"""
+            CREATE OR REPLACE TABLE `{gold}.fact_perfil_eleitorado` AS
+            SELECT
+                sg_uf,
+                SAFE_CAST(ano AS INT64)                              AS ano,
+                COALESCE(ds_genero, 'Não informado')                 AS ds_genero,
+                COALESCE(ds_faixa_etaria, 'Não informado')           AS ds_faixa_etaria,
+                COALESCE(ds_grau_escolaridade, 'Não informado')      AS ds_grau_escolaridade,
+                COALESCE(ds_estado_civil, 'Não informado')           AS ds_estado_civil,
+                SUM(SAFE_CAST(qt_eleitores AS INT64))                AS qt_eleitores,
+                SUM(SAFE_CAST(qt_eleitores_deficiencia AS INT64))    AS qt_eleitores_deficiencia,
+                SUM(SAFE_CAST(qt_eleitores_biometria AS INT64))      AS qt_eleitores_biometria,
+                ROUND(
+                    SUM(SAFE_CAST(qt_eleitores_biometria AS INT64)) /
+                    NULLIF(SUM(SAFE_CAST(qt_eleitores AS INT64)), 0) * 100, 1
+                )                                                    AS pct_biometria,
+                CURRENT_TIMESTAMP()                                  AS ingested_at
+            FROM `{silver}.perfil_eleitorado`
+            WHERE sg_uf IS NOT NULL
+            GROUP BY sg_uf, ano, ds_genero, ds_faixa_etaria, ds_grau_escolaridade, ds_estado_civil
+        """,
         # ── Índice combinado: gasto Meta Ads + interesse Trends + sentimento social ──
         "fact_indice_digital_candidato": f"""
             CREATE OR REPLACE TABLE `{gold}.fact_indice_digital_candidato` AS
@@ -515,6 +576,9 @@ def _build_gold_via_bigquery_sql() -> dict:
         "fact_emendas_parlamentar",
         "fact_emendas_municipio",
         "fact_sancoes_uf",
+        "fact_endividamento_nacional",
+        "fact_votacoes_parlamentar",
+        "fact_perfil_eleitorado",
     }
 
     results = {}
