@@ -81,6 +81,16 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+_STATIC_DIR = Path(__file__).parent / "static"
+
+
+@app.get("/static/{filename:path}")
+async def serve_static(filename: str) -> FileResponse:
+    file_path = _STATIC_DIR / filename
+    if not file_path.exists() or not file_path.is_file():
+        raise HTTPException(status_code=404, detail="File not found")
+    return FileResponse(str(file_path))
+
 logger = logging.getLogger("spepe.dashboard_api")
 
 _LOCAL_SILVER_DIR = Path(os.environ.get("DATA_DIR", "data")) / "silver"

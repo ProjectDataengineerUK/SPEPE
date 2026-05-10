@@ -1684,7 +1684,7 @@ const REGIAO_IBGE = {'Norte':'1','Nordeste':'2','Centro-Oeste':'5','Sudeste':'3'
 const IBGE_GEO = {
   nacional:  ()=> 'https://servicodados.ibge.gov.br/api/v3/malhas/paises/BR?resolucao=1&formato=application/vnd.geo+json',
   regiao:    ()=> 'https://servicodados.ibge.gov.br/api/v3/malhas/paises/BR?resolucao=1&formato=application/vnd.geo+json',
-  uf:        ()=> 'https://servicodados.ibge.gov.br/api/v3/malhas/paises/BR?resolucao=2&formato=application/vnd.geo+json',
+  uf:        ()=> '/static/geo_uf.geojson',
   municipio: (uf)=> `https://servicodados.ibge.gov.br/api/v3/malhas/estados/${UF_IBGE[uf]||'35'}?resolucao=5&formato=application/vnd.geo+json`,
 };
 
