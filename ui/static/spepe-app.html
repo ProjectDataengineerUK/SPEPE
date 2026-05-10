@@ -1646,10 +1646,15 @@ let _mapData = {};
 
 const MAP_DARK_STYLE = [
   {elementType:'geometry',stylers:[{color:'#1a1a2e'}]},
-  {elementType:'labels.text.fill',stylers:[{color:'#8ec3b9'}]},
+  {elementType:'labels',stylers:[{visibility:'on'}]},
+  {elementType:'labels.text.fill',stylers:[{color:'#c9d1d9'}]},
+  {elementType:'labels.text.stroke',stylers:[{color:'#0d1117',weight:2}]},
+  {featureType:'administrative',elementType:'labels.text.fill',stylers:[{color:'#e6edf3'}]},
   {featureType:'administrative.province',elementType:'geometry.stroke',stylers:[{color:'#4b6878'}]},
+  {featureType:'administrative.locality',elementType:'labels.text.fill',stylers:[{color:'#adbac7'}]},
   {featureType:'water',elementType:'geometry',stylers:[{color:'#0e1626'}]},
-  {featureType:'road',stylers:[{visibility:'simplified'}]}
+  {featureType:'road',stylers:[{visibility:'simplified'}]},
+  {featureType:'poi',elementType:'labels',stylers:[{visibility:'off'}]},
 ];
 
 function handleMapClick(cod, nome) {
@@ -1716,7 +1721,7 @@ function renderGeoJSON(geojsonData, colorBy, layer) {
   dataLayer.setStyle(feature => {
     const cod = String(feature.getProperty('codarea') || feature.getProperty('CD_MUN') || feature.getProperty('CD_UF') || feature.getProperty('CD_REGIAO') || '');
     const d = _mapData[cod] || _mapData[cod.slice(0,2)];
-    if(!d) return {fillColor:'#21262d', fillOpacity:0.7, strokeColor:'#30363d', strokeWeight:1};
+    if(!d) return {fillColor:'#21262d', fillOpacity:0.25, strokeColor:'#4b6878', strokeWeight:1};
     let color = '#21262d';
     if(layer && layer !== 'electoral'){
       const val = (d.pct||50) / 100;
@@ -1739,7 +1744,7 @@ function renderGeoJSON(geojsonData, colorBy, layer) {
         color = margem > 20 ? '#ef4444' : margem > 10 ? '#f59e0b' : '#22c55e';
       }
     }
-    return {fillColor:color, fillOpacity:0.78, strokeColor:'#30363d', strokeWeight:1};
+    return {fillColor:color, fillOpacity:0.60, strokeColor:'#4b6878', strokeWeight:1};
   });
 }
 
