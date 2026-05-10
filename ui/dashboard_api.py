@@ -91,6 +91,7 @@ async def serve_static(filename: str) -> FileResponse:
         raise HTTPException(status_code=404, detail="File not found")
     return FileResponse(str(file_path))
 
+
 logger = logging.getLogger("spepe.dashboard_api")
 
 _LOCAL_SILVER_DIR = Path(os.environ.get("DATA_DIR", "data")) / "silver"
@@ -1440,17 +1441,18 @@ async def _bq_mapa_municipio(uf: str, cargo: str, ano: int, turno: int) -> list[
     cd_cargo = _CARGO_CD.get(cargo, 1)
     query = f"""
         WITH ranked AS (
-            SELECT cd_municipio, nm_municipio, nm_candidato, sg_partido,
+            SELECT cd_municipio, cd_municipio_ibge, nm_municipio, nm_candidato, sg_partido,
                    SUM(total_votos) AS votos,
                    RANK() OVER (PARTITION BY cd_municipio ORDER BY SUM(total_votos) DESC) AS rnk
             FROM `{settings.gcp_project_id}.{settings.bigquery_dataset_gold}.fact_municipio_candidato_eleicao`
             WHERE sg_uf = @uf AND ano_eleicao = @ano AND cd_cargo = @cd_cargo AND nr_turno = @turno
-            GROUP BY cd_municipio, nm_municipio, nm_candidato, sg_partido
+            GROUP BY cd_municipio, cd_municipio_ibge, nm_municipio, nm_candidato, sg_partido
         ),
         totais AS (
             SELECT cd_municipio, SUM(votos) AS total_votos FROM ranked GROUP BY cd_municipio
         )
-        SELECT r1.cd_municipio, r1.nm_municipio, r1.nm_candidato AS lider, r1.sg_partido AS partido,
+        SELECT r1.cd_municipio, r1.cd_municipio_ibge, r1.nm_municipio,
+               r1.nm_candidato AS lider, r1.sg_partido AS partido,
                ROUND(r1.votos / t.total_votos * 100, 1) AS pct,
                r2.nm_candidato AS segundo, ROUND(r2.votos / t.total_votos * 100, 1) AS pct2,
                t.total_votos
@@ -1474,7 +1476,7 @@ async def _bq_mapa_municipio(uf: str, cargo: str, ano: int, turno: int) -> list[
         {
             "id": str(r["cd_municipio"]),
             "cd_municipio": str(r["cd_municipio"]),
-            "ibge_code": str(r["cd_municipio"]),
+            "ibge_code": str(r["cd_municipio_ibge"]),
             "label": r["nm_municipio"],
             "lider": r["lider"],
             "partido": r["partido"],
