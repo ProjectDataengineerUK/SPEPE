@@ -5,12 +5,16 @@ from __future__ import annotations
 import logging
 import os
 import sys
-import tempfile
-import zipfile
-
 from dataops.bronze_writer import write_bronze_from_file
 from dataops.clients.tse_client import download_tse_resultados
 from dataops.clients.tse_client import download_br_presidente
+
+# Lista completa de UFs – usada tanto no modo script quanto nos jobs Cloud Run
+_ALL_UFS = [
+    "AC", "AL", "AP", "AM", "BA", "CE", "DF", "ES", "GO", "MA", "MT", "MS",
+    "MG", "PA", "PB", "PR", "PE", "PI", "RJ", "RN", "RS", "RO", "RR",
+    "SC", "SP", "SE", "TO",
+]
 
 logbook = logging.getLogger("spepe.jobs.tse_ingest")
 
@@ -59,6 +63,12 @@ def main(uf: str, year: int) -> None:
 
 if __name__ == "__main__":
     import argparse
+
+    _ALL_UFS = [
+        "AC", "AL", "AP", "AM", "BA", "CE", "DF", "ES", "GO", "MA", "MT", "MS",
+        "MG", "PA", "PB", "PR", "PE", "PI", "RJ", "RN", "RS", "RO", "RR",
+        "SC", "SP", "SE", "TO"
+    ]
 
     parser = argparse.ArgumentParser(description="TSE ingest job")
     parser.add_argument("--uf", default=os.environ.get("DEFAULT_UF", "SP"))
