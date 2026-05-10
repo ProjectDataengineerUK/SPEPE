@@ -1053,15 +1053,21 @@ async def _bq_perfis(uf: str, ano: int) -> dict:
     from google.cloud import bigquery
 
     client = bigquery.Client(project=settings.gcp_project_id)
-    silver = f"{settings.gcp_project_id}.spepe_silver"
+    gold = f"{settings.gcp_project_id}.{settings.bigquery_dataset_gold}"
     query = f"""
         SELECT ds_genero, ds_faixa_etaria, ds_grau_escolaridade,
                SUM(qt_eleitores) AS qt_eleitores
-        FROM `{silver}.perfil_eleitorado_{uf.lower()}_{ano}`
+        FROM `{gold}.fact_perfil_eleitorado`
+        WHERE sg_uf = @uf AND ano = @ano
         GROUP BY 1, 2, 3
         ORDER BY 1, 2, 3
     """
-    job_config = bigquery.QueryJobConfig()
+    job_config = bigquery.QueryJobConfig(
+        query_parameters=[
+            bigquery.ScalarQueryParameter("uf", "STRING", uf.upper()),
+            bigquery.ScalarQueryParameter("ano", "INT64", ano),
+        ]
+    )
     rows = list(client.query(query, job_config=job_config).result())
     genero: dict[str, int] = {}
     faixa: dict[str, int] = {}
@@ -1987,6 +1993,85 @@ async def get_previsao(
     return JSONResponse({"data": []})
 
 
+# ── Endividamento familiar BACEN ──────────────────────────────────────────────
+
+
+@app.get("/api/endividamento")
+async def get_endividamento(
+    ano_start: int = Query(2025),
+    ano_end: int = Query(2026),
+) -> JSONResponse:
+    if settings.gcp_project_id and os.environ.get("USE_BIGQUERY", "").lower() == "true":
+        try:
+            from google.cloud import bigquery
+
+            client = bigquery.Client(project=settings.gcp_project_id)
+            gold = f"{settings.gcp_project_id}.{settings.bigquery_dataset_gold}"
+            query = f"""
+                SELECT data_referencia, endividamento_familias_pct,
+                       comprometimento_renda_pct, inadimplencia_pf_pct,
+                       inadimplencia_pf_credito, fontes
+                FROM `{gold}.fact_endividamento_nacional`
+                WHERE ano BETWEEN @ano_start AND @ano_end
+                ORDER BY data_referencia
+            """
+            job_config = bigquery.QueryJobConfig(
+                query_parameters=[
+                    bigquery.ScalarQueryParameter("ano_start", "INT64", ano_start),
+                    bigquery.ScalarQueryParameter("ano_end", "INT64", ano_end),
+                ]
+            )
+            rows = list(client.query(query, job_config=job_config).result())
+            return JSONResponse({"data": [dict(r) for r in rows]})
+        except Exception as exc:
+            logger.warning("BigQuery endividamento falhou: %s", exc)
+    return JSONResponse({"data": []})
+
+
+# ── Votações parlamentares (Câmara + Senado) ──────────────────────────────────
+
+
+@app.get("/api/parlamentares")
+async def get_parlamentares(
+    uf: str = Query("BR"),
+    year: int = Query(2025),
+    casa: str = Query(""),
+) -> JSONResponse:
+    if settings.gcp_project_id and os.environ.get("USE_BIGQUERY", "").lower() == "true":
+        try:
+            from google.cloud import bigquery
+
+            client = bigquery.Client(project=settings.gcp_project_id)
+            gold = f"{settings.gcp_project_id}.{settings.bigquery_dataset_gold}"
+            params: list = [bigquery.ScalarQueryParameter("year", "INT64", year)]
+            uf_filter = "" if uf.upper() == "BR" else "AND sg_uf = @uf"
+            casa_filter = ""
+            if uf.upper() != "BR":
+                params.append(bigquery.ScalarQueryParameter("uf", "STRING", uf.upper()))
+            if casa:
+                casa_filter = "AND casa = @casa"
+                params.append(bigquery.ScalarQueryParameter("casa", "STRING", casa))
+            query = f"""
+                SELECT sg_uf, sg_partido, casa, tema,
+                       SUM(qt_votacoes) AS qt_votacoes,
+                       SUM(qt_sim)      AS qt_sim,
+                       SUM(qt_nao)      AS qt_nao,
+                       SUM(qt_abstencao) AS qt_abstencao,
+                       ROUND(SUM(qt_sim) / NULLIF(SUM(qt_votacoes), 0) * 100, 1) AS pct_favoravel
+                FROM `{gold}.fact_votacoes_parlamentar`
+                WHERE ano = @year {uf_filter} {casa_filter}
+                GROUP BY sg_uf, sg_partido, casa, tema
+                ORDER BY qt_votacoes DESC
+                LIMIT 200
+            """
+            job_config = bigquery.QueryJobConfig(query_parameters=params)
+            rows = list(client.query(query, job_config=job_config).result())
+            return JSONResponse({"data": [dict(r) for r in rows]})
+        except Exception as exc:
+            logger.warning("BigQuery parlamentares falhou: %s", exc)
+    return JSONResponse({"data": []})
+
+
 # ── Config: Google Maps Key ───────────────────────────────────────────────────
 
 
@@ -2232,14 +2317,32 @@ async def admin_list_jobs() -> JSONResponse:
     """List Cloud Run Jobs with last execution status."""
     jobs_config = [
         {"name": "spepe-tse-ingest", "module": "tse_ingest", "timeout": "3600s"},
+        {
+            "name": "spepe-tse-candidaturas-ingest",
+            "module": "tse_candidaturas_ingest",
+            "timeout": "3600s",
+        },
+        {"name": "spepe-tse-perfil-ingest", "module": "tse_perfil_ingest", "timeout": "1800s"},
         {"name": "spepe-ibge-sync", "module": "ibge_sync", "timeout": "1800s"},
         {"name": "spepe-security-ingest", "module": "security_ingest", "timeout": "1800s"},
         {"name": "spepe-datasus-ingest", "module": "datasus_ingest", "timeout": "1800s"},
         {"name": "spepe-dieese-ingest", "module": "dieese_ingest", "timeout": "900s"},
         {"name": "spepe-cetic-ingest", "module": "cetic_ingest", "timeout": "900s"},
+        {"name": "spepe-social-ingest", "module": "social_ingest", "timeout": "1800s"},
+        {"name": "spepe-pesquisas-ingest", "module": "pesquisas_ingest", "timeout": "1800s"},
+        {"name": "spepe-digital-ingest", "module": "digital_ingest", "timeout": "900s"},
+        {
+            "name": "spepe-camara-senado-ingest",
+            "module": "camara_senado_ingest",
+            "timeout": "3600s",
+        },
+        {"name": "spepe-endividamento-ingest", "module": "endividamento_ingest", "timeout": "900s"},
+        {"name": "spepe-cadunico-ingest", "module": "cadunico_ingest", "timeout": "3600s"},
+        {"name": "spepe-emendas-ingest", "module": "emendas_ingest", "timeout": "1800s"},
+        {"name": "spepe-sancoes-ingest", "module": "sancoes_ingest", "timeout": "1800s"},
+        {"name": "spepe-reddit-ingest", "module": "reddit_ingest", "timeout": "900s"},
         {"name": "spepe-silver-transform", "module": "silver_transform", "timeout": "1800s"},
         {"name": "spepe-gold-build", "module": "gold_build", "timeout": "1800s"},
-        {"name": "spepe-digital-ingest", "module": "digital_ingest", "timeout": "900s"},
     ]
     if settings.gcp_project_id:
         try:

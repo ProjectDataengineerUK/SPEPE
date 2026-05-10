@@ -349,6 +349,8 @@ tr.rhl td{background:rgba(0,200,83,.07)!important}
     <div class="main-tab" onclick="switchTab(this,'Perfis Eleitorais')">🗂️ Perfis</div>
     <div class="main-tab" onclick="switchTab(this,'Relatórios')">📄 Relatórios</div>
     <div class="main-tab" onclick="switchTab(this,'Social')">📡 Social</div>
+    <div class="main-tab" onclick="switchTab(this,'Endividamento')">💳 Endividamento</div>
+    <div class="main-tab" onclick="switchTab(this,'Parlamentares')">🏛️ Parlamentares</div>
   </div>
 
   <div class="layout">
@@ -811,6 +813,50 @@ tr.rhl td{background:rgba(0,200,83,.07)!important}
       </div>
     </div>
 
+    <!-- ENDIVIDAMENTO TAB -->
+    <div id="tab-endividamento" class="tab-content" style="display:none;flex:1;overflow-y:auto;padding:16px;flex-direction:column;gap:12px">
+      <div style="display:flex;gap:8px;align-items:center;margin-bottom:4px">
+        <span style="font-size:1rem;font-weight:700">Endividamento Familiar — BCB/BACEN</span>
+        <span id="endiv-ano-badge" style="font-size:.75rem;background:#0891b2;color:#fff;padding:2px 8px;border-radius:4px">2025-2026</span>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+        <div class="card" style="padding:12px">
+          <div style="font-size:.8rem;color:var(--text3);margin-bottom:8px">Endividamento das Famílias (%)</div>
+          <canvas id="ch-endividamento" height="200"></canvas>
+        </div>
+        <div class="card" style="padding:12px">
+          <div style="font-size:.8rem;color:var(--text3);margin-bottom:8px">Comprometimento de Renda e Inadimplência (%)</div>
+          <canvas id="ch-inadimplencia" height="200"></canvas>
+        </div>
+      </div>
+      <div class="card" style="padding:12px">
+        <div style="font-size:.8rem;color:var(--text3);margin-bottom:6px">Dados BACEN — Série mensal (SGS API)</div>
+        <div id="endiv-table" style="font-size:.74rem;color:var(--text2)">Carregando...</div>
+      </div>
+    </div>
+
+    <!-- PARLAMENTARES TAB -->
+    <div id="tab-parlamentares" class="tab-content" style="display:none;flex:1;overflow-y:auto;padding:16px;flex-direction:column;gap:12px">
+      <div style="display:flex;gap:8px;align-items:center;margin-bottom:4px">
+        <span style="font-size:1rem;font-weight:700">Câmara &amp; Senado — Votações Parlamentares</span>
+        <span id="parl-ano-badge" style="font-size:.75rem;background:#059669;color:#fff;padding:2px 8px;border-radius:4px">2025</span>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+        <div class="card" style="padding:12px">
+          <div style="font-size:.8rem;color:var(--text3);margin-bottom:8px">Votações por Partido (% favorável)</div>
+          <canvas id="ch-partido-voto" height="220"></canvas>
+        </div>
+        <div class="card" style="padding:12px">
+          <div style="font-size:.8rem;color:var(--text3);margin-bottom:8px">Câmara vs Senado — Volume de Votações</div>
+          <canvas id="ch-casa-voto" height="220"></canvas>
+        </div>
+      </div>
+      <div class="card" style="padding:12px">
+        <div style="font-size:.8rem;color:var(--text3);margin-bottom:6px">Top Temas por Volume de Votações</div>
+        <div id="parl-table" style="font-size:.74rem;color:var(--text2)">Carregando...</div>
+      </div>
+    </div>
+
     <!-- CHAT -->
     <aside class="chat-panel">
       <div class="chat-hdr">
@@ -900,16 +946,17 @@ const TAB_IDS = {
   'Dashboard':'dash', 'Mapa':'tab-mapa', 'Socioeconômico':'tab-socioeconomico',
   'Segurança':'tab-seguranca', 'Saúde':'tab-saude', 'Pesquisas':'tab-pesquisas',
   'Predição':'tab-predicao', 'Perfis Eleitorais':'tab-perfis', 'Relatórios':'dash',
-  'Social':'tab-social',
+  'Social':'tab-social', 'Endividamento':'tab-endividamento', 'Parlamentares':'tab-parlamentares',
 };
 const _ALT_PANELS = [
   'tab-mapa','tab-socioeconomico','tab-seguranca','tab-saude',
   'tab-pesquisas','tab-predicao','tab-perfis','tab-social',
+  'tab-endividamento','tab-parlamentares',
 ];
 const _TAB_PANEL_MAP = {
   'Socioeconômico':'socioeconomico','Segurança':'seguranca','Saúde':'saude',
   'Pesquisas':'pesquisas','Predição':'predicao','Perfis Eleitorais':'perfis',
-  'Social':'social',
+  'Social':'social','Endividamento':'endividamento','Parlamentares':'parlamentares',
 };
 function switchTab(el,nm){
   document.querySelectorAll('.main-tab').forEach(t=>t.classList.remove('active'));
@@ -953,6 +1000,8 @@ function _loadTabData(nm){
   else if(nm==='Pesquisas')  _loadPesquisas(ano);
   else if(nm==='Perfis Eleitorais') _loadPerfis(uf, ano);
   else if(nm==='Social')     { initSocialCharts(); refreshSocialTab(uf, ano); }
+  else if(nm==='Endividamento') _loadEndividamento();
+  else if(nm==='Parlamentares') _loadParlamentares(uf, ano);
 }
 
 function _mkChart(id, type, labels, datasets, opts={}){
@@ -1128,6 +1177,84 @@ async function _loadPerfis(uf, ano){
     backgroundColor:['rgba(236,72,153,.85)','rgba(59,130,246,.85)','rgba(156,163,175,.7)'],
   }],{plugins:{legend:{position:'right',labels:{color:'#c9d1d9',font:{size:12}}}}});
 }
+async function _loadEndividamento(){
+  const badge = document.getElementById('endiv-ano-badge');
+  const tableEl = document.getElementById('endiv-table');
+  const data = await apiFetch('/api/endividamento?ano_start=2025&ano_end=2026').then(r=>r.json()).catch(()=>({data:[]}));
+  const rows = data.data || [];
+  if(!rows.length){
+    if(tableEl) tableEl.innerHTML='<span style="color:var(--text3)">Bronze BACEN ainda não ingerido (spepe-endividamento-ingest)</span>';
+    return;
+  }
+  const labels = rows.map(r=>r.data_referencia?.value||r.data_referencia||'');
+  const endiv  = rows.map(r=>+(r.endividamento_familias_pct||0).toFixed(1));
+  const compr  = rows.map(r=>+(r.comprometimento_renda_pct||0).toFixed(1));
+  const inadim = rows.map(r=>+(r.inadimplencia_pf_pct||0).toFixed(1));
+  _mkChart('ch-endividamento','line',labels,[
+    {label:'Endividamento (%)',data:endiv,borderColor:'#f59e0b',backgroundColor:'rgba(245,158,11,.12)',tension:.3,fill:true},
+  ]);
+  _mkChart('ch-inadimplencia','line',labels,[
+    {label:'Comprometimento Renda (%)',data:compr,borderColor:'#ef4444',backgroundColor:'rgba(239,68,68,.1)',tension:.3},
+    {label:'Inadimplência PF (%)',data:inadim,borderColor:'#8b5cf6',backgroundColor:'rgba(139,92,246,.1)',tension:.3},
+  ]);
+  if(tableEl){
+    const last = rows[rows.length-1];
+    tableEl.innerHTML=`<table style="width:100%;border-collapse:collapse;font-size:.73rem">
+      <thead><tr style="color:var(--text3)">${['Data','Endivid.%','Comprometimento%','Inadimpl.%'].map(h=>`<th style="text-align:left;padding:3px 6px">${h}</th>`).join('')}</tr></thead>
+      <tbody>${rows.slice(-12).reverse().map(r=>`<tr style="border-top:1px solid #1e293b">
+        <td style="padding:3px 6px;color:var(--text2)">${r.data_referencia?.value||r.data_referencia||'—'}</td>
+        <td style="padding:3px 6px;color:#f59e0b">${(r.endividamento_familias_pct||0).toFixed(1)}%</td>
+        <td style="padding:3px 6px;color:#ef4444">${(r.comprometimento_renda_pct||0).toFixed(1)}%</td>
+        <td style="padding:3px 6px;color:#8b5cf6">${(r.inadimplencia_pf_pct||0).toFixed(1)}%</td>
+      </tr>`).join('')}</tbody></table>`;
+  }
+}
+
+async function _loadParlamentares(uf, ano){
+  const badge = document.getElementById('parl-ano-badge');
+  if(badge) badge.textContent = `${uf||'BR'} ${ano}`;
+  const tableEl = document.getElementById('parl-table');
+  const data = await apiFetch(`/api/parlamentares?uf=${uf||'BR'}&year=${ano}`).then(r=>r.json()).catch(()=>({data:[]}));
+  const rows = data.data || [];
+  if(!rows.length){
+    if(tableEl) tableEl.innerHTML='<span style="color:var(--text3)">Bronze Câmara/Senado ainda não ingerido (spepe-camara-senado-ingest)</span>';
+    return;
+  }
+  // Bar chart: top partidos por % favorável
+  const partidos = [...new Map(rows.filter(r=>r.sg_partido).map(r=>[r.sg_partido,r])).values()]
+    .sort((a,b)=>(b.pct_favoravel||0)-(a.pct_favoravel||0)).slice(0,12);
+  _mkChart('ch-partido-voto','bar',partidos.map(r=>r.sg_partido),[{
+    label:'% Favorável',
+    data:partidos.map(r=>+(r.pct_favoravel||0).toFixed(1)),
+    backgroundColor:'rgba(5,150,105,.75)',
+  }]);
+  // Câmara vs Senado volumes
+  const casas = rows.reduce((acc,r)=>{
+    const c=r.casa||'Câmara'; acc[c]=(acc[c]||0)+(r.qt_votacoes||0); return acc;
+  },{});
+  _mkChart('ch-casa-voto','doughnut',Object.keys(casas),[{
+    data:Object.values(casas),
+    backgroundColor:['rgba(59,130,246,.8)','rgba(139,92,246,.8)'],
+  }],{plugins:{legend:{position:'right',labels:{color:'#c9d1d9',font:{size:12}}}}});
+  // Top temas table
+  const temas = rows.reduce((acc,r)=>{
+    const t=r.tema||'Geral'; if(!acc[t]) acc[t]={tema:t,qt:0,sim:0,nao:0};
+    acc[t].qt+=(r.qt_votacoes||0); acc[t].sim+=(r.qt_sim||0); acc[t].nao+=(r.qt_nao||0); return acc;
+  },{});
+  const temasArr = Object.values(temas).sort((a,b)=>b.qt-a.qt).slice(0,10);
+  if(tableEl){
+    tableEl.innerHTML=`<table style="width:100%;border-collapse:collapse;font-size:.73rem">
+      <thead><tr style="color:var(--text3)">${['Tema','Votações','Sim','Não','% Fav'].map(h=>`<th style="text-align:left;padding:3px 6px">${h}</th>`).join('')}</tr></thead>
+      <tbody>${temasArr.map(r=>`<tr style="border-top:1px solid #1e293b">
+        <td style="padding:3px 6px;color:var(--text2)">${r.tema}</td>
+        <td style="padding:3px 6px">${r.qt}</td>
+        <td style="padding:3px 6px;color:#22c55e">${r.sim}</td>
+        <td style="padding:3px 6px;color:#ef4444">${r.nao}</td>
+        <td style="padding:3px 6px;color:#f59e0b">${r.qt?((r.sim/r.qt)*100).toFixed(1)+'%':'—'}</td>
+      </tr>`).join('')}</tbody></table>`;
+  }
+}
+
 function applyFilters(){
   const uf=document.getElementById('f-uf').value;
   const ano=document.getElementById('f-ano').value;
