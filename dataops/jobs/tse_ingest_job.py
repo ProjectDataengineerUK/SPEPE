@@ -11,9 +11,33 @@ from dataops.clients.tse_client import download_br_presidente
 
 # Lista completa de UFs – usada tanto no modo script quanto nos jobs Cloud Run
 _ALL_UFS = [
-    "AC", "AL", "AP", "AM", "BA", "CE", "DF", "ES", "GO", "MA", "MT", "MS",
-    "MG", "PA", "PB", "PR", "PE", "PI", "RJ", "RN", "RS", "RO", "RR",
-    "SC", "SP", "SE", "TO",
+    "AC",
+    "AL",
+    "AP",
+    "AM",
+    "BA",
+    "CE",
+    "DF",
+    "ES",
+    "GO",
+    "MA",
+    "MT",
+    "MS",
+    "MG",
+    "PA",
+    "PB",
+    "PR",
+    "PE",
+    "PI",
+    "RJ",
+    "RN",
+    "RS",
+    "RO",
+    "RR",
+    "SC",
+    "SP",
+    "SE",
+    "TO",
 ]
 
 logbook = logging.getLogger("spepe.jobs.tse_ingest")
@@ -39,7 +63,7 @@ def main(uf: str, year: int) -> None:
                 src_path=br_parquet_path,
                 source="tse_presidente",
                 year=year,
-                uf="BR",               # código fictício para indicar "nacional"
+                uf="BR",  # código fictício para indicar "nacional"
                 filename=f"presidente_{year}.parquet",
                 use_gcs=bool(os.environ.get("GCS_BUCKET")),
             )
@@ -63,12 +87,6 @@ def main(uf: str, year: int) -> None:
 
 if __name__ == "__main__":
     import argparse
-
-    _ALL_UFS = [
-        "AC", "AL", "AP", "AM", "BA", "CE", "DF", "ES", "GO", "MA", "MT", "MS",
-        "MG", "PA", "PB", "PR", "PE", "PI", "RJ", "RN", "RS", "RO", "RR",
-        "SC", "SP", "SE", "TO"
-    ]
 
     parser = argparse.ArgumentParser(description="TSE ingest job")
     parser.add_argument("--uf", default=os.environ.get("DEFAULT_UF", "SP"))

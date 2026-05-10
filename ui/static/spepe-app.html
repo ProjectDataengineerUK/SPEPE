@@ -1138,6 +1138,7 @@ function applyFilters(){
   refreshPrevisaoChart(cargo, uf, ano);
   refreshSentimentChart(uf, ano);
   refreshResultadosChart(cargo, uf, ano, turnoNum);
+  if(gMap && document.getElementById('tab-mapa')?.classList.contains('active')) reloadMap();
 }
 function onCargoSelect(val){
   const tab=[...document.querySelectorAll('.cargo-tab')].find(t=>t.textContent.includes(val.split('.')[0].trim()));
@@ -1152,7 +1153,11 @@ function switchCargo(el,cargo){
   el.classList.add('active');
   activeCargo=cargo;
   document.getElementById('f-cargo').value=cargo;
-
+  const mapSel=document.getElementById('map-cargo-sel');
+  if(mapSel && [...mapSel.options].some(o=>o.value===cargo||o.text===cargo)){
+    mapSel.value=cargo;
+    if(gMap && document.getElementById('tab-mapa')?.classList.contains('active')) reloadMap();
+  }
   if(cargo==='Comparativo'){
     showCompare(); return;
   }
@@ -1657,6 +1662,10 @@ const PARTIDO_COR = {
   'Rep':'#7c3aed','PDT':'#f97316','PP':'#06b6d4','PSD':'#84cc16',
   'União':'#8b5cf6','PSB':'#ec4899','PSOL':'#ff6b35',
 };
+function _candidateColor(name){
+  let h=0; for(let i=0;i<(name||'').length;i++) h=(h*31+name.charCodeAt(i))&0xffff;
+  return `hsl(${h%360},65%,48%)`;
+}
 
 const UF_IBGE = {
   'AC':'12','AL':'27','AP':'16','AM':'13','BA':'29','CE':'23','DF':'53','ES':'32',
@@ -1724,7 +1733,7 @@ function renderGeoJSON(geojsonData, colorBy, layer) {
       }
     } else {
       if(colorBy === 'partido' || colorBy === 'lider'){
-        color = PARTIDO_COR[d.partido] || '#57606a';
+        color = d.partido ? (PARTIDO_COR[d.partido] || _candidateColor(d.lider)) : _candidateColor(d.lider);
       } else if(colorBy === 'margem'){
         const margem = Math.abs((d.pct||0) - (d.pct2||0));
         color = margem > 20 ? '#ef4444' : margem > 10 ? '#f59e0b' : '#22c55e';
@@ -1748,7 +1757,7 @@ async function setMapLevel(level){
 
 async function reloadMap(){
   if(!gMap) return;
-  const cargo = document.getElementById('map-cargo-sel')?.value || 'Presidente';
+  const cargo = document.getElementById('map-cargo-sel')?.value || 'Governador';
   const colorBy = document.getElementById('map-color-by')?.value || 'lider';
   const layer = document.getElementById('map-layer-sel')?.value || 'electoral';
   const turnoRaw = document.getElementById('f-turno')?.value || '1º Turno';

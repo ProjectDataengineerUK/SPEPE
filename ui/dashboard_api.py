@@ -1393,7 +1393,7 @@ async def _bq_mapa_uf(cargo: str, ano: int, turno: int) -> list[dict]:
                r2.nm_candidato AS segundo, ROUND(r2.votos / t.total_votos * 100, 1) AS pct2,
                t.total_votos
         FROM ranked r1
-        JOIN ranked r2 ON r1.sg_uf = r2.sg_uf AND r2.rnk = 2
+        LEFT JOIN ranked r2 ON r1.sg_uf = r2.sg_uf AND r2.rnk = 2
         JOIN totais t ON r1.sg_uf = t.sg_uf
         WHERE r1.rnk = 1
     """
@@ -1445,7 +1445,7 @@ async def _bq_mapa_municipio(uf: str, cargo: str, ano: int, turno: int) -> list[
                r2.nm_candidato AS segundo, ROUND(r2.votos / t.total_votos * 100, 1) AS pct2,
                t.total_votos
         FROM ranked r1
-        JOIN ranked r2 ON r1.cd_municipio = r2.cd_municipio AND r2.rnk = 2
+        LEFT JOIN ranked r2 ON r1.cd_municipio = r2.cd_municipio AND r2.rnk = 2
         JOIN totais t ON r1.cd_municipio = t.cd_municipio
         WHERE r1.rnk = 1
         ORDER BY t.total_votos DESC
@@ -1500,7 +1500,7 @@ async def _bq_mapa_zona(uf: str, cd_municipio: str, cargo: str, ano: int, turno:
                r2.nm_candidato AS segundo, ROUND(r2.votos / t.total_votos * 100, 1) AS pct2,
                t.total_votos
         FROM ranked r1
-        JOIN ranked r2 ON r1.nr_zona = r2.nr_zona AND r2.rnk = 2
+        LEFT JOIN ranked r2 ON r1.nr_zona = r2.nr_zona AND r2.rnk = 2
         JOIN totais t ON r1.nr_zona = t.nr_zona
         WHERE r1.rnk = 1
         ORDER BY r1.nr_zona
@@ -1556,7 +1556,7 @@ async def _bq_mapa_secao(
                r2.nm_candidato AS segundo, ROUND(r2.votos / t.total_votos * 100, 1) AS pct2,
                t.total_votos
         FROM ranked r1
-        JOIN ranked r2 ON r1.nr_secao = r2.nr_secao AND r2.rnk = 2
+        LEFT JOIN ranked r2 ON r1.nr_secao = r2.nr_secao AND r2.rnk = 2
         JOIN totais t ON r1.nr_secao = t.nr_secao
         WHERE r1.rnk = 1
         ORDER BY r1.nr_secao
