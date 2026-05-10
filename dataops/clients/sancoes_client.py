@@ -104,7 +104,8 @@ def _normalize_ceis_cnep(item: dict, origem: str) -> dict:
         "tp_pessoa": "PF" if len(cpf_cnpj) == 11 else "PJ",
         "sg_uf_sancionado": _extract_str(sancionado.get("uf"), "sigla"),
         "nm_orgao_sancionador": _extract_str(orgao.get("nome") or orgao),
-        "sg_uf_orgao": _extract_str(orgao.get("uf"), "sigla"),
+        # Coluna renomeada para bater com o schema Silver (sg_uf_sancionador)
+        "sg_uf_sancionador": _extract_str(orgao.get("uf"), "sigla"),
         "tp_sancao": _extract_str(item.get("tipoSancao")),
         "dt_inicio_sancao": str(item.get("dataInicioSancao") or ""),
         "dt_fim_sancao": str(item.get("dataFimSancao") or ""),
@@ -160,7 +161,8 @@ def _normalize_ceaf(item: dict) -> dict:
         "tp_pessoa": "PF",
         "sg_uf_sancionado": _extract_str(servidor.get("uf"), "sigla"),
         "nm_orgao_sancionador": _extract_str(orgao.get("nome") or orgao),
-        "sg_uf_orgao": _extract_str(orgao.get("uf"), "sigla"),
+        # Coluna renomeada para bater com o schema Silver (sg_uf_sancionador)
+        "sg_uf_sancionador": _extract_str(orgao.get("uf"), "sigla"),
         "tp_sancao": _extract_str(item.get("tipoExpulsao") or item.get("tipoPunicao")),
         "dt_inicio_sancao": str(item.get("dataExpulsao") or item.get("dataPublicacao") or ""),
         "dt_fim_sancao": "",
@@ -211,7 +213,8 @@ def _normalize_cepim(item: dict) -> dict:
         "tp_pessoa": "PJ",
         "sg_uf_sancionado": _extract_str(entidade.get("uf"), "sigla"),
         "nm_orgao_sancionador": _extract_str(orgao_superior.get("nome") or orgao_superior),
-        "sg_uf_orgao": "",
+        # Coluna renomeada para bater com o schema Silver (sg_uf_sancionador)
+        "sg_uf_sancionador": "",
         "tp_sancao": _extract_str(item.get("motivoImpedimento") or item.get("tipoImpedimento")),
         "dt_inicio_sancao": str(item.get("dataInicioImpedimento") or item.get("dataInicio") or ""),
         "dt_fim_sancao": str(item.get("dataFimImpedimento") or item.get("dataFim") or ""),

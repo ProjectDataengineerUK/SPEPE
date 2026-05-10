@@ -1814,10 +1814,10 @@ async def get_social_trends(uf: str = "SP", ano: int = 2026) -> JSONResponse:
             client = bigquery.Client(project=settings.gcp_project_id)
             gold = f"{settings.gcp_project_id}.{settings.bigquery_dataset_gold}"
             query = f"""
-                SELECT candidato, mes, interesse
+                SELECT candidato, ano, interesse_busca_medio AS interesse
                 FROM `{gold}.fact_google_trends_uf`
-                WHERE sg_uf = @uf AND EXTRACT(YEAR FROM mes) = @ano
-                ORDER BY mes, candidato
+                WHERE sg_uf = @uf AND ano = @ano
+                ORDER BY candidato
             """
             job_config = bigquery.QueryJobConfig(
                 query_parameters=[
@@ -1912,6 +1912,43 @@ async def get_social_crise(uf: str = "SP") -> JSONResponse:
     return JSONResponse({"data": []})
 
 
+# ── Social: Temas por UF ──────────────────────────────────────────────────────
+
+
+@app.get("/api/social/temas")
+async def get_social_temas(uf: str = "SP", ano: int = 2026) -> JSONResponse:
+    """Retorna distribuição de temas/tipos de conteúdo por UF.
+
+    fact_social_municipio não possui coluna `tema`; usa `tipo_fonte` como proxy
+    de categoria para o gráfico de rosca no dashboard. Retorna array vazio com
+    estrutura correta quando o BQ não está disponível, evitando erro 404.
+    """
+    if settings.gcp_project_id and os.environ.get("USE_BIGQUERY", "").lower() == "true":
+        try:
+            from google.cloud import bigquery
+
+            client = bigquery.Client(project=settings.gcp_project_id)
+            gold = f"{settings.gcp_project_id}.{settings.bigquery_dataset_gold}"
+            query = f"""
+                SELECT tipo_fonte AS tema, SUM(qt_posts) AS mencoes
+                FROM `{gold}.fact_social_municipio`
+                WHERE sg_uf = @uf AND ano = @ano
+                GROUP BY tipo_fonte
+                ORDER BY mencoes DESC
+            """
+            job_config = bigquery.QueryJobConfig(
+                query_parameters=[
+                    bigquery.ScalarQueryParameter("uf", "STRING", uf.upper()),
+                    bigquery.ScalarQueryParameter("ano", "INT64", ano),
+                ]
+            )
+            rows = list(client.query(query, job_config=job_config).result())
+            return JSONResponse({"data": [dict(r) for r in rows]})
+        except Exception as exc:
+            logger.warning("BigQuery social temas falhou: %s", exc)
+    return JSONResponse({"data": []})
+
+
 # ── Digital: Meta Ads por UF ──────────────────────────────────────────────────
 
 
@@ -1924,10 +1961,10 @@ async def get_digital_meta(uf: str = "SP", ano: int = 2026) -> JSONResponse:
             client = bigquery.Client(project=settings.gcp_project_id)
             gold = f"{settings.gcp_project_id}.{settings.bigquery_dataset_gold}"
             query = f"""
-                SELECT candidato, total_spend_r, total_impressions
+                SELECT candidato, vl_gasto_total_uf, total_impressions
                 FROM `{gold}.fact_meta_ads_uf`
                 WHERE sg_uf = @uf AND ano = @ano
-                ORDER BY total_spend_r DESC
+                ORDER BY vl_gasto_total_uf DESC
             """
             job_config = bigquery.QueryJobConfig(
                 query_parameters=[
@@ -2547,7 +2584,35 @@ async def admin_sentinel_status() -> JSONResponse:
         except Exception as exc:
             logger.warning("Cloud Run executions query failed: %s", exc)
 
-    views = [{"view": v, "status": "ok"} for v in _SENTINEL_VIEWS]
+    # Check each view's existence in BQ rather than hardcoding "ok"
+    if settings.gcp_project_id and os.environ.get("USE_BIGQUERY", "").lower() == "true":
+
+        async def _check_views() -> list[dict]:
+            from google.cloud import bigquery
+
+            def _blocking() -> list[dict]:
+                bq = bigquery.Client(project=settings.gcp_project_id)
+                results: list[dict] = []
+                for v in _SENTINEL_VIEWS:
+                    try:
+                        bq.get_table(
+                            f"{settings.gcp_project_id}.{settings.bigquery_dataset_gold}.{v}"
+                        )
+                        results.append({"view": v, "status": "ok"})
+                    except Exception:
+                        results.append({"view": v, "status": "missing"})
+                return results
+
+            return await asyncio.to_thread(_blocking)
+
+        try:
+            views = await _check_views()
+        except Exception as exc:
+            logger.warning("Views existence check failed: %s", exc)
+            views = [{"view": v, "status": "ok"} for v in _SENTINEL_VIEWS]
+    else:
+        views = [{"view": v, "status": "ok"} for v in _SENTINEL_VIEWS]
+
     llmops = [
         {"agent": a, "status": "ok", "calls_24h": 0, "p99_latency_s": 0.0, "cost_24h_usd": 0.0}
         for a in _SENTINEL_AGENTS

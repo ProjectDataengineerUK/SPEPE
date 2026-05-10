@@ -38,12 +38,11 @@ GOLD_TABLES: list[str] = [
     "fact_pesquisa",
     "fact_social_municipio",
     "fact_transferencias_sociais",
-    "fact_emendas",
+    "fact_emendas_parlamentar",
     "fact_emendas_municipio",
-    "fact_sancoes",
-    "fact_endividamento_municipio",
-    "fact_camara_senado",
-    "fact_candidatos_discovery",
+    "fact_sancoes_uf",
+    "fact_endividamento_nacional",
+    "fact_votacoes_parlamentar",
 ]
 
 SEMANTIC_VIEWS: list[str] = [
