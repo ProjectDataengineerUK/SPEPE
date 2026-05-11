@@ -207,7 +207,6 @@ def build_pipeline():
         mae_threshold: float,
         output_promoted: Output[Model],
     ) -> None:
-        import json
         import logging
         import pickle
         import uuid
@@ -267,9 +266,7 @@ def build_pipeline():
             ic_high_offset = float(np.percentile(residuals, 97.5))
 
             candidato_col = "nm_candidato" if "nm_candidato" in df.columns else None
-            cargo_col = "cd_cargo" if "cd_cargo" in df.columns else None
             uf_col = "sg_uf" if "sg_uf" in df.columns else None
-            municipio_col = "cd_municipio_ibge" if "cd_municipio_ibge" in df.columns else "cd_municipio"
 
             rows = []
             session_id = str(uuid.uuid4())
