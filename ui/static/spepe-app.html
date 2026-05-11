@@ -416,7 +416,7 @@ tr.rhl td{background:rgba(0,200,83,.07)!important}
         <h4>Eleição</h4>
         <div class="filt"><label>Ano</label>
           <select id="f-ano" onchange="applyFilters()">
-            <option selected>2026</option><option>2022</option><option>2020</option><option>2018</option><option>2016</option>
+            <option>2026</option><option selected>2022</option><option>2020</option><option>2018</option><option>2016</option>
           </select>
         </div>
         <div class="filt"><label>Cargo</label>
@@ -1824,6 +1824,12 @@ function setMapMode(mode) {
   document.getElementById('btn-mode-' + mode)?.classList.add('active');
   const badge = document.getElementById('poll-date-badge');
   if (badge) badge.style.display = mode === '2026' ? 'block' : 'none';
+  // Sincroniza f-ano com o modo: histórico usa 2022, eleição 2026 usa 2026
+  const anoSel = document.getElementById('f-ano');
+  if (anoSel) {
+    if (mode === '2026') anoSel.value = '2026';
+    else if (anoSel.value === '2026') anoSel.value = '2022';
+  }
   loadCandidatoList();
   reloadMap();
 }

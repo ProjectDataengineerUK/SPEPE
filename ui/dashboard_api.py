@@ -311,8 +311,8 @@ async def _bq_candidatos(cargo: str, uf: str, ano: int) -> list[dict]:
     gold = f"{settings.gcp_project_id}.{settings.bigquery_dataset_gold}"
 
     # 2026+: fonte é pesquisas (fact_intencao_voto) — TSE não tem resultados ainda
-    # Presidente: âmbito nacional (uf='BR') independente do ano
-    if ano >= 2026 or cd_cargo == 1:
+    # Presidente histórico: TSE não inclui eleições nacionais nos arquivos por UF → retorna vazio
+    if ano >= 2026:
         uf_filter = "BR" if cd_cargo == 1 else uf.upper()
         query = f"""
             SELECT
