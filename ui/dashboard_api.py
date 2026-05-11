@@ -491,6 +491,88 @@ async def _bq_municipios(cargo: str, uf: str, ano: int, limit: int) -> list[dict
     return result
 
 
+# ── Resultados por cargo / UF / ano / turno ───────────────────────────────
+
+
+@app.get("/api/resultados/{cargo}")
+async def get_resultados(
+    cargo: str,
+    uf: str = Query("SP"),
+    ano: int = Query(2022),
+    turno: int = Query(1),
+) -> JSONResponse:
+    """Resultados eleitorais agregados por candidato para o cargo/UF/ano/turno."""
+    if settings.gcp_project_id and os.environ.get("USE_BIGQUERY", "").lower() == "true":
+        try:
+            data = await _bq_resultados(cargo, uf, ano, turno)
+            return JSONResponse(
+                {"cargo": cargo, "uf": uf, "ano": ano, "turno": turno, "candidatos": data}
+            )
+        except Exception as exc:
+            logger.warning("BigQuery resultados falhou: %s", exc)
+
+    return JSONResponse(
+        {
+            "cargo": cargo,
+            "uf": uf,
+            "ano": ano,
+            "turno": turno,
+            "candidatos": [],
+            "fonte": "indisponivel",
+        }
+    )
+
+
+async def _bq_resultados(cargo: str, uf: str, ano: int, turno: int) -> list[dict]:
+    """Query ao BigQuery Gold — fact_municipio_candidato_eleicao agregado por candidato."""
+    from google.cloud import bigquery
+
+    client = bigquery.Client(project=settings.gcp_project_id)
+    cd_cargo = _CARGO_CD.get(cargo, 1)
+    gold = f"{settings.gcp_project_id}.{settings.bigquery_dataset_gold}"
+
+    query = f"""
+        SELECT
+            nm_candidato                                                        AS candidato,
+            sg_partido                                                          AS partido,
+            SUM(total_votos)                                                    AS total_votos,
+            ROUND(
+                SUM(total_votos) / NULLIF(SUM(SUM(total_votos)) OVER (), 0) * 100,
+                2
+            )                                                                   AS pct_votos_validos
+        FROM `{gold}.fact_municipio_candidato_eleicao`
+        WHERE sg_uf       = @uf
+          AND ano_eleicao = @ano
+          AND cd_cargo    = @cd_cargo
+          AND nr_turno    = @turno
+        GROUP BY nm_candidato, sg_partido
+        ORDER BY pct_votos_validos DESC
+        LIMIT 50
+    """
+    job_config = bigquery.QueryJobConfig(
+        query_parameters=[
+            bigquery.ScalarQueryParameter("uf", "STRING", uf.upper()),
+            bigquery.ScalarQueryParameter("ano", "INT64", ano),
+            bigquery.ScalarQueryParameter("cd_cargo", "INT64", cd_cargo),
+            bigquery.ScalarQueryParameter("turno", "INT64", turno),
+        ]
+    )
+    rows = await asyncio.to_thread(
+        lambda: list(client.query(query, job_config=job_config).result())
+    )
+    return [
+        {
+            "candidato": r.get("candidato", ""),
+            "nm_candidato": r.get("candidato", ""),
+            "partido": r.get("partido", ""),
+            "total_votos": r.get("total_votos") or 0,
+            "pct_votos_validos": float(r.get("pct_votos_validos") or 0.0),
+            "pct": float(r.get("pct_votos_validos") or 0.0),
+        }
+        for r in rows
+    ]
+
+
 # ── Google Trends ─────────────────────────────────────────────────────────
 
 

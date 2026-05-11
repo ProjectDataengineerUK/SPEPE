@@ -40,6 +40,8 @@ google-cloud-secret-manager==2.23.0
 google-cloud-logging==3.11.3
 google-cloud-trace==1.13.3
 google-cloud-datacatalog-lineage==0.3.4
+google-cloud-run>=0.10.0
+google-cloud-pubsub>=2.18.0
 
 # ML Pipeline
 kfp==2.11.0
