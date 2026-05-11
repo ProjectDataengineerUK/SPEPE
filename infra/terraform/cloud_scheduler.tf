@@ -46,6 +46,9 @@ locals {
     endividamento_ingest    = { schedule = "0 13 1 * *", desc = "Endividamento BACEN — mensal dia 1 13:00 BRT" }
     cadunico_ingest         = { schedule = "0 14 1 * *", desc = "CadÚnico/BF — mensal dia 1 14:00 BRT" }
     emendas_ingest          = { schedule = "0 15 1 * *", desc = "Emendas parlamentares — mensal dia 1 15:00 BRT" }
+
+    # ── Drift check (após gold build) ────────────────────────────────────────
+    drift_check             = { schedule = "0 10 * * *", desc = "Drift check — diário 10:00 BRT (após gold)" }
   }
 }
 

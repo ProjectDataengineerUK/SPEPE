@@ -24,6 +24,7 @@ locals {
     emendas_ingest        = { timeout = "3600s", memory = "512Mi", cpu = "1", args = [] }
     sancoes_ingest        = { timeout = "3600s", memory = "512Mi", cpu = "1", args = [] }
     candidatos_discovery  = { timeout = "1800s", memory = "1Gi",   cpu = "1", args = [] }
+    drift_check           = { timeout = "600s",  memory = "1Gi",   cpu = "1", args = [] }
   }
 
   # Env vars adicionais por job (além das compartilhadas)
@@ -70,6 +71,10 @@ locals {
     emendas_ingest       = { EMENDAS_YEAR = "2018,2022,2025" }
     sancoes_ingest       = { SANCOES_YEAR = "2026" }
     candidatos_discovery = {}
+    drift_check = {
+      DRIFT_THRESHOLD      = "0.10"
+      PUBSUB_TOPIC_DRIFT   = "drift-detected"
+    }
   }
 
   job_entrypoints = {
@@ -93,6 +98,7 @@ locals {
     emendas_ingest          = ["python", "-m", "dataops.jobs.emendas_ingest_job"]
     sancoes_ingest          = ["python", "-m", "dataops.jobs.sancoes_ingest_job"]
     candidatos_discovery    = ["python", "-m", "dataops.jobs.candidatos_discovery_job"]
+    drift_check             = ["python", "-m", "dataops.jobs.drift_check_job"]
   }
 }
 

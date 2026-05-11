@@ -197,8 +197,4 @@ resource "google_cloud_scheduler_job" "ml_retrain_monthly" {
   }
 }
 
-resource "google_project_iam_member" "scheduler_run_invoker" {
-  project = var.project_id
-  role    = "roles/run.invoker"
-  member  = "serviceAccount:${local.scheduler_sa_email}"
-}
+# IAM binding moved to cloud_scheduler.tf (google_project_iam_member.scheduler_run_invoker)
