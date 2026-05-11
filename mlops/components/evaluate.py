@@ -19,27 +19,30 @@ def backtest_2018_2022(
     y_2022: np.ndarray,
     feature_names: list[str],
 ) -> dict:
-    """Train on 2018 data, predict 2022, compute observed error."""
-    from sklearn.metrics import accuracy_score, brier_score_loss, log_loss
+    """Train on 2018 features, predict 2022 pct_votos_municipio, compute regression error.
 
-    y_pred_proba = (
-        model.predict_proba(X_2018)[:, 1]
-        if hasattr(model, "predict_proba")
-        else model.predict(X_2018)
-    )
-    y_pred = (y_pred_proba >= 0.5).astype(int)
+    Bug 2 fix: model is Ridge regression — target is continuous (pct_votos_municipio).
+    Replaced classification metrics (accuracy, brier_score_loss, log_loss) with
+    regression metrics (r2_score, MAE, RMSE).
+    """
+    from sklearn.metrics import r2_score, mean_absolute_error, mean_squared_error
+
+    y_pred = model.predict(X_2018)
 
     metrics = {
-        "accuracy": float(accuracy_score(y_2022, y_pred)),
-        "brier_score": float(brier_score_loss(y_2022, y_pred_proba)),
-        "log_loss": float(log_loss(y_2022, y_pred_proba)),
-        "mean_absolute_error": float(np.abs(y_pred_proba - y_2022).mean()),
+        "r2_score": float(r2_score(y_2022, y_pred)),
+        "mean_absolute_error": float(mean_absolute_error(y_2022, y_pred)),
+        "rmse": float(np.sqrt(mean_squared_error(y_2022, y_pred))),
         "n_samples": len(y_2022),
     }
 
     _save_eval(metrics, "backtest_2018_2022.json")
     logger.info(
-        f"Backtest 2018→2022: accuracy={metrics['accuracy']:.3f} MAE={metrics['mean_absolute_error']:.3f}"
+        "Backtest 2018→2022: R²=%.4f  MAE=%.4f  RMSE=%.4f  n=%d",
+        metrics["r2_score"],
+        metrics["mean_absolute_error"],
+        metrics["rmse"],
+        metrics["n_samples"],
     )
     return metrics
 

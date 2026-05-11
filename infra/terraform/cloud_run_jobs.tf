@@ -25,6 +25,8 @@ locals {
     sancoes_ingest        = { timeout = "3600s", memory = "512Mi", cpu = "1", args = [] }
     candidatos_discovery  = { timeout = "1800s", memory = "1Gi",   cpu = "1", args = [] }
     drift_check           = { timeout = "600s",  memory = "1Gi",   cpu = "1", args = [] }
+    sentiment_geocode     = { timeout = "3600s", memory = "2Gi",   cpu = "2", args = ["--days", "1"] }
+    dim_territorio_sync   = { timeout = "300s",  memory = "512Mi", cpu = "1", args = [] }
   }
 
   # Env vars adicionais por job (além das compartilhadas)
@@ -75,6 +77,11 @@ locals {
       DRIFT_THRESHOLD      = "0.10"
       PUBSUB_TOPIC_DRIFT   = "drift-detected"
     }
+    sentiment_geocode = {
+      VERTEX_LOCATION = "us-central1"
+      SENTIMENT_DAYS  = "1"
+    }
+    dim_territorio_sync = {}
   }
 
   job_entrypoints = {
@@ -99,6 +106,8 @@ locals {
     sancoes_ingest          = ["python", "-m", "dataops.jobs.sancoes_ingest_job"]
     candidatos_discovery    = ["python", "-m", "dataops.jobs.candidatos_discovery_job"]
     drift_check             = ["python", "-m", "dataops.jobs.drift_check_job"]
+    sentiment_geocode       = ["python", "-m", "dataops.jobs.sentiment_geocode_job"]
+    dim_territorio_sync     = ["python", "-m", "dataops.jobs.dim_territorio_sync_job"]
   }
 }
 

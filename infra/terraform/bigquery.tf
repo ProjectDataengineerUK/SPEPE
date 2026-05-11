@@ -509,6 +509,39 @@ resource "google_bigquery_table" "fact_ibge_municipio" {
   ])
 }
 
+# ─── Gold: Sentimento geolocalizado ─────────────────────────────────────────
+resource "google_bigquery_table" "fact_sentiment_municipio" {
+  dataset_id               = google_bigquery_dataset.spepe_gold.dataset_id
+  table_id                 = "fact_sentiment_municipio"
+  description              = "Sentimento político por município × dia × candidato — NER via Gemini 2.0 Flash"
+  labels                   = local.labels
+  deletion_protection      = var.environment == "prod"
+  require_partition_filter = false
+
+  lifecycle { ignore_changes = [schema] }
+
+  time_partitioning {
+    type  = "DAY"
+    field = "data_referencia"
+  }
+
+  clustering = ["sg_uf", "cd_municipio_ibge"]
+
+  schema = jsonencode([
+    { name = "data_referencia",  type = "DATE",      mode = "REQUIRED" },
+    { name = "cd_municipio_ibge", type = "INT64",    mode = "REQUIRED" },
+    { name = "sg_uf",            type = "STRING",    mode = "REQUIRED" },
+    { name = "candidato",        type = "STRING",    mode = "NULLABLE" },
+    { name = "sentimento_score", type = "FLOAT64",   mode = "NULLABLE" },
+    { name = "volume_mencoes",   type = "INT64",     mode = "NULLABLE" },
+    { name = "polaridade_neg",   type = "INT64",     mode = "NULLABLE" },
+    { name = "polaridade_pos",   type = "INT64",     mode = "NULLABLE" },
+    { name = "polaridade_neu",   type = "INT64",     mode = "NULLABLE" },
+    { name = "fontes",           type = "STRING",    mode = "REPEATED" },
+    { name = "ingested_at",      type = "TIMESTAMP", mode = "NULLABLE" }
+  ])
+}
+
 # Gold: indicadores econômicos municipais — DIEESE + CETIC + PIB IBGE + desigualdade
 resource "google_bigquery_table" "fact_economico_municipio" {
   dataset_id          = google_bigquery_dataset.spepe_gold.dataset_id

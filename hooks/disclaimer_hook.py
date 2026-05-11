@@ -18,9 +18,23 @@ from pathlib import Path
 
 import yaml
 
+from config.exceptions import DisclaimerMissingError
+
 logger = logging.getLogger("spepe.hooks.disclaimer")
 
 _TEMPLATES_PATH = Path(__file__).parent.parent / "security" / "disclaimer_templates.yaml"
+
+# Detecta outputs de previsão que exigem gate binário (HTTP 422 se disclaimer ausente).
+_FORECAST_GATE_PATTERN = re.compile(
+    r"%.*?(?:município|municípios|candidato|votos|previsão|previsto)|"
+    r"(?:município|municípios|candidato|votos|previsão|previsto).*?%",
+    re.IGNORECASE | re.DOTALL,
+)
+
+_DISCLAIMER_MANDATORY_FRAGMENT = re.compile(
+    r"Esta projeção é baseada em dados históricos",
+    re.IGNORECASE,
+)
 
 TRIGGERS: dict[str, re.Pattern[str]] = {
     "tipo_a_previsao": re.compile(
@@ -71,12 +85,36 @@ def _disclaimer_already_present(output: str, template: str) -> bool:
     return head in output
 
 
+def is_forecast_output(output: str) -> bool:
+    """Return True if `output` is a forecast result requiring mandatory disclaimer gate."""
+    return bool(_FORECAST_GATE_PATTERN.search(output))
+
+
+def forecast_disclaimer_present(output: str) -> bool:
+    """Return True if the mandatory forecast disclaimer fragment is present."""
+    return bool(_DISCLAIMER_MANDATORY_FRAGMENT.search(output))
+
+
 def disclaimer_hook(output: str, agent_name: str | None = None) -> tuple[str, bool]:
     """Inject disclaimers into output if missing.
 
+    For forecast outputs (percentage + electoral keywords) this is a **hard gate**:
+    raises DisclaimerMissingError (HTTP 422) when the mandatory disclaimer is absent
+    instead of injecting it silently.
+
     Returns:
         (output_final, was_modified)
+
+    Raises:
+        DisclaimerMissingError: when a forecast output is missing the required disclaimer.
     """
+    if is_forecast_output(output) and not forecast_disclaimer_present(output):
+        logger.error(
+            "disclaimer_gate_blocked agent=%s reason=forecast_output_missing_disclaimer",
+            agent_name,
+        )
+        raise DisclaimerMissingError(agent_name=agent_name)
+
     templates = _load_templates()
     if not templates:
         return output, False

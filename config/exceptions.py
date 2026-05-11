@@ -29,3 +29,16 @@ class IBGEAPIError(SPEPEError):
 
 class ModelFitError(SPEPEError):
     pass
+
+
+class DisclaimerMissingError(SPEPEError):
+    """Raised when a forecast output lacks the mandatory disclaimer block."""
+
+    def __init__(self, agent_name: str | None = None):
+        self.agent_name = agent_name
+        msg = (
+            f"Output de previsão do agente '{agent_name}' não contém o disclaimer obrigatório. "
+            "Adicione: '⚠️ Esta projeção é baseada em dados históricos e modelos estatísticos. "
+            "Não constitui certeza eleitoral. Margem de erro: ±Xpp (IC 95%).'"
+        )
+        super().__init__(msg)

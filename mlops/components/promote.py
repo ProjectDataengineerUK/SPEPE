@@ -21,7 +21,8 @@ CHALLENGER_META_PATH = MODEL_DIR / "challenger_meta.json"
 def promote_if_better(
     new_model,
     new_metrics: dict,
-    metric_key: str = "brier_score",
+    # Bug 4 fix: metric_key changed from brier_score (classification) to eval_mae (regression)
+    metric_key: str = "eval_mae",
     higher_is_better: bool = False,
     save_as_challenger: bool = True,
 ) -> bool:
@@ -92,11 +93,13 @@ def finalize_promotion(rollback: bool = False) -> None:
         challenger_model,
         challenger_meta["metrics"],
         challenger_meta.get("previous_champion_score", 0.0),
-        challenger_meta.get("metric_key", "brier_score"),
+        challenger_meta.get("metric_key", "eval_mae"),
     )
     CHALLENGER_PATH.unlink(missing_ok=True)
     CHALLENGER_META_PATH.unlink(missing_ok=True)
     _register_vertex(challenger_model, challenger_meta["metrics"])
+    # Bug 4 fix: write a promotion event row to fact_predictions so the model is traceable
+    _record_promotion_to_bq(challenger_meta["metrics"])
     logger.info("Canary promotion finalized: challenger is now champion")
 
 
@@ -157,12 +160,54 @@ def _register_vertex(model, metrics: dict) -> None:
         with tempfile.NamedTemporaryFile(suffix=".pkl", delete=False) as tmp:
             pickle.dump(model, tmp)
 
+        # Bug 4 fix: description uses regression metric (eval_mae), not classification accuracy
         model_obj = aiplatform.Model.upload(
             display_name="spepe-electoral-model",
-            artifact_uri=f"gs://{project}-models/",
+            artifact_uri=f"gs://{project}-data/models/",
             serving_container_image_uri="us-docker.pkg.dev/vertex-ai/prediction/sklearn-cpu.1-3:latest",
-            description=f"SPEPE electoral model | accuracy={metrics.get('accuracy', 0):.3f}",
+            description=f"SPEPE Ridge regression | MAE={metrics.get('eval_mae', 0):.4f} R²={metrics.get('eval_r2_score', 0):.4f}",
         )
-        logger.info(f"Modelo registrado no Vertex AI Model Registry: {model_obj.resource_name}")
+        logger.info("Modelo registrado no Vertex AI Model Registry: %s", model_obj.resource_name)
     except Exception as e:
-        logger.warning(f"Vertex Model Registry falhou: {e}")
+        logger.warning("Vertex Model Registry falhou: %s", e)
+
+
+def _record_promotion_to_bq(metrics: dict) -> None:
+    """Write a sentinel row to fact_predictions marking the canary promotion event."""
+    project = os.environ.get("GCP_PROJECT_ID", "")
+    if not project:
+        return
+    try:
+        import uuid
+        import pandas as pd
+        from google.cloud import bigquery
+
+        client = bigquery.Client(project=project)
+        now_ts = datetime.now(timezone.utc).isoformat()
+        model_id = f"spepe-ridge-promoted-{datetime.now(timezone.utc).strftime('%Y%m%d%H%M%S')}"
+
+        row = {
+            "prediction_id": str(uuid.uuid4()),
+            "session_id": "canary-promotion",
+            "candidato": "__promotion_event__",
+            "sg_uf": None,
+            "prediction_date": now_ts,
+            "p_mean": float(metrics.get("eval_mae", 0.0)),
+            "p_lower": 0.0,
+            "p_upper": 0.0,
+            "model_version": model_id,
+            "features_hash": None,
+            "actual_result": None,
+            "brier_score": None,
+            "evaluated_at": None,
+        }
+        table_id = f"{project}.spepe_mlops.fact_predictions"
+        job_config = bigquery.LoadJobConfig(
+            write_disposition=bigquery.WriteDisposition.WRITE_APPEND,
+            time_partitioning=bigquery.TimePartitioning(field="prediction_date"),
+        )
+        load_job = client.load_table_from_dataframe(pd.DataFrame([row]), table_id, job_config=job_config)
+        load_job.result()
+        logger.info("Promotion event recorded in fact_predictions: model=%s", model_id)
+    except Exception as exc:
+        logger.warning("Falha ao registrar promoção em fact_predictions: %s", exc)

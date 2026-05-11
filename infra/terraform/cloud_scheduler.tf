@@ -49,6 +49,12 @@ locals {
 
     # ── Drift check (após gold build) ────────────────────────────────────────
     drift_check             = { schedule = "0 10 * * *", desc = "Drift check — diário 10:00 BRT (após gold)" }
+
+    # ── Sentimento geolocalizado (após social_ingest + gold_build) ────────────
+    sentiment_geocode       = { schedule = "0 6 * * *",  desc = "NER geográfico + sentimento — diário 06:00 BRT" }
+
+    # ── Sync dim_territorio (semanal, após ibge_sync mensal) ─────────────────
+    dim_territorio_sync     = { schedule = "0 11 1 * *", desc = "Sync dim_territorio — mensal dia 1 11:00 BRT (após ibge_sync)" }
   }
 }
 

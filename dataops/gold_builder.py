@@ -309,6 +309,42 @@ def _build_gold_via_bigquery_sql() -> dict:
             CREATE OR REPLACE TABLE `{gold}.fact_pesquisa` AS
             SELECT * FROM `{silver}.fact_pesquisa`
         """,
+        # fact_intencao_voto: intenção agregada por data × candidato × UF × cargo
+        # Fonte: Silver fact_pesquisa_intencao (gerado pelo polls_client + Poder360)
+        "fact_intencao_voto": f"""
+            CREATE OR REPLACE TABLE `{gold}.fact_intencao_voto`
+            PARTITION BY RANGE_BUCKET(ano_eleitoral, GENERATE_ARRAY(2018, 2030, 1))
+            CLUSTER BY uf, cd_cargo, candidato_normalizado
+            AS
+            SELECT
+                CAST(data_pesquisa_fim AS DATE)                              AS data_referencia,
+                EXTRACT(YEAR FROM CAST(data_pesquisa_fim AS DATE))           AS ano_eleitoral,
+                candidato_normalizado,
+                COALESCE(uf, 'BR')                                           AS uf,
+                SAFE_CAST(cd_cargo AS INT64)                                 AS cd_cargo,
+                COUNT(*)                                                     AS n_pesquisas,
+                AVG(intencao_pct)                                            AS intencao_media,
+                SAFE_DIVIDE(
+                    SUM(intencao_pct * COALESCE(SAFE_CAST(n_entrevistados AS FLOAT64), 1)),
+                    NULLIF(SUM(COALESCE(SAFE_CAST(n_entrevistados AS FLOAT64), 1)), 0)
+                )                                                            AS intencao_ponderada,
+                AVG(intencao_ajustada)                                       AS intencao_ajustada_media,
+                AVG(SAFE_CAST(margem_erro AS FLOAT64))                       AS margem_erro_media,
+                MIN(intencao_pct)                                            AS intencao_min,
+                MAX(intencao_pct)                                            AS intencao_max,
+                TO_JSON_STRING(
+                    ARRAY_AGG(DISTINCT instituto IGNORE NULLS)
+                )                                                            AS institutos,
+                CURRENT_TIMESTAMP()                                          AS updated_at
+            FROM `{silver}.fact_pesquisa_intencao`
+            WHERE intencao_pct IS NOT NULL
+            GROUP BY
+                CAST(data_pesquisa_fim AS DATE),
+                EXTRACT(YEAR FROM CAST(data_pesquisa_fim AS DATE)),
+                candidato_normalizado,
+                COALESCE(uf, 'BR'),
+                SAFE_CAST(cd_cargo AS INT64)
+        """,
         "fact_transferencias_sociais": f"""
             CREATE OR REPLACE TABLE `{gold}.fact_transferencias_sociais` AS
             SELECT
@@ -570,6 +606,7 @@ def _build_gold_via_bigquery_sql() -> dict:
     # Tables that may have no Silver source yet — skip without failing the job
     _OPTIONAL = {
         "fact_pesquisa",
+        "fact_intencao_voto",
         "fact_social_municipio",
         "fact_economico_municipio",
         "fact_transferencias_sociais",

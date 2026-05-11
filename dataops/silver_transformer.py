@@ -440,20 +440,37 @@ def _write_bigquery_pesquisas(df: pd.DataFrame, year: int) -> str:
     return table_id
 
 
+_CANDIDATO_NORM_MAP: dict[str, str] = {
+    "lula": "LULA",
+    "luiz inácio lula da silva": "LULA",
+    "luiz inacio lula da silva": "LULA",
+    "luiz inacio": "LULA",
+    "lula da silva": "LULA",
+    "bolsonaro": "BOLSONARO",
+    "jair bolsonaro": "BOLSONARO",
+    "jair messias bolsonaro": "BOLSONARO",
+    "jair messias": "BOLSONARO",
+    "ciro": "CIRO GOMES",
+    "ciro gomes": "CIRO GOMES",
+    "simone tebet": "TEBET",
+    "tebet": "TEBET",
+    "marina silva": "MARINA",
+    "marina": "MARINA",
+}
+
+
 def transform_pesquisas_to_silver(
     year: int,
     use_bigquery: bool = False,
 ) -> dict:
-    """Transform Bronze polls (TSE PesqEle + Atlas) to Silver fact_pesquisa.
+    """Transform Bronze polls (TSE PesqEle + Atlas + Poder360) to Silver.
 
-    Reads:  bronze/pesquisas/{year}/BR/pesquisas_tse_{year}.parquet  (registro de firmas)
-            bronze/pesquisas/{year}/BR/pesquisas_atlas_{year}.parquet (intenção de voto)
+    Reads:  bronze/pesquisas/{year}/BR/pesquisas_tse_{year}.parquet       (cadastro TSE)
+            bronze/pesquisas/{year}/BR/pesquisas_atlas_{year}.parquet     (Atlas Político)
+            bronze/pesquisas/{year}/BR/pesquisas_intencao_{year}.parquet  (intenção real)
             bronze/pesquisas/{year}/BR/dim_instituto.parquet
-    Writes: Silver table `fact_pesquisa` (BigQuery) or local parquet.
-
-    Atlas Político é a fonte primária para intencao_pct (candidato × %).
-    TSE PesqEle fornece metadata de cadastro (n_entrevistados, margem_erro).
-    Rows do TSE sem correspondência no Atlas são marcadas como tipo_registro='cadastro'.
+    Writes: Silver table `fact_pesquisa`         — cadastro + intenção enriquecida
+            Silver table `fact_pesquisa_intencao` — intenção ajustada por house_effect
     """
     LOCAL_SILVER_DIR.mkdir(parents=True, exist_ok=True)
 
@@ -571,7 +588,135 @@ def transform_pesquisas_to_silver(
         path = str(path_local)
         logger.info("Pesquisas Silver local: %s (%d rows)", path, len(df))
 
+    # ── fact_pesquisa_intencao — intenção real com candidato normalizado ───────
+    intencao_result = _transform_intencao_to_silver(
+        year=year,
+        bronze_dir=bronze_dir,
+        gcs_prefix=gcs_prefix,
+        house_map=house_map,
+        use_bigquery=use_bigquery,
+    )
+
+    return {"status": "ok", "path": path, "rows": len(df), "intencao": intencao_result}
+
+
+def _transform_intencao_to_silver(
+    year: int,
+    bronze_dir: "Path",
+    gcs_prefix: str,
+    house_map: dict[str, float],
+    use_bigquery: bool,
+) -> dict:
+    """Read pesquisas_intencao_{year}.parquet and write fact_pesquisa_intencao Silver."""
+    from pathlib import Path as _Path
+
+    def _read_named(filename: str) -> pd.DataFrame:
+        if GCS_BUCKET:
+            try:
+                from google.cloud import storage as _gcs
+
+                blob = _gcs.Client().bucket(GCS_BUCKET).blob(f"{gcs_prefix}/{filename}")
+                if not blob.exists():
+                    return pd.DataFrame()
+                return pd.read_parquet(io.BytesIO(blob.download_as_bytes()))
+            except Exception as exc:
+                logger.warning("Falha GCS intencao %s: %s", filename, exc)
+                return pd.DataFrame()
+        path = _Path(bronze_dir) / filename
+        if not path.exists():
+            return pd.DataFrame()
+        try:
+            return pd.read_parquet(path)
+        except Exception as exc:
+            logger.warning("Falha local intencao %s: %s", filename, exc)
+            return pd.DataFrame()
+
+    df_intencao = _read_named(f"pesquisas_intencao_{year}.parquet")
+
+    if df_intencao.empty or "intencao_pct" not in df_intencao.columns:
+        logger.info("Bronze pesquisas_intencao_%d: vazio ou sem intencao_pct — pulando", year)
+        return {"status": "skipped", "rows": 0}
+
+    df = df_intencao.copy()
+
+    if "candidato" in df.columns:
+        df["candidato_normalizado"] = (
+            df["candidato"]
+            .str.lower()
+            .str.strip()
+            .map(_CANDIDATO_NORM_MAP)
+            .fillna(df["candidato"].str.upper().str.strip())
+        )
+    else:
+        df["candidato_normalizado"] = "DESCONHECIDO"
+
+    if "instituto" in df.columns:
+        df["house_effect_score"] = (
+            df["instituto"]
+            .str.lower()
+            .map(lambda x: house_map.get(str(x).strip(), 0.0) if pd.notna(x) else 0.0)
+        )
+    else:
+        df["house_effect_score"] = 0.0
+
+    df["intencao_pct"] = pd.to_numeric(df["intencao_pct"], errors="coerce")
+    df["intencao_ajustada"] = df["intencao_pct"] - df["house_effect_score"]
+
+    if "cd_cargo" not in df.columns:
+        _cargo_map = {"presidente": 1, "governador": 3, "senador": 5}
+        if "cargo" in df.columns:
+            df["cd_cargo"] = df["cargo"].str.lower().map(_cargo_map).fillna(1).astype(int)
+        else:
+            df["cd_cargo"] = 1
+
+    if "uf" not in df.columns:
+        df["uf"] = "BR"
+
+    df["ano"] = year
+    df["ingested_at"] = pd.Timestamp.utcnow()
+
+    if use_bigquery:
+        path = _write_bigquery_intencao(df, year)
+    else:
+        path_local = LOCAL_SILVER_DIR / f"fact_pesquisa_intencao_{year}.parquet"
+        df.to_parquet(path_local, index=False, compression="zstd")
+        path = str(path_local)
+        logger.info("Pesquisas intencao Silver local: %s (%d rows)", path, len(df))
+
     return {"status": "ok", "path": path, "rows": len(df)}
+
+
+def _write_bigquery_intencao(df: pd.DataFrame, year: int) -> str:
+    """Write fact_pesquisa_intencao to BigQuery Silver (pre-delete by year)."""
+    project = os.environ.get("GCP_PROJECT_ID", "spepe-dev")
+    dataset = os.environ.get("BIGQUERY_DATASET_SILVER", "spepe_silver")
+    table_id = f"{project}.{dataset}.fact_pesquisa_intencao"
+
+    from google.cloud import bigquery
+
+    client = bigquery.Client(project=project)
+    df = _normalize_for_bq(df)
+    if "ingested_at" not in df.columns:
+        df["ingested_at"] = pd.Timestamp.utcnow()
+
+    try:
+        client.query(
+            f"DELETE FROM `{table_id}` WHERE ano = {year}"
+        ).result()
+        logger.info("Pre-delete fact_pesquisa_intencao ano=%d OK", year)
+    except Exception:
+        pass
+
+    job_config = bigquery.LoadJobConfig(
+        write_disposition="WRITE_APPEND",
+        create_disposition="CREATE_IF_NEEDED",
+        autodetect=True,
+        schema_update_options=[bigquery.SchemaUpdateOption.ALLOW_FIELD_ADDITION],
+    )
+    job = client.load_table_from_dataframe(df, table_id, job_config=job_config)
+    job.result()
+    logger.info("fact_pesquisa_intencao BQ: %s ano=%d (%d rows)", table_id, year, len(df))
+    return table_id
 
 
 import re as _re  # noqa: E402

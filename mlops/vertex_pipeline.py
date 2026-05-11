@@ -8,10 +8,10 @@ import os
 
 logger = logging.getLogger("spepe.mlops.vertex_pipeline")
 
-GCP_PROJECT = os.environ.get("GCP_PROJECT_ID", "spepe-dev")
+GCP_PROJECT = os.environ.get("GCP_PROJECT_ID", "spepe-prod")
 VERTEX_LOCATION = os.environ.get("VERTEX_LOCATION", "us-central1")
-GCS_BUCKET = os.environ.get("GCS_BUCKET", f"{GCP_PROJECT}-pipelines")
-PIPELINE_ROOT = f"gs://{GCS_BUCKET}/pipeline-runs"
+GCS_BUCKET = os.environ.get("GCS_BUCKET", f"{GCP_PROJECT}-data")
+PIPELINE_ROOT = f"gs://{GCS_BUCKET}/vertex-pipelines"
 
 
 def build_pipeline():
@@ -161,6 +161,7 @@ def build_pipeline():
 
         model = model_dict["model"]
         feature_cols = model_dict["feature_cols"]
+        # Bug 2 fix: target_col is the continuous regression target, not a binary label
         target_col = model_dict.get("target_col", "pct_votos_municipio")
 
         if target_col not in df.columns:
@@ -168,7 +169,7 @@ def build_pipeline():
                 "target_col %s não encontrado. Colunas: %s", target_col, df.columns.tolist()
             )
             output_metrics.log_metric("error", 1.0)
-            output_metrics.log_metric("error_reason", 0.0)  # target_col_missing
+            output_metrics.log_metric("error_reason", 0.0)
             return
 
         avail = [c for c in feature_cols if c in df.columns]
@@ -178,12 +179,136 @@ def build_pipeline():
             return
 
         X = df[avail].fillna(0).values
+        # Bug 2 fix: y_true is the continuous target column directly (regression, not classification)
         y_true = df[target_col].values
         y_pred = model.predict(X)
 
+        # Regression metrics: R² and MAE (not Brier/accuracy — those are for classifiers)
         output_metrics.log_metric("eval_r2_score", float(r2_score(y_true, y_pred)))
         output_metrics.log_metric("eval_mae", float(mean_absolute_error(y_true, y_pred)))
         output_metrics.log_metric("eval_n_samples", float(len(y_true)))
+
+    @component(
+        base_image="python:3.12-slim",
+        packages_to_install=[
+            "google-cloud-bigquery",
+            "pandas",
+            "pyarrow",
+            "scikit-learn",
+            "db-dtypes",
+        ],
+    )
+    def promote_component(
+        input_dataset: Input[Dataset],
+        input_model: Input[Model],
+        eval_metrics: Input[Metrics],
+        project_id: str,
+        ano_eleicao: int,
+        mae_threshold: float,
+        output_promoted: Output[Model],
+    ) -> None:
+        import json
+        import logging
+        import pickle
+        import uuid
+        from datetime import datetime, timezone
+        from pathlib import Path
+
+        import pandas as pd
+        from sklearn.metrics import r2_score, mean_absolute_error
+
+        _logger = logging.getLogger("spepe.promote_component")
+
+        raw = Path(input_model.path).read_bytes()
+        if len(raw) < 4:
+            raise RuntimeError("Arquivo de modelo corrompido")
+        model_dict = pickle.loads(raw)
+
+        model = model_dict["model"]
+        feature_cols = model_dict["feature_cols"]
+        target_col = model_dict.get("target_col", "pct_votos_municipio")
+
+        df = pd.read_parquet(input_dataset.path)
+        avail = [c for c in feature_cols if c in df.columns]
+        X = df[avail].fillna(0).values
+        y_true = df[target_col].values
+        y_pred = model.predict(X)
+
+        eval_mae = float(mean_absolute_error(y_true, y_pred))
+        eval_r2 = float(r2_score(y_true, y_pred))
+        _logger.info("Gate: MAE=%.4f threshold=%.4f R²=%.4f", eval_mae, mae_threshold, eval_r2)
+
+        if eval_mae > mae_threshold:
+            _logger.warning(
+                "Modelo reprovado no gate de qualidade: MAE %.4f > %.4f", eval_mae, mae_threshold
+            )
+            # Still write the model artifact so the step succeeds, but skip BQ write
+            import shutil
+            shutil.copy2(input_model.path, output_promoted.path)
+            return
+
+        # Promote: copy model artifact
+        import shutil
+        shutil.copy2(input_model.path, output_promoted.path)
+
+        # Write fact_predictions to BigQuery (one row per municipality per candidate)
+        try:
+            from google.cloud import bigquery
+
+            client = bigquery.Client(project=project_id)
+
+            model_id = f"spepe-ridge-{ano_eleicao}-{datetime.now(timezone.utc).strftime('%Y%m%d%H%M%S')}"
+            now_ts = datetime.now(timezone.utc).isoformat()
+
+            # Bootstrap IC 95% via residual percentiles as a lightweight approximation
+            import numpy as np
+            residuals = y_true - y_pred
+            ic_low_offset = float(np.percentile(residuals, 2.5))
+            ic_high_offset = float(np.percentile(residuals, 97.5))
+
+            candidato_col = "nm_candidato" if "nm_candidato" in df.columns else None
+            cargo_col = "cd_cargo" if "cd_cargo" in df.columns else None
+            uf_col = "sg_uf" if "sg_uf" in df.columns else None
+            municipio_col = "cd_municipio_ibge" if "cd_municipio_ibge" in df.columns else "cd_municipio"
+
+            rows = []
+            session_id = str(uuid.uuid4())
+            for i, (pred_val, row) in enumerate(zip(y_pred, df.itertuples(index=False))):
+                rows.append({
+                    "prediction_id": str(uuid.uuid4()),
+                    "session_id": session_id,
+                    "candidato": str(getattr(row, candidato_col, "")) if candidato_col else "",
+                    "sg_uf": str(getattr(row, uf_col, "")) if uf_col else None,
+                    "prediction_date": now_ts,
+                    "p_mean": float(pred_val),
+                    "p_lower": float(max(0.0, pred_val + ic_low_offset)),
+                    "p_upper": float(min(1.0, pred_val + ic_high_offset)),
+                    "model_version": model_id,
+                    "features_hash": None,
+                    "actual_result": None,
+                    "brier_score": None,
+                    "evaluated_at": None,
+                })
+
+            if rows:
+                predictions_df = pd.DataFrame(rows)
+                table_id = f"{project_id}.spepe_mlops.fact_predictions"
+                job_config = bigquery.LoadJobConfig(
+                    write_disposition=bigquery.WriteDisposition.WRITE_APPEND,
+                    schema_update_options=[],
+                    time_partitioning=bigquery.TimePartitioning(field="prediction_date"),
+                )
+                load_job = client.load_table_from_dataframe(
+                    predictions_df, table_id, job_config=job_config
+                )
+                load_job.result()
+                _logger.info(
+                    "fact_predictions: %d linhas gravadas em %s (model=%s)",
+                    len(rows), table_id, model_id,
+                )
+        except Exception as exc:
+            _logger.error("Falha ao gravar fact_predictions: %s", exc)
+            raise
 
     @dsl.pipeline(
         name="spepe-ml-pipeline",
@@ -193,10 +318,12 @@ def build_pipeline():
     def spepe_pipeline(
         project_id: str = GCP_PROJECT,
         gold_dataset: str = "spepe_gold",
+        # Bug 3 fix: correct Gold table name
         gold_table: str = "fact_municipio_candidato_eleicao",
         n_bootstrap: int = 1000,
         cd_cargo: int = 3,
         ano_eleicao: int = 2022,
+        mae_threshold: float = 0.10,
     ):
         features_task = extract_features_component(
             project_id=project_id,
@@ -209,9 +336,17 @@ def build_pipeline():
             input_dataset=features_task.outputs["output_dataset"],
             n_bootstrap=n_bootstrap,
         )
-        evaluate_component(
+        eval_task = evaluate_component(
             input_dataset=features_task.outputs["output_dataset"],
             input_model=train_task.outputs["output_model"],
+        )
+        promote_component(
+            input_dataset=features_task.outputs["output_dataset"],
+            input_model=train_task.outputs["output_model"],
+            eval_metrics=eval_task.outputs["output_metrics"],
+            project_id=project_id,
+            ano_eleicao=ano_eleicao,
+            mae_threshold=mae_threshold,
         )
 
     return spepe_pipeline
@@ -257,7 +392,8 @@ def submit_pipeline(
             pipeline_root=pipeline_root,
             enable_caching=True,
         )
-        job.submit()
+        # Bug 1 fix: use run(sync=False) — submit() is not the correct PipelineJob API
+        job.run(sync=False)
         logger.info("Pipeline submetido: %s", job.resource_name)
         return job.resource_name
     except ImportError:

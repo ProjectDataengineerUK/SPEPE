@@ -5,6 +5,8 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>SPEPE — Análise Eleitoral</title>
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<script defer src="/static/js/dashboard_actions.js"></script>
+<script defer src="/static/js/map_layers.js"></script>
 <script src="https://accounts.google.com/gsi/client" async defer></script>
 <script>
 async function initGoogleMaps() {
@@ -244,6 +246,13 @@ tr.rhl td{background:rgba(0,200,83,.07)!important}
 /* MAP TAB */
 #tab-mapa{display:none;flex:1;flex-direction:column;overflow:hidden;min-height:0}
 #tab-mapa.active{display:flex}
+
+/* LAYER TOGGLE BAR */
+.layer-toggle-bar{display:flex;gap:6px;padding:8px 14px;background:var(--bg2);border-bottom:1px solid var(--border);flex-shrink:0;align-items:center}
+.layer-toggle-bar::before{content:"Camada:";font-size:.65rem;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:var(--text3);margin-right:4px}
+.layer-btn{padding:4px 13px;font-size:.7rem;font-weight:600;border-radius:20px;border:1px solid var(--border);color:var(--text2);background:transparent;cursor:pointer;transition:all .2s;white-space:nowrap}
+.layer-btn:hover{border-color:var(--border2);color:var(--text)}
+.layer-btn.active{background:#1a73e8;border-color:#1a73e8;color:#fff}
 /* SOCIAL TAB */
 #tab-social{display:none;flex:1;overflow-y:auto;flex-direction:column;gap:12px}
 #tab-social.active{display:flex}
@@ -572,6 +581,12 @@ tr.rhl td{background:rgba(0,200,83,.07)!important}
 
     <!-- MAP TAB -->
     <div id="tab-mapa" class="tab-content">
+      <div id="layer-controls" class="layer-toggle-bar">
+        <button class="layer-btn active" data-layer="eleitoral">Eleitoral</button>
+        <button class="layer-btn" data-layer="ibge">IBGE</button>
+        <button class="layer-btn" data-layer="sentimento">Sentimento</button>
+        <button class="layer-btn" data-layer="previsao">Previsao 2026</button>
+      </div>
       <div class="map-toolbar">
         <h3>Mapa Eleitoral</h3>
         <div style="display:flex;gap:4px" id="level-btns">
@@ -625,6 +640,7 @@ tr.rhl td{background:rgba(0,200,83,.07)!important}
           </div>
         </div>
       </div>
+      <div id="agent-narration" style="display:none;margin:8px 16px;padding:10px 14px;background:rgba(34,197,94,.08);border-left:3px solid #22c55e;border-radius:6px;color:#cbd5e1;font-size:.78rem;line-height:1.45;white-space:pre-wrap"></div>
     </div>
 
     <!-- SOCIOECONÔMICO TAB -->
@@ -1618,8 +1634,17 @@ function _onChatMsg(e){
     syncBar();
     if(data.dashboard_update){
       const upd=data.dashboard_update;
-      if(upd.intent_schema==='v1' && upd.actions?.length){
-        setTimeout(()=>applyIntent(upd.actions),300);
+      const acts=upd.actions||[];
+      const isV1New=acts.some(a=>a && typeof a.type==='string');
+      if(upd.intent_schema==='v1' && acts.length){
+        if(isV1New && typeof window.applyDashboardUpdate==='function'){
+          setTimeout(()=>window.applyDashboardUpdate(upd),300);
+        } else {
+          setTimeout(()=>applyIntent(acts),300);
+          if(upd.narration && typeof window.showNarration==='function'){
+            window.showNarration(upd.narration);
+          }
+        }
       } else {
         _fallbackIntent(_aiBuffer);
       }
@@ -1845,6 +1870,7 @@ function initMap(){
     if(d) _drillDown(null, d);
   });
   _map = gMap; // alias for legacy references
+  if (typeof initMapLayers === "function") initMapLayers();
   reloadMap();
 }
 

@@ -2,8 +2,11 @@
 
 from __future__ import annotations
 
+import asyncio
+import json
 import logging
-from typing import AsyncGenerator
+import re
+from typing import Any, AsyncGenerator
 
 import anthropic
 
@@ -36,6 +39,97 @@ _MODEL = _MODEL_VERTEX if settings.use_vertex_claude else _MODEL_DIRECT
 _MAX_HOPS = 5
 _CLAUDE_INPUT_RATE = 3.0 / 1_000_000
 _CLAUDE_OUTPUT_RATE = 15.0 / 1_000_000
+
+
+_INTENT_MODEL = "gemini-2.0-flash-001"
+_INTENT_REGION = "us-central1"
+
+_INTENT_EXTRACT_PROMPT = """\
+Você extrai instruções estruturadas para um dashboard eleitoral brasileiro a partir do
+texto produzido por um agente de análise. Retorne EXCLUSIVAMENTE um JSON com este schema:
+
+{
+  "intent_schema": "v1",
+  "actions": [...],
+  "narration": "..."
+}
+
+Tipos de ações permitidos (use apenas os necessários, omita campos desconhecidos):
+  {"type": "set_layer",  "layer": "sentimento|eleitoral|ibge|previsao"}
+  {"type": "set_filter", "uf": "SP", "cargo": "presidente|governador|senador|deputado federal|deputado estadual", "candidato": "NOME"}
+  {"type": "zoom_to",    "uf": "SP", "municipio": 3550308}
+  {"type": "highlight",  "municipios": [3550308, 3304557]}
+  {"type": "set_metric", "metric": "idhm|renda|gini|pct_votos|sentiment_score|prediction_pct"}
+  {"type": "set_period", "from": "2026-01-01", "to": "2026-05-10"}
+
+Regras:
+- Se nenhuma ação for inferível, retorne {"intent_schema":"v1","actions":[],"narration":""}.
+- narration deve resumir em 1-2 frases o que o agente disse, sem markdown.
+- Cargo/UF/candidato só se MENCIONADOS explicitamente.
+- Códigos IBGE de município só se aparecerem literalmente no texto.
+- Não invente dados.
+
+Pergunta original do usuário:
+{user_input}
+
+Resposta do agente:
+{agent_text}
+
+JSON:"""
+
+
+def _strip_json_fence(text: str) -> str:
+    text = text.strip()
+    fence = re.match(r"^```(?:json)?\s*(.*?)\s*```$", text, re.DOTALL)
+    return fence.group(1).strip() if fence else text
+
+
+def _extract_intent_sync(user_input: str, agent_text: str) -> dict[str, Any] | None:
+    try:
+        from google import genai
+        from google.genai import types
+
+        client = genai.Client(
+            vertexai=True,
+            project=settings.gcp_project_id or "spepe-prod",
+            location=_INTENT_REGION,
+        )
+        prompt = _INTENT_EXTRACT_PROMPT.replace("{user_input}", user_input[:1500]).replace(
+            "{agent_text}", agent_text[:4000]
+        )
+        config = types.GenerateContentConfig(
+            temperature=0.0,
+            max_output_tokens=1024,
+            response_mime_type="application/json",
+        )
+        response = client.models.generate_content(
+            model=_INTENT_MODEL,
+            contents=prompt,
+            config=config,
+        )
+        raw = _strip_json_fence(response.text or "")
+        if not raw:
+            return None
+        data = json.loads(raw)
+        actions = data.get("actions") or []
+        if not isinstance(actions, list) or not actions:
+            return None
+        return {
+            "intent_schema": "v1",
+            "actions": actions,
+            "narration": str(data.get("narration") or "").strip(),
+        }
+    except Exception as exc:  # noqa: BLE001
+        logger.debug("emit_structured_intent falhou: %s", exc)
+        return None
+
+
+async def emit_structured_intent(user_input: str, agent_text: str) -> dict[str, Any] | None:
+    """Extract a v1 DashboardCommand from a free-form agent reply via Gemini Flash."""
+    if not agent_text or not agent_text.strip():
+        return None
+    loop = asyncio.get_event_loop()
+    return await loop.run_in_executor(None, _extract_intent_sync, user_input, agent_text)
 
 
 def _build_anthropic_client() -> anthropic.Anthropic | anthropic.AnthropicVertex:
@@ -185,6 +279,8 @@ class Supervisor:
         *,
         _intent_sink: list | None = None,
     ) -> AsyncGenerator[str, None]:
+        original_user_input = user_input
+        last_agent_text: str = ""
         if state.total_cost_usd >= BUDGET_USD:
             yield f"⚠️ Budget esgotado: ${state.total_cost_usd:.4f} / ${BUDGET_USD:.2f}"
             return
@@ -290,11 +386,17 @@ class Supervisor:
                     f"sessão: ${state.total_cost_usd:.5f} / ${BUDGET_USD:.2f}*\n\n"
                 )
 
+                last_agent_text = validated_text
+
                 if is_done:
+                    await self._maybe_emit_intent(
+                        original_user_input, last_agent_text, _intent_sink
+                    )
                     return
                 current_input = None
                 continue
 
+        await self._maybe_emit_intent(original_user_input, last_agent_text, _intent_sink)
         yield "\n⚠️ Limite de hops atingido. Tarefa pode estar incompleta."
 
     def _build_messages(
@@ -316,6 +418,21 @@ class Supervisor:
             return run_dataops_job(args)
         except Exception as e:
             return {"ok": False, "job": raw.get("job", "?"), "error": str(e)}
+
+    async def _maybe_emit_intent(
+        self,
+        user_input: str,
+        agent_text: str,
+        sink: list | None,
+    ) -> None:
+        """Fallback: if no tool-emitted intent landed in sink, infer one via Gemini Flash."""
+        if sink is None or sink:
+            return
+        if not agent_text:
+            return
+        intent = await emit_structured_intent(user_input, agent_text)
+        if intent and intent.get("actions"):
+            sink.append(intent)
 
     async def _validate_output(self, agent_id: str, text: str, agent, prompt: str) -> str:
         validators = AGENT_VALIDATORS.get(agent_id, [])

@@ -40,6 +40,7 @@ from fastapi.responses import (
     StreamingResponse,
 )
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
+from pydantic import BaseModel, Field, ValidationError
 
 from agents.supervisor import Supervisor
 from config.logging_config import setup_logging
@@ -1117,6 +1118,210 @@ def _local_pesquisas(cargo: str, sg_uf: str, ano: int, tipo: str) -> dict:
     series = [{"candidato": c, "pontos": pts} for c, pts in by_candidato.items()]
     house_effects = [{"instituto": k, "house_effect": v} for k, v in institutes.items()]
     return {"series": series, "house_effects": house_effects, "tipo": tipo}
+
+
+# ── Pesquisas: Intenção de Voto (fact_pesquisa_intencao Silver) ───────────
+
+
+@app.get("/api/pesquisas/intencao")
+async def get_pesquisas_intencao(
+    candidato: str | None = Query(None, description="Filtro parcial por nome normalizado"),
+    uf: str = Query("BR"),
+    cargo: str = Query("presidente", description="presidente | governador | senador"),
+    ano: int = Query(2026),
+    instituto: str | None = Query(None, description="Filtro exato por instituto"),
+    formato: str = Query("serie", description="serie | tabela"),
+    janela_dias: int = Query(30, ge=1, le=365),
+) -> JSONResponse:
+    if settings.gcp_project_id and os.environ.get("USE_BIGQUERY", "").lower() == "true":
+        try:
+            return JSONResponse(
+                await _bq_pesquisas_intencao(candidato, uf, cargo, ano, instituto, formato, janela_dias)
+            )
+        except Exception as exc:
+            logger.warning("BigQuery pesquisas/intencao falhou: %s", exc)
+    return JSONResponse({"status": "no_data", "message": "Pesquisas requerem BigQuery", "rows": []})
+
+
+async def _bq_pesquisas_intencao(
+    candidato: str | None,
+    uf: str,
+    cargo: str,
+    ano: int,
+    instituto: str | None,
+    formato: str,
+    janela_dias: int,
+) -> dict:
+    from google.cloud import bigquery
+
+    client = bigquery.Client(project=settings.gcp_project_id)
+    silver = f"{settings.gcp_project_id}.{settings.bigquery_dataset_silver}"
+
+    params: list[bigquery.ScalarQueryParameter] = [
+        bigquery.ScalarQueryParameter("ano", "INT64", ano),
+        bigquery.ScalarQueryParameter("uf", "STRING", uf.upper()),
+        bigquery.ScalarQueryParameter("cargo", "STRING", cargo.lower()),
+        bigquery.ScalarQueryParameter("janela_dias", "INT64", janela_dias),
+    ]
+    candidato_filter = ""
+    if candidato:
+        candidato_filter = "AND LOWER(candidato_normalizado) LIKE CONCAT('%', LOWER(@candidato), '%')"
+        params.append(bigquery.ScalarQueryParameter("candidato", "STRING", candidato))
+
+    instituto_filter = ""
+    if instituto:
+        instituto_filter = "AND LOWER(instituto) = LOWER(@instituto)"
+        params.append(bigquery.ScalarQueryParameter("instituto", "STRING", instituto))
+
+    query = f"""
+        SELECT
+            CAST(data_pesquisa_fim AS DATE)                              AS data_referencia,
+            candidato_normalizado,
+            AVG(intencao_pct)                                            AS intencao_media,
+            SAFE_DIVIDE(
+                SUM(intencao_pct * COALESCE(SAFE_CAST(n_entrevistados AS FLOAT64), 1)),
+                NULLIF(SUM(COALESCE(SAFE_CAST(n_entrevistados AS FLOAT64), 1)), 0)
+            )                                                            AS intencao_ponderada,
+            AVG(intencao_ajustada)                                       AS intencao_ajustada_media,
+            COUNT(*)                                                     AS n_pesquisas,
+            TO_JSON_STRING(ARRAY_AGG(DISTINCT instituto IGNORE NULLS))   AS institutos
+        FROM `{silver}.fact_pesquisa_intencao`
+        WHERE ano = @ano
+          AND LOWER(COALESCE(uf, 'BR')) = LOWER(@uf)
+          AND LOWER(COALESCE(cargo, 'presidente')) = LOWER(@cargo)
+          AND data_pesquisa_fim BETWEEN
+              DATE_SUB(CURRENT_DATE(), INTERVAL @janela_dias DAY) AND CURRENT_DATE()
+          {candidato_filter}
+          {instituto_filter}
+        GROUP BY CAST(data_pesquisa_fim AS DATE), candidato_normalizado
+        ORDER BY data_referencia DESC
+        LIMIT 500
+    """
+    job_config = bigquery.QueryJobConfig(query_parameters=params)
+    rows = [dict(r) for r in client.query(query, job_config=job_config).result()]
+
+    if formato == "tabela":
+        return {"rows": rows, "total": len(rows), "formato": "tabela"}
+
+    by_candidato: dict[str, list] = {}
+    for r in rows:
+        cand = r.get("candidato_normalizado", "")
+        by_candidato.setdefault(cand, []).append(
+            {
+                "data": str(r.get("data_referencia", "")),
+                "intencao_media": round(r.get("intencao_media") or 0, 2),
+                "intencao_ponderada": round(r.get("intencao_ponderada") or 0, 2),
+                "intencao_ajustada": round(r.get("intencao_ajustada_media") or 0, 2),
+                "n_pesquisas": r.get("n_pesquisas", 0),
+                "institutos": r.get("institutos", "[]"),
+            }
+        )
+    series = [{"candidato": c, "pontos": pts} for c, pts in by_candidato.items()]
+    return {"series": series, "total": len(rows), "formato": "serie"}
+
+
+# ── Indicadores temáticos para camadas do mapa ────────────────────────────
+
+_INDICADORES_IBGE_METRICS = frozenset({
+    "idhm", "renda_per_capita", "taxa_analfabetismo", "populacao_total",
+})
+_INDICADORES_ALLOWED: dict[str, frozenset[str]] = {
+    "ibge":       _INDICADORES_IBGE_METRICS,
+    "sentimento": frozenset({"sentiment_score"}),
+    "previsao":   frozenset({"pct_previsto", "ic_low_95", "ic_high_95"}),
+}
+
+
+@app.get("/api/indicadores/{tipo}")
+async def get_indicadores(
+    tipo: str,
+    metrica: str = Query("idhm"),
+    uf: str | None = Query(None),
+    candidato: str | None = Query(None),
+    data_ref: str | None = Query(None, description="YYYY-MM-DD; default: hoje"),
+) -> JSONResponse:
+    """Dados temáticos para camadas do mapa (ibge | sentimento | previsao)."""
+    if tipo not in _INDICADORES_ALLOWED:
+        raise HTTPException(status_code=400, detail=f"tipo deve ser: {', '.join(_INDICADORES_ALLOWED)}")
+
+    allowed_metrics = _INDICADORES_ALLOWED[tipo]
+    if metrica not in allowed_metrics:
+        raise HTTPException(
+            status_code=400,
+            detail=f"metrica '{metrica}' inválida para tipo '{tipo}'. Permitidas: {', '.join(allowed_metrics)}",
+        )
+
+    if not (settings.gcp_project_id and os.environ.get("USE_BIGQUERY", "").lower() == "true"):
+        return JSONResponse({"tipo": tipo, "metrica": metrica, "data": [], "status": "no_data"})
+
+    try:
+        result = await _bq_indicadores(tipo, metrica, uf, candidato, data_ref)
+        return JSONResponse({"tipo": tipo, "metrica": metrica, "data": result})
+    except Exception as exc:
+        logger.warning("BigQuery indicadores/%s falhou: %s", tipo, exc)
+        return JSONResponse({"tipo": tipo, "metrica": metrica, "data": [], "status": "error"})
+
+
+async def _bq_indicadores(
+    tipo: str,
+    metrica: str,
+    uf: str | None,
+    candidato: str | None,
+    data_ref: str | None,
+) -> list[dict]:
+    from google.cloud import bigquery
+
+    client = bigquery.Client(project=settings.gcp_project_id)
+    gold = f"{settings.gcp_project_id}.{settings.bigquery_dataset_gold}"
+    mlops = f"{settings.gcp_project_id}.spepe_mlops"
+
+    if tipo == "ibge":
+        query = f"""
+            SELECT cd_municipio_ibge, sg_uf, {metrica} AS valor
+            FROM `{gold}.fact_ibge_municipio`
+            WHERE (@uf IS NULL OR sg_uf = @uf)
+        """
+        job_config = bigquery.QueryJobConfig(
+            query_parameters=[
+                bigquery.ScalarQueryParameter("uf", "STRING", uf.upper() if uf else None),
+            ]
+        )
+
+    elif tipo == "sentimento":
+        resolved_date = data_ref or __import__("datetime").date.today().isoformat()
+        query = f"""
+            SELECT cd_municipio_ibge, sg_uf, sentimento_score AS valor
+            FROM `{gold}.fact_sentiment_municipio`
+            WHERE data_referencia = @data_ref
+              AND (@candidato IS NULL OR candidato = @candidato)
+              AND (@uf IS NULL OR sg_uf = @uf)
+            LIMIT 5600
+        """
+        job_config = bigquery.QueryJobConfig(
+            query_parameters=[
+                bigquery.ScalarQueryParameter("data_ref", "DATE", resolved_date),
+                bigquery.ScalarQueryParameter("candidato", "STRING", candidato),
+                bigquery.ScalarQueryParameter("uf", "STRING", uf.upper() if uf else None),
+            ]
+        )
+
+    else:  # previsao
+        query = f"""
+            SELECT cd_municipio_ibge, candidato, cargo,
+                   pct_previsto AS valor, ic_low_95, ic_high_95
+            FROM `{mlops}.fact_predictions`
+            WHERE (@candidato IS NULL OR LOWER(candidato) LIKE CONCAT('%', LOWER(@candidato), '%'))
+        """
+        job_config = bigquery.QueryJobConfig(
+            query_parameters=[
+                bigquery.ScalarQueryParameter("candidato", "STRING", candidato),
+            ]
+        )
+
+    rows = await asyncio.to_thread(
+        lambda: list(client.query(query, job_config=job_config).result())
+    )
+    return [dict(r) for r in rows]
 
 
 # ── Perfis Eleitorais ──────────────────────────────────────────────────────
@@ -2212,6 +2417,60 @@ async def get_maps_key() -> JSONResponse:
     return JSONResponse({"key": key})
 
 
+# ── DashboardCommand v1 — structured intent payload sent to frontend ──────
+
+
+class DashboardAction(BaseModel):
+    type: str
+    layer: str | None = None
+    uf: str | None = None
+    cargo: str | None = None
+    candidato: str | None = None
+    municipio: int | str | None = None
+    municipios: list[int | str] | None = None
+    metric: str | None = None
+    period_from: str | None = Field(default=None, alias="from")
+    period_to: str | None = Field(default=None, alias="to")
+
+    model_config = {"populate_by_name": True, "extra": "ignore"}
+
+
+class DashboardUpdate(BaseModel):
+    intent_schema: str = "v1"
+    actions: list[DashboardAction] = Field(default_factory=list)
+    narration: str = ""
+
+    model_config = {"extra": "ignore"}
+
+
+_ALLOWED_ACTION_TYPES = {
+    "set_layer", "set_filter", "zoom_to", "highlight", "set_metric", "set_period",
+}
+
+
+def _validate_dashboard_update(raw: dict[str, Any]) -> dict[str, Any] | None:
+    """Validate v1 DashboardCommand. Returns serializable dict (alias preserved) or None."""
+    if not isinstance(raw, dict):
+        return None
+    try:
+        update = DashboardUpdate(**raw)
+    except ValidationError as exc:
+        logger.warning("DashboardUpdate validation failed: %s", exc)
+        return None
+    actions: list[dict[str, Any]] = []
+    for action in update.actions:
+        if action.type not in _ALLOWED_ACTION_TYPES:
+            continue
+        actions.append(action.model_dump(by_alias=True, exclude_none=True))
+    if not actions:
+        return None
+    return {
+        "intent_schema": "v1",
+        "actions": actions,
+        "narration": update.narration,
+    }
+
+
 # ── WebSocket Chat → Supervisor ────────────────────────────────────────────
 
 
@@ -2296,25 +2555,41 @@ async def ws_chat(websocket: WebSocket) -> None:
                 await websocket.send_json({"type": "error", "message": str(exc)})
                 continue
 
-            # Prefer structured intent from emit_dashboard_intent tool; fall back to heuristic
+            # Prefer structured intent from emit_dashboard_intent tool / Gemini extraction
+            dashboard_update: dict[str, Any] = {}
             if intent_sink:
                 last_intent = intent_sink[-1]
-                dashboard_update: dict[str, Any] = {
-                    "intent_schema": "v1",
-                    "actions": last_intent.get("actions", []),
-                    "narration": last_intent.get("narration", ""),
-                }
-            else:
+                actions = last_intent.get("actions") or []
+                is_v1 = any(isinstance(a, dict) and "type" in a for a in actions)
+                if is_v1:
+                    validated = _validate_dashboard_update(
+                        {
+                            "intent_schema": "v1",
+                            "actions": actions,
+                            "narration": last_intent.get("narration", ""),
+                        }
+                    )
+                    if validated:
+                        dashboard_update = validated
+                else:
+                    dashboard_update = {
+                        "intent_schema": "v1",
+                        "actions": actions,
+                        "narration": last_intent.get("narration", ""),
+                    }
+
+            if not dashboard_update:
                 dashboard_update = _extract_dashboard_update(full_text, user_text)
 
-            await websocket.send_json(
-                {
-                    "type": "done",
-                    "cost": round(state.total_cost_usd, 5),
-                    "budget_remaining": round(2.0 - state.total_cost_usd, 4),
-                    "dashboard_update": dashboard_update,
-                }
-            )
+            payload: dict[str, Any] = {
+                "type": "done",
+                "cost": round(state.total_cost_usd, 5),
+                "budget_remaining": round(2.0 - state.total_cost_usd, 4),
+            }
+            if dashboard_update:
+                payload["dashboard_update"] = dashboard_update
+
+            await websocket.send_json(payload)
 
     except WebSocketDisconnect:
         logger.info("WS chat desconectado: %s", state.session_id)

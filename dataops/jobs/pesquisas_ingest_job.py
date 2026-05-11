@@ -12,9 +12,11 @@ from dataops.bronze_writer import write_bronze
 from dataops.clients.polls_client import (
     build_dim_instituto,
     enrich_with_pdfs,
+    fetch_atlas_politico,
     fetch_atlas_polls,
     fetch_pesqele_csv,
     reconcile_atlas_with_pesqele,
+    scrape_poder360,
 )
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s %(message)s")
@@ -98,7 +100,44 @@ def main(year: int, cargos: list[int], enrich_pdf: bool, uf: str | None) -> None
             else 0,
         )
 
-    # ── 5. dim_instituto seed ──────────────────────────────────────────────
+    # ── 5. Intenção de voto — Atlas Político + Poder360 ───────────────────
+    _CARGO_STRS = ["presidente", "governador", "senador"]
+    frames_intencao: list[pd.DataFrame] = []
+    for cargo_str in _CARGO_STRS:
+        try:
+            df_ap = fetch_atlas_politico(year, cargo=cargo_str)
+            if not df_ap.empty:
+                df_ap["cargo"] = cargo_str
+                frames_intencao.append(df_ap)
+        except Exception as exc:
+            logger.warning("fetch_atlas_politico cargo=%s: %s", cargo_str, exc)
+        try:
+            df_p3 = scrape_poder360(year, cargo=cargo_str)
+            if not df_p3.empty:
+                df_p3["cargo"] = cargo_str
+                frames_intencao.append(df_p3)
+        except Exception as exc:
+            logger.warning("scrape_poder360 cargo=%s: %s", cargo_str, exc)
+
+    if frames_intencao:
+        df_intencao = pd.concat(frames_intencao, ignore_index=True)
+        path_intencao = write_bronze(
+            df=df_intencao,
+            source="pesquisas",
+            year=year,
+            uf=bronze_uf,
+            filename=f"pesquisas_intencao_{year}.parquet",
+            use_gcs=use_gcs,
+        )
+        logger.info(
+            "Bronze pesquisas_intencao: %s (%d rows)",
+            path_intencao,
+            len(df_intencao),
+        )
+    else:
+        logger.warning("Nenhum dado de intenção de voto coletado (Atlas+Poder360)")
+
+    # ── 6. dim_instituto seed ──────────────────────────────────────────────
     df_dim = build_dim_instituto()
     path_dim = write_bronze(
         df=df_dim,
@@ -110,7 +149,7 @@ def main(year: int, cargos: list[int], enrich_pdf: bool, uf: str | None) -> None
     )
     logger.info("dim_instituto seed: %s (%d institutos)", path_dim, len(df_dim))
 
-    # ── 6. Summary ─────────────────────────────────────────────────────────
+    # ── 7. Summary ─────────────────────────────────────────────────────────
     total_rows = len(df_pesqele) + len(df_atlas)
     logger.info(
         "Pesquisas ingest concluído: %d pesquisas total (TSE=%d Atlas=%d)",
