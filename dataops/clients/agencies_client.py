@@ -133,9 +133,7 @@ def _fetch_datafolha_page(url: str) -> requests.Response:
     return resp
 
 
-def _datafolha_parse_poll_page(
-    soup: Any, poll_url: str, year: int, cargo: str
-) -> list[dict]:
+def _datafolha_parse_poll_page(soup: Any, poll_url: str, year: int, cargo: str) -> list[dict]:
     """Extract voting intention rows from a single Datafolha poll page."""
     rows: list[dict] = []
 
@@ -187,9 +185,7 @@ def _datafolha_parse_poll_page(
             (i for i, h in enumerate(headers) if "%" in h or "inten" in h or "estimul" in h),
             None,
         )
-        rejeicao_idx = next(
-            (i for i, h in enumerate(headers) if "rejei" in h), None
-        )
+        rejeicao_idx = next((i for i, h in enumerate(headers) if "rejei" in h), None)
 
         if candidato_idx is None or pct_idx is None:
             continue
@@ -209,9 +205,7 @@ def _datafolha_parse_poll_page(
             rejeicao = None
             if rejeicao_idx is not None and len(cells) > rejeicao_idx:
                 try:
-                    rejeicao = float(
-                        cells[rejeicao_idx].replace(",", ".").replace("%", "").strip()
-                    )
+                    rejeicao = float(cells[rejeicao_idx].replace(",", ".").replace("%", "").strip())
                 except ValueError:
                     pass
             rows.append(
@@ -330,9 +324,7 @@ def scrape_datafolha(year: int, cargo: str = "presidente") -> pd.DataFrame:
     if "candidato" in df.columns and "data_pesquisa_fim" in df.columns:
         df = df.drop_duplicates(subset=["candidato", "data_pesquisa_fim"])
 
-    logger.info(
-        "Datafolha: %d linhas scrapeadas para ano=%d cargo=%s", len(df), year, cargo
-    )
+    logger.info("Datafolha: %d linhas scrapeadas para ano=%d cargo=%s", len(df), year, cargo)
     return df[_CANONICAL_COLUMNS].copy() if set(_CANONICAL_COLUMNS).issubset(df.columns) else df
 
 
@@ -350,9 +342,7 @@ def _fetch_quaest_page(url: str) -> requests.Response:
     return resp
 
 
-def _quaest_parse_next_data(
-    soup: Any, year: int, cargo: str
-) -> list[dict]:
+def _quaest_parse_next_data(soup: Any, year: int, cargo: str) -> list[dict]:
     """Strategy 1: parse __NEXT_DATA__ JSON (Quaest is Next.js)."""
     tag = soup.find("script", {"id": "__NEXT_DATA__"})
     if not tag:
@@ -437,7 +427,9 @@ def _quaest_parse_next_data(
 def _quaest_parse_inline_json(soup: Any, year: int, cargo: str) -> list[dict]:
     """Strategy 2: look for inline window.__STATE__ or similar JSON blobs."""
     _PATTERNS = [
-        re.compile(r"window\.__(?:INITIAL_STATE|DATA|APP_STATE|REDUX_STATE)__\s*=\s*(\{.*?\});", re.DOTALL),
+        re.compile(
+            r"window\.__(?:INITIAL_STATE|DATA|APP_STATE|REDUX_STATE)__\s*=\s*(\{.*?\});", re.DOTALL
+        ),
         re.compile(r"var\s+(?:initialData|pesquisasData|pollsData)\s*=\s*(\[.*?\]);", re.DOTALL),
     ]
     for script in soup.find_all("script"):
@@ -481,12 +473,14 @@ def _quaest_parse_inline_json(soup: Any, year: int, cargo: str) -> list[dict]:
                     "ano": year,
                     "rejeicao_pct": None,
                 }
-                for c in (p.get("candidatos") or p.get("resultados") or []):
+                for c in p.get("candidatos") or p.get("resultados") or []:
                     rows.append(
                         {
                             **base,
                             "candidato": c.get("nome") or c.get("candidato"),
-                            "intencao_pct": c.get("intencao_pct") or c.get("intencao") or c.get("percentual"),
+                            "intencao_pct": c.get("intencao_pct")
+                            or c.get("intencao")
+                            or c.get("percentual"),
                             "rejeicao_pct": c.get("rejeicao"),
                         }
                     )
@@ -598,9 +592,7 @@ def scrape_quaest(year: int, cargo: str = "presidente") -> pd.DataFrame:
         if year_mask.any():
             df = df[year_mask | df["data_pesquisa_fim"].isna()]
 
-    logger.info(
-        "Quaest: %d linhas scrapeadas para ano=%d cargo=%s", len(df), year, cargo
-    )
+    logger.info("Quaest: %d linhas scrapeadas para ano=%d cargo=%s", len(df), year, cargo)
     return df[_CANONICAL_COLUMNS].copy() if set(_CANONICAL_COLUMNS).issubset(df.columns) else df
 
 
@@ -645,7 +637,9 @@ def _extract_pdf_tables_raw(pdf_bytes: bytes) -> list[dict]:
                         candidato = str(row[candidato_idx] or "").strip()
                         if not candidato:
                             continue
-                        raw = str(row[intencao_idx] or "").replace(",", ".").replace("%", "").strip()
+                        raw = (
+                            str(row[intencao_idx] or "").replace(",", ".").replace("%", "").strip()
+                        )
                         try:
                             intencao = float(raw)
                         except ValueError:
@@ -813,9 +807,7 @@ def _parse_html_tables_generic(
         pct_idx = next(
             (i for i, h in enumerate(headers) if "%" in h or "inten" in h or "voto" in h), None
         )
-        rejeicao_idx = next(
-            (i for i, h in enumerate(headers) if "rejei" in h), None
-        )
+        rejeicao_idx = next((i for i, h in enumerate(headers) if "rejei" in h), None)
         if candidato_idx is None or pct_idx is None:
             continue
         for tr in table.find_all("tr")[1:]:
@@ -900,7 +892,12 @@ def scrape_parana_pesquisas(year: int, cargo: str = "presidente") -> pd.DataFram
             page_soup = BeautifulSoup(r.text, "html.parser")
             rows.extend(
                 _parse_html_tables_generic(
-                    page_soup, year, "parana_pesquisas", "parana_pesquisas", cargo, _CONFIDENCE_PARANA
+                    page_soup,
+                    year,
+                    "parana_pesquisas",
+                    "parana_pesquisas",
+                    cargo,
+                    _CONFIDENCE_PARANA,
                 )
             )
         except Exception as exc:
@@ -1080,9 +1077,7 @@ def fetch_all_agencies(year: int, cargo: str = "presidente") -> pd.DataFrame:
 # ── cross_validate_with_agencies ──────────────────────────────────────────────
 
 
-def cross_validate_with_agencies(
-    df_tse: pd.DataFrame, year: int, cargo: str
-) -> pd.DataFrame:
+def cross_validate_with_agencies(df_tse: pd.DataFrame, year: int, cargo: str) -> pd.DataFrame:
     """Cross-validate TSE poll data against agency sites.
 
     When TSE PDF extraction matches agency site within 2pp:

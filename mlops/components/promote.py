@@ -206,7 +206,9 @@ def _record_promotion_to_bq(metrics: dict) -> None:
             write_disposition=bigquery.WriteDisposition.WRITE_APPEND,
             time_partitioning=bigquery.TimePartitioning(field="prediction_date"),
         )
-        load_job = client.load_table_from_dataframe(pd.DataFrame([row]), table_id, job_config=job_config)
+        load_job = client.load_table_from_dataframe(
+            pd.DataFrame([row]), table_id, job_config=job_config
+        )
         load_job.result()
         logger.info("Promotion event recorded in fact_predictions: model=%s", model_id)
     except Exception as exc:

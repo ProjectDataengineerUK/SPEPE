@@ -1136,7 +1136,9 @@ async def get_pesquisas_intencao(
     if settings.gcp_project_id and os.environ.get("USE_BIGQUERY", "").lower() == "true":
         try:
             return JSONResponse(
-                await _bq_pesquisas_intencao(candidato, uf, cargo, ano, instituto, formato, janela_dias)
+                await _bq_pesquisas_intencao(
+                    candidato, uf, cargo, ano, instituto, formato, janela_dias
+                )
             )
         except Exception as exc:
             logger.warning("BigQuery pesquisas/intencao falhou: %s", exc)
@@ -1165,7 +1167,9 @@ async def _bq_pesquisas_intencao(
     ]
     candidato_filter = ""
     if candidato:
-        candidato_filter = "AND LOWER(candidato_normalizado) LIKE CONCAT('%', LOWER(@candidato), '%')"
+        candidato_filter = (
+            "AND LOWER(candidato_normalizado) LIKE CONCAT('%', LOWER(@candidato), '%')"
+        )
         params.append(bigquery.ScalarQueryParameter("candidato", "STRING", candidato))
 
     instituto_filter = ""
@@ -1222,13 +1226,18 @@ async def _bq_pesquisas_intencao(
 
 # ── Indicadores temáticos para camadas do mapa ────────────────────────────
 
-_INDICADORES_IBGE_METRICS = frozenset({
-    "idhm", "renda_per_capita", "taxa_analfabetismo", "populacao_total",
-})
+_INDICADORES_IBGE_METRICS = frozenset(
+    {
+        "idhm",
+        "renda_per_capita",
+        "taxa_analfabetismo",
+        "populacao_total",
+    }
+)
 _INDICADORES_ALLOWED: dict[str, frozenset[str]] = {
-    "ibge":       _INDICADORES_IBGE_METRICS,
+    "ibge": _INDICADORES_IBGE_METRICS,
     "sentimento": frozenset({"sentiment_score"}),
-    "previsao":   frozenset({"pct_previsto", "ic_low_95", "ic_high_95"}),
+    "previsao": frozenset({"pct_previsto", "ic_low_95", "ic_high_95"}),
 }
 
 
@@ -1242,7 +1251,9 @@ async def get_indicadores(
 ) -> JSONResponse:
     """Dados temáticos para camadas do mapa (ibge | sentimento | previsao)."""
     if tipo not in _INDICADORES_ALLOWED:
-        raise HTTPException(status_code=400, detail=f"tipo deve ser: {', '.join(_INDICADORES_ALLOWED)}")
+        raise HTTPException(
+            status_code=400, detail=f"tipo deve ser: {', '.join(_INDICADORES_ALLOWED)}"
+        )
 
     allowed_metrics = _INDICADORES_ALLOWED[tipo]
     if metrica not in allowed_metrics:
@@ -2445,7 +2456,12 @@ class DashboardUpdate(BaseModel):
 
 
 _ALLOWED_ACTION_TYPES = {
-    "set_layer", "set_filter", "zoom_to", "highlight", "set_metric", "set_period",
+    "set_layer",
+    "set_filter",
+    "zoom_to",
+    "highlight",
+    "set_metric",
+    "set_period",
 }
 
 

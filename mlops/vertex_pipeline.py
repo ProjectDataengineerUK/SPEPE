@@ -128,9 +128,7 @@ def build_pipeline():
         model.fit(X, y)
 
         with open(output_model.path, "wb") as f:
-            pickle.dump(
-                {"model": model, "feature_cols": feature_cols, "target_col": TARGET_COL}, f
-            )
+            pickle.dump({"model": model, "feature_cols": feature_cols, "target_col": TARGET_COL}, f)
 
         output_metrics.log_metric("r2_score", float(r2_score(y, model.predict(X))))
         output_metrics.log_metric("mae", float(mean_absolute_error(y, model.predict(X))))
@@ -243,11 +241,13 @@ def build_pipeline():
             )
             # Still write the model artifact so the step succeeds, but skip BQ write
             import shutil
+
             shutil.copy2(input_model.path, output_promoted.path)
             return
 
         # Promote: copy model artifact
         import shutil
+
         shutil.copy2(input_model.path, output_promoted.path)
 
         # Write fact_predictions to BigQuery (one row per municipality per candidate)
@@ -256,11 +256,14 @@ def build_pipeline():
 
             client = bigquery.Client(project=project_id)
 
-            model_id = f"spepe-ridge-{ano_eleicao}-{datetime.now(timezone.utc).strftime('%Y%m%d%H%M%S')}"
+            model_id = (
+                f"spepe-ridge-{ano_eleicao}-{datetime.now(timezone.utc).strftime('%Y%m%d%H%M%S')}"
+            )
             now_ts = datetime.now(timezone.utc).isoformat()
 
             # Bootstrap IC 95% via residual percentiles as a lightweight approximation
             import numpy as np
+
             residuals = y_true - y_pred
             ic_low_offset = float(np.percentile(residuals, 2.5))
             ic_high_offset = float(np.percentile(residuals, 97.5))
@@ -271,21 +274,23 @@ def build_pipeline():
             rows = []
             session_id = str(uuid.uuid4())
             for i, (pred_val, row) in enumerate(zip(y_pred, df.itertuples(index=False))):
-                rows.append({
-                    "prediction_id": str(uuid.uuid4()),
-                    "session_id": session_id,
-                    "candidato": str(getattr(row, candidato_col, "")) if candidato_col else "",
-                    "sg_uf": str(getattr(row, uf_col, "")) if uf_col else None,
-                    "prediction_date": now_ts,
-                    "p_mean": float(pred_val),
-                    "p_lower": float(max(0.0, pred_val + ic_low_offset)),
-                    "p_upper": float(min(1.0, pred_val + ic_high_offset)),
-                    "model_version": model_id,
-                    "features_hash": None,
-                    "actual_result": None,
-                    "brier_score": None,
-                    "evaluated_at": None,
-                })
+                rows.append(
+                    {
+                        "prediction_id": str(uuid.uuid4()),
+                        "session_id": session_id,
+                        "candidato": str(getattr(row, candidato_col, "")) if candidato_col else "",
+                        "sg_uf": str(getattr(row, uf_col, "")) if uf_col else None,
+                        "prediction_date": now_ts,
+                        "p_mean": float(pred_val),
+                        "p_lower": float(max(0.0, pred_val + ic_low_offset)),
+                        "p_upper": float(min(1.0, pred_val + ic_high_offset)),
+                        "model_version": model_id,
+                        "features_hash": None,
+                        "actual_result": None,
+                        "brier_score": None,
+                        "evaluated_at": None,
+                    }
+                )
 
             if rows:
                 predictions_df = pd.DataFrame(rows)
@@ -301,7 +306,9 @@ def build_pipeline():
                 load_job.result()
                 _logger.info(
                     "fact_predictions: %d linhas gravadas em %s (model=%s)",
-                    len(rows), table_id, model_id,
+                    len(rows),
+                    table_id,
+                    model_id,
                 )
         except Exception as exc:
             _logger.error("Falha ao gravar fact_predictions: %s", exc)

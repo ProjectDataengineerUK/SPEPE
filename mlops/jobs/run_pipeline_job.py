@@ -29,7 +29,10 @@ def main() -> None:
 
     logger.info(
         "Compilando pipeline: project=%s  location=%s  cargo=%d  ano=%d",
-        project_id, vertex_location, cd_cargo, ano_eleicao,
+        project_id,
+        vertex_location,
+        cd_cargo,
+        ano_eleicao,
     )
 
     try:

@@ -700,9 +700,7 @@ def _write_bigquery_intencao(df: pd.DataFrame, year: int) -> str:
         df["ingested_at"] = pd.Timestamp.utcnow()
 
     try:
-        client.query(
-            f"DELETE FROM `{table_id}` WHERE ano = {year}"
-        ).result()
+        client.query(f"DELETE FROM `{table_id}` WHERE ano = {year}").result()
         logger.info("Pre-delete fact_pesquisa_intencao ano=%d OK", year)
     except Exception:
         pass

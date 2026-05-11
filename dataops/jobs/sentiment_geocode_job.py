@@ -161,9 +161,7 @@ def _call_gemini(model: Any, posts: list[str]) -> list[dict]:
     """Envia um batch de posts ao Gemini e retorna o array de análises."""
     from google.api_core.exceptions import ResourceExhausted
 
-    posts_blob = "\n---\n".join(
-        f"[{i + 1}] {p[:500]}" for i, p in enumerate(posts)
-    )
+    posts_blob = "\n---\n".join(f"[{i + 1}] {p[:500]}" for i, p in enumerate(posts))
     prompt = _USER_PROMPT_TEMPLATE.format(n=len(posts), posts=posts_blob)
 
     try:
@@ -204,9 +202,7 @@ def _build_municipio_index(df_dim: pd.DataFrame) -> dict[str, dict]:
     return idx
 
 
-def _lookup_municipio(
-    nm: str | None, uf: str | None, idx: dict[str, dict]
-) -> dict | None:
+def _lookup_municipio(nm: str | None, uf: str | None, idx: dict[str, dict]) -> dict | None:
     """Tenta match exato normalizado; se uf fornecida, filtra pelo estado."""
     if not nm:
         return None
@@ -376,9 +372,8 @@ def main(hours: int = 24) -> None:
             sentimento = max(-1.0, min(1.0, float(sentimento)))
 
             # Candidato: preferir nm_candidato do Silver se NER não detectou
-            candidato_final = (
-                candidato_ner
-                or (record["nm_candidato"] if record["nm_candidato"] else None)
+            candidato_final = candidato_ner or (
+                record["nm_candidato"] if record["nm_candidato"] else None
             )
 
             # Match municipal
@@ -469,9 +464,7 @@ def _merge_gold(bq: Any, rows: list[dict]) -> None:
         sys.exit(1)
 
     merge_sql = _MERGE_SQL.format(gold_table=_GOLD_TABLE)
-    merge_sql_with_staging = merge_sql.replace(
-        "FROM UNNEST(@rows)", f"FROM `{staging_ref}`"
-    )
+    merge_sql_with_staging = merge_sql.replace("FROM UNNEST(@rows)", f"FROM `{staging_ref}`")
     try:
         bq.query(merge_sql_with_staging).result()
         logger.info("MERGE concluído em %s", _GOLD_TABLE)

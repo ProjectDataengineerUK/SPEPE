@@ -416,9 +416,7 @@ def _parse_pdf_table(table: list[list[str | None]]) -> list[dict]:
         return []
 
     header = [str(c or "").lower() for c in table[0]]
-    candidato_idx = next(
-        (i for i, h in enumerate(header) if "candidato" in h or "nome" in h), None
-    )
+    candidato_idx = next((i for i, h in enumerate(header) if "candidato" in h or "nome" in h), None)
     intencao_idx = next(
         (i for i, h in enumerate(header) if "inten" in h or "%" in h or "votos" in h), None
     )
@@ -639,26 +637,36 @@ def fetch_atlas_politico(year: int, cargo: str = "presidente") -> pd.DataFrame:
     df["data_pesquisa_inicio"] = pd.to_datetime(df["data_pesquisa_inicio"], errors="coerce")
     df["data_pesquisa_fim"] = pd.to_datetime(df["data_pesquisa_fim"], errors="coerce")
     df["intencao_pct"] = pd.to_numeric(df["intencao_pct"], errors="coerce")
-    df["n_entrevistados"] = pd.to_numeric(df.get("n_entrevistados", pd.Series(dtype=str)), errors="coerce") if "n_entrevistados" in df.columns else float("nan")
+    df["n_entrevistados"] = (
+        pd.to_numeric(df.get("n_entrevistados", pd.Series(dtype=str)), errors="coerce")
+        if "n_entrevistados" in df.columns
+        else float("nan")
+    )
     df["record_confidence_score"] = 0.75
     df["ano"] = year
 
     if "data_pesquisa_fim" in df.columns:
         df = df[df["data_pesquisa_fim"].dt.year == year]
 
-    logger.info(
-        "Atlas Político scrape: %d linhas para ano=%d cargo=%s", len(df), year, cargo
-    )
+    logger.info("Atlas Político scrape: %d linhas para ano=%d cargo=%s", len(df), year, cargo)
     return df
 
 
 def _atlas_build_base(pesquisa: dict, year: int, cargo: str) -> dict:
     return {
         "poll_id": pesquisa.get("id") or pesquisa.get("poll_id") or pesquisa.get("registro"),
-        "instituto": pesquisa.get("instituto") or pesquisa.get("institute") or pesquisa.get("empresa"),
-        "data_pesquisa_inicio": pesquisa.get("data_inicio") or pesquisa.get("dataInicio") or pesquisa.get("data_inicio_pesquisa"),
-        "data_pesquisa_fim": pesquisa.get("data_fim") or pesquisa.get("dataFim") or pesquisa.get("data_fim_pesquisa"),
-        "n_entrevistados": pesquisa.get("n_entrevistados") or pesquisa.get("entrevistados") or pesquisa.get("amostra"),
+        "instituto": pesquisa.get("instituto")
+        or pesquisa.get("institute")
+        or pesquisa.get("empresa"),
+        "data_pesquisa_inicio": pesquisa.get("data_inicio")
+        or pesquisa.get("dataInicio")
+        or pesquisa.get("data_inicio_pesquisa"),
+        "data_pesquisa_fim": pesquisa.get("data_fim")
+        or pesquisa.get("dataFim")
+        or pesquisa.get("data_fim_pesquisa"),
+        "n_entrevistados": pesquisa.get("n_entrevistados")
+        or pesquisa.get("entrevistados")
+        or pesquisa.get("amostra"),
         "margem_erro": pesquisa.get("margem_erro") or pesquisa.get("margemErro"),
         "uf": pesquisa.get("uf", "BR"),
         "cd_cargo": cargo,
@@ -669,18 +677,20 @@ def _atlas_build_base(pesquisa: dict, year: int, cargo: str) -> dict:
 
 def _atlas_expand_candidatos(pesquisa: dict, base: dict) -> list[dict]:
     candidatos = (
-        pesquisa.get("candidatos")
-        or pesquisa.get("resultados")
-        or pesquisa.get("candidates")
-        or []
+        pesquisa.get("candidatos") or pesquisa.get("resultados") or pesquisa.get("candidates") or []
     )
     rows = []
     for c in candidatos:
-        rows.append({
-            **base,
-            "candidato": c.get("nome") or c.get("candidato") or c.get("name"),
-            "intencao_pct": c.get("intencao_pct") or c.get("intencao") or c.get("percentual") or c.get("value"),
-        })
+        rows.append(
+            {
+                **base,
+                "candidato": c.get("nome") or c.get("candidato") or c.get("name"),
+                "intencao_pct": c.get("intencao_pct")
+                or c.get("intencao")
+                or c.get("percentual")
+                or c.get("value"),
+            }
+        )
     return rows
 
 
@@ -745,7 +755,9 @@ def _atlas_parse_initial_state(soup: Any, year: int, cargo: str) -> list[dict]:
             for pesquisa in polls_raw:
                 base = _atlas_build_base(pesquisa, year, cargo)
                 expanded = _atlas_expand_candidatos(pesquisa, base)
-                rows.extend(expanded if expanded else [{**base, "candidato": None, "intencao_pct": None}])
+                rows.extend(
+                    expanded if expanded else [{**base, "candidato": None, "intencao_pct": None}]
+                )
             if rows:
                 return rows
     return []
@@ -759,9 +771,7 @@ def _atlas_parse_html_tables(soup: Any, year: int, cargo: str) -> list[dict]:
         candidato_idx = next(
             (i for i, h in enumerate(headers) if "candidato" in h or "nome" in h), None
         )
-        intencao_idx = next(
-            (i for i, h in enumerate(headers) if "inten" in h or "%" in h), None
-        )
+        intencao_idx = next((i for i, h in enumerate(headers) if "inten" in h or "%" in h), None)
         if candidato_idx is None or intencao_idx is None:
             continue
         for tr in table.find_all("tr")[1:]:
@@ -776,20 +786,22 @@ def _atlas_parse_html_tables(soup: Any, year: int, cargo: str) -> list[dict]:
                 intencao = float(intencao_raw)
             except ValueError:
                 intencao = None
-            rows.append({
-                "poll_id": None,
-                "instituto": None,
-                "data_pesquisa_inicio": None,
-                "data_pesquisa_fim": None,
-                "n_entrevistados": None,
-                "margem_erro": None,
-                "uf": "BR",
-                "cd_cargo": cargo,
-                "ano": year,
-                "fonte": "atlas_politico_scrape",
-                "candidato": candidato,
-                "intencao_pct": intencao,
-            })
+            rows.append(
+                {
+                    "poll_id": None,
+                    "instituto": None,
+                    "data_pesquisa_inicio": None,
+                    "data_pesquisa_fim": None,
+                    "n_entrevistados": None,
+                    "margem_erro": None,
+                    "uf": "BR",
+                    "cd_cargo": cargo,
+                    "ano": year,
+                    "fonte": "atlas_politico_scrape",
+                    "candidato": candidato,
+                    "intencao_pct": intencao,
+                }
+            )
     return rows
 
 

@@ -35,9 +35,7 @@ def main(year: int, cargo: str) -> None:
     )
 
     avg_score = (
-        df["record_confidence_score"].mean()
-        if "record_confidence_score" in df.columns
-        else 0.0
+        df["record_confidence_score"].mean() if "record_confidence_score" in df.columns else 0.0
     )
     logger.info(
         "Bronze agencies: %s (%d rows, score médio=%.2f)",
@@ -46,9 +44,7 @@ def main(year: int, cargo: str) -> None:
         avg_score,
     )
 
-    fonte_counts = (
-        df["fonte"].value_counts().to_dict() if "fonte" in df.columns else {}
-    )
+    fonte_counts = df["fonte"].value_counts().to_dict() if "fonte" in df.columns else {}
     logger.info("Distribuição por fonte: %s", fonte_counts)
 
 
