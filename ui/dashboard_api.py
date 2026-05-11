@@ -274,7 +274,12 @@ async def get_candidatos(
 
 
 async def _bq_candidatos(cargo: str, uf: str, ano: int) -> list[dict]:
-    """Query real ao BigQuery Gold — quando dados estiverem ingeridos."""
+    """Retorna candidatos para cargo/UF/ano.
+
+    Para ano >= 2026 (ou Presidente sem dados históricos), usa fact_intencao_voto
+    (pesquisas agregadas) como fonte. Presidente sempre filtra por uf='BR' (âmbito nacional).
+    Para anos históricos usa fact_municipio_candidato_eleicao (resultado TSE).
+    """
     from google.cloud import bigquery
 
     client = bigquery.Client(project=settings.gcp_project_id)
@@ -286,28 +291,58 @@ async def _bq_candidatos(cargo: str, uf: str, ano: int) -> list[dict]:
         "Dep. Estadual": 7,
     }
     cd_cargo = cargo_map.get(cargo, 1)
-    query = f"""
-        SELECT
-            nm_candidato   AS nm,
-            sg_partido     AS partido,
-            ROUND(SUM(total_votos) / SUM(SUM(total_votos)) OVER () * 100, 1) AS pct_t1,
-            CAST(SUM(total_votos) AS STRING) AS votos
-        FROM `{settings.gcp_project_id}.{settings.bigquery_dataset_gold}.fact_municipio_candidato_eleicao`
-        WHERE sg_uf = @uf
-          AND ano_eleicao = @ano
-          AND cd_cargo = @cd_cargo
-          AND nr_turno = 1
-        GROUP BY nm_candidato, sg_partido
-        ORDER BY pct_t1 DESC
-        LIMIT 50
-    """
-    job_config = bigquery.QueryJobConfig(
-        query_parameters=[
-            bigquery.ScalarQueryParameter("uf", "STRING", uf.upper()),
-            bigquery.ScalarQueryParameter("ano", "INT64", ano),
-            bigquery.ScalarQueryParameter("cd_cargo", "INT64", cd_cargo),
-        ]
-    )
+    gold = f"{settings.gcp_project_id}.{settings.bigquery_dataset_gold}"
+
+    # 2026+: fonte é pesquisas (fact_intencao_voto) — TSE não tem resultados ainda
+    # Presidente: âmbito nacional (uf='BR') independente do ano
+    if ano >= 2026 or cd_cargo == 1:
+        uf_filter = "BR" if cd_cargo == 1 else uf.upper()
+        query = f"""
+            SELECT
+                candidato_normalizado                          AS nm,
+                NULL                                          AS partido,
+                ROUND(AVG(intencao_ponderada), 1)             AS pct_t1,
+                CAST(SUM(n_pesquisas) AS STRING)              AS votos
+            FROM `{gold}.fact_intencao_voto`
+            WHERE cd_cargo   = @cd_cargo
+              AND uf         = @uf_filter
+              AND ano_eleitoral = @ano
+              AND intencao_ponderada IS NOT NULL
+            GROUP BY candidato_normalizado
+            ORDER BY pct_t1 DESC
+            LIMIT 50
+        """
+        job_config = bigquery.QueryJobConfig(
+            query_parameters=[
+                bigquery.ScalarQueryParameter("cd_cargo", "INT64", cd_cargo),
+                bigquery.ScalarQueryParameter("uf_filter", "STRING", uf_filter),
+                bigquery.ScalarQueryParameter("ano", "INT64", ano),
+            ]
+        )
+    else:
+        query = f"""
+            SELECT
+                nm_candidato   AS nm,
+                sg_partido     AS partido,
+                ROUND(SUM(total_votos) / SUM(SUM(total_votos)) OVER () * 100, 1) AS pct_t1,
+                CAST(SUM(total_votos) AS STRING) AS votos
+            FROM `{gold}.fact_municipio_candidato_eleicao`
+            WHERE sg_uf = @uf
+              AND ano_eleicao = @ano
+              AND cd_cargo = @cd_cargo
+              AND nr_turno = 1
+            GROUP BY nm_candidato, sg_partido
+            ORDER BY pct_t1 DESC
+            LIMIT 50
+        """
+        job_config = bigquery.QueryJobConfig(
+            query_parameters=[
+                bigquery.ScalarQueryParameter("uf", "STRING", uf.upper()),
+                bigquery.ScalarQueryParameter("ano", "INT64", ano),
+                bigquery.ScalarQueryParameter("cd_cargo", "INT64", cd_cargo),
+            ]
+        )
+
     rows = await asyncio.to_thread(
         lambda: list(client.query(query, job_config=job_config).result())
     )
