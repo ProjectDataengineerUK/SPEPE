@@ -51,6 +51,18 @@ def main(year: int, cargos: list[int], enrich_pdf: bool, uf: str | None) -> None
         logger.info("Enriquecendo com PDFs (max 200)")
         df_pesqele = enrich_with_pdfs(df_pesqele)
 
+    # ── 2b. Cross-validate with external agencies ──────────────────────────
+    if not df_pesqele.empty:
+        from dataops.clients.agencies_client import cross_validate_with_agencies
+
+        _CARGO_STR_MAP = {1: "presidente", 3: "governador", 13: "senador"}
+        for cargo_int, cargo_str in _CARGO_STR_MAP.items():
+            mask = df_pesqele["cd_cargo"].astype(str) == str(cargo_int)
+            if mask.any():
+                df_pesqele.loc[mask] = cross_validate_with_agencies(
+                    df_pesqele[mask].copy(), year, cargo_str
+                )
+
     # ── 3. Atlas Político secondary ────────────────────────────────────────
     logger.info("Atlas Político: ano=%d", year)
     df_atlas = fetch_atlas_polls(year)

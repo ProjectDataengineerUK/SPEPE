@@ -1308,9 +1308,10 @@ async def _bq_indicadores(
     else:  # previsao
         query = f"""
             SELECT cd_municipio_ibge, candidato, cargo,
-                   pct_previsto AS valor, ic_low_95, ic_high_95
+                   p_mean AS pct_previsto, p_lower AS ic_low_95, p_upper AS ic_high_95
             FROM `{mlops}.fact_predictions`
-            WHERE (@candidato IS NULL OR LOWER(candidato) LIKE CONCAT('%', LOWER(@candidato), '%'))
+            WHERE prediction_date >= DATE_SUB(CURRENT_DATE(), INTERVAL 30 DAY)
+              AND (@candidato IS NULL OR LOWER(candidato) LIKE CONCAT('%', LOWER(@candidato), '%'))
         """
         job_config = bigquery.QueryJobConfig(
             query_parameters=[

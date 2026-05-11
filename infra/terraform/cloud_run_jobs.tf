@@ -27,6 +27,7 @@ locals {
     drift_check           = { timeout = "600s",  memory = "1Gi",   cpu = "1", args = [] }
     sentiment_geocode     = { timeout = "3600s", memory = "2Gi",   cpu = "2", args = ["--days", "1"] }
     dim_territorio_sync   = { timeout = "300s",  memory = "512Mi", cpu = "1", args = [] }
+    agencies_ingest       = { timeout = "1800s", memory = "1Gi",   cpu = "1", args = [] }
   }
 
   # Env vars adicionais por job (além das compartilhadas)
@@ -82,6 +83,7 @@ locals {
       SENTIMENT_DAYS  = "1"
     }
     dim_territorio_sync = {}
+    agencies_ingest     = { PESQUISAS_YEARS = "2024,2025,2026" }
   }
 
   job_entrypoints = {
@@ -108,6 +110,7 @@ locals {
     drift_check             = ["python", "-m", "dataops.jobs.drift_check_job"]
     sentiment_geocode       = ["python", "-m", "dataops.jobs.sentiment_geocode_job"]
     dim_territorio_sync     = ["python", "-m", "dataops.jobs.dim_territorio_sync_job"]
+    agencies_ingest         = ["python", "-m", "dataops.jobs.agencies_ingest_job"]
   }
 }
 

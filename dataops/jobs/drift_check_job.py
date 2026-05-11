@@ -94,8 +94,6 @@ def _load_recent(client, project: str, lookback_days: int = 90):
         logger.warning("Não foi possível ler fact_predictions: %s — usando proxy Gold", exc)
 
     # Proxy: Gold mais recente disponível (cd_cargo=3, ano != 2022)
-    from google.cloud import bigquery as bq
-
     proxy_query = """
         SELECT
             f.sg_uf,
@@ -124,7 +122,6 @@ def _load_recent(client, project: str, lookback_days: int = 90):
 
 def main() -> None:
     project = os.environ.get("GCP_PROJECT_ID", "spepe-prod")
-    threshold = float(os.environ.get("DRIFT_THRESHOLD", "0.10"))
     cd_cargo = int(os.environ.get("DRIFT_CD_CARGO", "3"))
     ano_eleicao = int(os.environ.get("DRIFT_ANO_ELEICAO", "2022"))
 
