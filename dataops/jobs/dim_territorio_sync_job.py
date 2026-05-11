@@ -24,10 +24,9 @@ MERGE `{project}.spepe_gold.dim_territorio` AS T
 USING (
     SELECT
         cd_municipio_ibge,
-        ANY_VALUE(nm_municipio)  AS nm_municipio,
+        ANY_VALUE(nm_municipio) AS nm_municipio,
         sg_uf,
-        ANY_VALUE(sg_regiao)     AS sg_regiao,
-        CURRENT_TIMESTAMP()      AS ingested_at
+        CURRENT_TIMESTAMP()     AS ingested_at
     FROM `{project}.spepe_gold.fact_ibge_municipio`
     WHERE cd_municipio_ibge IS NOT NULL
       AND nm_municipio IS NOT NULL
@@ -36,7 +35,6 @@ USING (
 ON T.cd_municipio_ibge = S.cd_municipio_ibge AND T.sg_uf = S.sg_uf
 WHEN MATCHED THEN UPDATE SET
     nm_municipio = S.nm_municipio,
-    sg_regiao    = S.sg_regiao,
     ingested_at  = S.ingested_at
 WHEN NOT MATCHED THEN INSERT (
     cd_municipio_ibge,
@@ -55,7 +53,7 @@ WHEN NOT MATCHED THEN INSERT (
     S.cd_municipio_ibge,
     S.sg_uf,
     NULL,
-    S.sg_regiao,
+    NULL,
     NULL,
     NULL,
     NULL,
