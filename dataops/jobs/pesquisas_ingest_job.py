@@ -121,7 +121,9 @@ def main(year: int, cargos: list[int], enrich_pdf: bool, uf: str | None) -> None
             else 0,
         )
 
-    # ── 5. Intenção de voto — Atlas Político + Poder360 ───────────────────
+    # ── 5. Intenção de voto — Atlas Político + Poder360 + Agências ───────
+    from dataops.clients.agencies_client import fetch_all_agencies
+
     _CARGO_STRS = ["presidente", "governador", "senador"]
     frames_intencao: list[pd.DataFrame] = []
     for cargo_str in _CARGO_STRS:
@@ -139,6 +141,18 @@ def main(year: int, cargos: list[int], enrich_pdf: bool, uf: str | None) -> None
                 frames_intencao.append(df_p3)
         except Exception as exc:
             logger.warning("scrape_poder360 cargo=%s: %s", cargo_str, exc)
+        # Agências (Datafolha, Quaest, etc.) como fonte primária quando Atlas/Poder360 falham
+        try:
+            df_ag = fetch_all_agencies(year, cargo=cargo_str)
+            if not df_ag.empty and "intencao_pct" in df_ag.columns:
+                df_ag = df_ag[df_ag["intencao_pct"].notna()]
+                if not df_ag.empty:
+                    frames_intencao.append(df_ag)
+                    logger.info(
+                        "Agências %s: %d rows de intenção adicionados", cargo_str, len(df_ag)
+                    )
+        except Exception as exc:
+            logger.warning("fetch_all_agencies cargo=%s: %s", cargo_str, exc)
 
     # ── 5b. Fallback: expandir pdf_data do enrich_with_pdfs ───────────────────
     if (
