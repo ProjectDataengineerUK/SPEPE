@@ -38,8 +38,9 @@ _PESQELE_CDN = (
     "pesquisa_eleitoral_{year}.zip"
 )
 
-# Atlas Político secondary source
-_ATLAS_BASE = os.environ.get("ATLAS_BASE_URL", "https://www.atlasdopoder.com.br")
+# Atlas Político / AtlasIntel secondary source
+# Domínio migrou de atlasdopoder.com.br → atlasintelligencia.com.br → atlasintel.org (2025)
+_ATLAS_BASE = os.environ.get("ATLAS_BASE_URL", "https://atlasintel.org")
 _ATLAS_CSV_PATH = "/api/pesquisas/csv?ano={year}"
 
 # pdfplumber fail rate threshold before enabling LLM fallback
@@ -582,9 +583,19 @@ def _log_pipeline_summary(df_extras: pd.DataFrame, poll_id_col: str) -> None:
     )
 
 
-# ── Atlas Político secondary ───────────────────────────────────────────────────
+# ── Atlas Político / AtlasIntel secondary ─────────────────────────────────────
 
-_ATLAS_SCRAPE_URL = "https://www.atlasintelligencia.com.br/pesquisas"
+# Histórico de domínios:
+#   atlasdopoder.com.br        → deprecado ~2023
+#   atlasintelligencia.com.br  → deprecado ~2024 (gera ConnectionError)
+#   atlasintel.org             → domínio atual (2025+)
+# Endpoint público de polls: https://atlasintel.org/polls/general-release-polls
+_ATLAS_SCRAPE_URLS = [
+    "https://atlasintel.org/polls/general-release-polls",
+    "https://www.atlasintel.org/polls/general-release-polls",
+    "https://atlasintel.org/media",
+    "https://www.atlasintelligencia.com.br/pesquisas",  # legado — pode retornar ConnectionError
+]
 
 
 @retry(
@@ -592,15 +603,55 @@ _ATLAS_SCRAPE_URL = "https://www.atlasintelligencia.com.br/pesquisas"
     stop=stop_after_attempt(3),
     wait=wait_exponential(min=2, max=30),
 )
+def _fetch_atlas_page(url: str) -> requests.Response:
+    resp = _SESSION.get(url, timeout=30, headers={"Accept-Language": "pt-BR"}, allow_redirects=True)
+    resp.raise_for_status()
+    return resp
+
+
+def _atlas_parse_json_api(data: Any, year: int, cargo: str) -> list[dict]:
+    """Parse AtlasIntel JSON API response (list of polls or wrapper object)."""
+    polls_raw: list = []
+    if isinstance(data, list):
+        polls_raw = data
+    elif isinstance(data, dict):
+        polls_raw = (
+            data.get("polls")
+            or data.get("pesquisas")
+            or data.get("results")
+            or data.get("data")
+            or []
+        )
+    if not isinstance(polls_raw, list):
+        return []
+
+    rows: list[dict] = []
+    year_str = str(year)
+    for p in polls_raw:
+        if not isinstance(p, dict):
+            continue
+        data_fim = p.get("date") or p.get("data_fim") or p.get("dataFim") or p.get("end_date")
+        if data_fim and year_str not in str(data_fim):
+            continue
+        base = _atlas_build_base(p, year, cargo)
+        expanded = _atlas_expand_candidatos(p, base)
+        rows.extend(expanded if expanded else [{**base, "candidato": None, "intencao_pct": None}])
+    return rows
+
+
 def fetch_atlas_politico(year: int, cargo: str = "presidente") -> pd.DataFrame:
-    """Scrape voting intention polls from Atlas Político public website.
+    """Scrape voting intention polls from AtlasIntel public website.
+
+    O domínio migrou de atlasintelligencia.com.br para atlasintel.org em 2025.
+    Tenta múltiplas URLs em ordem.
 
     Returns DataFrame with canonical schema aligned to fetch_pesqele_csv output.
     record_confidence_score = 0.75 (scraping, no API contract).
 
-    Strategy 1 (preferred): parse <script id="__NEXT_DATA__"> Next.js JSON.
-    Strategy 2 (fallback):  parse <script> tags containing window.__INITIAL_STATE__.
-    Strategy 3 (last resort): parse HTML tables with BeautifulSoup.
+    Strategy 1 (preferred): JSON API response (atlasintel.org serves JSON directly).
+    Strategy 2: parse <script id="__NEXT_DATA__"> Next.js JSON.
+    Strategy 3: parse <script> tags containing window.__INITIAL_STATE__.
+    Strategy 4 (last resort): parse HTML tables with BeautifulSoup.
     """
     try:
         from bs4 import BeautifulSoup
@@ -614,17 +665,42 @@ def fetch_atlas_politico(year: int, cargo: str = "presidente") -> pd.DataFrame:
         "senador": "senador",
     }
     slug = _CARGO_SLUG.get(cargo.lower(), "presidente")
-    url = f"{_ATLAS_SCRAPE_URL}?cargo={slug}&ano={year}"
 
-    resp = _SESSION.get(url, timeout=30, headers={"Accept-Language": "pt-BR"})
-    resp.raise_for_status()
+    rows: list[dict] = []
+    for base_url in _ATLAS_SCRAPE_URLS:
+        try:
+            # Try JSON API first (atlasintel.org may serve JSON for /polls/*)
+            url = base_url
+            if "?" not in base_url:
+                url = f"{base_url}?cargo={slug}&ano={year}"
+            resp = _fetch_atlas_page(url)
 
-    soup = BeautifulSoup(resp.text, "html.parser")
-    rows = (
-        _atlas_parse_next_data(soup, year, cargo)
-        or _atlas_parse_initial_state(soup, year, cargo)
-        or _atlas_parse_html_tables(soup, year, cargo)
-    )
+            # Strategy 1: JSON response
+            content_type = resp.headers.get("Content-Type", "")
+            if "application/json" in content_type or "json" in content_type:
+                try:
+                    json_data = resp.json()
+                    rows = _atlas_parse_json_api(json_data, year, cargo)
+                    if rows:
+                        logger.debug("Atlas: JSON API funcionou em %s", url)
+                        break
+                except Exception:
+                    pass
+
+            # Strategies 2–4: HTML parsing
+            soup = BeautifulSoup(resp.text, "html.parser")
+            rows = (
+                _atlas_parse_next_data(soup, year, cargo)
+                or _atlas_parse_initial_state(soup, year, cargo)
+                or _atlas_parse_html_tables(soup, year, cargo)
+            )
+            if rows:
+                logger.debug("Atlas: HTML parse funcionou em %s", url)
+                break
+        except requests.ConnectionError as exc:
+            logger.debug("Atlas: ConnectionError em %s: %s", base_url, exc)
+        except Exception as exc:
+            logger.debug("Atlas: falha em %s: %s", base_url, exc)
 
     if not rows:
         logger.warning(
@@ -647,7 +723,9 @@ def fetch_atlas_politico(year: int, cargo: str = "presidente") -> pd.DataFrame:
     df["ano"] = year
 
     if "data_pesquisa_fim" in df.columns:
-        df = df[df["data_pesquisa_fim"].dt.year == year]
+        year_mask = df["data_pesquisa_fim"].dt.year == year
+        if year_mask.any():
+            df = df[year_mask | df["data_pesquisa_fim"].isna()]
 
     logger.info("Atlas Político scrape: %d linhas para ano=%d cargo=%s", len(df), year, cargo)
     return df
@@ -806,57 +884,12 @@ def _atlas_parse_html_tables(soup: Any, year: int, cargo: str) -> list[dict]:
     return rows
 
 
-def scrape_poder360(year: int, cargo: str = "presidente") -> pd.DataFrame:
-    """Scrape Poder360 poll aggregator (Next.js __NEXT_DATA__ JSON).
-
-    Returns DataFrame with canonical schema. record_confidence_score = 0.70
-    (public aggregator, no API contract). Raises on HTTP error; returns empty
-    DataFrame on parse failure.
-    """
-    try:
-        from bs4 import BeautifulSoup
-    except ImportError:
-        logger.error("beautifulsoup4 não instalado — scrape_poder360 desabilitado")
-        return pd.DataFrame()
-
-    _PODER360_URL = os.environ.get(
-        "PODER360_URL", "https://poder360.com.br/agregador-de-pesquisas/"
-    )
-    _CARGO_SLUG: dict[str, str] = {
-        "presidente": "presidente",
-        "governador": "governador",
-        "senador": "senador",
-    }
-    slug = _CARGO_SLUG.get(cargo.lower(), "presidente")
-    url = f"{_PODER360_URL}?cargo={slug}&ano={year}"
-
-    resp = _SESSION.get(url, timeout=30, headers={"Accept-Language": "pt-BR"})
-    resp.raise_for_status()
-
-    soup = BeautifulSoup(resp.text, "html.parser")
-    script_tag = soup.find("script", {"id": "__NEXT_DATA__"})
-    if not script_tag:
-        logger.warning("Poder360: __NEXT_DATA__ não encontrado — estrutura mudou")
-        return pd.DataFrame()
-
-    try:
-        next_data = json.loads(script_tag.string)
-        page_props = next_data.get("props", {}).get("pageProps", {})
-        polls_raw = (
-            page_props.get("polls")
-            or page_props.get("pesquisas")
-            or page_props.get("data", {}).get("pesquisas", [])
-        )
-    except (json.JSONDecodeError, AttributeError) as exc:
-        logger.warning("Poder360: falha parse JSON: %s", exc)
-        return pd.DataFrame()
-
-    if not polls_raw:
-        logger.warning("Poder360: array de pesquisas vazio")
-        return pd.DataFrame()
-
-    rows = []
+def _poder360_parse_polls(polls_raw: list, cargo: str, year: int) -> list[dict]:
+    """Convert raw Poder360 poll list to canonical row dicts."""
+    rows: list[dict] = []
     for pesquisa in polls_raw:
+        if not isinstance(pesquisa, dict):
+            continue
         base = {
             "poll_id": pesquisa.get("id") or pesquisa.get("registro"),
             "instituto": pesquisa.get("instituto") or pesquisa.get("institute"),
@@ -870,15 +903,186 @@ def scrape_poder360(year: int, cargo: str = "presidente") -> pd.DataFrame:
             "fonte": "poder360",
             "record_confidence_score": 0.70,
         }
-        for candidato in pesquisa.get("candidatos", pesquisa.get("resultados", [])):
-            row = {
-                **base,
-                "candidato": candidato.get("nome") or candidato.get("candidato"),
-                "intencao_pct": candidato.get("intencao") or candidato.get("percentual"),
-            }
-            rows.append(row)
+        candidatos = pesquisa.get("candidatos") or pesquisa.get("resultados") or []
+        if candidatos:
+            for candidato in candidatos:
+                rows.append(
+                    {
+                        **base,
+                        "candidato": candidato.get("nome") or candidato.get("candidato"),
+                        "intencao_pct": candidato.get("intencao") or candidato.get("percentual"),
+                    }
+                )
+        else:
+            rows.append({**base, "candidato": None, "intencao_pct": None})
+    return rows
+
+
+def scrape_poder360(year: int, cargo: str = "presidente") -> pd.DataFrame:
+    """Scrape Poder360 poll aggregator.
+
+    O Poder360 alterou a estrutura em 2025/2026: a página /agregador-de-pesquisas/
+    passou a ser um iframe (/iframe-ap/) sem __NEXT_DATA__. Tenta em ordem:
+      1. __NEXT_DATA__ JSON (funciona se o Next.js ainda inclui dados SSR)
+      2. window.__INITIAL_STATE__ / inline JSON blobs nos <script>
+      3. HTML tables dentro da página principal
+      4. Página alternativa /pesquisas/ com listagem de artigos individuais
+
+    Returns DataFrame with canonical schema. record_confidence_score = 0.70.
+    Returns empty DataFrame on parse failure (does not raise).
+    """
+    try:
+        from bs4 import BeautifulSoup
+    except ImportError:
+        logger.error("beautifulsoup4 não instalado — scrape_poder360 desabilitado")
+        return pd.DataFrame()
+
+    import re as _re
+
+    _PODER360_URLS = [
+        os.environ.get("PODER360_URL", "https://poder360.com.br/agregador-de-pesquisas/"),
+        "https://www.poder360.com.br/agregador-de-pesquisas/",
+        "https://www.poder360.com.br/iframe-ap/",
+        "https://www.poder360.com.br/pesquisas/",
+        "https://www.poder360.com.br/poder-pesquisas/leia-as-ultimas-pesquisas-eleitorais-para-presidente/",
+    ]
+    _CARGO_SLUG: dict[str, str] = {
+        "presidente": "presidente",
+        "governador": "governador",
+        "senador": "senador",
+    }
+    slug = _CARGO_SLUG.get(cargo.lower(), "presidente")
+
+    soup = None
+    fetched_url = ""
+    for base_url in _PODER360_URLS:
+        url = f"{base_url}?cargo={slug}&ano={year}" if "?" not in base_url else base_url
+        try:
+            resp = _SESSION.get(
+                url, timeout=30, headers={"Accept-Language": "pt-BR"}, allow_redirects=True
+            )
+            resp.raise_for_status()
+            soup = BeautifulSoup(resp.text, "html.parser")
+            fetched_url = url
+            logger.debug("Poder360: página carregada de %s", url)
+            break
+        except Exception as exc:
+            logger.debug("Poder360: falha em %s: %s", url, exc)
+
+    if soup is None:
+        logger.warning("Poder360: todas as URLs falharam para ano=%d cargo=%s", year, cargo)
+        return pd.DataFrame()
+
+    rows: list[dict] = []
+
+    # Strategy 1: __NEXT_DATA__ JSON
+    script_tag = soup.find("script", {"id": "__NEXT_DATA__"})
+    if script_tag:
+        try:
+            next_data = json.loads(script_tag.string or "")
+            page_props = next_data.get("props", {}).get("pageProps", {})
+            polls_raw = (
+                page_props.get("polls")
+                or page_props.get("pesquisas")
+                or page_props.get("data", {}).get("pesquisas", [])
+                or page_props.get("results", [])
+                or []
+            )
+            if polls_raw and isinstance(polls_raw, list):
+                rows = _poder360_parse_polls(polls_raw, cargo, year)
+                if rows:
+                    logger.debug("Poder360: __NEXT_DATA__ funcionou")
+        except (json.JSONDecodeError, AttributeError) as exc:
+            logger.debug("Poder360: falha parse __NEXT_DATA__: %s", exc)
+    else:
+        logger.debug(
+            "Poder360: __NEXT_DATA__ não encontrado em %s — tentando fallbacks", fetched_url
+        )
+
+    # Strategy 2: inline JS blobs (window.__INITIAL_STATE__ etc.)
+    if not rows:
+        _INLINE_PATTERNS = [
+            _re.compile(
+                r"window\.__(?:INITIAL_STATE|DATA|APP_STATE|REDUX_STATE)__\s*=\s*(\{.*?\});",
+                _re.DOTALL,
+            ),
+            _re.compile(
+                r"var\s+(?:pesquisasData|pollsData|initialData)\s*=\s*(\[.*?\]);", _re.DOTALL
+            ),
+        ]
+        for script in soup.find_all("script"):
+            text = script.string or ""
+            for pattern in _INLINE_PATTERNS:
+                m = pattern.search(text)
+                if not m:
+                    continue
+                try:
+                    blob = json.loads(m.group(1))
+                    polls_raw = (
+                        blob.get("pesquisas")
+                        or blob.get("polls")
+                        or (blob if isinstance(blob, list) else [])
+                    )
+                    if polls_raw and isinstance(polls_raw, list):
+                        rows = _poder360_parse_polls(polls_raw, cargo, year)
+                        if rows:
+                            logger.debug("Poder360: inline JS blob funcionou")
+                            break
+                except json.JSONDecodeError:
+                    continue
+            if rows:
+                break
+
+    # Strategy 3: HTML tables
+    if not rows:
+        for table in soup.find_all("table"):
+            headers = [th.get_text(strip=True).lower() for th in table.find_all("th")]
+            if not headers:
+                first_row = table.find("tr")
+                if first_row:
+                    headers = [td.get_text(strip=True).lower() for td in first_row.find_all("td")]
+            cand_idx = next(
+                (i for i, h in enumerate(headers) if "candidato" in h or "nome" in h), None
+            )
+            pct_idx = next((i for i, h in enumerate(headers) if "%" in h or "inten" in h), None)
+            if cand_idx is None or pct_idx is None:
+                continue
+            for tr in table.find_all("tr")[1:]:
+                cells = [td.get_text(strip=True) for td in tr.find_all("td")]
+                if len(cells) <= max(cand_idx, pct_idx):
+                    continue
+                candidato = cells[cand_idx].strip()
+                if not candidato:
+                    continue
+                try:
+                    intencao = float(cells[pct_idx].replace(",", ".").replace("%", "").strip())
+                except ValueError:
+                    continue
+                rows.append(
+                    {
+                        "poll_id": None,
+                        "instituto": None,
+                        "data_pesquisa_inicio": None,
+                        "data_pesquisa_fim": None,
+                        "n_entrevistados": None,
+                        "margem_erro": None,
+                        "uf": "BR",
+                        "cd_cargo": cargo,
+                        "ano": year,
+                        "fonte": "poder360",
+                        "record_confidence_score": 0.70,
+                        "candidato": candidato,
+                        "intencao_pct": intencao,
+                    }
+                )
 
     if not rows:
+        logger.warning(
+            "Poder360: scraping retornou DataFrame vazio para ano=%d cargo=%s — "
+            "página usa iframe-ap sem dados SSR ou estrutura incompatível",
+            year,
+            cargo,
+        )
         return pd.DataFrame()
 
     df = pd.DataFrame(rows)
@@ -889,7 +1093,9 @@ def scrape_poder360(year: int, cargo: str = "presidente") -> pd.DataFrame:
     df["ano"] = year
 
     if "data_pesquisa_fim" in df.columns:
-        df = df[df["data_pesquisa_fim"].dt.year == year]
+        year_mask = df["data_pesquisa_fim"].dt.year == year
+        if year_mask.any():
+            df = df[year_mask | df["data_pesquisa_fim"].isna()]
 
     logger.info("Poder360: %d linhas scrapeadas para ano=%d cargo=%s", len(df), year, cargo)
     return df
@@ -897,7 +1103,10 @@ def scrape_poder360(year: int, cargo: str = "presidente") -> pd.DataFrame:
 
 @retry(stop=stop_after_attempt(2), wait=wait_exponential(min=2, max=20))
 def fetch_atlas_polls(year: int) -> pd.DataFrame:
-    """Fetch polls from Atlas Político as secondary source.
+    """Fetch polls from AtlasIntel as secondary source.
+
+    Tenta primeiro o CSV endpoint no domínio atual (atlasintel.org) e depois
+    o scraping via fetch_atlas_politico se o CSV não estiver disponível.
 
     Returns DataFrame aligned to the same schema as fetch_pesqele_csv.
     Assigns record_confidence_score:
@@ -905,21 +1114,40 @@ def fetch_atlas_polls(year: int) -> pd.DataFrame:
       0.50 otherwise
     """
     url = _ATLAS_BASE + _ATLAS_CSV_PATH.format(year=year)
-    logger.info("Buscando Atlas Político: %s", url)
+    logger.info("Buscando Atlas Político CSV: %s", url)
 
     try:
         resp = _SESSION.get(url, timeout=30)
         resp.raise_for_status()
+        df = _parse_atlas_csv(resp.content, year)
+        df["fonte"] = "atlas_politico"
+        logger.info("Atlas Político: %d pesquisas para %d", len(df), year)
+        return df
     except requests.HTTPError as exc:
         if exc.response is not None and exc.response.status_code in (403, 404):
-            logger.warning("Atlas Político indisponível para %d", year)
-            return pd.DataFrame()
-        raise
+            logger.warning(
+                "Atlas Político CSV indisponível para %d (HTTP %d) — tentando scraping",
+                year,
+                exc.response.status_code,
+            )
+            # Fall through to scraping fallback
+        else:
+            raise
+    except Exception as exc:
+        logger.warning("Atlas Político CSV falhou para %d: %s — tentando scraping", year, exc)
 
-    df = _parse_atlas_csv(resp.content, year)
-    df["fonte"] = "atlas_politico"
-    logger.info("Atlas Político: %d pesquisas para %d", len(df), year)
-    return df
+    # Scraping fallback via fetch_atlas_politico
+    try:
+        df_scrape = fetch_atlas_politico(year)
+        if not df_scrape.empty:
+            df_scrape["fonte"] = "atlas_politico"
+            df_scrape["record_confidence_score"] = 0.50
+            logger.info("Atlas Político scraping fallback: %d linhas para %d", len(df_scrape), year)
+            return df_scrape
+    except Exception as exc2:
+        logger.warning("Atlas Político scraping fallback falhou para %d: %s", year, exc2)
+
+    return pd.DataFrame()
 
 
 def _parse_atlas_csv(raw: bytes, year: int) -> pd.DataFrame:

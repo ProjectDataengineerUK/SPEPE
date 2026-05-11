@@ -13,6 +13,13 @@ Hierarquia de confiança:
 Uso:
   df_tse = fetch_pesqele_csv(year) → enrich_with_pdfs(df_tse)
   df_validated = cross_validate_with_agencies(df_tse, year, cargo)
+
+URLs atualizadas (2026-05):
+  Quaest     → /relatorios-dc5902a407f4f271a324451899baf0f0/ (slug oculto)
+  Ipespe     → ipespe.org.br (domínio novo; SSL bypass)
+  Paraná     → paranapesquisas.com.br (ASCII, sem ã)
+  CNT/MDA    → static.poder360.com.br (PDFs hospedados pelo Poder360)
+  Atlas      → atlasintel.org/polls/general-release-polls (domínio novo)
 """
 
 from __future__ import annotations
@@ -22,12 +29,14 @@ import logging
 import re
 import tempfile
 import time
+import warnings
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 from typing import Any
 
 import pandas as pd
 import requests
+import urllib3
 from tenacity import (
     retry,
     retry_if_exception_type,
@@ -36,6 +45,10 @@ from tenacity import (
 )
 
 logger = logging.getLogger("spepe.clients.agencies")
+
+# Suppress only the InsecureRequestWarning that comes from verify=False calls (Ipespe)
+urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
+warnings.filterwarnings("ignore", message="Unverified HTTPS request")
 
 _SESSION = requests.Session()
 _SESSION.headers.update(
@@ -46,17 +59,42 @@ _SESSION.headers.update(
 )
 
 _DATAFOLHA_BASE = "https://datafolha.folha.uol.com.br/eleicoes/"
-_QUAEST_BASE = "https://quaest.com.br/pesquisas-eleitorais/"
-_IPESPE_BASE = "https://www.ipespe.com.br/pesquisas/"
-_PARANA_URLS = [
-    "https://www.paranápesquisas.com.br/pesquisas-eleitorais/",
-    "https://paranápesquisas.com.br/pesquisas-eleitorais/",
-    "https://www.paranápesquisas.com.br/pesquisas/",
+
+# Quaest: /pesquisas-eleitorais/ retorna 404; usar a listagem de relatórios (slug fixo)
+# e também tentar a tag /categoria/pesquisas-eleitorais/
+_QUAEST_URLS = [
+    "https://quaest.com.br/relatorios-dc5902a407f4f271a324451899baf0f0/",
+    "https://quaest.com.br/categoria/pesquisas-eleitorais/",
+    "https://quaest.com.br/tag/pesquisa-eleitoral/",
+    "https://quaest.com.br/",
 ]
+
+# Ipespe: domínio migrou de ipespe.com.br para ipespe.org.br
+# SSL certificado inválido no domínio antigo → verify=False + domínio novo
+_IPESPE_URLS = [
+    "https://ipespe.org.br/pesquisas/",
+    "https://ipespe.org.br/tags/eleicoes-2026/",
+    "https://ipespe.org.br/",
+    "https://www.ipespe.com.br/pesquisas/",  # fallback legado (verify=False)
+]
+
+# Paraná Pesquisas: domínio é ASCII puro (sem ã) — paranapesquisas.com.br
+_PARANA_URLS = [
+    "https://paranapesquisas.com.br/pesquisas/",
+    "https://www.paranapesquisas.com.br/pesquisas/",
+    "https://paranapesquisas.com.br/",
+    "https://www.paranapesquisas.com.br/",
+]
+
+# CNT/MDA: os PDFs são hospedados em static.poder360.com.br
+# O cnt.org.br não publica PDFs eleitorais diretamente
 _CNT_URLS = [
+    "https://www.poder360.com.br/poder-pesquisas/leia-as-ultimas-pesquisas-eleitorais-para-presidente/",
     "https://cnt.org.br/pesquisas",
     "https://cnt.org.br/pesquisas-transporte",
 ]
+_CNT_PDF_STATIC_BASE = "https://static.poder360.com.br"
+
 _SCRAPE_SLEEP = 0.5
 
 _CANONICAL_COLUMNS: list[str] = [
@@ -337,7 +375,7 @@ def scrape_datafolha(year: int, cargo: str = "presidente") -> pd.DataFrame:
     wait=wait_exponential(min=2, max=30),
 )
 def _fetch_quaest_page(url: str) -> requests.Response:
-    resp = _SESSION.get(url, timeout=30)
+    resp = _SESSION.get(url, timeout=30, allow_redirects=True)
     resp.raise_for_status()
     return resp
 
@@ -547,10 +585,11 @@ def _quaest_parse_html_tables(soup: Any, year: int, cargo: str) -> list[dict]:
 def scrape_quaest(year: int, cargo: str = "presidente") -> pd.DataFrame:
     """Scrape voting intention data from Quaest public website.
 
-    Tries three strategies in order:
-      1. Parse __NEXT_DATA__ JSON (site is Next.js)
+    Tenta múltiplas URLs de listagem pois /pesquisas-eleitorais/ retornou 404 em 2026.
+    Para cada URL encontrada, tenta três estratégias em ordem:
+      1. Parse __NEXT_DATA__ JSON (site é Next.js)
       2. Look for inline JS data blobs
-      3. Parse HTML tables
+      3. Parse HTML tables + links de artigos individuais
 
     record_confidence_score = 0.90.
     Returns an empty DataFrame on any scraping failure.
@@ -561,19 +600,57 @@ def scrape_quaest(year: int, cargo: str = "presidente") -> pd.DataFrame:
         logger.error("beautifulsoup4 não instalado — scrape_quaest desabilitado")
         return _empty_canonical()
 
-    try:
-        resp = _fetch_quaest_page(_QUAEST_BASE)
-    except Exception as exc:
-        logger.warning("Quaest: falha ao buscar página: %s", exc)
-        return _empty_canonical()
+    soup = None
+    for url in _QUAEST_URLS:
+        try:
+            resp = _fetch_quaest_page(url)
+            soup = BeautifulSoup(resp.text, "html.parser")
+            logger.debug("Quaest: página carregada de %s", url)
+            break
+        except Exception as exc:
+            logger.debug("Quaest: falha em %s: %s", url, exc)
 
-    soup = BeautifulSoup(resp.text, "html.parser")
+    if soup is None:
+        logger.warning("Quaest: todas as URLs falharam para ano=%d cargo=%s", year, cargo)
+        return _empty_canonical()
 
     rows = (
         _quaest_parse_next_data(soup, year, cargo)
         or _quaest_parse_inline_json(soup, year, cargo)
         or _quaest_parse_html_tables(soup, year, cargo)
     )
+
+    # Strategy 4: follow article links matching year + cargo keyword and parse each page
+    if not rows:
+        year_str = str(year)
+        cargo_keywords = {
+            "presidente": ["presidente", "presidenci", "eleic"],
+            "governador": ["governador", "governo"],
+            "senador": ["senador"],
+        }
+        kws = cargo_keywords.get(cargo.lower(), ["eleic"])
+        article_links: list[str] = []
+        for a in soup.find_all("a", href=True):
+            href: str = a["href"]
+            text = (a.get_text(strip=True) + " " + href).lower()
+            if year_str in text and any(kw in text for kw in kws):
+                if not href.startswith("http"):
+                    href = "https://quaest.com.br" + href
+                if href not in article_links:
+                    article_links.append(href)
+        for link in article_links[:10]:
+            try:
+                time.sleep(_SCRAPE_SLEEP)
+                r = _fetch_quaest_page(link)
+                page_soup = BeautifulSoup(r.text, "html.parser")
+                page_rows = (
+                    _quaest_parse_next_data(page_soup, year, cargo)
+                    or _quaest_parse_inline_json(page_soup, year, cargo)
+                    or _quaest_parse_html_tables(page_soup, year, cargo)
+                )
+                rows.extend(page_rows)
+            except Exception as exc:
+                logger.debug("Quaest: falha em artigo %s: %s", link, exc)
 
     if not rows:
         logger.warning(
@@ -656,19 +733,29 @@ def _extract_pdf_tables_raw(pdf_bytes: bytes) -> list[dict]:
 # ── Ipespe ────────────────────────────────────────────────────────────────────
 
 
-@retry(
-    retry=retry_if_exception_type((requests.Timeout, requests.ConnectionError)),
-    stop=stop_after_attempt(3),
-    wait=wait_exponential(min=2, max=30),
-)
 def _fetch_ipespe_page(url: str) -> requests.Response:
-    resp = _SESSION.get(url, timeout=30)
-    resp.raise_for_status()
-    return resp
+    """Fetch an Ipespe page, trying first with SSL verification, then without.
+
+    O domínio legado ipespe.com.br tem certificado inválido; o novo ipespe.org.br
+    funciona com SSL normal. Tenta verify=True primeiro, cai para verify=False se
+    SSLError for levantado (suprimindo InsecureRequestWarning via urllib3).
+    """
+    try:
+        resp = _SESSION.get(url, timeout=30, allow_redirects=True)
+        resp.raise_for_status()
+        return resp
+    except requests.exceptions.SSLError:
+        logger.debug("Ipespe: SSL error em %s — tentando verify=False", url)
+        resp = _SESSION.get(url, timeout=30, verify=False, allow_redirects=True)
+        resp.raise_for_status()
+        return resp
 
 
 def scrape_ipespe(year: int, cargo: str = "presidente") -> pd.DataFrame:
     """Scrape Ipespe via listagem de PDFs → extração com pdfplumber.
+
+    O domínio migrou de ipespe.com.br para ipespe.org.br em 2024/2025.
+    Tenta múltiplas URLs de listagem em ordem, com fallback de SSL.
 
     Linhas onde pdfplumber não extrai tabelas preservam metadados com
     intencao_pct=None e record_confidence_score=0.30 para rastreabilidade.
@@ -680,13 +767,26 @@ def scrape_ipespe(year: int, cargo: str = "presidente") -> pd.DataFrame:
         logger.error("beautifulsoup4 não instalado — scrape_ipespe desabilitado")
         return _empty_canonical()
 
-    try:
-        resp = _fetch_ipespe_page(_IPESPE_BASE)
-    except Exception as exc:
-        logger.warning("Ipespe: falha ao buscar listagem: %s", exc)
+    soup = None
+    base_url = "https://ipespe.org.br"
+    for url in _IPESPE_URLS:
+        try:
+            resp = _fetch_ipespe_page(url)
+            soup = BeautifulSoup(resp.text, "html.parser")
+            # Determine base URL from the URL that succeeded
+            if "ipespe.org.br" in url:
+                base_url = "https://ipespe.org.br"
+            else:
+                base_url = "https://www.ipespe.com.br"
+            logger.debug("Ipespe: listagem carregada de %s", url)
+            break
+        except Exception as exc:
+            logger.debug("Ipespe: falha em %s: %s", url, exc)
+
+    if soup is None:
+        logger.warning("Ipespe: todas as URLs falharam para ano=%d", year)
         return _empty_canonical()
 
-    soup = BeautifulSoup(resp.text, "html.parser")
     year_str = str(year)
 
     pdf_links: list[str] = []
@@ -695,9 +795,35 @@ def scrape_ipespe(year: int, cargo: str = "presidente") -> pd.DataFrame:
         text = a.get_text(strip=True) + href
         if href.lower().endswith(".pdf") and year_str in text:
             if not href.startswith("http"):
-                href = "https://www.ipespe.com.br" + href
+                href = base_url + href
             if href not in pdf_links:
                 pdf_links.append(href)
+
+    # Also follow article/post links and look for PDFs inside each
+    if not pdf_links:
+        article_links: list[str] = []
+        for a in soup.find_all("a", href=True):
+            href = a["href"]
+            text = (a.get_text(strip=True) + " " + href).lower()
+            if year_str in text and ("pesquisa" in text or "pulso" in text or "eleic" in text):
+                if not href.startswith("http"):
+                    href = base_url + href
+                if href not in article_links and base_url.split("//")[1].split("/")[0] in href:
+                    article_links.append(href)
+        for link in article_links[:10]:
+            try:
+                time.sleep(_SCRAPE_SLEEP)
+                r = _fetch_ipespe_page(link)
+                page_soup = BeautifulSoup(r.text, "html.parser")
+                for a in page_soup.find_all("a", href=True):
+                    h = a["href"]
+                    if h.lower().endswith(".pdf"):
+                        if not h.startswith("http"):
+                            h = base_url + h
+                        if h not in pdf_links:
+                            pdf_links.append(h)
+            except Exception as exc:
+                logger.debug("Ipespe: falha em artigo %s: %s", link, exc)
 
     pdf_links = pdf_links[:10]
 
@@ -709,7 +835,7 @@ def scrape_ipespe(year: int, cargo: str = "presidente") -> pd.DataFrame:
     for pdf_url in pdf_links:
         try:
             time.sleep(_SCRAPE_SLEEP)
-            r = _fetch_ipespe_page(pdf_url)
+            r = _fetch_ipespe_page(pdf_url)  # handles SSL fallback internally
             pdf_rows = _extract_pdf_tables_raw(r.content)
             if pdf_rows:
                 for row in pdf_rows:
@@ -854,6 +980,7 @@ def _parse_html_tables_generic(
 def scrape_parana_pesquisas(year: int, cargo: str = "presidente") -> pd.DataFrame:
     """Scrape Paraná Pesquisas via tabelas HTML; tenta múltiplas URLs.
 
+    Domínio correto em 2026: paranapesquisas.com.br (ASCII, sem ã).
     record_confidence_score = 0.85.
     Returns an empty DataFrame on any scraping failure.
     """
@@ -880,14 +1007,15 @@ def scrape_parana_pesquisas(year: int, cargo: str = "presidente") -> pd.DataFram
         text = a.get_text(strip=True) + href
         if year_str in text and ("pesquisa" in text.lower() or "elei" in text.lower()):
             if not href.startswith("http"):
-                href = "https://www.paranápesquisas.com.br" + href
+                # Use ASCII domain (without ã) for relative URL construction
+                href = "https://paranapesquisas.com.br" + href
             if href not in article_links:
                 article_links.append(href)
 
     for link in article_links[:10]:
         try:
             time.sleep(_SCRAPE_SLEEP)
-            r = _SESSION.get(link, timeout=30)
+            r = _SESSION.get(link, timeout=30, allow_redirects=True)
             r.raise_for_status()
             page_soup = BeautifulSoup(r.text, "html.parser")
             rows.extend(
@@ -931,8 +1059,41 @@ def _fetch_cnt_page(url: str) -> requests.Response:
     return resp
 
 
+def _collect_cnt_pdf_links(soup: Any, year: int) -> list[str]:
+    """Extract CNT/MDA PDF links from a BeautifulSoup page.
+
+    Os PDFs da CNT/MDA são hospedados em static.poder360.com.br (não em cnt.org.br).
+    Padrão de nome: CNT-MDA-*-{year}*.pdf ou CNT-MDA-*ELEICOES-{year}*.pdf
+    """
+    year_str = str(year)
+    pdf_links: list[str] = []
+    cnt_pattern = re.compile(r"cnt.{0,5}mda", re.IGNORECASE)
+
+    for a in soup.find_all("a", href=True):
+        href: str = a["href"]
+        text = a.get_text(strip=True) + " " + href
+        is_pdf = href.lower().endswith(".pdf")
+        is_cnt = cnt_pattern.search(text) or cnt_pattern.search(href)
+        has_year = year_str in text or year_str in href
+
+        if is_pdf and (is_cnt or has_year):
+            if not href.startswith("http"):
+                # Poder360 hosts on static.poder360.com.br; relative links go to poder360.com.br
+                href = "https://www.poder360.com.br" + href
+            if href not in pdf_links:
+                pdf_links.append(href)
+
+    return pdf_links
+
+
 def scrape_cnt_mda(year: int, cargo: str = "presidente") -> pd.DataFrame:
     """Scrape CNT/MDA via listagem de PDFs → extração com pdfplumber.
+
+    Os PDFs da CNT/MDA não estão em cnt.org.br mas em static.poder360.com.br.
+    A estratégia é:
+      1. Buscar a página de pesquisas do Poder360 que lista todas as CNT/MDA
+      2. Tentar também cnt.org.br como fallback
+      3. Construir URLs diretas de PDFs com padrão de nomes conhecido
 
     record_confidence_score = 0.85.
     Returns an empty DataFrame on any listing or download failure.
@@ -943,32 +1104,55 @@ def scrape_cnt_mda(year: int, cargo: str = "presidente") -> pd.DataFrame:
         logger.error("beautifulsoup4 não instalado — scrape_cnt_mda desabilitado")
         return _empty_canonical()
 
-    resp = None
+    pdf_links: list[str] = []
+
+    # Strategy 1: scrape pages that list CNT/MDA PDFs
     for url in _CNT_URLS:
         try:
             resp = _fetch_cnt_page(url)
-            break
+            soup = BeautifulSoup(resp.text, "html.parser")
+            found = _collect_cnt_pdf_links(soup, year)
+            pdf_links.extend(lnk for lnk in found if lnk not in pdf_links)
+            if pdf_links:
+                break
         except Exception as exc:
             logger.debug("CNT/MDA: %s falhou: %s", url, exc)
 
-    if resp is None:
-        logger.warning("CNT/MDA: todas as URLs falharam para ano=%d", year)
-        return _empty_canonical()
+    # Strategy 2: try known static URL patterns on poder360 CDN
+    # Pattern: https://static.poder360.com.br/{year}/MM/CNT-MDA-MES-{year}-ELEICOES-{year}.pdf
+    if not pdf_links:
+        _MONTH_MAP = {
+            1: "JANEIRO",
+            2: "FEVEREIRO",
+            3: "MARCO",
+            4: "ABRIL",
+            5: "MAIO",
+            6: "JUNHO",
+            7: "JULHO",
+            8: "AGOSTO",
+            9: "SETEMBRO",
+            10: "OUTUBRO",
+            11: "NOVEMBRO",
+            12: "DEZEMBRO",
+        }
+        import datetime
 
-    soup = BeautifulSoup(resp.text, "html.parser")
-    year_str = str(year)
+        current_month = datetime.date.today().month
+        current_year = datetime.date.today().year
+        # Only try months up to current month for current year
+        months_to_try = range(1, (current_month + 1) if year == current_year else 13)
+        for month in months_to_try:
+            month_name = _MONTH_MAP[month]
+            month_num = f"{month:02d}"
+            candidate_urls = [
+                f"{_CNT_PDF_STATIC_BASE}/{year}/{month_num}/CNT-MDA-{month_name}-{year}-ELEICOES-{year}.pdf",
+                f"{_CNT_PDF_STATIC_BASE}/{year}/{month_num}/CNT-MDA-{month_name}-{year}.pdf",
+            ]
+            for candidate in candidate_urls:
+                if candidate not in pdf_links:
+                    pdf_links.append(candidate)
 
-    pdf_links: list[str] = []
-    for a in soup.find_all("a", href=True):
-        href: str = a["href"]
-        text = a.get_text(strip=True) + href
-        if href.lower().endswith(".pdf") and year_str in text:
-            if not href.startswith("http"):
-                href = "https://cnt.org.br" + href
-            if href not in pdf_links:
-                pdf_links.append(href)
-
-    pdf_links = pdf_links[:10]
+    pdf_links = pdf_links[:12]
 
     if not pdf_links:
         logger.warning("CNT/MDA: nenhum PDF encontrado para ano=%d", year)
@@ -979,6 +1163,10 @@ def scrape_cnt_mda(year: int, cargo: str = "presidente") -> pd.DataFrame:
         try:
             time.sleep(_SCRAPE_SLEEP)
             r = _fetch_cnt_page(pdf_url)
+            # Skip non-PDF responses (e.g., HTML 404 pages served as 200)
+            if "application/pdf" not in r.headers.get("Content-Type", "") and len(r.content) < 1024:
+                logger.debug("CNT/MDA: resposta não-PDF em %s — pulando", pdf_url)
+                continue
             pdf_rows = _extract_pdf_tables_raw(r.content)
             for row in pdf_rows:
                 all_rows.append(
@@ -1003,6 +1191,11 @@ def scrape_cnt_mda(year: int, cargo: str = "presidente") -> pd.DataFrame:
                 )
             if not pdf_rows:
                 logger.debug("CNT/MDA: pdfplumber sem tabelas em %s", pdf_url)
+        except requests.HTTPError as exc:
+            if exc.response is not None and exc.response.status_code == 404:
+                logger.debug("CNT/MDA: PDF não encontrado (404): %s", pdf_url)
+            else:
+                logger.debug("CNT/MDA: HTTP error em %s: %s", pdf_url, exc)
         except Exception as exc:
             logger.debug("CNT/MDA: falha ao processar %s: %s", pdf_url, exc)
 
