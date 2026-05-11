@@ -274,7 +274,13 @@ async def get_candidatos(
                     data_pesquisa = dp.isoformat() if hasattr(dp, "isoformat") else str(dp)
                 candidatos.append(d)
             return JSONResponse(
-                {"cargo": cargo, "uf": uf, "ano": ano, "candidatos": candidatos, "data_pesquisa": data_pesquisa}
+                {
+                    "cargo": cargo,
+                    "uf": uf,
+                    "ano": ano,
+                    "candidatos": candidatos,
+                    "data_pesquisa": data_pesquisa,
+                }
             )
         except Exception as exc:
             logger.warning("BigQuery candidatos falhou: %s", exc)
