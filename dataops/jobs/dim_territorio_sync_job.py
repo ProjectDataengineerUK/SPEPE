@@ -23,21 +23,51 @@ _MERGE_SQL = """
 MERGE `{project}.spepe_gold.dim_territorio` AS T
 USING (
     SELECT
-        cd_municipio_ibge,
-        ANY_VALUE(nm_municipio) AS nm_municipio,
+        cd_municipio_ibge                                              AS cd_municipio,
+        ANY_VALUE(nm_municipio)                                        AS nm_municipio,
         sg_uf,
-        CURRENT_TIMESTAMP()     AS ingested_at
+        CASE sg_uf
+            WHEN 'AM' THEN 'N'  WHEN 'RR' THEN 'N'  WHEN 'AP' THEN 'N'
+            WHEN 'PA' THEN 'N'  WHEN 'TO' THEN 'N'  WHEN 'RO' THEN 'N'
+            WHEN 'AC' THEN 'N'
+            WHEN 'MA' THEN 'NE' WHEN 'PI' THEN 'NE' WHEN 'CE' THEN 'NE'
+            WHEN 'RN' THEN 'NE' WHEN 'PB' THEN 'NE' WHEN 'PE' THEN 'NE'
+            WHEN 'AL' THEN 'NE' WHEN 'SE' THEN 'NE' WHEN 'BA' THEN 'NE'
+            WHEN 'MT' THEN 'CO' WHEN 'MS' THEN 'CO' WHEN 'GO' THEN 'CO'
+            WHEN 'DF' THEN 'CO'
+            WHEN 'MG' THEN 'SE' WHEN 'SP' THEN 'SE' WHEN 'RJ' THEN 'SE'
+            WHEN 'ES' THEN 'SE'
+            WHEN 'PR' THEN 'S'  WHEN 'SC' THEN 'S'  WHEN 'RS' THEN 'S'
+            ELSE 'BR'
+        END                                                            AS sg_regiao,
+        CASE sg_uf
+            WHEN 'AM' THEN 'Norte'     WHEN 'RR' THEN 'Norte'     WHEN 'AP' THEN 'Norte'
+            WHEN 'PA' THEN 'Norte'     WHEN 'TO' THEN 'Norte'     WHEN 'RO' THEN 'Norte'
+            WHEN 'AC' THEN 'Norte'
+            WHEN 'MA' THEN 'Nordeste'  WHEN 'PI' THEN 'Nordeste'  WHEN 'CE' THEN 'Nordeste'
+            WHEN 'RN' THEN 'Nordeste'  WHEN 'PB' THEN 'Nordeste'  WHEN 'PE' THEN 'Nordeste'
+            WHEN 'AL' THEN 'Nordeste'  WHEN 'SE' THEN 'Nordeste'  WHEN 'BA' THEN 'Nordeste'
+            WHEN 'MT' THEN 'Centro-Oeste' WHEN 'MS' THEN 'Centro-Oeste'
+            WHEN 'GO' THEN 'Centro-Oeste' WHEN 'DF' THEN 'Centro-Oeste'
+            WHEN 'MG' THEN 'Sudeste'   WHEN 'SP' THEN 'Sudeste'   WHEN 'RJ' THEN 'Sudeste'
+            WHEN 'ES' THEN 'Sudeste'
+            WHEN 'PR' THEN 'Sul'       WHEN 'SC' THEN 'Sul'       WHEN 'RS' THEN 'Sul'
+            ELSE 'Brasil'
+        END                                                            AS nm_regiao,
+        CURRENT_TIMESTAMP()                                            AS ingested_at
     FROM `{project}.spepe_gold.fact_ibge_municipio`
     WHERE cd_municipio_ibge IS NOT NULL
       AND nm_municipio IS NOT NULL
     GROUP BY cd_municipio_ibge, sg_uf
 ) AS S
-ON T.cd_municipio_ibge = S.cd_municipio_ibge AND T.sg_uf = S.sg_uf
+ON T.cd_municipio = S.cd_municipio AND T.sg_uf = S.sg_uf
 WHEN MATCHED THEN UPDATE SET
     nm_municipio = S.nm_municipio,
+    sg_regiao    = S.sg_regiao,
+    nm_regiao    = S.nm_regiao,
     ingested_at  = S.ingested_at
 WHEN NOT MATCHED THEN INSERT (
-    cd_municipio_ibge,
+    cd_municipio,
     nm_municipio,
     cd_ibge,
     sg_uf,
@@ -48,13 +78,13 @@ WHEN NOT MATCHED THEN INSERT (
     longitude,
     ingested_at
 ) VALUES (
-    S.cd_municipio_ibge,
+    S.cd_municipio,
     S.nm_municipio,
-    S.cd_municipio_ibge,
+    S.cd_municipio,
     S.sg_uf,
     NULL,
-    NULL,
-    NULL,
+    S.sg_regiao,
+    S.nm_regiao,
     NULL,
     NULL,
     S.ingested_at
