@@ -140,6 +140,48 @@ def main(year: int, cargos: list[int], enrich_pdf: bool, uf: str | None) -> None
         except Exception as exc:
             logger.warning("scrape_poder360 cargo=%s: %s", cargo_str, exc)
 
+    # ── 5b. Fallback: expandir pdf_data do enrich_with_pdfs ───────────────────
+    if (
+        not frames_intencao
+        and enrich_pdf
+        and not df_pesqele.empty
+        and "pdf_data" in df_pesqele.columns
+    ):
+        pdf_rows: list[dict] = []
+        for _, row in df_pesqele.iterrows():
+            pdf_data = row.get("pdf_data")
+            if not isinstance(pdf_data, list) or not pdf_data:
+                continue
+            for entry in pdf_data:
+                if not isinstance(entry, dict):
+                    continue
+                intencao = entry.get("intencao_pct")
+                candidato = entry.get("candidato")
+                if intencao is None or candidato is None:
+                    continue
+                pdf_rows.append(
+                    {
+                        "candidato": candidato,
+                        "intencao_pct": float(intencao),
+                        "data_pesquisa_fim": row.get("data_pesquisa_fim"),
+                        "data_pesquisa_inicio": row.get("data_pesquisa_inicio"),
+                        "instituto": row.get("instituto"),
+                        "uf": row.get("uf", "BR"),
+                        "cd_cargo": row.get("cd_cargo"),
+                        "n_entrevistados": row.get("n_entrevistados"),
+                        "poll_id": row.get("poll_id"),
+                        "ano": year,
+                        "fonte": "pdf_tse",
+                    }
+                )
+        if pdf_rows:
+            frames_intencao.append(pd.DataFrame(pdf_rows))
+            logger.info("Fallback PDF: %d registros de intenção extraídos dos PDFs", len(pdf_rows))
+        else:
+            logger.warning(
+                "Fallback PDF: nenhum dado de intenção extraído (pdf_data vazio ou sem candidatos)"
+            )
+
     if frames_intencao:
         df_intencao = pd.concat(frames_intencao, ignore_index=True)
         path_intencao = write_bronze(
@@ -156,7 +198,7 @@ def main(year: int, cargos: list[int], enrich_pdf: bool, uf: str | None) -> None
             len(df_intencao),
         )
     else:
-        logger.warning("Nenhum dado de intenção de voto coletado (Atlas+Poder360)")
+        logger.warning("Nenhum dado de intenção de voto coletado (Atlas+Poder360+PDF)")
 
     # ── 6. dim_instituto seed ──────────────────────────────────────────────
     df_dim = build_dim_instituto()
