@@ -134,6 +134,7 @@ def _parse_pesqele_csv(raw: bytes, year: int) -> pd.DataFrame:
         "dt_inicio_pesquisa": "data_pesquisa_inicio",
         "dt_fim_pesquisa": "data_pesquisa_fim",
         "sg_uf": "uf",
+        "nr_cargo": "cd_cargo",  # 2026 format uses nr_cargo instead of cd_cargo
         # Legacy column names (pre-2024)
         "nr_registro": "poll_id",
         "sq_pesquisa": "poll_id",

@@ -56,8 +56,17 @@ def main(year: int, cargos: list[int], enrich_pdf: bool, uf: str | None) -> None
         from dataops.clients.agencies_client import cross_validate_with_agencies
 
         _CARGO_STR_MAP = {1: "presidente", 3: "governador", 13: "senador"}
+        cargo_col = next(
+            (c for c in ("cd_cargo", "nr_cargo", "ds_cargo") if c in df_pesqele.columns),
+            None,
+        )
         for cargo_int, cargo_str in _CARGO_STR_MAP.items():
-            mask = df_pesqele["cd_cargo"].astype(str) == str(cargo_int)
+            if cargo_col is None:
+                df_pesqele = cross_validate_with_agencies(df_pesqele, year, cargo_str)
+                break
+            mask = df_pesqele[cargo_col].astype(str).str.upper() == str(cargo_int)
+            if not mask.any() and cargo_col == "ds_cargo":
+                mask = df_pesqele[cargo_col].str.upper().str.contains(cargo_str.upper(), na=False)
             if mask.any():
                 df_pesqele.loc[mask] = cross_validate_with_agencies(
                     df_pesqele[mask].copy(), year, cargo_str
