@@ -35,7 +35,7 @@ google-cloud-bigquery-storage==2.27.0
 db-dtypes==1.4.2
 google-cloud-storage==2.19.0
 google-cloud-aiplatform[vertexai]>=1.133.0
-beautifulsoup4==4.13.6
+beautifulsoup4==4.12.3
 pdfplumber==0.11.7
 google-cloud-firestore==2.20.0
 google-cloud-secret-manager==2.23.0

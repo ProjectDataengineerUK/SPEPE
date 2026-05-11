@@ -31,10 +31,8 @@ google-cloud-logging==3.11.3
 google-cloud-trace>=1.14.0
 
 # Scraping / parsing (usado pelos Cloud Run Jobs de ingestão)
-beautifulsoup4==4.13.6
+beautifulsoup4==4.12.3
 pdfplumber==0.11.7
-feedparser==6.0.11
-atproto==0.0.55
 
 # Utilities
 pyyaml==6.0.3
