@@ -253,6 +253,12 @@ tr.rhl td{background:rgba(0,200,83,.07)!important}
 .layer-btn{padding:4px 13px;font-size:.7rem;font-weight:600;border-radius:20px;border:1px solid var(--border);color:var(--text2);background:transparent;cursor:pointer;transition:all .2s;white-space:nowrap}
 .layer-btn:hover{border-color:var(--border2);color:var(--text)}
 .layer-btn.active{background:#1a73e8;border-color:#1a73e8;color:#fff}
+/* MAP MODE TOGGLE */
+.map-mode-bar{display:flex;align-items:center;background:var(--bg3);border-bottom:1px solid var(--border);padding:5px 14px;gap:6px}
+.map-mode-btn{padding:4px 14px;font-size:.73rem;font-weight:600;border-radius:6px;border:1px solid var(--border);color:var(--text2);background:transparent;cursor:pointer;transition:all .2s;white-space:nowrap}
+.map-mode-btn:hover{border-color:var(--border2);color:var(--text)}
+.map-mode-btn.active{background:var(--blue-dim);border-color:var(--blue2);color:var(--blue2)}
+.poll-date-badge{display:none;margin-left:auto;font-size:.72rem;background:var(--teal-dim);color:var(--teal);padding:3px 10px;border-radius:12px;border:1px solid var(--teal)}
 /* SOCIAL TAB */
 #tab-social{display:none;flex:1;overflow-y:auto;flex-direction:column;gap:12px}
 #tab-social.active{display:flex}
@@ -581,6 +587,13 @@ tr.rhl td{background:rgba(0,200,83,.07)!important}
 
     <!-- MAP TAB -->
     <div id="tab-mapa" class="tab-content">
+      <!-- MAP MODE TOGGLE -->
+      <div class="map-mode-bar">
+        <span style="font-size:.65rem;font-weight:700;text-transform:uppercase;letter-spacing:.09em;color:var(--text3);margin-right:4px">Modo</span>
+        <button id="btn-mode-historico" class="map-mode-btn active" onclick="setMapMode('historico')">📜 Histórico (TSE)</button>
+        <button id="btn-mode-2026" class="map-mode-btn" onclick="setMapMode('2026')">🗳 Eleição 2026</button>
+        <div id="poll-date-badge" class="poll-date-badge"></div>
+      </div>
       <div id="layer-controls" class="layer-toggle-bar">
         <button class="layer-btn active" data-layer="eleitoral">Eleitoral</button>
         <button class="layer-btn" data-layer="ibge">IBGE</button>
@@ -1803,6 +1816,17 @@ let _mapLevel = 'uf';
 let _mapCtx = {}; // {uf:'SP', cd_municipio:'71072', nr_zona:'1'}
 let _geoLayer = null;
 let _mapData = {};
+let _mapMode = 'historico'; // 'historico' | '2026'
+
+function setMapMode(mode) {
+  _mapMode = mode;
+  document.querySelectorAll('.map-mode-btn').forEach(b => b.classList.remove('active'));
+  document.getElementById('btn-mode-' + mode)?.classList.add('active');
+  const badge = document.getElementById('poll-date-badge');
+  if (badge) badge.style.display = mode === '2026' ? 'block' : 'none';
+  loadCandidatoList();
+  reloadMap();
+}
 
 const MAP_DARK_STYLE = [
   {elementType:'geometry',stylers:[{color:'#1a1a2e'}]},
@@ -1932,7 +1956,7 @@ async function reloadMap(){
   const turnoRaw = document.getElementById('f-turno')?.value || '1º Turno';
   const turno = turnoRaw.includes('2') ? 2 : 1;
 
-  const ano = document.getElementById('f-ano')?.value || '2022';
+  const ano = _mapMode === '2026' ? '2026' : (document.getElementById('f-ano')?.value || '2022');
   const ufSel = document.getElementById('f-uf')?.value || 'SP';
   if(_mapLevel === 'municipio' && !_mapCtx.uf) _mapCtx.uf = ufSel;
   let url = `/api/mapa/${_mapLevel}?cargo=${encodeURIComponent(cargo)}&ano=${ano}&turno=${turno}&layer=${layer}`;
@@ -1974,7 +1998,7 @@ async function reloadMap(){
 }
 
 async function loadCandidatoList(){
-  const ano = document.getElementById('f-ano')?.value || '2022';
+  const ano = _mapMode === '2026' ? '2026' : (document.getElementById('f-ano')?.value || '2022');
   const uf = document.getElementById('f-uf')?.value || 'SP';
   const cargo = document.getElementById('map-cargo-sel')?.value || 'Governador';
   const input = document.getElementById('map-candidato');
@@ -1982,14 +2006,24 @@ async function loadCandidatoList(){
   if(input) input.value = '';
   if(!dl) return;
   dl.innerHTML = '';
+  const badge = document.getElementById('poll-date-badge');
   try {
     const res = await apiFetch(`/api/candidatos?ano=${ano}&uf=${encodeURIComponent(uf)}&cargo=${encodeURIComponent(cargo)}`);
     if(!res) return;
     const data = await res.json();
+    // Mostrar data da última pesquisa em modo 2026
+    if(_mapMode === '2026' && badge) {
+      badge.textContent = data.data_pesquisa
+        ? `📋 Última pesquisa: ${data.data_pesquisa}`
+        : '📋 Pesquisas 2026';
+      badge.style.display = 'block';
+    }
     (data.candidatos||[]).forEach(c => {
       const opt = document.createElement('option');
       opt.value = c.nm;
-      opt.label = `${c.nm} (${c.partido})`;
+      opt.label = c.pct_t1 != null
+        ? `${c.nm} — ${c.pct_t1}%`
+        : `${c.nm}${c.partido ? ' (' + c.partido + ')' : ''}`;
       dl.appendChild(opt);
     });
   } catch {}

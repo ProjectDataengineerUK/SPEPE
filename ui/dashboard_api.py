@@ -263,8 +263,19 @@ async def get_candidatos(
     """Retorna candidatos para o cargo/UF/ano a partir do BigQuery Gold."""
     if settings.gcp_project_id and os.environ.get("USE_BIGQUERY", "").lower() == "true":
         try:
-            data = await _bq_candidatos(cargo, uf, ano)
-            return JSONResponse({"cargo": cargo, "uf": uf, "ano": ano, "candidatos": data})
+            raw = await _bq_candidatos(cargo, uf, ano)
+            # Extrai data_ultima_pesquisa (polls) e retorna separado do array de candidatos
+            data_pesquisa: str | None = None
+            candidatos = []
+            for row in raw:
+                d = dict(row)
+                dp = d.pop("data_ultima_pesquisa", None)
+                if dp is not None and data_pesquisa is None:
+                    data_pesquisa = dp.isoformat() if hasattr(dp, "isoformat") else str(dp)
+                candidatos.append(d)
+            return JSONResponse(
+                {"cargo": cargo, "uf": uf, "ano": ano, "candidatos": candidatos, "data_pesquisa": data_pesquisa}
+            )
         except Exception as exc:
             logger.warning("BigQuery candidatos falhou: %s", exc)
 
@@ -302,7 +313,8 @@ async def _bq_candidatos(cargo: str, uf: str, ano: int) -> list[dict]:
                 candidato_normalizado                          AS nm,
                 NULL                                          AS partido,
                 ROUND(AVG(intencao_ponderada), 1)             AS pct_t1,
-                CAST(SUM(n_pesquisas) AS STRING)              AS votos
+                CAST(SUM(n_pesquisas) AS STRING)              AS votos,
+                MAX(data_referencia)                          AS data_ultima_pesquisa
             FROM `{gold}.fact_intencao_voto`
             WHERE cd_cargo   = @cd_cargo
               AND uf         = @uf_filter
