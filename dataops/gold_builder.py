@@ -141,6 +141,34 @@ def _build_gold_via_bigquery_sql() -> dict:
                          {_s}cd_cargo, {_s}ds_cargo, {_s}nr_turno, {_s}ano_eleicao
             )
         """,
+        "fact_presidente_resultado": f"""
+            CREATE OR REPLACE TABLE `{gold}.fact_presidente_resultado` AS
+            SELECT
+                sg_uf,
+                SAFE_CAST(cd_municipio AS INT64)        AS cd_municipio,
+                nm_municipio_x                          AS nm_municipio,
+                SAFE_CAST(cd_municipio_ibge AS INT64)   AS cd_municipio_ibge,
+                nm_candidato,
+                SAFE_CAST(nr_candidato AS INT64)        AS nr_candidato,
+                SAFE_CAST(cd_cargo AS INT64)            AS cd_cargo,
+                ds_cargo,
+                SAFE_CAST(nr_turno AS INT64)            AS nr_turno,
+                SAFE_CAST(ano_eleicao AS INT64)         AS ano_eleicao,
+                SAFE_CAST(SUM(qt_votos) AS INT64)       AS total_votos,
+                ROUND(
+                    SUM(qt_votos) / NULLIF(SUM(SUM(qt_votos)) OVER (
+                        PARTITION BY sg_uf, cd_municipio, nr_turno, ano_eleicao
+                    ), 0) * 100, 1
+                )                                       AS pct_votos_municipio,
+                CURRENT_TIMESTAMP()                     AS ingested_at
+            FROM `{silver}.tse_presidente`
+            WHERE cd_municipio IS NOT NULL
+              AND nm_candidato IS NOT NULL
+              AND qt_votos IS NOT NULL
+            GROUP BY
+                sg_uf, cd_municipio, nm_municipio_x, cd_municipio_ibge,
+                nm_candidato, nr_candidato, cd_cargo, ds_cargo, nr_turno, ano_eleicao
+        """,
         "fact_ibge_municipio": f"""
             CREATE OR REPLACE TABLE `{gold}.fact_ibge_municipio` AS
             SELECT
@@ -605,6 +633,7 @@ def _build_gold_via_bigquery_sql() -> dict:
 
     # Tables that may have no Silver source yet — skip without failing the job
     _OPTIONAL = {
+        "fact_presidente_resultado",
         "fact_pesquisa",
         "fact_intencao_voto",
         "fact_social_municipio",
