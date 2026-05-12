@@ -3,8 +3,9 @@
 **Sistema de Perfilamento do Eleitorado e Previsão Eleitoral**
 Análise eleitoral brasileira via multi-agentes LLM com arquitetura Medallion no GCP.
 
-**Estado atual:** v1.1 — 19 Cloud Run Jobs em prod; 13 módulos de dados; CadÚnico/Emendas/Sanções adicionados
-**Próximo:** Redes Sociais (módulo #4) + Silver/Gold Emendas + Silver/Gold Sanções
+**Estado atual:** v1.1 — 21 clientes de dados implementados; 17 prontos para modelo (14 Bronze→Silver→Gold + 3 parciais)
+**Próximo:** Sprint 1 Modelo Bayesiano (começa quarta 2026-05-15); Completar 3 fontes parciais (Polls/GDELT/BlueSky) seg-ter
+**Decisão FINAL (2026-05-12):** Usar 17 fontes para modelo (não 13 ou 14) para máxima riqueza de features
 
 ---
 
@@ -225,6 +226,40 @@ Use o modelo adequado à complexidade da tarefa para otimizar custo e qualidade.
 | Data | Tarefa | Modelo usado | Resultado |
 |---|---|---|---|
 | 2026-04-24 | Criar seção de seleção de modelo | Sonnet 4.6 | ✅ OK |
+| 2026-05-12 | Auditoria 21 fontes de dados | Haiku 4.5 | ✅ Decisão: 17 fontes para modelo |
+
+---
+
+## Auditoria de Fontes de Dados — 21 Clientes Implementados
+
+**Data:** 2026-05-12
+**Achado:** 21 clientes de dados (não 13 como documentado)
+**Decisão:** Usar **17 fontes prontas** (14 completas + 3 parciais em +3 dias) para modelo Bayesiano
+
+### Status das 21 Fontes
+
+✅ **14 Pronto Agora (Bronze→Silver→Gold)**
+- TSE (Pesquisas, Candidaturas, Perfil)
+- IBGE, DATASUS, CadÚnico, Emendas, Sanções
+- Segurança, Digital, Câmara/Senado, Dieese, CETIC, Social
+
+🟡 **3 Parcial (+3 dias para completar)**
+- Polls (Atlas/institutos) — Silver OK, falta job
+- GDELT (eventos globais) — Silver OK, falta job
+- BlueSky (rede social) — Silver OK, falta job
+
+🔴 **4 Incompleto (não usar agora)**
+- Agencies, Reddit, News RSS, BACEN
+
+### Timeline Modelo
+
+| Dia | Ação | Fontes |
+|-----|------|--------|
+| Seg-Ter (12-13 mai) | Rodar 3 jobs Polls/GDELT/BlueSky | 17 |
+| Qua (14 mai) | Gold-build com 17 fontes | 17 |
+| Qui (15 mai) | Sprint 1 modelo começa | 17 ✅ |
+
+Ver [Auditoria Completa](../memory/audit_21_data_sources.md) para detalhes.
 
 ---
 

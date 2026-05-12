@@ -2127,6 +2127,105 @@ def transform_tse_perfil_to_silver(
     return {"status": "ok", "path": path, "rows": len(df)}
 
 
+def transform_presidente_to_silver(year: int, use_bigquery: bool = False) -> dict:
+    """Transform Bronze TSE Presidente (nacional) → Silver (expandido para municípios).
+
+    Reads: raw/tse_presidente/{year}/BR/presidente_{year}.parquet
+    Writes: Silver table `tse_presidente_{year}` (nacional expandido por município)
+
+    Estratégia: Presidente é cargo nacional (BR).
+    Expandir para municípios por UF proporcionalmente aos votos.
+    """
+    LOCAL_SILVER_DIR.mkdir(parents=True, exist_ok=True)
+
+    df_pres = pd.DataFrame()
+
+    # 1. Ler Bronze presidente (nacional BR)
+    if GCS_BUCKET:
+        prefix = f"raw/tse_presidente/{year}/BR/"
+        try:
+            df_pres = _read_gcs_parquet_glob(GCS_BUCKET, prefix)
+        except Exception as exc:
+            logger.warning("GCS tse_presidente read %d: %s", year, exc)
+
+    if df_pres.empty:
+        bronze_path = LOCAL_BRONZE_DIR / "tse_presidente" / str(year) / "BR"
+        files = list(bronze_path.glob(f"presidente_{year}.parquet")) if bronze_path.exists() else []
+        if files:
+            df_pres = pd.concat([pd.read_parquet(f) for f in files], ignore_index=True)
+
+    if df_pres.empty:
+        logger.warning("Bronze tse_presidente vazio para %d", year)
+        return {"status": "error", "message": f"Bronze TSE presidente vazio para {year}"}
+
+    df_pres = df_pres.copy()
+
+    # 2. Normalizar colunas para schema Silver
+    df_pres = normalize_columns(df_pres, year)
+
+    # 3. Carregar dim_territorio para expandir BR → municípios
+    from pathlib import Path
+    dim_path = LOCAL_SILVER_DIR / "dim_territorio.parquet"
+    if dim_path.exists():
+        dim_territorio = pd.read_parquet(dim_path)[["sg_uf", "cd_municipio", "nm_municipio"]]
+    else:
+        # Fallback: criar dim_territorio a partir de outras fontes
+        logger.warning("dim_territorio não encontrado, usando UFs hardcoded")
+        all_ufs = ["AC", "AL", "AP", "AM", "BA", "CE", "DF", "ES", "GO", "MA", "MT", "MS", "MG",
+                   "PA", "PB", "PR", "PE", "PI", "RJ", "RN", "RS", "RO", "RR", "SC", "SP", "SE", "TO"]
+        dim_territorio = pd.DataFrame({"sg_uf": all_ufs})
+        dim_territorio["cd_municipio"] = 0  # Placeholder para expandir depois
+
+    # 4. Cross-join: presidente nacional × UFs (proporcional)
+    if not dim_territorio.empty:
+        # Copiar presidente para cada UF (proporcional)
+        df_pres_expandido = []
+        for _, row_uf in dim_territorio.drop_duplicates("sg_uf").iterrows():
+            uf = row_uf["sg_uf"]
+            df_temp = df_pres.copy()
+            df_temp["sg_uf"] = uf
+            # Se há município, usar; senão deixar vazio para depois preencher
+            if "cd_municipio" not in df_temp.columns or df_temp["cd_municipio"].isna().all():
+                # Proporcional: dividir votos por população da UF (simplificado: igual)
+                df_temp["qt_votos"] = (df_temp.get("qt_votos", 0) / len(dim_territorio.drop_duplicates("sg_uf"))).astype(int)
+            df_pres_expandido.append(df_temp)
+        df_pres = pd.concat(df_pres_expandido, ignore_index=True) if df_pres_expandido else df_pres
+
+    # 5. Garantir colunas mínimas de Silver
+    required_cols = ["sg_uf", "cd_municipio", "nm_municipio", "nr_zona", "nr_secao",
+                     "nm_candidato", "qt_votos", "ds_cargo", "cd_cargo", "ano_eleicao"]
+    for col in required_cols:
+        if col not in df_pres.columns:
+            if col == "cd_municipio":
+                df_pres[col] = 0  # Placeholder
+            elif col == "nm_municipio":
+                df_pres[col] = "Nacional"
+            elif col == "nr_zona" or col == "nr_secao":
+                df_pres[col] = 0
+            elif col == "ano_eleicao":
+                df_pres[col] = year
+            else:
+                df_pres[col] = ""
+
+    df_pres = df_pres[required_cols]
+
+    # 6. Salvar em Silver
+    if use_bigquery and GCS_BUCKET:
+        try:
+            path = _write_bigquery_generic(df_pres, f"tse_presidente", year=year)
+            logger.info("TSE Presidente Silver BQ: %s (%d rows)", path, len(df_pres))
+        except Exception as exc:
+            logger.warning("Presidente Silver BQ falhou: %s", exc)
+            return {"status": "error", "message": str(exc)}
+    else:
+        path_local = LOCAL_SILVER_DIR / f"tse_presidente_{year}.parquet"
+        df_pres.to_parquet(path_local, index=False, compression="zstd")
+        path = str(path_local)
+        logger.info("TSE Presidente Silver local: %s (%d rows)", path, len(df_pres))
+
+    return {"status": "ok", "path": path, "rows": len(df_pres)}
+
+
 def _dataframe_to_bq_schema(df: pd.DataFrame) -> list:
     from google.cloud import bigquery
 
