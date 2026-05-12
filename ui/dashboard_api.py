@@ -2703,8 +2703,8 @@ async def serve_admin() -> FileResponse:
 
 
 _USER_STORE: list[dict] = [
-    {"id": "admin-001", "name": "Admin SPEPE", "email": "admin@spepe.com.br", "role": "admin", "created_at": "2026-05-01"},
-    {"id": "analyst-001", "name": "Analista Senior", "email": "analyst@spepe.com.br", "role": "analyst", "created_at": "2026-05-01"},
+    {"id": "admin-001", "name": "Admin SPEPE", "email": "admin@***.***", "role": "admin", "created_at": "2026-05-01"},
+    {"id": "analyst-001", "name": "Analista Senior", "email": "analyst@***.***", "role": "analyst", "created_at": "2026-05-01"},
 ]  # fallback when Firestore unavailable
 _ACCESS_MATRIX: dict = {
     "coletor": True,
