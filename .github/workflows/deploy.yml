@@ -1,11 +1,6 @@
 name: Deploy
 
 on:
-  # Auto-deploy to staging only when CI passes on main
-  workflow_run:
-    workflows: [CI]
-    branches: [main]
-    types: [completed]
   # Manual promotion to staging or prod
   workflow_dispatch:
     inputs:
