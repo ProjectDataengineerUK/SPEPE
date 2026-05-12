@@ -161,8 +161,8 @@ jobs:
     #   - workflow_dispatch with environment=prod: manual promotion
     # github.event.inputs is null for workflow_run, so the first condition covers auto triggers.
     if: >
-      (github.event_name == 'workflow_run' && github.event.workflow_run.conclusion == 'success') ||
-      (github.event_name == 'workflow_dispatch' && github.event.inputs.environment == 'prod')
+      (github.event_name == 'workflow_dispatch' &&
+       (github.event.inputs.environment == 'prod' || github.event.inputs.environment == 'staging'))
     # "production" environment requires manual approval in GitHub Settings → Environments.
     # Same WIF SA as staging — SA must have run.developer on spepe-prod.
     environment: production
