@@ -1089,13 +1089,20 @@ def transform_saude_to_silver(
     if "ano" not in df.columns:
         df["ano"] = year
 
-    for col in (
+    # Convert all numeric columns
+    numeric_cols = [
         "taxa_mortalidade_infantil_1000",
         "taxa_mortalidade_materna_100k",
+        "taxa_mortalidade_infantil",
         "pct_cobertura_plano_saude",
         "qt_obitos_total",
         "qt_nascimentos",
-    ):
+        "idsus",
+        "tx_mortalidade_infantil",
+        "tx_mortalidade_materna",
+        "pct_cobertura_esf",
+    ]
+    for col in numeric_cols:
         if col in df.columns:
             df[col] = pd.to_numeric(df[col], errors="coerce")
 
