@@ -209,7 +209,9 @@ def main(candidatos: list[str], dias: int, year: int) -> None:
         reddit_posts = fetch_reddit_mentions(candidatos, dias=dias, max_por_candidato=300)
         if reddit_posts:
             if gcp_project:
-                reddit_posts = enrich_sentiment_vertex(reddit_posts, text_field="text", project=gcp_project)
+                reddit_posts = enrich_sentiment_vertex(
+                    reddit_posts, text_field="text", project=gcp_project
+                )
             enrich_with_source_meta(reddit_posts)
             _write(
                 pd.DataFrame(reddit_posts), "social", year, f"reddit_posts_{year}.parquet", use_gcs

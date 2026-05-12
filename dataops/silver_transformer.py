@@ -2164,8 +2164,35 @@ def transform_presidente_to_silver(year: int, use_bigquery: bool = False) -> dic
     df_pres = _normalize_tse(df_pres, year)
 
     # 3. Expandir presidente nacional para UFs (replicar para cada UF)
-    all_ufs = ["AC", "AL", "AP", "AM", "BA", "CE", "DF", "ES", "GO", "MA", "MT", "MS", "MG",
-               "PA", "PB", "PR", "PE", "PI", "RJ", "RN", "RS", "RO", "RR", "SC", "SP", "SE", "TO"]
+    all_ufs = [
+        "AC",
+        "AL",
+        "AP",
+        "AM",
+        "BA",
+        "CE",
+        "DF",
+        "ES",
+        "GO",
+        "MA",
+        "MT",
+        "MS",
+        "MG",
+        "PA",
+        "PB",
+        "PR",
+        "PE",
+        "PI",
+        "RJ",
+        "RN",
+        "RS",
+        "RO",
+        "RR",
+        "SC",
+        "SP",
+        "SE",
+        "TO",
+    ]
     df_pres_expandido = []
     for uf in all_ufs:
         df_temp = df_pres.copy()
@@ -2179,8 +2206,18 @@ def transform_presidente_to_silver(year: int, use_bigquery: bool = False) -> dic
     df_pres = pd.concat(df_pres_expandido, ignore_index=True)
 
     # 4. Garantir colunas mínimas de Silver
-    required_cols = ["sg_uf", "cd_municipio", "nm_municipio", "nr_zona", "nr_secao",
-                     "nm_candidato", "qt_votos", "ds_cargo", "cd_cargo", "ano_eleicao"]
+    required_cols = [
+        "sg_uf",
+        "cd_municipio",
+        "nm_municipio",
+        "nr_zona",
+        "nr_secao",
+        "nm_candidato",
+        "qt_votos",
+        "ds_cargo",
+        "cd_cargo",
+        "ano_eleicao",
+    ]
     for col in required_cols:
         if col not in df_pres.columns:
             if col in ("cd_municipio", "nr_zona", "nr_secao"):
