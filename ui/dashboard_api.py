@@ -2703,8 +2703,20 @@ async def serve_admin() -> FileResponse:
 
 
 _USER_STORE: list[dict] = [
-    {"id": "admin-001", "name": "Admin SPEPE", "email": "admin@***.***", "role": "admin", "created_at": "2026-05-01"},
-    {"id": "analyst-001", "name": "Analista Senior", "email": "analyst@***.***", "role": "analyst", "created_at": "2026-05-01"},
+    {
+        "id": "admin-001",
+        "name": "Admin SPEPE",
+        "email": "admin@***.***",
+        "role": "admin",
+        "created_at": "2026-05-01",
+    },
+    {
+        "id": "analyst-001",
+        "name": "Analista Senior",
+        "email": "analyst@***.***",
+        "role": "analyst",
+        "created_at": "2026-05-01",
+    },
 ]  # fallback when Firestore unavailable
 _ACCESS_MATRIX: dict = {
     "coletor": True,
@@ -2807,7 +2819,9 @@ async def admin_get_access() -> JSONResponse:
                 return JSONResponse({"matrix": matrix, "source": "firestore"})
         except Exception as exc:
             logger.debug("Firestore access_matrix query failed: %s", exc)
-    return JSONResponse({"matrix": _ACCESS_MATRIX, "source": "local" if _ACCESS_MATRIX else "empty"})
+    return JSONResponse(
+        {"matrix": _ACCESS_MATRIX, "source": "local" if _ACCESS_MATRIX else "empty"}
+    )
 
 
 @app.post("/admin/api/access", dependencies=[Depends(require_auth)])
@@ -3045,7 +3059,9 @@ async def admin_sentinel_status() -> JSONResponse:
     if settings.gcp_project_id and os.environ.get("USE_BIGQUERY", "").lower() == "true":
         try:
             gold_tables, silver_tables = await asyncio.to_thread(_query_bq_tables)
-            logger.debug("BQ tables query: %d gold, %d silver", len(gold_tables), len(silver_tables))
+            logger.debug(
+                "BQ tables query: %d gold, %d silver", len(gold_tables), len(silver_tables)
+            )
         except Exception as exc:
             logger.warning("BQ tables query failed: %s", exc)
         try:
@@ -3208,7 +3224,9 @@ async def admin_catalog() -> JSONResponse:
             "description": "Estado Sentinel",
         },
     ]
-    return JSONResponse({"tables": stub_catalog, "source": "stub", "note": "BigQuery unavailable or disabled"})
+    return JSONResponse(
+        {"tables": stub_catalog, "source": "stub", "note": "BigQuery unavailable or disabled"}
+    )
 
 
 # ── Sentinel WebSocket ────────────────────────────────────────────────────────
