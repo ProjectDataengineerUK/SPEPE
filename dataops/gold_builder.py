@@ -56,15 +56,27 @@ def _build_gold_via_bigquery_sql() -> dict:
         "fact_municipio_eleicao": f"""
             CREATE OR REPLACE TABLE `{gold}.fact_municipio_eleicao` AS
             SELECT
-                sg_uf, cd_municipio,
-                nm_municipio_x AS nm_municipio,
-                cd_cargo, ds_cargo, ano_eleicao,
-                SUM(qt_votos) AS total_votos,
-                COUNT(DISTINCT nr_candidato) AS n_candidatos,
-                COUNT(DISTINCT CONCAT(CAST(nr_zona AS STRING), '-', CAST(nr_secao AS STRING))) AS n_secoes,
-                CURRENT_TIMESTAMP() AS ingested_at
-            FROM {silver_wc}
-            GROUP BY sg_uf, cd_municipio, nm_municipio_x, cd_cargo, ds_cargo, ano_eleicao
+                {_s}sg_uf,
+                SAFE_CAST({_s}cd_municipio AS INT64)        AS cd_municipio,
+                {_s}nm_municipio_x                           AS nm_municipio,
+                SAFE_CAST({_s}cd_municipio_ibge AS INT64)   AS cd_municipio_ibge,
+                {_s}nm_candidato,
+                {_partido_cols}
+                SAFE_CAST({_s}cd_cargo AS INT64)             AS cd_cargo,
+                {_s}ds_cargo,
+                SAFE_CAST({_s}ano_eleicao AS INT64)          AS ano_eleicao,
+                SAFE_CAST(SUM({_s}qt_votos) AS INT64)        AS total_votos,
+                ROUND(
+                    SUM({_s}qt_votos) / NULLIF(SUM(SUM({_s}qt_votos)) OVER (
+                        PARTITION BY {_s}sg_uf, {_s}cd_municipio, {_s}cd_cargo, {_s}ano_eleicao
+                    ), 0) * 100, 2
+                ) AS pct_votos_municipio,
+                CURRENT_TIMESTAMP()                          AS ingested_at
+            FROM {_from_tse_s}
+            {_partido_join}
+            GROUP BY {_s}sg_uf, {_s}cd_municipio, {_s}nm_municipio_x, {_s}cd_municipio_ibge,
+                     {_s}nm_candidato, {_partido_grp}
+                     {_s}cd_cargo, {_s}ds_cargo, {_s}ano_eleicao
         """,
         "fact_secao_eleicao": f"""
             CREATE OR REPLACE TABLE `{gold}.fact_secao_eleicao` AS
