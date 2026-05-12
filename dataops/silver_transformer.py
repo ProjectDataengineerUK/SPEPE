@@ -2212,7 +2212,7 @@ def transform_presidente_to_silver(year: int, use_bigquery: bool = False) -> dic
     # 6. Salvar em Silver
     if use_bigquery and GCS_BUCKET:
         try:
-            path = _write_bigquery_generic(df_pres, f"tse_presidente", year=year)
+            path = _write_bigquery_generic(df_pres, "tse_presidente", year=year)
             logger.info("TSE Presidente Silver BQ: %s (%d rows)", path, len(df_pres))
         except Exception as exc:
             logger.warning("Presidente Silver BQ falhou: %s", exc)
