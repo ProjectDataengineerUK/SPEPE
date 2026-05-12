@@ -8,6 +8,7 @@ Fontes coletadas:
   Bluesky        — sem credenciais (AT Protocol público)
   GDELT          — sem credenciais (imprensa BR indexada); GDELT_ENABLED controla ativação
   RSS portais BR — sem credenciais (G1, Folha, Poder360, etc.)
+  Reddit         — REDDIT_CLIENT_ID + REDDIT_CLIENT_SECRET (opcional, r/brasil, r/politica, etc.)
   Google Trends  — sem credenciais (pytrends)
 
 SOURCE_FILTER env var: comma-separated list of sources to run. If unset, all sources run.
@@ -31,6 +32,7 @@ from dataops.clients.bluesky_client import fetch_bluesky_mentions
 from dataops.clients.digital_client import fetch_trends, fetch_trends_by_uf
 from dataops.clients.gdelt_client import fetch_gdelt_events
 from dataops.clients.news_rss_client import fetch_rss_mentions
+from dataops.clients.reddit_client import fetch_reddit_mentions
 from dataops.clients.social_client import (
     aggregate_x_sentiment,
     enrich_sentiment_vertex,
@@ -201,6 +203,19 @@ def main(candidatos: list[str], dias: int, year: int) -> None:
             )
         else:
             logger.info("RSS: nenhum artigo coletado")
+
+    # ── Reddit (r/brasil, r/politica, etc.) ───────────────────────────────────
+    if should_run("reddit", filter_set):
+        reddit_posts = fetch_reddit_mentions(candidatos, dias=dias, max_por_candidato=300)
+        if reddit_posts:
+            if gcp_project:
+                reddit_posts = enrich_sentiment_vertex(reddit_posts, text_field="text", project=gcp_project)
+            enrich_with_source_meta(reddit_posts)
+            _write(
+                pd.DataFrame(reddit_posts), "social", year, f"reddit_posts_{year}.parquet", use_gcs
+            )
+        else:
+            logger.warning("Reddit: nenhum post (credenciais ausentes ou API vazia)")
 
     # ── Google Trends ─────────────────────────────────────────────────────────
     if should_run("google_trends", filter_set):
