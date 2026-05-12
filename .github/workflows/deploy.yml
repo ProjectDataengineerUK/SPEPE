@@ -77,14 +77,14 @@ jobs:
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 
-      - name: Build and push (without layer cache)
+      - name: Build and push
         uses: docker/build-push-action@v5
         with:
           context: .
           push: true
           tags: ${{ steps.meta.outputs.image_tag }}
-          # Simplified build without layer cache to avoid timeouts
-          cache-type: gha
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
 
   deploy-staging:
     runs-on: ubuntu-latest
