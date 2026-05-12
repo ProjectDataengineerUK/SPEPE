@@ -38,7 +38,7 @@ locals {
     datasus_ingest   = {}
     dieese_ingest    = { DEFAULT_ANO = "2025" }
     cetic_ingest     = {}
-    silver_transform = { SOCIAL_YEAR = "2026" }
+    silver_transform = { SOCIAL_YEAR = "2026", PRESIDENTE_YEARS = "2018,2022" }
     gold_build       = {}
     digital_ingest   = {}
     pesquisas_ingest = {
