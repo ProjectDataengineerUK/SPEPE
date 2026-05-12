@@ -17,6 +17,7 @@ pyarrow==23.0.1
 # Google Cloud
 google-cloud-bigquery==3.29.0
 google-cloud-bigquery-storage==2.27.0
+db-dtypes==1.4.2
 google-cloud-storage==2.19.0
 google-cloud-secret-manager==2.23.0
 google-cloud-logging==3.11.3
