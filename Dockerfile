@@ -2,12 +2,6 @@ FROM python:3.12-slim AS builder
 
 WORKDIR /build
 
-RUN apt-get update && apt-get install -y --no-install-recommends \
-    build-essential \
-    pkg-config \
-    && rm -rf /var/lib/apt/lists/*
-
-# uv resolves deps orders of magnitude faster and avoids ResolutionTooDeep
 RUN pip install --no-cache-dir uv
 
 RUN python -m venv /opt/venv
@@ -21,10 +15,7 @@ FROM python:3.12-slim
 
 WORKDIR /app
 
-RUN apt-get update && apt-get install -y --no-install-recommends \
-    curl \
-    && rm -rf /var/lib/apt/lists/* \
-    && useradd -m -u 1000 spepe
+RUN useradd -m -u 1000 spepe
 
 COPY --from=builder /opt/venv /opt/venv
 COPY --chown=spepe:spepe . .
