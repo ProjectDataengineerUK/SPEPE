@@ -2866,7 +2866,8 @@ async def admin_list_jobs() -> JSONResponse:
         {"name": "spepe-endividamento-ingest", "module": "endividamento_ingest", "timeout": "900s"},
         {"name": "spepe-cadunico-ingest", "module": "cadunico_ingest", "timeout": "3600s"},
         {"name": "spepe-emendas-ingest", "module": "emendas_ingest", "timeout": "1800s"},
-        {"name": "spepe-sancoes-ingest", "module": "sancoes_ingest", "timeout": "1800s"},
+        # Sanções: mantém em Gold para modelo, removido de dashboard (2026-05-12)
+        # {"name": "spepe-sancoes-ingest", "module": "sancoes_ingest", "timeout": "1800s"},
         {"name": "spepe-reddit-ingest", "module": "reddit_ingest", "timeout": "900s"},
         {"name": "spepe-silver-transform", "module": "silver_transform", "timeout": "1800s"},
         {"name": "spepe-gold-build", "module": "gold_build", "timeout": "1800s"},
@@ -2935,7 +2936,7 @@ _SENTINEL_VIEWS = [
     "vw_transferencias_vs_eleicao",
     "vw_emendas_municipio",
     "vw_emendas_vs_eleicao",
-    "vw_sancoes_uf",
+    # "vw_sancoes_uf",  # Removido de dashboard (mantém em Gold para modelo)
     "vw_score_municipal_integrado",
     "vw_mapa_prioridade_campanha",
     "vw_social_candidato_sentimento",
@@ -2966,7 +2967,7 @@ _SENTINEL_JOBS = [
     "spepe-endividamento-ingest",
     "spepe-cadunico-ingest",
     "spepe-emendas-ingest",
-    "spepe-sancoes-ingest",
+    # "spepe-sancoes-ingest",  # Removido de dashboard (mantém em Gold para modelo)
     "spepe-candidatos-discovery",
 ]
 _SENTINEL_AGENTS = [
