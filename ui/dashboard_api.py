@@ -128,7 +128,9 @@ _PUBLIC_API_PATHS = {
 @app.middleware("http")
 async def dashboard_auth_middleware(request: Request, call_next):
     path = request.url.path
-    if not path.startswith("/api/") or path in _PUBLIC_API_PATHS:
+    if not path.startswith("/api/"):
+        return await call_next(request)
+    if any(path == p or path.startswith(p + "/") for p in _PUBLIC_API_PATHS):
         return await call_next(request)
     if not settings.gcp_project_id or settings.gcp_project_id in ("", "local"):
         return await call_next(request)
