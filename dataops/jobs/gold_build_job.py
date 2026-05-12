@@ -15,8 +15,13 @@ def main() -> None:
     from pathlib import Path
     import pandas as pd
 
+    # SEMPRE usar BigQuery em Cloud Run (não tentar ler arquivos locais)
     use_bq = bool(os.environ.get("GCP_PROJECT_ID"))
-    result = build_gold(use_bigquery=use_bq)
+    if not use_bq:
+        logger.error("GCP_PROJECT_ID não definido — não é possível usar BigQuery SQL")
+        raise RuntimeError("GCP_PROJECT_ID obrigatório")
+
+    result = build_gold(use_bigquery=True)
 
     if result.get("status") == "error":
         logger.error(f"Gold build falhou: {result.get('message')}")
