@@ -4,13 +4,6 @@ WORKDIR /build
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
     build-essential \
-    gcc \
-    g++ \
-    gfortran \
-    libgeos-dev \
-    libproj-dev \
-    libgdal-dev \
-    libopenblas-dev \
     pkg-config \
     && rm -rf /var/lib/apt/lists/*
 
@@ -29,7 +22,6 @@ FROM python:3.12-slim
 WORKDIR /app
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
-    libgdal-dev \
     curl \
     && rm -rf /var/lib/apt/lists/* \
     && useradd -m -u 1000 spepe
