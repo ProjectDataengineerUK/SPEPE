@@ -23,6 +23,7 @@ def main(uf: str, years: list[int] | None = None, include_social: bool = True) -
         transform_emendas_to_silver,
         transform_endividamento_to_silver,
         transform_pesquisas_to_silver,
+        transform_presidente_to_silver,
         transform_saude_to_silver,
         transform_sancoes_to_silver,
         transform_seguranca_to_silver,
@@ -58,6 +59,21 @@ def main(uf: str, years: list[int] | None = None, include_social: bool = True) -
         else:
             logger.info(
                 "Silver TSE OK %s/%d: %d rows, DQ=%.1f%%", uf, year, result.get("rows", 0), dq_score
+            )
+
+    # ── Presidente TSE (nacional — BR, multi-ano, expandido para municípios) ──
+    _pres_years_env = os.environ.get("PRESIDENTE_YEARS", "2018,2022")
+    pres_years = [int(y.strip()) for y in _pres_years_env.split(",") if y.strip()]
+    for pres_year in pres_years:
+        logger.info("Silver presidente: ano=%d", pres_year)
+        r = transform_presidente_to_silver(pres_year, use_bigquery=use_bq)
+        if r.get("status") == "ok":
+            logger.info("Presidente Silver OK ano=%d: %d rows", pres_year, r.get("rows", 0))
+        else:
+            logger.warning(
+                "Presidente Silver ano=%d: %s (Bronze pode estar vazio)",
+                pres_year,
+                r.get("message"),
             )
 
     # ── Pesquisas eleitorais (nacional — BR, multi-ano) ─────────────────────
