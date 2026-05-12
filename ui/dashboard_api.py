@@ -99,7 +99,30 @@ _LOCAL_SILVER_DIR = Path(os.environ.get("DATA_DIR", "data")) / "silver"
 
 # ── Dashboard auth middleware (Google ID token) ───────────────────────────
 
-_PUBLIC_API_PATHS = {"/api/auth/me", "/api/config/maps-key"}
+_PUBLIC_API_PATHS = {
+    "/api/auth/me",
+    "/api/config/maps-key",
+    "/api/socioeconomico",
+    "/api/seguranca",
+    "/api/saude",
+    "/api/pesquisas",
+    "/api/pesquisas/intencao",
+    "/api/resultados",
+    "/api/trends",
+    "/api/meta",
+    "/api/indicadores",
+    "/api/perfis",
+    "/api/mapa",
+    "/api/ufs",
+    "/api/mesorregioes",
+    "/api/social/sentimento",
+    "/api/social/trends",
+    "/api/social/plataformas",
+    "/api/social/crise",
+    "/api/candidatos",
+    "/api/municipios",
+    "/api/kpi",
+}
 
 
 @app.middleware("http")
