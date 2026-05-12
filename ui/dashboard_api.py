@@ -2719,15 +2719,17 @@ def _fs_client():
 
 @app.get("/admin/api/users", dependencies=[Depends(require_auth)])
 async def admin_list_users() -> JSONResponse:
+    """List users from Firestore spepe_users collection with fallback to local store."""
     db = _fs_client()
     if db:
         try:
             docs = db.collection("spepe_users").stream()
             users = [doc.to_dict() async for doc in docs]
-            return JSONResponse({"users": users})
-        except Exception:
-            pass
-    return JSONResponse({"users": _USER_STORE})
+            if users:
+                return JSONResponse({"users": users, "source": "firestore"})
+        except Exception as exc:
+            logger.debug("Firestore users query failed: %s", exc)
+    return JSONResponse({"users": _USER_STORE, "source": "local" if _USER_STORE else "empty"})
 
 
 @app.post("/admin/api/users", dependencies=[Depends(require_auth)])
@@ -2785,15 +2787,17 @@ async def admin_delete_user(user_id: str) -> JSONResponse:
 
 @app.get("/admin/api/access", dependencies=[Depends(require_auth)])
 async def admin_get_access() -> JSONResponse:
+    """Get access matrix from Firestore spepe_admin/access_matrix with fallback."""
     db = _fs_client()
     if db:
         try:
             doc = await db.collection("spepe_admin").document("access_matrix").get()
             if doc.exists:
-                return JSONResponse({"matrix": doc.to_dict().get("matrix", {})})
-        except Exception:
-            pass
-    return JSONResponse({"matrix": _ACCESS_MATRIX})
+                matrix = doc.to_dict()
+                return JSONResponse({"matrix": matrix, "source": "firestore"})
+        except Exception as exc:
+            logger.debug("Firestore access_matrix query failed: %s", exc)
+    return JSONResponse({"matrix": _ACCESS_MATRIX, "source": "local" if _ACCESS_MATRIX else "empty"})
 
 
 @app.post("/admin/api/access", dependencies=[Depends(require_auth)])
@@ -2843,6 +2847,7 @@ async def admin_list_jobs() -> JSONResponse:
         {"name": "spepe-silver-transform", "module": "silver_transform", "timeout": "1800s"},
         {"name": "spepe-gold-build", "module": "gold_build", "timeout": "1800s"},
     ]
+    source = "local"
     if settings.gcp_project_id:
         try:
             from google.cloud import run_v2
@@ -2857,6 +2862,7 @@ async def admin_list_jobs() -> JSONResponse:
                         gj.terminal_condition.type_ if gj.terminal_condition else "UNKNOWN"
                     )
                     jcfg["last_run_at"] = str(gj.update_time) if gj.update_time else ""
+                    source = "cloud_run"
                 else:
                     jcfg["last_status"] = "NOT_DEPLOYED"
                     jcfg["last_run_at"] = ""
@@ -2869,7 +2875,7 @@ async def admin_list_jobs() -> JSONResponse:
         for jcfg in jobs_config:
             jcfg["last_status"] = "LOCAL_DEV"
             jcfg["last_run_at"] = ""
-    return JSONResponse({"jobs": jobs_config})
+    return JSONResponse({"jobs": jobs_config, "source": source})
 
 
 @app.post("/admin/api/jobs/{job_name}/run", dependencies=[Depends(require_auth)])
@@ -3029,10 +3035,12 @@ async def admin_sentinel_status() -> JSONResponse:
     if settings.gcp_project_id and os.environ.get("USE_BIGQUERY", "").lower() == "true":
         try:
             gold_tables, silver_tables = await asyncio.to_thread(_query_bq_tables)
+            logger.debug("BQ tables query: %d gold, %d silver", len(gold_tables), len(silver_tables))
         except Exception as exc:
             logger.warning("BQ tables query failed: %s", exc)
         try:
             jobs = await asyncio.to_thread(_query_run_jobs)
+            logger.debug("Cloud Run executions query: %d jobs", len(jobs))
         except Exception as exc:
             logger.warning("Cloud Run executions query failed: %s", exc)
 
@@ -3096,25 +3104,31 @@ async def admin_catalog() -> JSONResponse:
     """Return BigQuery table metadata for all SPEPE datasets."""
     datasets = ["spepe_silver", "spepe_gold", "spepe_mlops"]
     catalog = []
+    source = "stub"
     if settings.gcp_project_id and os.environ.get("USE_BIGQUERY", "").lower() == "true":
         try:
             from google.cloud import bigquery
 
             client = bigquery.Client(project=settings.gcp_project_id)
             for ds in datasets:
-                for tbl in client.list_tables(f"{settings.gcp_project_id}.{ds}"):
-                    t = client.get_table(tbl)
-                    catalog.append(
-                        {
-                            "dataset": ds,
-                            "table": t.table_id,
-                            "rows": t.num_rows,
-                            "size_mb": round(t.num_bytes / 1e6, 1),
-                            "last_modified": str(t.modified),
-                            "description": t.description or "",
-                        }
-                    )
-            return JSONResponse({"tables": catalog, "source": "bigquery"})
+                try:
+                    for tbl in client.list_tables(ds):
+                        t = client.get_table(tbl)
+                        catalog.append(
+                            {
+                                "dataset": ds,
+                                "table": t.table_id,
+                                "rows": t.num_rows,
+                                "size_mb": round(t.num_bytes / 1e6, 1) if t.num_bytes else 0,
+                                "last_modified": str(t.modified),
+                                "description": t.description or "",
+                            }
+                        )
+                except Exception as exc:
+                    logger.debug("Failed to read dataset %s: %s", ds, exc)
+            if catalog:
+                source = "bigquery"
+                return JSONResponse({"tables": catalog, "source": source})
         except Exception as exc:
             logger.warning("Catalog BQ query failed: %s", exc)
 
@@ -3184,7 +3198,7 @@ async def admin_catalog() -> JSONResponse:
             "description": "Estado Sentinel",
         },
     ]
-    return JSONResponse({"tables": stub_catalog, "source": "stub"})
+    return JSONResponse({"tables": stub_catalog, "source": "stub", "note": "BigQuery unavailable or disabled"})
 
 
 # ── Sentinel WebSocket ────────────────────────────────────────────────────────
