@@ -385,6 +385,35 @@ def _build_gold_via_bigquery_sql() -> dict:
                 COALESCE(uf, 'BR'),
                 SAFE_CAST(cd_cargo AS INT64)
         """,
+        "vw_pesquisa_intencao_detalhada": f"""
+            CREATE OR REPLACE VIEW `{gold}.vw_pesquisa_intencao_detalhada` AS
+            SELECT
+                p.poll_id,
+                p.data_pesquisa_inicio,
+                p.data_pesquisa_fim,
+                p.instituto,
+                i.candidato AS candidato,
+                SAFE_CAST(i.intencao_pct AS FLOAT64)                         AS intencao_pct,
+                SAFE_CAST(i.intencao_ajustada AS FLOAT64)                    AS intencao_ajustada,
+                SAFE_CAST(i.house_effect AS FLOAT64)                         AS house_effect,
+                SAFE_CAST(p.margem_erro AS FLOAT64)                          AS margem_erro,
+                SAFE_CAST(p.n_entrevistados AS INT64)                        AS n_entrevistados,
+                COALESCE(i.uf, p.uf, 'BR')                                   AS uf,
+                SAFE_CAST(COALESCE(i.cd_cargo, p.cd_cargo, '1') AS INT64)   AS cd_cargo,
+                COALESCE(i.tipo_pesquisa, p.tipo_pesquisa, 'corrente')      AS tipo_pesquisa,
+                i.candidato_normalizado,
+                i.record_confidence_score,
+                EXTRACT(YEAR FROM COALESCE(i.data_pesquisa_fim, p.data_pesquisa_fim))
+                    AS ano_eleitoral,
+                CURRENT_TIMESTAMP()                                          AS updated_at
+            FROM `{silver}.fact_pesquisa` p
+            LEFT JOIN `{silver}.fact_pesquisa_intencao` i
+              ON p.poll_id = i.poll_id
+              AND COALESCE(p.uf, 'BR') = COALESCE(i.uf, 'BR')
+              AND COALESCE(p.cd_cargo, '1') = COALESCE(i.cd_cargo, '1')
+            WHERE i.candidato IS NOT NULL
+              AND SAFE_CAST(i.intencao_pct AS FLOAT64) IS NOT NULL
+        """,
         "fact_transferencias_sociais": f"""
             CREATE OR REPLACE TABLE `{gold}.fact_transferencias_sociais` AS
             SELECT
@@ -648,6 +677,7 @@ def _build_gold_via_bigquery_sql() -> dict:
         "fact_presidente_resultado",
         "fact_pesquisa",
         "fact_intencao_voto",
+        "vw_pesquisa_intencao_detalhada",
         "fact_social_municipio",
         "fact_economico_municipio",
         "fact_transferencias_sociais",
