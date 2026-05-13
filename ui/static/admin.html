@@ -296,6 +296,21 @@ select,input,textarea{font-family:inherit}
         <span class="sn-icon">🗄️</span> Catálogo de Dados
       </div>
     </div>
+    <div class="sidenav-section">
+      <div class="sn-label">Analytics</div>
+      <div class="sn-item" onclick="showSection('architecture')">
+        <span class="sn-icon">🏗️</span> Arquitetura
+      </div>
+      <div class="sn-item" onclick="showSection('kpis')">
+        <span class="sn-icon">📊</span> KPIs
+      </div>
+      <div class="sn-item" onclick="showSection('explorer')">
+        <span class="sn-icon">🔍</span> Explorer
+      </div>
+      <div class="sn-item" onclick="showSection('model')">
+        <span class="sn-icon">🎯</span> Modelo
+      </div>
+    </div>
   </nav>
 
   <!-- MAIN -->
@@ -457,6 +472,82 @@ select,input,textarea{font-family:inherit}
       </div>
     </div>
 
+    <!-- ===== ARQUITETURA ===== -->
+    <div id="page-architecture" class="section-page">
+      <div class="page-hdr">
+        <div>
+          <div class="page-title">Arquitetura do Pipeline</div>
+          <div class="page-sub">DAG Bronze → Silver → Gold → MLOps — status dos jobs</div>
+        </div>
+        <button class="btn btn-secondary btn-sm" onclick="loadArchitecture()">↺ Atualizar</button>
+      </div>
+      <div id="arch-pipeline" style="display:flex;gap:12px;margin-bottom:18px;flex-wrap:wrap"></div>
+      <div style="font-size:.7rem;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:var(--text3);margin-bottom:10px">Jobs por Grupo</div>
+      <div id="arch-jobs" style="display:flex;flex-direction:column;gap:14px">
+        <div style="color:var(--text3);font-size:.78rem;padding:20px 0">Carregando…</div>
+      </div>
+    </div>
+
+    <!-- ===== KPIs ===== -->
+    <div id="page-kpis" class="section-page">
+      <div class="page-hdr">
+        <div>
+          <div class="page-title">KPIs do Sistema</div>
+          <div class="page-sub">DataOps · MLOps · LLMOps · FinOps — maturidade e custos</div>
+        </div>
+        <button class="btn btn-secondary btn-sm" onclick="loadKpis()">↺ Atualizar</button>
+      </div>
+      <div id="kpis-grid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:12px">
+        <div style="color:var(--text3);font-size:.78rem;padding:20px 0">Carregando…</div>
+      </div>
+      <div style="margin-top:18px;font-size:.7rem;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:var(--text3);margin-bottom:10px">FinOps — Custos 30 dias</div>
+      <div id="kpis-costs" style="display:flex;gap:12px;flex-wrap:wrap"></div>
+    </div>
+
+    <!-- ===== EXPLORER ===== -->
+    <div id="page-explorer" class="section-page">
+      <div class="page-hdr">
+        <div>
+          <div class="page-title">Data Explorer</div>
+          <div class="page-sub">Navegue nas tabelas Silver/Gold do BigQuery</div>
+        </div>
+      </div>
+      <div style="display:flex;gap:10px;align-items:center;margin-bottom:14px;flex-wrap:wrap">
+        <select id="explorer-layer" onchange="explorerLoadTables()" style="padding:6px 10px;font-size:.78rem;border-radius:6px;border:1px solid var(--border);background:var(--bg2);color:var(--text)">
+          <option value="gold">Gold</option>
+          <option value="silver">Silver</option>
+        </select>
+        <select id="explorer-table" onchange="explorerPreview()" style="padding:6px 10px;font-size:.78rem;border-radius:6px;border:1px solid var(--border);background:var(--bg2);color:var(--text);min-width:220px">
+          <option value="">— Selecione tabela —</option>
+        </select>
+        <span id="explorer-count" style="font-size:.72rem;color:var(--text3)"></span>
+      </div>
+      <div id="explorer-table-wrap" style="overflow-x:auto;border:1px solid var(--border);border-radius:8px;min-height:100px">
+        <div style="padding:20px;color:var(--text3);font-size:.78rem">Selecione uma camada e tabela para visualizar os dados.</div>
+      </div>
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-top:8px">
+        <div style="display:flex;gap:8px">
+          <button class="btn btn-sm btn-secondary" onclick="explorerPage(-1)">← Anterior</button>
+          <button class="btn btn-sm btn-secondary" onclick="explorerPage(1)">Próxima →</button>
+        </div>
+        <span id="explorer-page-info" style="font-size:.72rem;color:var(--text3)"></span>
+      </div>
+    </div>
+
+    <!-- ===== MODELO ===== -->
+    <div id="page-model" class="section-page">
+      <div class="page-hdr">
+        <div>
+          <div class="page-title">Validação do Modelo</div>
+          <div class="page-sub">Bayesiano PyMC — Brier Score · Drift · Features · Bias</div>
+        </div>
+        <button class="btn btn-secondary btn-sm" onclick="loadModel()">↺ Atualizar</button>
+      </div>
+      <div id="model-content">
+        <div style="color:var(--text3);font-size:.78rem;padding:20px 0">Carregando…</div>
+      </div>
+    </div>
+
   </main>
 </div>
 
@@ -585,6 +676,10 @@ function showSection(name) {
   if (name === 'access') renderAccessMatrix();
   if (name === 'jobs') loadJobs();
   if (name === 'catalog') loadCatalog();
+  if (name === 'architecture') loadArchitecture();
+  if (name === 'kpis') loadKpis();
+  if (name === 'explorer') explorerLoadTables();
+  if (name === 'model') loadModel();
 }
 
 // ============================================================
@@ -1023,6 +1118,251 @@ function renderCatalog(tables) {
       </div>
     </div>`;
   }).join('');
+}
+
+// ============================================================
+// ARQUITETURA
+// ============================================================
+async function loadArchitecture() {
+  try {
+    const r = await apiFetch('/admin/api/architecture');
+    const data = await r.json();
+    renderArchPipeline(data.stages || []);
+    renderArchJobs(data.jobs || {});
+  } catch {
+    document.getElementById('arch-jobs').innerHTML = '<div style="color:var(--red);font-size:.78rem">Erro ao carregar arquitetura.</div>';
+  }
+}
+
+function renderArchPipeline(stages) {
+  const el = document.getElementById('arch-pipeline');
+  el.innerHTML = stages.map((s, i) => `
+    <div style="display:flex;align-items:center;gap:8px">
+      <div style="background:var(--bg3);border:1px solid var(--border);border-radius:8px;padding:10px 16px;text-align:center;min-width:110px">
+        <div style="font-size:.78rem;font-weight:700;color:${s.color}">${s.stage}</div>
+        <div style="font-size:.66rem;color:var(--text3);margin-top:2px">${s.layer}</div>
+      </div>
+      ${i < stages.length - 1 ? '<span style="color:var(--text3);font-size:1.1rem">→</span>' : ''}
+    </div>`).join('');
+}
+
+function renderArchJobs(jobGroups) {
+  const groupLabels = { ingestion: '📥 Ingestão (Bronze)', transform: '🔄 Transformação (Silver)', aggregation: '⚡ Agregação (Gold)', mlops: '🤖 MLOps' };
+  const el = document.getElementById('arch-jobs');
+  el.innerHTML = Object.entries(jobGroups).map(([group, jobs]) => `
+    <div>
+      <div style="font-size:.7rem;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:var(--text3);margin-bottom:8px">${groupLabels[group] || group}</div>
+      <div style="display:flex;flex-wrap:wrap;gap:6px">
+        ${jobs.map(j => {
+          const st = j.status || 'unknown';
+          const color = {ok:'var(--green)',warn:'var(--yellow)',error:'var(--red)',unknown:'var(--text3)'}[st] || 'var(--text3)';
+          const dot = {ok:'✅',warn:'⚠️',error:'❌',unknown:'—'}[st] || '—';
+          const shortName = j.name.replace('spepe-','');
+          const last = j.last_run_at ? new Date(j.last_run_at).toLocaleDateString('pt-BR') : '—';
+          return `<div style="border:1px solid var(--border);border-radius:6px;padding:6px 10px;font-size:.72rem;background:var(--bg2)" title="${j.alert_message || j.last_status || ''}">
+            <span style="color:${color}">${dot}</span>
+            <span style="font-weight:600;margin-left:4px">${shortName}</span>
+            <span style="color:var(--text3);margin-left:6px">${last}</span>
+          </div>`;
+        }).join('')}
+      </div>
+    </div>`).join('');
+}
+
+// ============================================================
+// KPIs
+// ============================================================
+async function loadKpis() {
+  try {
+    const r = await apiFetch('/admin/api/kpis');
+    const d = await r.json();
+    renderKpis(d);
+  } catch {
+    document.getElementById('kpis-grid').innerHTML = '<div style="color:var(--red);font-size:.78rem">Erro ao carregar KPIs.</div>';
+  }
+}
+
+function renderKpis(d) {
+  const score = (v) => `<span style="font-size:1.6rem;font-weight:800;color:${v>=70?'var(--green)':v>=40?'var(--yellow)':'var(--red)'}">${v}</span><span style="font-size:.72rem;color:var(--text3)">/100</span>`;
+  const val = (v, unit='') => v != null ? `<span style="font-size:1.1rem;font-weight:700">${typeof v==='number'?v.toLocaleString('pt-BR'):v}</span><span style="font-size:.72rem;color:var(--text3)">${unit}</span>` : '<span style="color:var(--text3)">—</span>';
+
+  const cards = [
+    { title: 'DataOps', icon: '⚙️', score: d.dataops?.score, rows: [
+      ['Jobs OK', `${d.dataops?.jobs_ok||0} / ${d.dataops?.jobs_total||0}`],
+      ['Tabelas OK', `${d.dataops?.tables_ok||0} / ${d.dataops?.tables_total||0}`],
+    ]},
+    { title: 'MLOps', icon: '🤖', score: d.mlops?.score, rows: [
+      ['Brier Score', d.mlops?.brier_score != null ? d.mlops.brier_score.toFixed(3) : '—'],
+      ['Eval Score', d.mlops?.eval_score != null ? (d.mlops.eval_score*100).toFixed(1)+'%' : '—'],
+      ['Versão', d.mlops?.model_version || '—'],
+    ]},
+    { title: 'LLMOps', icon: '💬', score: d.llmops?.score, rows: [
+      ['Agentes OK', `${d.llmops?.agents_ok||0} / ${d.llmops?.agents||0}`],
+      ['Calls 24h', (d.llmops?.calls_24h||0).toLocaleString('pt-BR')],
+    ]},
+    { title: 'FinOps', icon: '💰', score: null, rows: [
+      ['BQ 30d', `$${(d.finops?.bq_total_30d_usd||0).toFixed(2)}`],
+      ['LLM 30d', `$${(d.finops?.llm_total_30d_usd||0).toFixed(2)}`],
+      ['Total', `$${(d.finops?.total_30d_usd||0).toFixed(2)}`],
+    ]},
+  ];
+
+  document.getElementById('kpis-grid').innerHTML = cards.map(c => `
+    <div style="background:var(--bg2);border:1px solid var(--border);border-radius:10px;padding:16px">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">
+        <div style="font-size:.78rem;font-weight:700">${c.icon} ${c.title}</div>
+        ${c.score != null ? score(c.score) : ''}
+      </div>
+      ${c.rows.map(([k,v]) => `
+        <div style="display:flex;justify-content:space-between;font-size:.74rem;margin-bottom:5px">
+          <span style="color:var(--text3)">${k}</span>
+          <span style="font-weight:500">${v}</span>
+        </div>`).join('')}
+    </div>`).join('');
+
+  const daily = (d.finops?.bq_daily || []).slice(-7);
+  document.getElementById('kpis-costs').innerHTML = daily.length ? daily.map(r => `
+    <div style="background:var(--bg2);border:1px solid var(--border);border-radius:6px;padding:8px 12px;font-size:.72rem">
+      <div style="color:var(--text3)">${r.day||'—'}</div>
+      <div style="font-weight:700;color:var(--green2)">$${(r.bq_cost_usd||0).toFixed(4)}</div>
+    </div>`).join('') : '<div style="color:var(--text3);font-size:.74rem">Sem dados de custo disponíveis.</div>';
+}
+
+// ============================================================
+// EXPLORER
+// ============================================================
+let _explorerTables = [];
+let _explorerOffset = 0;
+const _explorerLimit = 50;
+
+async function explorerLoadTables() {
+  const layer = document.getElementById('explorer-layer').value;
+  const sel = document.getElementById('explorer-table');
+  sel.innerHTML = '<option value="">Carregando…</option>';
+  try {
+    const r = await apiFetch('/admin/api/explorer/tables');
+    const d = await r.json();
+    _explorerTables = (d.tables || []).filter(t => t.layer === layer || t.table);
+    const filtered = _explorerTables.filter(t => (t.layer || 'gold') === layer);
+    sel.innerHTML = '<option value="">— Selecione tabela —</option>' +
+      filtered.map(t => `<option value="${t.table}">${t.table} (${(t.row_count||0).toLocaleString('pt-BR')} rows)</option>`).join('');
+    document.getElementById('explorer-table-wrap').innerHTML = '<div style="padding:20px;color:var(--text3);font-size:.78rem">Selecione uma tabela.</div>';
+    document.getElementById('explorer-count').textContent = '';
+  } catch {
+    sel.innerHTML = '<option value="">Erro ao carregar</option>';
+  }
+}
+
+async function explorerPreview(reset = true) {
+  const table = document.getElementById('explorer-table').value;
+  const layer = document.getElementById('explorer-layer').value;
+  if (!table) return;
+  if (reset) _explorerOffset = 0;
+  const wrap = document.getElementById('explorer-table-wrap');
+  wrap.innerHTML = '<div style="padding:20px;color:var(--text3);font-size:.78rem">Carregando…</div>';
+  try {
+    const r = await apiFetch(`/admin/api/explorer/data?table=${table}&layer=${layer}&limit=${_explorerLimit}&offset=${_explorerOffset}`);
+    const d = await r.json();
+    if (!d.rows || d.rows.length === 0) {
+      wrap.innerHTML = '<div style="padding:20px;color:var(--text3);font-size:.78rem">Sem dados nesta tabela.</div>';
+      return;
+    }
+    const cols = d.columns || Object.keys(d.rows[0]);
+    const total = d.total || d.rows.length;
+    document.getElementById('explorer-count').textContent = `${total.toLocaleString('pt-BR')} linhas`;
+    document.getElementById('explorer-page-info').textContent = `${_explorerOffset+1}–${Math.min(_explorerOffset+_explorerLimit,total)} de ${total.toLocaleString('pt-BR')}`;
+    wrap.innerHTML = `<table style="width:100%;border-collapse:collapse;font-size:.72rem">
+      <thead><tr>${cols.map(c => `<th style="padding:7px 10px;border-bottom:1px solid var(--border);background:var(--bg3);font-weight:700;text-align:left;white-space:nowrap;font-size:.66rem;color:var(--text3)">${c}</th>`).join('')}</tr></thead>
+      <tbody>${d.rows.map(row => `<tr>${cols.map(c => `<td style="padding:6px 10px;border-bottom:1px solid var(--border);max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${row[c]??''}">${row[c]??'—'}</td>`).join('')}</tr>`).join('')}</tbody>
+    </table>`;
+  } catch(e) {
+    wrap.innerHTML = `<div style="padding:20px;color:var(--red);font-size:.78rem">Erro: ${e.message}</div>`;
+  }
+}
+
+function explorerPage(dir) {
+  _explorerOffset = Math.max(0, _explorerOffset + dir * _explorerLimit);
+  explorerPreview(false);
+}
+
+// ============================================================
+// MODELO
+// ============================================================
+async function loadModel() {
+  try {
+    const r = await apiFetch('/admin/api/model/overview');
+    const d = await r.json();
+    renderModel(d);
+  } catch {
+    document.getElementById('model-content').innerHTML = '<div style="color:var(--red);font-size:.78rem">Erro ao carregar dados do modelo.</div>';
+  }
+}
+
+function renderModel(d) {
+  const el = document.getElementById('model-content');
+  if (!d.trained) {
+    el.innerHTML = `
+      <div style="background:var(--bg2);border:1px solid var(--border);border-radius:10px;padding:32px;text-align:center">
+        <div style="font-size:2rem;margin-bottom:12px">🤖</div>
+        <div style="font-size:.9rem;font-weight:700;margin-bottom:8px">Modelo ainda não treinado</div>
+        <div style="font-size:.78rem;color:var(--text3);max-width:400px;margin:0 auto">
+          Execute o job <code style="font-family:'JetBrains Mono',monospace">spepe-pymc-train</code> na aba Jobs para iniciar o treinamento do modelo Bayesiano PyMC.
+          Os indicadores (Brier Score, SHAP, Drift) aparecerão aqui após o primeiro treinamento.
+        </div>
+        <button class="btn btn-primary" style="margin-top:16px" onclick="showSection('jobs');document.querySelector(\'.sn-item[onclick*=jobs]\').click()">
+          Ir para Jobs →
+        </button>
+      </div>`;
+    return;
+  }
+
+  const m = d.metrics;
+  const scoreColor = (v, good, bad) => v == null ? 'var(--text3)' : v <= good ? 'var(--green)' : v >= bad ? 'var(--red)' : 'var(--yellow)';
+
+  const metricCards = [
+    { label: 'Brier Score', val: m.brier_score?.toFixed(3) ?? '—', color: scoreColor(m.brier_score, 0.1, 0.25), hint: '≤ 0.10 excelente · ≤ 0.20 OK · > 0.25 requer revisão' },
+    { label: 'Eval Score', val: m.eval_score != null ? (m.eval_score*100).toFixed(1)+'%' : '—', color: scoreColor(1 - (m.eval_score||0), 0.2, 0.5), hint: 'Score LLM-as-judge no golden_dataset' },
+    { label: 'Drift (JS)', val: m.js_divergence?.toFixed(4) ?? '—', color: scoreColor(m.js_divergence, 0.05, 0.10), hint: '< 0.05 estável · > 0.10 aciona retraining' },
+    { label: 'Versão', val: m.model_version ?? '—', color: 'var(--text2)', hint: `Treinado em: ${m.computed_at?.slice(0,19) ?? '—'}` },
+  ];
+
+  const featuresHtml = d.feature_importance?.length ? `
+    <div style="margin-top:20px;font-size:.7rem;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:var(--text3);margin-bottom:10px">Top Features (SHAP)</div>
+    <div style="display:flex;flex-direction:column;gap:6px">
+      ${d.feature_importance.slice(0,10).map(f => {
+        const maxImp = d.feature_importance[0].importance_mean;
+        const pct = maxImp > 0 ? (f.importance_mean / maxImp * 100).toFixed(0) : 0;
+        return `<div style="display:flex;align-items:center;gap:10px;font-size:.74rem">
+          <span style="width:160px;color:var(--text2);overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${f.feature_name}">#${f.rank} ${f.feature_name}</span>
+          <div style="flex:1;height:8px;background:var(--bg3);border-radius:4px">
+            <div style="width:${pct}%;height:100%;background:var(--green);border-radius:4px"></div>
+          </div>
+          <span style="width:50px;text-align:right;color:var(--text3)">${f.importance_mean?.toFixed(4) ?? '—'}</span>
+        </div>`;
+      }).join('')}
+    </div>` : '';
+
+  const biasHtml = d.bias_metrics?.length ? `
+    <div style="margin-top:20px;font-size:.7rem;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:var(--text3);margin-bottom:10px">Bias por UF</div>
+    <div style="display:flex;flex-wrap:wrap;gap:6px">
+      ${d.bias_metrics.slice(0,27).map(b => `
+        <div style="font-size:.7rem;border:1px solid var(--border);border-radius:4px;padding:4px 8px;background:var(--bg2)" title="bias_score: ${b.bias_score?.toFixed(4)}">
+          <span style="font-weight:600">${b.sg_uf}</span>
+          <span style="color:${b.bias_score>0.1?'var(--red)':b.bias_score>0.05?'var(--yellow)':'var(--green)'};margin-left:4px">${b.bias_score?.toFixed(3)??'—'}</span>
+        </div>`).join('')}
+    </div>` : '';
+
+  el.innerHTML = `
+    <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:12px;margin-bottom:16px">
+      ${metricCards.map(c => `
+        <div style="background:var(--bg2);border:1px solid var(--border);border-radius:10px;padding:14px">
+          <div style="font-size:.66rem;color:var(--text3);text-transform:uppercase;letter-spacing:.06em;margin-bottom:6px">${c.label}</div>
+          <div style="font-size:1.4rem;font-weight:800;color:${c.color}">${c.val}</div>
+          <div style="font-size:.64rem;color:var(--text3);margin-top:4px">${c.hint}</div>
+        </div>`).join('')}
+    </div>
+    ${featuresHtml}
+    ${biasHtml}`;
 }
 
 // ============================================================
