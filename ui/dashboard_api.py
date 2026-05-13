@@ -2463,6 +2463,79 @@ async def get_previsao(
     return JSONResponse({"data": []})
 
 
+@app.get("/api/multifonte")
+async def get_multifonte(
+    cargo: str = Query("Governador"),
+    uf: str = Query("SP"),
+    ano: int = Query(2022),
+) -> JSONResponse:
+    """Comparação de dados entre fontes: TSE histórico, polls, sentimento social, socioeco."""
+    results: dict = {"tse": None, "polls": None, "social": None, "ibge": None}
+
+    if not (settings.gcp_project_id and os.environ.get("USE_BIGQUERY", "").lower() == "true"):
+        return JSONResponse({"sources": results, "uf": uf, "ano": ano, "cargo": cargo})
+
+    try:
+        from google.cloud import bigquery
+
+        client = bigquery.Client(project=settings.gcp_project_id)
+        gold = f"{settings.gcp_project_id}.{settings.bigquery_dataset_gold}"
+        cd_cargo = _CARGO_CD.get(cargo, 3)
+
+        async def _run_q(key: str, q: str, params: list) -> None:
+            try:
+                rows = await asyncio.to_thread(
+                    lambda: list(
+                        client.query(
+                            q,
+                            job_config=bigquery.QueryJobConfig(query_parameters=params),
+                        ).result()
+                    )
+                )
+                results[key] = [dict(r) for r in rows]
+            except Exception as exc:
+                logger.debug("multifonte[%s] falhou: %s", key, exc)
+
+        tse_q = f"""
+            SELECT nm_candidato AS candidato,
+                   ROUND(SUM(total_votos)/SUM(SUM(total_votos)) OVER()*100,1) AS valor,
+                   'pct_votos_tse' AS metrica
+            FROM `{gold}.fact_municipio_candidato_eleicao`
+            WHERE sg_uf=@uf AND ano_eleicao=@ano AND cd_cargo=@cd AND nr_turno=1
+            GROUP BY nm_candidato ORDER BY valor DESC LIMIT 6
+        """
+        polls_q = f"""
+            SELECT candidato_normalizado AS candidato,
+                   ROUND(AVG(intencao_ponderada),1) AS valor,
+                   'pct_pesquisa' AS metrica
+            FROM `{gold}.fact_intencao_voto`
+            WHERE uf=@uf AND ano_eleitoral=@ano AND cd_cargo=@cd
+            GROUP BY candidato_normalizado ORDER BY valor DESC LIMIT 6
+        """
+        social_q = f"""
+            SELECT nm_candidato AS candidato,
+                   ROUND(AVG(sentimento_score_medio)*100,1) AS valor,
+                   'sentimento_pct' AS metrica
+            FROM `{gold}.vw_sentimento_municipio`
+            WHERE sg_uf=@uf AND EXTRACT(YEAR FROM data_semana)=@ano
+            GROUP BY nm_candidato ORDER BY valor DESC LIMIT 6
+        """
+        base_params = [
+            bigquery.ScalarQueryParameter("uf", "STRING", uf.upper()),
+            bigquery.ScalarQueryParameter("ano", "INT64", ano),
+            bigquery.ScalarQueryParameter("cd", "INT64", cd_cargo),
+        ]
+        await asyncio.gather(
+            _run_q("tse", tse_q, base_params),
+            _run_q("polls", polls_q, base_params),
+            _run_q("social", social_q, base_params[:2]),
+        )
+    except Exception as exc:
+        logger.warning("multifonte geral falhou: %s", exc)
+
+    return JSONResponse({"sources": results, "uf": uf, "ano": ano, "cargo": cargo})
+
+
 # ── Endividamento familiar BACEN ──────────────────────────────────────────────
 
 

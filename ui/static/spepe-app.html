@@ -356,15 +356,15 @@ tr.rhl td{background:rgba(0,200,83,.07)!important}
 
   <div class="main-tabs">
     <div class="main-tab active" onclick="switchTab(this,'Dashboard')">📊 Dashboard</div>
-    <div class="main-tab" onclick="switchTab(this,'Mapa')">🗺️ Mapa</div>
-    <div class="main-tab" onclick="switchTab(this,'Socioeconômico')">📈 Socioeconômico</div>
-    <div class="main-tab" onclick="switchTab(this,'Segurança')">🛡️ Segurança</div>
-    <div class="main-tab" onclick="switchTab(this,'Saúde')">🏥 Saúde</div>
-    <div class="main-tab" onclick="switchTab(this,'Pesquisas')">📋 Pesquisas</div>
+    <div class="main-tab" onclick="switchTab(this,'Mapa')" data-src-tab="tse">🗺️ Mapa</div>
+    <div class="main-tab" onclick="switchTab(this,'Socioeconômico')" data-src-tab="ibge">📈 Socioeconômico</div>
+    <div class="main-tab" onclick="switchTab(this,'Segurança')" data-src-tab="ibge">🛡️ Segurança</div>
+    <div class="main-tab" onclick="switchTab(this,'Saúde')" data-src-tab="ibge">🏥 Saúde</div>
+    <div class="main-tab" onclick="switchTab(this,'Pesquisas')" data-src-tab="pesquisas">📋 Pesquisas</div>
     <div class="main-tab" onclick="switchTab(this,'Predição')">🎯 Predição</div>
     <div class="main-tab" onclick="switchTab(this,'Perfis Eleitorais')">🗂️ Perfis</div>
     <div class="main-tab" onclick="switchTab(this,'Relatórios')">📄 Relatórios</div>
-    <div class="main-tab" onclick="switchTab(this,'Social')">📡 Social</div>
+    <div class="main-tab" onclick="switchTab(this,'Social')" data-src-tab="google-trends meta-ads youtube">📡 Social</div>
     <div class="main-tab" onclick="switchTab(this,'Endividamento')">💳 Endividamento</div>
     <div class="main-tab" onclick="switchTab(this,'Parlamentares')">🏛️ Parlamentares</div>
   </div>
@@ -444,7 +444,8 @@ tr.rhl td{background:rgba(0,200,83,.07)!important}
       </div>
       <div class="sb-actions">
         <button class="btn-apply" onclick="applyFilters()">Aplicar Filtros</button>
-        <button class="btn-pdf" onclick="toast('📄 Relatório gerado — PDF em instantes')">Gerar Relatório PDF</button>
+        <button class="btn-pdf" onclick="gerarRelatorioPDF()">Gerar Relatório PDF</button>
+        <button class="btn-pdf" style="margin-top:4px;color:#22c55e;border-color:#22c55e33" onclick="solicitarParecerAuditor()">🔍 Parecer Auditor</button>
       </div>
     </aside>
 
@@ -570,6 +571,20 @@ tr.rhl td{background:rgba(0,200,83,.07)!important}
             <div class="tags"><span class="tag t-pesq">Pesquisas</span><span class="tag t-upd" id="upd-polls"></span></div>
           </div>
           <div class="cw" style="height:165px"><canvas id="ch-polls"></canvas></div>
+        </div>
+      </div>
+
+      <!-- Multi-fonte comparison -->
+      <div class="card" id="card-multifonte" style="margin-bottom:12px">
+        <div class="card-hdr">
+          <div><div class="card-title">Comparação Multi-Fonte</div>
+            <div class="card-sub">TSE · Pesquisas · Sentimento Social — mesmos candidatos</div></div>
+          <div class="tags"><span class="tag t-ia">17 Fontes</span>
+            <button onclick="loadMultifonte()" style="background:none;border:none;color:var(--text2);cursor:pointer;font-size:.7rem;padding:2px 6px;border:1px solid var(--border);border-radius:4px">↺</button>
+          </div>
+        </div>
+        <div id="multifonte-body" style="padding:8px 0">
+          <div style="color:var(--text3);font-size:.78rem;text-align:center;padding:1rem">Carregando dados multi-fonte...</div>
         </div>
       </div>
 
@@ -1327,6 +1342,7 @@ function switchCargo(el,cargo){
   }
   document.getElementById('card-compare').style.display='none';
   renderCargoView(cargo);
+  setTimeout(_notifyChatContext, 400);
 }
 
 async function renderCargoView(cargo){
@@ -2306,14 +2322,24 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   }
 
-  // Data source toggles — show/hide dependent chart containers
-  document.querySelectorAll('input[data-source]').forEach(cb => {
-    cb.addEventListener('change', e => {
-      const src = e.target.dataset.source?.toLowerCase().replace(/\s+/g,'-');
-      document.querySelectorAll(`[data-requires="${src}"]`)
-        .forEach(p => p.classList.toggle('hidden', !e.target.checked));
+  // Data source toggles — hide chart containers AND main-tab buttons
+  function _applySourceVisibility() {
+    const checked = new Set([...document.querySelectorAll('input[data-source]:checked')].map(c=>c.dataset.source));
+    // chart containers
+    document.querySelectorAll('[data-requires]').forEach(p => {
+      p.classList.toggle('hidden', !checked.has(p.dataset.requires));
     });
+    // main-tab buttons
+    document.querySelectorAll('[data-src-tab]').forEach(tab => {
+      const srcs = tab.dataset.srcTab.split(' ');
+      const anyChecked = srcs.some(s => checked.has(s));
+      tab.style.display = anyChecked ? '' : 'none';
+    });
+  }
+  document.querySelectorAll('input[data-source]').forEach(cb => {
+    cb.addEventListener('change', _applySourceVisibility);
   });
+  _applySourceVisibility();
 });
 
 // ══════════════════════════════════════════════════════
@@ -2906,6 +2932,149 @@ window.addEventListener('load', _ensureChatWs);
     if (pollTimer) { clearInterval(pollTimer); pollTimer = null; }
   };
 })();
+
+// ══════════════════════════════════════════════════════
+// MULTI-FONTE COMPARISON CHART
+// ══════════════════════════════════════════════════════
+async function loadMultifonte() {
+  const uf   = document.getElementById('f-uf')?.value   || 'SP';
+  const ano  = document.getElementById('f-ano')?.value  || '2022';
+  const cargo= document.getElementById('f-cargo')?.value|| 'Governador';
+  const box  = document.getElementById('multifonte-body');
+  if (!box) return;
+  box.innerHTML = '<div style="color:var(--text3);font-size:.78rem;text-align:center;padding:1rem">Carregando...</div>';
+  try {
+    const res = await apiFetch(`/api/multifonte?cargo=${encodeURIComponent(cargo)}&uf=${uf}&ano=${ano}`);
+    if (!res) { box.innerHTML='<div style="color:var(--text3);font-size:.78rem;padding:.5rem">Sem conexão com API</div>'; return; }
+    const d = await res.json();
+    const src = d.sources || {};
+    const FONTE_LABELS = {tse:'TSE Resultado', polls:'Pesquisas', social:'Sentimento Social'};
+    const FONTE_COLORS = {tse:'#6366f1', polls:'#22d3ee', social:'#22c55e'};
+    // Collect all candidatos across sources
+    const allCands = [...new Set(
+      Object.values(src).flatMap(rows=>(rows||[]).map(r=>r.candidato))
+    )].filter(Boolean).slice(0,8);
+    if (!allCands.length) {
+      box.innerHTML='<div style="color:var(--text3);font-size:.78rem;padding:.5rem;text-align:center">Dados multi-fonte não disponíveis para esta seleção — execute os jobs de ingestão primeiro.</div>';
+      return;
+    }
+    // Build comparison table
+    const fontes = ['tse','polls','social'];
+    const hdrs = fontes.map(f=>`<th style="text-align:right;padding:4px 8px;color:${FONTE_COLORS[f]};font-size:.7rem">${FONTE_LABELS[f]}</th>`).join('');
+    const rows = allCands.map(c=>{
+      const cells = fontes.map(f=>{
+        const row = (src[f]||[]).find(r=>r.candidato===c);
+        const val = row ? (+row.valor).toFixed(1)+'%' : '—';
+        return `<td style="text-align:right;padding:4px 8px;font-size:.76rem;color:${row?'var(--text)':'var(--text3)'}">${val}</td>`;
+      }).join('');
+      return `<tr style="border-top:1px solid var(--border)"><td style="padding:4px 8px;font-size:.76rem">${c}</td>${cells}</tr>`;
+    }).join('');
+    box.innerHTML = `<table style="width:100%;border-collapse:collapse">
+      <thead><tr><th style="text-align:left;padding:4px 8px;font-size:.7rem;color:var(--text2)">Candidato</th>${hdrs}</tr></thead>
+      <tbody>${rows}</tbody></table>
+      <div style="font-size:.64rem;color:var(--text3);padding:6px 8px 2px">TSE=votos reais · Pesquisas=intenção média · Sentimento=score NLP normalizado</div>`;
+  } catch(e) {
+    box.innerHTML=`<div style="color:var(--red);font-size:.76rem;padding:.5rem">Erro: ${e.message}</div>`;
+  }
+}
+
+// Load on Dashboard tab open and on filter apply
+const _origSwitchTab = switchTab;
+switchTab = function(el, name) {
+  _origSwitchTab(el, name);
+  if (name === 'Dashboard') setTimeout(loadMultifonte, 400);
+};
+
+// ══════════════════════════════════════════════════════
+// DASHBOARD → CHAT SYNC (reverse direction)
+// ══════════════════════════════════════════════════════
+function _notifyChatContext() {
+  if (!_chatWs || _chatWs.readyState !== 1) return;
+  const uf   = document.getElementById('f-uf')?.value   || 'SP';
+  const ano  = document.getElementById('f-ano')?.value  || '2022';
+  const cargo= document.getElementById('f-cargo')?.value|| 'Presidente';
+  _chatWs.send(JSON.stringify({type:'context', uf, ano, cargo}));
+  // Flash sync-bar to signal the sync
+  const bar = document.getElementById('sbar');
+  if (bar) { bar.classList.add('on'); setTimeout(()=>bar.classList.remove('on'),900); }
+}
+
+// Patch applyFilters to notify chat + reload multifonte after applying
+const _origApplyFilters = applyFilters;
+applyFilters = function() {
+  _origApplyFilters();
+  setTimeout(_notifyChatContext, 300);
+  setTimeout(loadMultifonte, 500);
+};
+
+// ══════════════════════════════════════════════════════
+// PDF REPORT — real browser print with styled snapshot
+// ══════════════════════════════════════════════════════
+function gerarRelatorioPDF() {
+  const uf   = document.getElementById('f-uf')?.value   || 'SP';
+  const ano  = document.getElementById('f-ano')?.value  || '2022';
+  const cargo= document.getElementById('f-cargo')?.value|| 'Presidente';
+  const cands= [...document.querySelectorAll('#cand-grid .cand-card')].slice(0,10).map(c=>{
+    const nm = c.querySelector('.cname')?.textContent || c.querySelector('strong')?.textContent || '?';
+    const pct= c.querySelector('.cpct,.pct-val,[class*="pct"]')?.textContent || '—';
+    return `<tr><td>${nm}</td><td style="text-align:right">${pct}</td></tr>`;
+  }).join('');
+  const kpiVotos = document.getElementById('kv-votos')?.textContent || '—';
+  const kpiMun   = document.getElementById('kv-mun')?.textContent   || '—';
+  const kpiCands = document.getElementById('kv-cands')?.textContent || '—';
+  const now = new Date().toLocaleString('pt-BR');
+  const win = window.open('', '_blank', 'width=900,height=700');
+  if (!win) { toast('⚠️ Permita popups para gerar o relatório'); return; }
+  win.document.write(`<!DOCTYPE html><html lang="pt-BR"><head><meta charset="UTF-8">
+<title>SPEPE — Relatório ${cargo} ${uf} ${ano}</title>
+<style>
+  body{font-family:Arial,sans-serif;margin:2rem;color:#111;font-size:13px}
+  h1{color:#1e40af;font-size:20px;margin-bottom:4px}
+  h2{color:#374151;font-size:14px;border-bottom:1px solid #e5e7eb;padding-bottom:4px;margin-top:1.5rem}
+  .meta{color:#6b7280;font-size:11px;margin-bottom:1.5rem}
+  .kpi-row{display:flex;gap:2rem;margin-bottom:1.5rem}
+  .kpi{background:#f9fafb;border:1px solid #e5e7eb;border-radius:6px;padding:.75rem 1rem;min-width:120px}
+  .kpi-label{font-size:11px;color:#6b7280;margin-bottom:2px}
+  .kpi-val{font-size:20px;font-weight:700;color:#1e40af}
+  table{width:100%;border-collapse:collapse;font-size:12px}
+  th{background:#f3f4f6;text-align:left;padding:6px 8px;border:1px solid #e5e7eb}
+  td{padding:5px 8px;border:1px solid #e5e7eb}
+  tr:nth-child(even) td{background:#f9fafb}
+  .footer{margin-top:2rem;color:#9ca3af;font-size:10px;border-top:1px solid #e5e7eb;padding-top:8px}
+  @media print{body{margin:1rem}}
+</style></head><body>
+<h1>SPEPE — Sistema de Perfilamento Eleitoral</h1>
+<div class="meta">Cargo: <strong>${cargo}</strong> · Estado: <strong>${uf}</strong> · Eleição: <strong>${ano}</strong> · Gerado em: ${now}</div>
+<h2>KPIs do Pleito</h2>
+<div class="kpi-row">
+  <div class="kpi"><div class="kpi-label">Total de Votos</div><div class="kpi-val">${kpiVotos}</div></div>
+  <div class="kpi"><div class="kpi-label">Municípios</div><div class="kpi-val">${kpiMun}</div></div>
+  <div class="kpi"><div class="kpi-label">Candidatos</div><div class="kpi-val">${kpiCands}</div></div>
+</div>
+<h2>Top Candidatos</h2>
+<table><thead><tr><th>Candidato</th><th style="text-align:right">% Votos</th></tr></thead>
+<tbody>${cands || '<tr><td colspan="2" style="color:#9ca3af;text-align:center">Dados não carregados — aplique filtros primeiro</td></tr>'}</tbody></table>
+<div class="footer">Fonte: TSE ${ano} · IBGE · SPEPE Analytics · Dados eleitorais de domínio público</div>
+<script>window.onload=()=>window.print();<\/script>
+</body></html>`);
+  win.document.close();
+}
+
+// ══════════════════════════════════════════════════════
+// PARECER AUDITOR — pré-preenche chat com prompt técnico
+// ══════════════════════════════════════════════════════
+function solicitarParecerAuditor() {
+  const uf   = document.getElementById('f-uf')?.value   || 'SP';
+  const ano  = document.getElementById('f-ano')?.value  || '2022';
+  const cargo= document.getElementById('f-cargo')?.value|| 'Presidente';
+  const prompt = `Atue como auditor técnico de dados eleitorais. Analise os dados disponíveis para ${cargo} em ${uf} (${ano}) e produza um parecer técnico cobrindo: (1) qualidade e completude dos dados TSE; (2) consistência entre fontes IBGE e TSE; (3) anomalias detectadas nos resultados; (4) recomendações de melhoria de dados; (5) limitações para uso analítico. Seja objetivo e técnico.`;
+  const inp = document.getElementById('cin');
+  if (inp) { inp.value = prompt; inp.focus(); }
+  // Switch to chat if hidden on mobile
+  const chatPanel = document.querySelector('.chat-panel');
+  if (chatPanel) chatPanel.scrollIntoView({behavior:'smooth'});
+  toast('📋 Prompt de auditoria carregado — pressione Enviar');
+}
 </script>
 </body>
 </html>
