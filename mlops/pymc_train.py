@@ -69,6 +69,7 @@ def train_pymc_model(
     logger.info("Preparing features...")
 
     # Select feature columns (exclude ID, target, metadata)
+    # PHASE 2: Removed low-coverage social features (YouTube, RSS < 5%); added temporal feature
     feature_cols = [
         "populacao",
         "densidade_populacional",
@@ -76,16 +77,12 @@ def train_pymc_model(
         "pct_ensino_superior",
         "pct_analfabetos",
         "taxa_desemprego",
-        "sentimento_positivo",
-        "sentimento_negativo",
-        "polarizacao_entropia",
-        "mencoes_sociais",
         "cobertura_sus",
         "mortalidade_infantil",
         "taxa_homicidio",
         "taxa_roubo",
+        "pct_votos_partido_anterior",
     ]
-
     # Normalize features (z-score)
     df_features = df[feature_cols].fillna(0)
     df_features_norm = (df_features - df_features.mean()) / (df_features.std() + 1e-6)
