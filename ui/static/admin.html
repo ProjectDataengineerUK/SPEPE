@@ -1190,6 +1190,7 @@ async function runJob(name) {
 async function loadCatalog() {
   try {
     const r = await apiFetch('/admin/api/catalog');
+    if (!r) return;
     const data = await r.json();
     renderCatalog(data.tables || _stubCatalog());
   } catch {
@@ -1213,19 +1214,33 @@ function _stubCatalog() {
 
 function renderCatalog(tables) {
   const grid = document.getElementById('catalog-grid');
+  if (!tables || !tables.length) {
+    grid.innerHTML = '<div style="color:var(--text3);font-size:.78rem;padding:20px 0">Nenhuma tabela encontrada.</div>';
+    return;
+  }
   grid.innerHTML = tables.map(t => {
-    const fresh = t.last_modified
-      ? (Date.now() - new Date(t.last_modified) < 86400000
+    // Handle both API (table_id/dataset_id/num_rows) and old stub (table/dataset/rows) formats
+    const tableId = t.table_id || t.table || '?';
+    const datasetId = t.dataset_id || t.dataset || '?';
+    const numRows = t.num_rows ?? t.rows ?? null;
+    const lastMod = t.last_modified && t.last_modified !== '-' ? t.last_modified : null;
+
+    const fresh = lastMod
+      ? (Date.now() - new Date(lastMod) < 86400000
         ? `<span class="freshness-ok">● Atualizado</span>`
         : `<span class="freshness-stale">● Dados antigos</span>`)
       : `<span class="freshness-unknown">● Não verificado</span>`;
-    const rowsFmt = t.num_rows != null ? Number(t.num_rows).toLocaleString('pt-BR') + ' rows' : null;
+
+    const rowsFmt = numRows != null ? Number(numRows).toLocaleString('pt-BR') + ' rows' : null;
+    const sizeFmt = t.size_mb != null && t.size_mb > 0 ? `${t.size_mb.toLocaleString('pt-BR')} MB` : null;
+    const lastFmt = lastMod ? new Date(lastMod).toLocaleString('pt-BR') : null;
+
     return `
     <div class="cata-card">
       <div class="cata-hdr">
         <div>
-          <div class="cata-table">${t.table_id}</div>
-          <div class="cata-dataset">${t.dataset_id}</div>
+          <div class="cata-table">${tableId}</div>
+          <div class="cata-dataset">${datasetId}</div>
         </div>
         ${fresh}
       </div>
@@ -1233,7 +1248,9 @@ function renderCatalog(tables) {
       <div class="cata-meta">
         ${t.partitioning ? `<span class="cata-tag">⊘ ${t.partitioning}</span>` : ''}
         ${(t.clustering || []).map(c => `<span class="cata-tag">≡ ${c}</span>`).join('')}
-        ${rowsFmt ? `<span class="cata-tag">${rowsFmt}</span>` : ''}
+        ${rowsFmt ? `<span class="cata-tag">📊 ${rowsFmt}</span>` : ''}
+        ${sizeFmt ? `<span class="cata-tag">💾 ${sizeFmt}</span>` : ''}
+        ${lastFmt ? `<span class="cata-tag" style="color:var(--text3)">🕐 ${lastFmt}</span>` : ''}
       </div>
     </div>`;
   }).join('');
