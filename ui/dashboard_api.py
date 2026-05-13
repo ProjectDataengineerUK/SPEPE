@@ -2745,13 +2745,16 @@ _USER_STORE: list[dict] = [
     },
 ]  # fallback when Firestore unavailable
 _ACCESS_MATRIX: dict = {
-    "coletor": True,
-    "analista": True,
-    "modelista": True,
-    "perfilador": True,
-    "narrador": True,
-    "vigilante": True,
-}  # fallback when Firestore unavailable
+    "jornalista":  {"tab_mapa": 1, "tab_socioeconomico": 1, "chat_ai": 1, "export_data": 1},
+    "consultor":   {"tab_mapa": 1, "tab_socioeconomico": 1, "tab_seguranca": 1, "tab_saude": 1,
+                    "tab_pesquisas": 1, "tab_comparar": 1, "chat_ai": 1, "export_data": 1, "tab_predicao": 1},
+    "cientista":   {"tab_mapa": 1, "tab_socioeconomico": 1, "tab_seguranca": 1, "tab_saude": 1,
+                    "tab_pesquisas": 1, "tab_comparar": 1, "tab_predicao": 1, "chat_ai": 1,
+                    "export_data": 1, "shap_detail": 1, "bias_metrics": 1, "model_confidence": 1, "raw_api": 1},
+    "pesquisador": {"tab_mapa": 1, "tab_socioeconomico": 1, "tab_seguranca": 1, "tab_saude": 1,
+                    "tab_pesquisas": 1, "tab_comparar": 1, "tab_predicao": 1, "chat_ai": 1,
+                    "export_data": 1, "shap_detail": 1, "bias_metrics": 1, "model_confidence": 1, "raw_api": 1},
+}  # fallback when Firestore unavailable — matches frontend ACCESS_DEFAULTS
 _FIRESTORE_PROJECT = os.environ.get("GCP_PROJECT_ID", "")
 
 
@@ -2841,13 +2844,14 @@ async def admin_get_access() -> JSONResponse:
         try:
             doc = await db.collection("spepe_admin").document("access_matrix").get()
             if doc.exists:
-                matrix = doc.to_dict()
-                return JSONResponse({"matrix": matrix, "source": "firestore"})
+                raw = doc.to_dict() or {}
+                # Handle both {"matrix": {...}} and flat {"jornalista": {...}} stored formats
+                matrix = raw.get("matrix", raw)
+                if matrix and isinstance(next(iter(matrix.values()), None), dict):
+                    return JSONResponse({"matrix": matrix, "source": "firestore"})
         except Exception as exc:
             logger.debug("Firestore access_matrix query failed: %s", exc)
-    return JSONResponse(
-        {"matrix": _ACCESS_MATRIX, "source": "local" if _ACCESS_MATRIX else "empty"}
-    )
+    return JSONResponse({"matrix": _ACCESS_MATRIX, "source": "local"})
 
 
 @app.post("/admin/api/access", dependencies=[Depends(require_auth)])
@@ -2857,12 +2861,37 @@ async def admin_save_access(request: Request) -> JSONResponse:
     db = _fs_client()
     if db:
         try:
-            await db.collection("spepe_admin").document("access_matrix").set({"matrix": data})
-            return JSONResponse({"ok": True})
+            # Store flat (not nested under "matrix") to avoid double-nesting on read
+            await db.collection("spepe_admin").document("access_matrix").set(
+                {"matrix": data, "updated_at": str(__import__("datetime").datetime.utcnow())}
+            )
+            _ACCESS_MATRIX = data
+            return JSONResponse({"ok": True, "source": "firestore"})
+        except Exception as exc:
+            logger.debug("Firestore access_matrix save failed: %s", exc)
+    _ACCESS_MATRIX = data
+    return JSONResponse({"ok": True, "source": "local"})
+
+
+@app.get("/admin/api/auth/me", dependencies=[Depends(require_auth)])
+async def admin_auth_me(user_info: dict = Depends(require_auth)) -> JSONResponse:
+    """Return current authenticated user info and their SPEPE profile."""
+    email = user_info.get("email", "")
+    name = user_info.get("name", email)
+    # Look up profile in Firestore or fallback to admin
+    profile = "admin"
+    db = _fs_client()
+    if db and email:
+        try:
+            docs = db.collection("spepe_users").where("email", "==", email).limit(1).stream()
+            async for doc in docs:
+                d = doc.to_dict() or {}
+                profile = d.get("profile") or d.get("role") or "admin"
+                name = d.get("name") or name
+                break
         except Exception:
             pass
-    _ACCESS_MATRIX = data
-    return JSONResponse({"ok": True})
+    return JSONResponse({"email": email, "name": name, "profile": profile})
 
 
 @app.get("/admin/api/jobs", dependencies=[Depends(require_auth)])
@@ -3256,17 +3285,25 @@ _ARCH_JOBS = {
 
 
 @app.get("/admin/api/architecture", dependencies=[Depends(require_auth)])
-async def admin_architecture() -> JSONResponse:
-    """Return pipeline DAG + job statuses for the Architecture tab."""
+async def admin_architecture() -> Response:
+    """Return pipeline DAG + job statuses + service health for the Architecture tab."""
     use_bq = settings.gcp_project_id and os.environ.get("USE_BIGQUERY", "").lower() == "true"
     jobs: list[dict] = []
+    services: list[dict] = []
+    gold_summary: list[dict] = []
     if use_bq:
-        try:
-            from ui.sentinel_queries import query_jobs_executions
-
-            jobs = await asyncio.to_thread(query_jobs_executions)
-        except Exception as exc:
-            logger.warning("architecture query_jobs_executions failed: %s", exc)
+        results = await asyncio.gather(
+            asyncio.to_thread(__import__("ui.sentinel_queries", fromlist=["query_jobs_executions"]).query_jobs_executions),
+            asyncio.to_thread(__import__("ui.sentinel_queries", fromlist=["query_cloud_run_services"]).query_cloud_run_services),
+            asyncio.to_thread(__import__("ui.sentinel_queries", fromlist=["query_gold_storage"]).query_gold_storage),
+            return_exceptions=True,
+        )
+        jobs = results[0] if not isinstance(results[0], Exception) else []
+        services = results[1] if not isinstance(results[1], Exception) else []
+        gold_summary = results[2] if not isinstance(results[2], Exception) else []
+        for r in results:
+            if isinstance(r, Exception):
+                logger.warning("architecture query failed: %s", r)
 
     job_map = {j["job"]: j for j in jobs}
 
@@ -3281,12 +3318,18 @@ async def admin_architecture() -> JSONResponse:
             "alert_message": info.get("alert_message"),
         }
 
-    return JSONResponse(
+    # Gold table summary per stage for the visual diagram
+    gold_ok = sum(1 for t in gold_summary if t.get("status") == "ok")
+    gold_total = len(gold_summary)
+
+    return _json_safe_response(
         {
             "stages": _PIPELINE_STAGES,
             "jobs": {
                 group: [_enrich(j) for j in job_list] for group, job_list in _ARCH_JOBS.items()
             },
+            "services": services,
+            "gold_summary": {"ok": gold_ok, "total": gold_total},
             "source": "cloud_run" if jobs else "stub",
         }
     )
@@ -3345,29 +3388,47 @@ async def admin_kpis() -> JSONResponse:
     n_tables_ok = sum(1 for t in gold if t.get("status") == "ok")
     n_agents_calls = sum(int(a.get("calls_24h", 0) or 0) for a in agents)
 
+    maturity_report: dict = {"dataops": {}, "mlops": {}, "llmops": {}, "opportunities": []}
+    try:
+        from ui.sentinel_queries import compute_maturity_report
+
+        maturity_report = compute_maturity_report(jobs, gold, silver, mlops or {}, agents)
+    except Exception as exc:
+        logger.warning("compute_maturity_report failed: %s", exc)
+
     return _json_safe_response(
         {
             "source": source,
             "maturity": maturity,
+            "maturity_report": maturity_report,
             "dataops": {
                 "score": maturity.get("dataops", 0),
+                "score_5": maturity_report.get("dataops", {}).get("score", 0),
+                "label": maturity_report.get("dataops", {}).get("label", "—"),
                 "jobs_ok": n_jobs_ok,
                 "jobs_total": len(jobs),
                 "tables_ok": n_tables_ok,
                 "tables_total": len(gold),
+                "items": maturity_report.get("dataops", {}).get("items", []),
             },
             "mlops": {
                 "score": maturity.get("mlops", 0),
+                "score_5": maturity_report.get("mlops", {}).get("score", 0),
+                "label": maturity_report.get("mlops", {}).get("label", "—"),
                 "brier_score": mlops.get("brier_score") if mlops else None,
                 "js_divergence": mlops.get("js_divergence") if mlops else None,
                 "eval_score": mlops.get("eval_score") if mlops else None,
                 "model_version": mlops.get("model_version") if mlops else None,
+                "items": maturity_report.get("mlops", {}).get("items", []),
             },
             "llmops": {
                 "score": maturity.get("llmops", 0),
+                "score_5": maturity_report.get("llmops", {}).get("score", 0),
+                "label": maturity_report.get("llmops", {}).get("label", "—"),
                 "calls_24h": n_agents_calls,
                 "agents": len(agents),
                 "agents_ok": sum(1 for a in agents if a.get("status") == "ok"),
+                "items": maturity_report.get("llmops", {}).get("items", []),
             },
             "finops": {
                 "bq_total_30d_usd": costs.get("bq_total_30d_usd", 0.0),
@@ -3379,6 +3440,7 @@ async def admin_kpis() -> JSONResponse:
                 ),
                 "bq_daily": costs.get("bq_daily", []),
             },
+            "opportunities": maturity_report.get("opportunities", []),
         }
     )
 

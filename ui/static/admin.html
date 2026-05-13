@@ -497,11 +497,10 @@ select,input,textarea{font-family:inherit}
         </div>
         <button class="btn btn-secondary btn-sm" onclick="loadKpis()">↺ Atualizar</button>
       </div>
-      <div id="kpis-grid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:12px">
+      <div id="kpis-grid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:12px">
         <div style="color:var(--text3);font-size:.78rem;padding:20px 0">Carregando…</div>
       </div>
-      <div style="margin-top:18px;font-size:.7rem;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:var(--text3);margin-bottom:10px">FinOps — Custos 30 dias</div>
-      <div id="kpis-costs" style="display:flex;gap:12px;flex-wrap:wrap"></div>
+      <div id="kpis-costs" style="margin-top:6px;display:flex;gap:10px;flex-wrap:wrap"></div>
     </div>
 
     <!-- ===== EXPLORER ===== -->
@@ -673,7 +672,7 @@ function showSection(name) {
 
   if (name === 'sentinel' && sentinelData.length === 0) loadSentinel();
   if (name === 'users' && usersData.length === 0) loadUsers();
-  if (name === 'access') renderAccessMatrix();
+  if (name === 'access') loadAccess();
   if (name === 'jobs') loadJobs();
   if (name === 'catalog') loadCatalog();
   if (name === 'architecture') loadArchitecture();
@@ -939,8 +938,11 @@ function closeDrawer() {
 async function loadUsers() {
   try {
     const r = await apiFetch('/admin/api/users');
+    if (!r) return;
     const data = await r.json();
-    usersData = data.users || _stubUsers();
+    // Normalize role→profile for backward compat with old Firestore records
+    usersData = (data.users || []).map(u => ({...u, profile: u.profile || u.role || 'consultor'}));
+    if (!usersData.length) usersData = _stubUsers();
   } catch {
     usersData = _stubUsers();
   }
@@ -1041,11 +1043,19 @@ function editUser(id) {
   if (u) openUserModal(u);
 }
 
-function toggleUserStatus(id) {
+async function toggleUserStatus(id) {
   const u = usersData.find(u => u.id === id);
   if (!u) return;
-  u.status = u.status === 'active' ? 'inactive' : 'active';
-  toast(`Usuário ${u.name} ${u.status === 'active' ? 'ativado' : 'desativado'}.`, 'info');
+  const newStatus = u.status === 'active' ? 'inactive' : 'active';
+  try {
+    await apiFetch(`/admin/api/users/${id}`, {
+      method: 'PUT',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({...u, status: newStatus}),
+    });
+  } catch {}
+  u.status = newStatus;
+  toast(`Usuário ${u.name} ${newStatus === 'active' ? 'ativado' : 'desativado'}.`, 'info');
   renderUsers(usersData);
 }
 
@@ -1062,6 +1072,23 @@ function deleteUser(id) {
 // ============================================================
 const profiles = ['jornalista', 'consultor', 'cientista', 'pesquisador'];
 let accessState = JSON.parse(JSON.stringify(ACCESS_DEFAULTS));
+
+async function loadAccess() {
+  try {
+    const r = await apiFetch('/admin/api/access');
+    if (!r) return;
+    const data = await r.json();
+    if (data.matrix && typeof data.matrix === 'object') {
+      // Merge API data over defaults (keeps defaults for any missing keys)
+      for (const profile of profiles) {
+        if (data.matrix[profile]) {
+          accessState[profile] = {...ACCESS_DEFAULTS[profile], ...data.matrix[profile]};
+        }
+      }
+    }
+  } catch {}
+  renderAccessMatrix();
+}
 
 function renderAccessMatrix() {
   const tbody = document.getElementById('access-tbody');
@@ -1213,58 +1240,139 @@ function renderCatalog(tables) {
 }
 
 // ============================================================
-// ARQUITETURA
+// ARQUITETURA — diagrama visual com nodes coloridos
 // ============================================================
 async function loadArchitecture() {
   try {
     const r = await apiFetch('/admin/api/architecture');
     if (!r) return;
     const data = await r.json();
-    renderArchPipeline(data.stages || []);
-    renderArchJobs(data.jobs || {});
+    renderArchDiagram(data);
   } catch(e) {
     document.getElementById('arch-jobs').innerHTML = '<div style="color:var(--red);font-size:.78rem">Erro ao carregar arquitetura.</div>';
     console.error('loadArchitecture error:', e);
   }
 }
 
-function renderArchPipeline(stages) {
-  const el = document.getElementById('arch-pipeline');
-  el.innerHTML = stages.map((s, i) => `
-    <div style="display:flex;align-items:center;gap:8px">
-      <div style="background:var(--bg3);border:1px solid var(--border);border-radius:8px;padding:10px 16px;text-align:center;min-width:110px">
-        <div style="font-size:.78rem;font-weight:700;color:${s.color}">${s.stage}</div>
-        <div style="font-size:.66rem;color:var(--text3);margin-top:2px">${s.layer}</div>
-      </div>
-      ${i < stages.length - 1 ? '<span style="color:var(--text3);font-size:1.1rem">→</span>' : ''}
-    </div>`).join('');
+function _archNode(label, sublabel, status, icon, wide=false) {
+  const bg = {ok:'rgba(34,197,94,.12)',warn:'rgba(234,179,8,.12)',error:'rgba(239,68,68,.12)',unknown:'var(--bg3)'}[status]||'var(--bg3)';
+  const border = {ok:'var(--green)',warn:'var(--yellow)',error:'var(--red)',unknown:'var(--border)'}[status]||'var(--border)';
+  const dot = {ok:'#22c55e',warn:'#eab308',error:'#ef4444',unknown:'#6b7280'}[status]||'#6b7280';
+  return `<div style="background:${bg};border:2px solid ${border};border-radius:10px;padding:10px 14px;min-width:${wide?'160':'130'}px;text-align:center">
+    <div style="font-size:1.1rem;margin-bottom:3px">${icon}</div>
+    <div style="font-size:.76rem;font-weight:700">${label}</div>
+    <div style="font-size:.64rem;color:var(--text3);margin-top:2px">${sublabel}</div>
+    <div style="margin-top:5px;display:flex;align-items:center;justify-content:center;gap:4px">
+      <div style="width:7px;height:7px;border-radius:50%;background:${dot}"></div>
+      <span style="font-size:.62rem;color:${dot};font-weight:600">${{ok:'ON',warn:'ATENÇÃO',error:'OFF',unknown:'—'}[status]||status}</span>
+    </div>
+  </div>`;
 }
 
-function renderArchJobs(jobGroups) {
-  const groupLabels = { ingestion: '📥 Ingestão (Bronze)', transform: '🔄 Transformação (Silver)', aggregation: '⚡ Agregação (Gold)', mlops: '🤖 MLOps' };
-  const el = document.getElementById('arch-jobs');
-  el.innerHTML = Object.entries(jobGroups).map(([group, jobs]) => `
-    <div>
-      <div style="font-size:.7rem;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:var(--text3);margin-bottom:8px">${groupLabels[group] || group}</div>
+function _archArrow(label='') {
+  return `<div style="display:flex;flex-direction:column;align-items:center;justify-content:center;padding:0 4px;color:var(--text3)">
+    <div style="font-size:.55rem;color:var(--text3);white-space:nowrap;margin-bottom:1px">${label}</div>
+    <div style="font-size:1.2rem">→</div>
+  </div>`;
+}
+
+function renderArchDiagram(data) {
+  const jobs = data.jobs || {};
+  const services = data.services || [];
+  const gs = data.gold_summary || {};
+
+  // ── Status helpers ──────────────────────────────────────────
+  function groupStatus(jobList) {
+    if (!jobList || !jobList.length) return 'unknown';
+    if (jobList.every(j => j.status === 'ok')) return 'ok';
+    if (jobList.some(j => j.status === 'error')) return 'error';
+    return 'warn';
+  }
+  function serviceStatus(name) {
+    const s = services.find(s => s.service === name);
+    return s ? s.status : 'unknown';
+  }
+
+  const ingStatus = groupStatus(jobs.ingestion);
+  const trfStatus = groupStatus(jobs.transform);
+  const aggStatus = groupStatus(jobs.aggregation);
+  const mlStatus = groupStatus(jobs.mlops);
+  const prodStatus = serviceStatus('spepe-prod');
+  const stagStatus = serviceStatus('spepe-staging');
+  const goldRows = gs.ok ?? '?';
+  const goldTotal = gs.total ?? '?';
+  const goldSt = gs.ok >= gs.total * 0.75 ? 'ok' : gs.ok > 0 ? 'warn' : 'error';
+
+  const archPipeline = document.getElementById('arch-pipeline');
+  archPipeline.innerHTML = `
+    <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;margin-bottom:18px;padding:14px;background:var(--bg3);border:1px solid var(--border);border-radius:12px;width:100%">
+      ${_archNode('Bronze', 'GCS · Parquet', ingStatus, '🗄️')}
+      ${_archArrow('ingestão')}
+      ${_archNode('Silver', 'BigQuery', trfStatus, '🔷')}
+      ${_archArrow('transform')}
+      ${_archNode('Gold', `${goldRows}/${goldTotal} tabelas OK`, goldSt, '⭐', true)}
+      ${_archArrow('agregação')}
+      ${_archNode('MLOps', 'Vertex · PyMC', mlStatus, '🤖')}
+      ${_archArrow('serve')}
+      <div style="display:flex;flex-direction:column;gap:8px">
+        ${_archNode('spepe-prod', 'Cloud Run · on', prodStatus, '🌐', true)}
+        ${_archNode('spepe-staging', 'Cloud Run', stagStatus, '🔧', true)}
+      </div>
+    </div>`;
+
+  // ── Job groups ────────────────────────────────────────────────
+  const groupLabels = {
+    ingestion: '📥 Ingestão → Bronze',
+    transform: '🔄 Transformação → Silver',
+    aggregation: '⚡ Agregação → Gold',
+    mlops: '🤖 MLOps / Treinamento',
+  };
+  const archJobs = document.getElementById('arch-jobs');
+  archJobs.innerHTML = Object.entries(jobs).map(([group, jobList]) => {
+    const gLabel = groupLabels[group] || group;
+    const gSt = groupStatus(jobList);
+    const gBorder = {ok:'var(--green)',warn:'var(--yellow)',error:'var(--red)',unknown:'var(--border)'}[gSt]||'var(--border)';
+    return `
+    <div style="border:1px solid ${gBorder};border-radius:10px;padding:12px 14px">
+      <div style="font-size:.7rem;font-weight:700;text-transform:uppercase;letter-spacing:.07em;margin-bottom:8px">${gLabel}</div>
       <div style="display:flex;flex-wrap:wrap;gap:6px">
-        ${jobs.map(j => {
+        ${jobList.map(j => {
           const st = j.status || 'unknown';
-          const color = {ok:'var(--green)',warn:'var(--yellow)',error:'var(--red)',unknown:'var(--text3)'}[st] || 'var(--text3)';
-          const dot = {ok:'✅',warn:'⚠️',error:'❌',unknown:'—'}[st] || '—';
-          const shortName = j.name.replace('spepe-','');
+          const bg = {ok:'rgba(34,197,94,.1)',warn:'rgba(234,179,8,.1)',error:'rgba(239,68,68,.1)',unknown:'var(--bg3)'}[st]||'var(--bg3)';
+          const brd = {ok:'var(--green)',warn:'var(--yellow)',error:'var(--red)',unknown:'var(--border)'}[st]||'var(--border)';
+          const dot = {ok:'#22c55e',warn:'#eab308',error:'#ef4444',unknown:'#6b7280'}[st]||'#6b7280';
+          const short = j.name.replace('spepe-','');
           const last = j.last_run_at ? new Date(j.last_run_at).toLocaleDateString('pt-BR') : '—';
-          return `<div style="border:1px solid var(--border);border-radius:6px;padding:6px 10px;font-size:.72rem;background:var(--bg2)" title="${j.alert_message || j.last_status || ''}">
-            <span style="color:${color}">${dot}</span>
-            <span style="font-weight:600;margin-left:4px">${shortName}</span>
-            <span style="color:var(--text3);margin-left:6px">${last}</span>
+          const tip = j.alert_message || j.last_status || '';
+          return `<div title="${tip}" onclick="runJobFromArch('${j.name}')" style="background:${bg};border:1px solid ${brd};border-radius:7px;padding:6px 10px;font-size:.71rem;cursor:pointer;transition:opacity .2s" onmouseover="this.style.opacity='.7'" onmouseout="this.style.opacity='1'">
+            <div style="display:flex;align-items:center;gap:4px;margin-bottom:2px">
+              <div style="width:6px;height:6px;border-radius:50%;background:${dot};flex-shrink:0"></div>
+              <span style="font-weight:700">${short}</span>
+            </div>
+            <div style="font-size:.62rem;color:var(--text3)">${last}</div>
           </div>`;
         }).join('')}
       </div>
-    </div>`).join('');
+    </div>`;
+  }).join('');
+}
+
+function renderArchPipeline(stages) { /* legacy — use renderArchDiagram */ }
+function renderArchJobs(jobGroups) { /* legacy — use renderArchDiagram */ }
+
+async function runJobFromArch(name) {
+  if (!confirm(`Executar ${name}?`)) return;
+  toast(`Iniciando ${name}…`, 'info');
+  try {
+    const r = await fetch(`/admin/api/jobs/${name}/run`, { method: 'POST' });
+    const d = await r.json();
+    toast(d.ok ? `${name} iniciado` : `Erro: ${d.error}`, d.ok ? 'ok' : 'err');
+    setTimeout(loadArchitecture, 2000);
+  } catch { toast(`Falha ao iniciar ${name}`, 'err'); }
 }
 
 // ============================================================
-// KPIs
+// KPIs — Maturity 0-5 + items + opportunities
 // ============================================================
 async function loadKpis() {
   try {
@@ -1278,50 +1386,108 @@ async function loadKpis() {
   }
 }
 
-function renderKpis(d) {
-  const score = (v) => `<span style="font-size:1.6rem;font-weight:800;color:${v>=70?'var(--green)':v>=40?'var(--yellow)':'var(--red)'}">${v}</span><span style="font-size:.72rem;color:var(--text3)">/100</span>`;
-  const val = (v, unit='') => v != null ? `<span style="font-size:1.1rem;font-weight:700">${typeof v==='number'?v.toLocaleString('pt-BR'):v}</span><span style="font-size:.72rem;color:var(--text3)">${unit}</span>` : '<span style="color:var(--text3)">—</span>';
+function _maturityMeter(score5, label) {
+  const colors = ['var(--red)','var(--red)','var(--yellow)','var(--yellow)','var(--green)','var(--green)'];
+  const c = colors[score5] || 'var(--text3)';
+  const pips = Array.from({length:6}, (_,i) => `<div style="width:22px;height:22px;border-radius:50%;background:${i<=score5?c:'var(--bg3)'};border:2px solid ${i<=score5?c:'var(--border)'};display:flex;align-items:center;justify-content:center;font-size:.6rem;font-weight:700;color:${i<=score5?'#fff':'var(--text3)'}">${i}</div>`).join('');
+  return `<div style="display:flex;flex-direction:column;align-items:center;gap:6px">
+    <div style="font-size:2.2rem;font-weight:900;color:${c};line-height:1">${score5}</div>
+    <div style="font-size:.65rem;color:${c};font-weight:700;text-transform:uppercase;letter-spacing:.05em">${label}</div>
+    <div style="display:flex;gap:4px;align-items:center">${pips}</div>
+    <div style="font-size:.6rem;color:var(--text3)">nível ${score5} de 5</div>
+  </div>`;
+}
 
-  const cards = [
-    { title: 'DataOps', icon: '⚙️', score: d.dataops?.score, rows: [
-      ['Jobs OK', `${d.dataops?.jobs_ok||0} / ${d.dataops?.jobs_total||0}`],
-      ['Tabelas OK', `${d.dataops?.tables_ok||0} / ${d.dataops?.tables_total||0}`],
-    ]},
-    { title: 'MLOps', icon: '🤖', score: d.mlops?.score, rows: [
-      ['Brier Score', d.mlops?.brier_score != null ? d.mlops.brier_score.toFixed(3) : '—'],
-      ['Eval Score', d.mlops?.eval_score != null ? (d.mlops.eval_score*100).toFixed(1)+'%' : '—'],
-      ['Versão', d.mlops?.model_version || '—'],
-    ]},
-    { title: 'LLMOps', icon: '💬', score: d.llmops?.score, rows: [
-      ['Agentes OK', `${d.llmops?.agents_ok||0} / ${d.llmops?.agents||0}`],
-      ['Calls 24h', (d.llmops?.calls_24h||0).toLocaleString('pt-BR')],
-    ]},
-    { title: 'FinOps', icon: '💰', score: null, rows: [
-      ['BQ 30d', `$${(d.finops?.bq_total_30d_usd||0).toFixed(2)}`],
-      ['LLM 30d', `$${(d.finops?.llm_total_30d_usd||0).toFixed(2)}`],
-      ['Total', `$${(d.finops?.total_30d_usd||0).toFixed(2)}`],
-    ]},
+function _itemsList(items, id) {
+  if (!items || !items.length) return '';
+  const stIcon = {ok:'✅', warn:'⚠️', error:'❌'};
+  const stColor = {ok:'var(--green2)', warn:'var(--yellow)', error:'var(--red)'};
+  return `<details style="margin-top:12px">
+    <summary style="cursor:pointer;font-size:.72rem;font-weight:600;color:var(--text2);list-style:none;user-select:none">
+      ▶ Itens técnicos (${items.length})
+    </summary>
+    <div style="margin-top:8px;display:flex;flex-direction:column;gap:5px">
+      ${items.map(it => `
+        <div style="display:flex;gap:8px;align-items:flex-start;padding:6px 8px;background:var(--bg3);border-radius:6px">
+          <span style="color:${stColor[it.status]||'var(--text3)'};font-size:.8rem;flex-shrink:0">${stIcon[it.status]||'—'}</span>
+          <div>
+            <div style="font-size:.72rem;font-weight:600">${it.item}</div>
+            <div style="font-size:.67rem;color:var(--text3);margin-top:2px">${it.evidence}</div>
+          </div>
+        </div>`).join('')}
+    </div>
+  </details>`;
+}
+
+function renderKpis(d) {
+  const pillars = [
+    { key: 'dataops', title: 'DataOps', icon: '⚙️',
+      extra: `<div style="display:flex;justify-content:space-between;font-size:.73rem;margin-top:8px"><span style="color:var(--text3)">Jobs OK</span><span>${d.dataops?.jobs_ok||0}/${d.dataops?.jobs_total||0}</span></div>
+              <div style="display:flex;justify-content:space-between;font-size:.73rem;margin-top:4px"><span style="color:var(--text3)">Tabelas Gold OK</span><span>${d.dataops?.tables_ok||0}/${d.dataops?.tables_total||0}</span></div>` },
+    { key: 'mlops', title: 'MLOps', icon: '🤖',
+      extra: `<div style="display:flex;justify-content:space-between;font-size:.73rem;margin-top:8px"><span style="color:var(--text3)">Brier Score</span><span>${d.mlops?.brier_score!=null?d.mlops.brier_score.toFixed(3):'—'}</span></div>
+              <div style="display:flex;justify-content:space-between;font-size:.73rem;margin-top:4px"><span style="color:var(--text3)">Versão</span><span>${d.mlops?.model_version||'—'}</span></div>` },
+    { key: 'llmops', title: 'LLMOps', icon: '💬',
+      extra: `<div style="display:flex;justify-content:space-between;font-size:.73rem;margin-top:8px"><span style="color:var(--text3)">Agentes OK</span><span>${d.llmops?.agents_ok||0}/${d.llmops?.agents||0}</span></div>
+              <div style="display:flex;justify-content:space-between;font-size:.73rem;margin-top:4px"><span style="color:var(--text3)">Calls 24h</span><span>${(d.llmops?.calls_24h||0).toLocaleString('pt-BR')}</span></div>` },
   ];
 
-  document.getElementById('kpis-grid').innerHTML = cards.map(c => `
+  document.getElementById('kpis-grid').innerHTML = pillars.map(p => {
+    const pillar = d[p.key] || {};
+    const s5 = pillar.score_5 ?? 0;
+    const lbl = pillar.label || '—';
+    return `
     <div style="background:var(--bg2);border:1px solid var(--border);border-radius:10px;padding:16px">
-      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">
-        <div style="font-size:.78rem;font-weight:700">${c.icon} ${c.title}</div>
-        ${c.score != null ? score(c.score) : ''}
+      <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:12px">
+        <div style="font-size:.8rem;font-weight:700">${p.icon} ${p.title}</div>
       </div>
-      ${c.rows.map(([k,v]) => `
-        <div style="display:flex;justify-content:space-between;font-size:.74rem;margin-bottom:5px">
-          <span style="color:var(--text3)">${k}</span>
-          <span style="font-weight:500">${v}</span>
-        </div>`).join('')}
-    </div>`).join('');
+      ${_maturityMeter(s5, lbl)}
+      ${p.extra}
+      ${_itemsList(pillar.items, p.key)}
+    </div>`;
+  }).join('');
 
-  const daily = (d.finops?.bq_daily || []).slice(-7);
+  // FinOps card
+  const fo = d.finops || {};
+  const foCard = `
+    <div style="background:var(--bg2);border:1px solid var(--border);border-radius:10px;padding:16px">
+      <div style="font-size:.8rem;font-weight:700;margin-bottom:12px">💰 FinOps</div>
+      <div style="display:flex;justify-content:space-between;font-size:.73rem;margin-bottom:5px"><span style="color:var(--text3)">BigQuery 30d</span><span style="font-weight:600">$${(fo.bq_total_30d_usd||0).toFixed(2)}</span></div>
+      <div style="display:flex;justify-content:space-between;font-size:.73rem;margin-bottom:5px"><span style="color:var(--text3)">LLM 30d</span><span style="font-weight:600">$${(fo.llm_total_30d_usd||0).toFixed(2)}</span></div>
+      <div style="display:flex;justify-content:space-between;font-size:.73rem;border-top:1px solid var(--border);padding-top:6px;margin-top:6px"><span style="color:var(--text3)">Total</span><span style="font-weight:800;color:var(--green2)">$${(fo.total_30d_usd||0).toFixed(2)}</span></div>
+    </div>`;
+  document.getElementById('kpis-grid').innerHTML += foCard;
+
+  // Daily cost sparkline
+  const daily = (fo.bq_daily || []).slice(-7);
   document.getElementById('kpis-costs').innerHTML = daily.length ? daily.map(r => `
     <div style="background:var(--bg2);border:1px solid var(--border);border-radius:6px;padding:8px 12px;font-size:.72rem">
       <div style="color:var(--text3)">${r.day||'—'}</div>
       <div style="font-weight:700;color:var(--green2)">$${(r.bq_cost_usd||0).toFixed(4)}</div>
-    </div>`).join('') : '<div style="color:var(--text3);font-size:.74rem">Sem dados de custo disponíveis.</div>';
+    </div>`).join('') : '';
+
+  // Opportunities section
+  const opps = d.opportunities || [];
+  if (opps.length) {
+    const priColor = {high:'var(--red)', medium:'var(--yellow)', low:'var(--text3)'};
+    const priLabel = {high:'Alta', medium:'Média', low:'Baixa'};
+    const oppHtml = `
+      <div style="margin-top:20px">
+        <div style="font-size:.7rem;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:var(--text3);margin-bottom:10px">Oportunidades de Melhoria (${opps.length})</div>
+        <div style="display:flex;flex-direction:column;gap:8px">
+          ${opps.map(o => `
+            <div style="background:var(--bg2);border:1px solid var(--border);border-left:3px solid ${priColor[o.priority]||'var(--border)'};border-radius:0 8px 8px 0;padding:10px 14px">
+              <div style="display:flex;align-items:center;gap:8px;margin-bottom:4px">
+                <span style="font-size:.65rem;font-weight:700;background:var(--bg3);padding:2px 7px;border-radius:10px;color:var(--text3)">${o.pillar}</span>
+                <span style="font-size:.65rem;font-weight:700;color:${priColor[o.priority]||'var(--text3)'}">${priLabel[o.priority]||o.priority}</span>
+              </div>
+              <div style="font-size:.76rem;font-weight:600;margin-bottom:3px">${o.recommendation}</div>
+              <div style="font-size:.68rem;color:var(--text2)">Impacto: ${o.impact}</div>
+            </div>`).join('')}
+        </div>
+      </div>`;
+    document.getElementById('kpis-costs').innerHTML += oppHtml;
+  }
 }
 
 // ============================================================

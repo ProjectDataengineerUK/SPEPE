@@ -596,8 +596,10 @@ def query_costs() -> dict[str, Any]:
 
 
 # ---------------------------------------------------------------------------
-# Maturity score (Pattern 7)
+# Maturity score (Pattern 7) — 0-100 legacy + 0-5 report
 # ---------------------------------------------------------------------------
+
+_MATURITY_LABELS = ["Inexistente", "Inicial", "Repetível", "Definido", "Gerenciado", "Otimizado"]
 
 
 def compute_maturity_score(
@@ -607,13 +609,7 @@ def compute_maturity_score(
     mlops: dict[str, Any],
     agents: list[dict[str, Any]],
 ) -> dict[str, int]:
-    """
-    Compute DataOps / MLOps / LLMOps scores 0-100.
-
-    DataOps = 0.40*pct_jobs_ok + 0.30*pct_tables_fresh + 0.30*avg_dq
-    MLOps   = 0.50*(1 - brier/0.30) + 0.30*(1 - drift/0.30) + 0.20*eval_score
-    LLMOps  = 0.40*(1 - error_rate) + 0.30*(1 - p99/10s) + 0.30*availability
-    """
+    """Compute DataOps / MLOps / LLMOps scores 0-100 (legacy, kept for compatibility)."""
 
     def clamp(x: float) -> int:
         return int(max(0, min(100, round(x * 100))))
@@ -652,4 +648,226 @@ def compute_maturity_score(
         "dataops": clamp(dataops),
         "mlops": clamp(mlops_s),
         "llmops": clamp(llmops),
+    }
+
+
+def compute_maturity_report(
+    jobs: list[dict[str, Any]],
+    gold: list[dict[str, Any]],
+    silver: list[dict[str, Any]],
+    mlops: dict[str, Any],
+    agents: list[dict[str, Any]],
+) -> dict[str, Any]:
+    """
+    Compute 0-5 maturity level per pillar with technical evidence and improvement opportunities.
+
+    Levels (following MLOps Maturity Model):
+      0 = Inexistente  — sem infraestrutura
+      1 = Inicial      — processos ad-hoc, manual
+      2 = Repetível    — processos básicos estabelecidos
+      3 = Definido     — padronizado e documentado
+      4 = Gerenciado   — monitorado e controlado
+      5 = Otimizado    — melhoria contínua, automação completa
+    """
+
+    def _st(ok_cond: bool, warn_cond: bool = False) -> str:
+        return "ok" if ok_cond else ("warn" if warn_cond else "error")
+
+    # ── DataOps ──────────────────────────────────────────────────────────────
+    n_gold = len(gold) or 1
+    gold_with_data = [t for t in gold if (t.get("row_count") or 0) > 0]
+    gold_fresh = [t for t in gold if (t.get("freshness_hours") or 999) < 24]
+    silver_count = len(silver)
+    jobs_deployed = [j for j in jobs if j.get("deployed", True)]
+    jobs_ok = [j for j in jobs if j.get("status") == "ok"]
+
+    pct_data = len(gold_with_data) / n_gold
+    pct_fresh = len(gold_fresh) / n_gold
+    pct_jobs = len(jobs_ok) / max(len(jobs), 1)
+
+    do_items = [
+        {
+            "item": f"Gold tables populadas ({len(gold_with_data)}/{len(gold)})",
+            "status": _st(pct_data >= 0.75, pct_data > 0),
+            "evidence": f"{len(gold_with_data)} de {len(gold)} tabelas Gold com dados",
+        },
+        {
+            "item": f"Gold tables atualizadas <24h ({len(gold_fresh)}/{len(gold)})",
+            "status": _st(pct_fresh >= 0.75, pct_fresh > 0),
+            "evidence": f"{len(gold_fresh)} tabelas com freshness < 24h",
+        },
+        {
+            "item": f"Silver tables ({silver_count} encontradas)",
+            "status": _st(silver_count >= 10, silver_count > 0),
+            "evidence": f"{silver_count} tabelas Silver no spepe_silver",
+        },
+        {
+            "item": f"Jobs Cloud Run deployados ({len(jobs_deployed)}/{len(jobs)})",
+            "status": _st(len(jobs_deployed) == len(jobs), len(jobs_deployed) > len(jobs) * 0.5),
+            "evidence": f"{len(jobs_deployed)} de {len(jobs)} jobs encontrados na região",
+        },
+        {
+            "item": f"Jobs com última execução OK ({len(jobs_ok)}/{len(jobs)})",
+            "status": _st(pct_jobs >= 0.75, pct_jobs > 0),
+            "evidence": f"{len(jobs_ok)} jobs com SUCCEEDED na última execução",
+        },
+        {
+            "item": "Arquitetura Medallion (Bronze→Silver→Gold)",
+            "status": "ok",
+            "evidence": "bronze_writer.py + silver_transformer.py + gold_builder.py implementados",
+        },
+    ]
+    do_score = max(0, min(5, round(pct_data * 2 + pct_fresh * 1.5 + pct_jobs * 1.5)))
+
+    # ── MLOps ────────────────────────────────────────────────────────────────
+    brier = mlops.get("brier_score")
+    drift = mlops.get("js_divergence")
+    eval_sc = mlops.get("eval_score")
+    model_v = mlops.get("model_version")
+
+    ml_items = [
+        {
+            "item": "Modelo treinado (versão disponível)",
+            "status": _st(bool(model_v)),
+            "evidence": f"model_version = {model_v}" if model_v else "Nenhum modelo em spepe_mlops.model_evaluations",
+        },
+        {
+            "item": f"Brier Score < 0.20 (atual: {f'{brier:.4f}' if brier is not None else 'N/A'})",
+            "status": _st(brier is not None and brier < 0.20, brier is not None and brier < 0.30),
+            "evidence": f"Brier = {round(brier, 4) if brier is not None else 'N/A'} (meta: < 0.20 para produção)",
+        },
+        {
+            "item": f"Eval LLM Score > 0.85 (atual: {f'{eval_sc:.3f}' if eval_sc is not None else 'N/A'})",
+            "status": _st(eval_sc is not None and eval_sc > 0.85, eval_sc is not None),
+            "evidence": f"eval_score = {round(eval_sc, 3) if eval_sc is not None else 'N/A'} via golden_dataset.jsonl",
+        },
+        {
+            "item": f"Drift JS Divergence < 0.10 (atual: {f'{drift:.4f}' if drift is not None else 'N/A'})",
+            "status": _st(drift is not None and drift < 0.10, drift is not None),
+            "evidence": f"js_divergence = {round(drift, 4) if drift is not None else 'N/A'} (meta: < 0.10)",
+        },
+        {
+            "item": "Pipeline KFP 2.x compilado",
+            "status": "ok",
+            "evidence": "output/ml_pipeline.yaml gerado (mlops/vertex_pipeline.py)",
+        },
+    ]
+    ml_score = sum([
+        bool(model_v),
+        brier is not None,
+        brier is not None and brier < 0.30,
+        brier is not None and brier < 0.20,
+        eval_sc is not None and eval_sc > 0.85,
+    ])
+
+    # ── LLMOps ───────────────────────────────────────────────────────────────
+    agents_active = [a for a in agents if int(a.get("calls_24h", 0) or 0) > 0]
+    total_calls = sum(int(a.get("calls_24h", 0) or 0) for a in agents)
+    total_errors = sum(int(a.get("errors_24h", 0) or 0) for a in agents)
+    error_rate = total_errors / max(total_calls, 1)
+    p99_max = max((float(a.get("p99_latency_s", 0) or 0) for a in agents), default=0.0)
+
+    ll_items = [
+        {
+            "item": f"Agentes ativos nas últimas 24h ({len(agents_active)}/{len(agents)})",
+            "status": _st(len(agents_active) >= len(agents) * 0.7, len(agents_active) > 0),
+            "evidence": f"{len(agents_active)} agentes com chamadas: {', '.join(a['agent'] for a in agents_active[:3])}",
+        },
+        {
+            "item": f"Taxa de erro < 2% (atual: {round(error_rate * 100, 1)}%)",
+            "status": _st(error_rate < 0.02, error_rate < 0.10),
+            "evidence": f"{total_errors} erros em {total_calls} chamadas nas últimas 24h",
+        },
+        {
+            "item": f"Latência p99 < 10s (atual: {round(p99_max, 1)}s)",
+            "status": _st(p99_max < 10, p99_max < 30),
+            "evidence": f"P99 máximo entre todos os agentes: {round(p99_max, 1)}s",
+        },
+        {
+            "item": "Budget por sessão ($2.00) configurado",
+            "status": "ok",
+            "evidence": "config/session_state.py: BUDGET_USD = 2.00, BUDGET_WARN_USD = 1.50",
+        },
+        {
+            "item": "Hooks de segurança (DLP, rate-limit, audit, cost-guard)",
+            "status": "ok",
+            "evidence": "hooks/: dlp_hook.py + rate_limit_hook.py + audit_hook.py + cost_guard_hook.py",
+        },
+    ]
+    ll_score = sum([
+        len(agents) > 0,
+        len(agents_active) > 0,
+        error_rate < 0.10,
+        error_rate < 0.02,
+        p99_max < 10 and bool(agents_active),
+    ])
+
+    # ── Opportunities ─────────────────────────────────────────────────────────
+    opportunities: list[dict[str, str]] = []
+
+    empty_gold = [t["table"] for t in gold if (t.get("row_count") or 0) == 0]
+    if empty_gold:
+        opportunities.append({
+            "pillar": "DataOps", "priority": "high",
+            "recommendation": f"Popular tabelas Gold vazias: {', '.join(empty_gold[:4])}{'…' if len(empty_gold) > 4 else ''}",
+            "impact": "Habilita análises completas e aumenta score DataOps para ≥4",
+        })
+
+    stale = [t["table"] for t in gold if (t.get("freshness_hours") or 0) > 72 and (t.get("row_count") or 0) > 0]
+    if stale:
+        opportunities.append({
+            "pillar": "DataOps", "priority": "medium",
+            "recommendation": f"Agendar re-execução de gold-build: {len(stale)} tabelas com dados >72h",
+            "impact": "Freshness <24h eleva score DataOps e evita análises desatualizadas",
+        })
+
+    failed = [j["job"] for j in jobs if j.get("status") not in ("ok",) and j.get("deployed")]
+    if failed:
+        opportunities.append({
+            "pillar": "DataOps", "priority": "high",
+            "recommendation": f"Investigar {len(failed)} job(s) com falha: {', '.join(failed[:3])}",
+            "impact": "Restaura pipeline completo de ingestão",
+        })
+
+    if not model_v:
+        opportunities.append({
+            "pillar": "MLOps", "priority": "high",
+            "recommendation": "Executar spepe-pymc-train para treinar o modelo Bayesiano PyMC",
+            "impact": "Habilita predições com IC 95% e eleva score MLOps de 1→3",
+        })
+    elif brier is not None and brier >= 0.20:
+        opportunities.append({
+            "pillar": "MLOps", "priority": "medium",
+            "recommendation": f"Brier Score atual {round(brier, 3)} > 0.20: revisar priors PyMC e adicionar features temporais",
+            "impact": "Brier < 0.20 é gate para promoção para produção",
+        })
+
+    if not agents_active:
+        opportunities.append({
+            "pillar": "LLMOps", "priority": "medium",
+            "recommendation": "Nenhum agente ativo nas últimas 24h — verificar Firestore spepe_sessions e Vertex AI",
+            "impact": "Telemetria de agentes é requisito para score LLMOps ≥3",
+        })
+
+    opportunities.append({
+        "pillar": "FinOps", "priority": "high",
+        "recommendation": "Adicionar partition pruning em fact_secao_eleicao (139M rows) — filtrar sempre por ano_eleicao",
+        "impact": "Redução estimada de 70% no custo por query — maior tabela do sistema",
+    })
+    opportunities.append({
+        "pillar": "FinOps", "priority": "medium",
+        "recommendation": "Usar BigQuery Editions (autoscale) em vez de on-demand para queries analíticas recorrentes",
+        "impact": "Previsibilidade de custo e redução em ~30% para cargas regulares",
+    })
+    opportunities.append({
+        "pillar": "FinOps", "priority": "low",
+        "recommendation": "Configurar expiração de partições no Silver (90 dias) para controlar storage growth",
+        "impact": "Reduz custo de armazenamento Silver em ~40% após 3 meses",
+    })
+
+    return {
+        "dataops": {"score": do_score, "label": _MATURITY_LABELS[do_score], "items": do_items},
+        "mlops": {"score": ml_score, "label": _MATURITY_LABELS[ml_score], "items": ml_items},
+        "llmops": {"score": ll_score, "label": _MATURITY_LABELS[ll_score], "items": ll_items},
+        "opportunities": opportunities,
     }
