@@ -344,10 +344,7 @@ def query_cloud_run_services() -> list[dict[str, Any]]:
             continue
         svc = deployed[name]
         ready = next((c for c in svc.conditions if c.type_ == "Ready"), None)
-        is_ready = (
-            ready is not None
-            and ready.state == run_v2.Condition.State.CONDITION_SUCCEEDED
-        )
+        is_ready = ready is not None and ready.state == run_v2.Condition.State.CONDITION_SUCCEEDED
         out.append(
             {
                 "service": name,
@@ -730,7 +727,9 @@ def compute_maturity_report(
         {
             "item": "Modelo treinado (versão disponível)",
             "status": _st(bool(model_v)),
-            "evidence": f"model_version = {model_v}" if model_v else "Nenhum modelo em spepe_mlops.model_evaluations",
+            "evidence": f"model_version = {model_v}"
+            if model_v
+            else "Nenhum modelo em spepe_mlops.model_evaluations",
         },
         {
             "item": f"Brier Score < 0.20 (atual: {f'{brier:.4f}' if brier is not None else 'N/A'})",
@@ -753,13 +752,15 @@ def compute_maturity_report(
             "evidence": "output/ml_pipeline.yaml gerado (mlops/vertex_pipeline.py)",
         },
     ]
-    ml_score = sum([
-        bool(model_v),
-        brier is not None,
-        brier is not None and brier < 0.30,
-        brier is not None and brier < 0.20,
-        eval_sc is not None and eval_sc > 0.85,
-    ])
+    ml_score = sum(
+        [
+            bool(model_v),
+            brier is not None,
+            brier is not None and brier < 0.30,
+            brier is not None and brier < 0.20,
+            eval_sc is not None and eval_sc > 0.85,
+        ]
+    )
 
     # ── LLMOps ───────────────────────────────────────────────────────────────
     agents_active = [a for a in agents if int(a.get("calls_24h", 0) or 0) > 0]
@@ -795,76 +796,109 @@ def compute_maturity_report(
             "evidence": "hooks/: dlp_hook.py + rate_limit_hook.py + audit_hook.py + cost_guard_hook.py",
         },
     ]
-    ll_score = sum([
-        len(agents) > 0,
-        len(agents_active) > 0,
-        error_rate < 0.10,
-        error_rate < 0.02,
-        p99_max < 10 and bool(agents_active),
-    ])
+    ll_score = sum(
+        [
+            len(agents) > 0,
+            len(agents_active) > 0,
+            error_rate < 0.10,
+            error_rate < 0.02,
+            p99_max < 10 and bool(agents_active),
+        ]
+    )
 
     # ── Opportunities ─────────────────────────────────────────────────────────
     opportunities: list[dict[str, str]] = []
 
     empty_gold = [t["table"] for t in gold if (t.get("row_count") or 0) == 0]
     if empty_gold:
-        opportunities.append({
-            "pillar": "DataOps", "priority": "high",
-            "recommendation": f"Popular tabelas Gold vazias: {', '.join(empty_gold[:4])}{'…' if len(empty_gold) > 4 else ''}",
-            "impact": "Habilita análises completas e aumenta score DataOps para ≥4",
-        })
+        opportunities.append(
+            {
+                "pillar": "DataOps",
+                "priority": "high",
+                "recommendation": f"Popular tabelas Gold vazias: {', '.join(empty_gold[:4])}{'…' if len(empty_gold) > 4 else ''}",
+                "impact": "Habilita análises completas e aumenta score DataOps para ≥4",
+            }
+        )
 
-    stale = [t["table"] for t in gold if (t.get("freshness_hours") or 0) > 72 and (t.get("row_count") or 0) > 0]
+    stale = [
+        t["table"]
+        for t in gold
+        if (t.get("freshness_hours") or 0) > 72 and (t.get("row_count") or 0) > 0
+    ]
     if stale:
-        opportunities.append({
-            "pillar": "DataOps", "priority": "medium",
-            "recommendation": f"Agendar re-execução de gold-build: {len(stale)} tabelas com dados >72h",
-            "impact": "Freshness <24h eleva score DataOps e evita análises desatualizadas",
-        })
+        opportunities.append(
+            {
+                "pillar": "DataOps",
+                "priority": "medium",
+                "recommendation": f"Agendar re-execução de gold-build: {len(stale)} tabelas com dados >72h",
+                "impact": "Freshness <24h eleva score DataOps e evita análises desatualizadas",
+            }
+        )
 
     failed = [j["job"] for j in jobs if j.get("status") not in ("ok",) and j.get("deployed")]
     if failed:
-        opportunities.append({
-            "pillar": "DataOps", "priority": "high",
-            "recommendation": f"Investigar {len(failed)} job(s) com falha: {', '.join(failed[:3])}",
-            "impact": "Restaura pipeline completo de ingestão",
-        })
+        opportunities.append(
+            {
+                "pillar": "DataOps",
+                "priority": "high",
+                "recommendation": f"Investigar {len(failed)} job(s) com falha: {', '.join(failed[:3])}",
+                "impact": "Restaura pipeline completo de ingestão",
+            }
+        )
 
     if not model_v:
-        opportunities.append({
-            "pillar": "MLOps", "priority": "high",
-            "recommendation": "Executar spepe-pymc-train para treinar o modelo Bayesiano PyMC",
-            "impact": "Habilita predições com IC 95% e eleva score MLOps de 1→3",
-        })
+        opportunities.append(
+            {
+                "pillar": "MLOps",
+                "priority": "high",
+                "recommendation": "Executar spepe-pymc-train para treinar o modelo Bayesiano PyMC",
+                "impact": "Habilita predições com IC 95% e eleva score MLOps de 1→3",
+            }
+        )
     elif brier is not None and brier >= 0.20:
-        opportunities.append({
-            "pillar": "MLOps", "priority": "medium",
-            "recommendation": f"Brier Score atual {round(brier, 3)} > 0.20: revisar priors PyMC e adicionar features temporais",
-            "impact": "Brier < 0.20 é gate para promoção para produção",
-        })
+        opportunities.append(
+            {
+                "pillar": "MLOps",
+                "priority": "medium",
+                "recommendation": f"Brier Score atual {round(brier, 3)} > 0.20: revisar priors PyMC e adicionar features temporais",
+                "impact": "Brier < 0.20 é gate para promoção para produção",
+            }
+        )
 
     if not agents_active:
-        opportunities.append({
-            "pillar": "LLMOps", "priority": "medium",
-            "recommendation": "Nenhum agente ativo nas últimas 24h — verificar Firestore spepe_sessions e Vertex AI",
-            "impact": "Telemetria de agentes é requisito para score LLMOps ≥3",
-        })
+        opportunities.append(
+            {
+                "pillar": "LLMOps",
+                "priority": "medium",
+                "recommendation": "Nenhum agente ativo nas últimas 24h — verificar Firestore spepe_sessions e Vertex AI",
+                "impact": "Telemetria de agentes é requisito para score LLMOps ≥3",
+            }
+        )
 
-    opportunities.append({
-        "pillar": "FinOps", "priority": "high",
-        "recommendation": "Adicionar partition pruning em fact_secao_eleicao (139M rows) — filtrar sempre por ano_eleicao",
-        "impact": "Redução estimada de 70% no custo por query — maior tabela do sistema",
-    })
-    opportunities.append({
-        "pillar": "FinOps", "priority": "medium",
-        "recommendation": "Usar BigQuery Editions (autoscale) em vez de on-demand para queries analíticas recorrentes",
-        "impact": "Previsibilidade de custo e redução em ~30% para cargas regulares",
-    })
-    opportunities.append({
-        "pillar": "FinOps", "priority": "low",
-        "recommendation": "Configurar expiração de partições no Silver (90 dias) para controlar storage growth",
-        "impact": "Reduz custo de armazenamento Silver em ~40% após 3 meses",
-    })
+    opportunities.append(
+        {
+            "pillar": "FinOps",
+            "priority": "high",
+            "recommendation": "Adicionar partition pruning em fact_secao_eleicao (139M rows) — filtrar sempre por ano_eleicao",
+            "impact": "Redução estimada de 70% no custo por query — maior tabela do sistema",
+        }
+    )
+    opportunities.append(
+        {
+            "pillar": "FinOps",
+            "priority": "medium",
+            "recommendation": "Usar BigQuery Editions (autoscale) em vez de on-demand para queries analíticas recorrentes",
+            "impact": "Previsibilidade de custo e redução em ~30% para cargas regulares",
+        }
+    )
+    opportunities.append(
+        {
+            "pillar": "FinOps",
+            "priority": "low",
+            "recommendation": "Configurar expiração de partições no Silver (90 dias) para controlar storage growth",
+            "impact": "Reduz custo de armazenamento Silver em ~40% após 3 meses",
+        }
+    )
 
     return {
         "dataops": {"score": do_score, "label": _MATURITY_LABELS[do_score], "items": do_items},

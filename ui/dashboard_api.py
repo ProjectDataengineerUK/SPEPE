@@ -2745,15 +2745,48 @@ _USER_STORE: list[dict] = [
     },
 ]  # fallback when Firestore unavailable
 _ACCESS_MATRIX: dict = {
-    "jornalista":  {"tab_mapa": 1, "tab_socioeconomico": 1, "chat_ai": 1, "export_data": 1},
-    "consultor":   {"tab_mapa": 1, "tab_socioeconomico": 1, "tab_seguranca": 1, "tab_saude": 1,
-                    "tab_pesquisas": 1, "tab_comparar": 1, "chat_ai": 1, "export_data": 1, "tab_predicao": 1},
-    "cientista":   {"tab_mapa": 1, "tab_socioeconomico": 1, "tab_seguranca": 1, "tab_saude": 1,
-                    "tab_pesquisas": 1, "tab_comparar": 1, "tab_predicao": 1, "chat_ai": 1,
-                    "export_data": 1, "shap_detail": 1, "bias_metrics": 1, "model_confidence": 1, "raw_api": 1},
-    "pesquisador": {"tab_mapa": 1, "tab_socioeconomico": 1, "tab_seguranca": 1, "tab_saude": 1,
-                    "tab_pesquisas": 1, "tab_comparar": 1, "tab_predicao": 1, "chat_ai": 1,
-                    "export_data": 1, "shap_detail": 1, "bias_metrics": 1, "model_confidence": 1, "raw_api": 1},
+    "jornalista": {"tab_mapa": 1, "tab_socioeconomico": 1, "chat_ai": 1, "export_data": 1},
+    "consultor": {
+        "tab_mapa": 1,
+        "tab_socioeconomico": 1,
+        "tab_seguranca": 1,
+        "tab_saude": 1,
+        "tab_pesquisas": 1,
+        "tab_comparar": 1,
+        "chat_ai": 1,
+        "export_data": 1,
+        "tab_predicao": 1,
+    },
+    "cientista": {
+        "tab_mapa": 1,
+        "tab_socioeconomico": 1,
+        "tab_seguranca": 1,
+        "tab_saude": 1,
+        "tab_pesquisas": 1,
+        "tab_comparar": 1,
+        "tab_predicao": 1,
+        "chat_ai": 1,
+        "export_data": 1,
+        "shap_detail": 1,
+        "bias_metrics": 1,
+        "model_confidence": 1,
+        "raw_api": 1,
+    },
+    "pesquisador": {
+        "tab_mapa": 1,
+        "tab_socioeconomico": 1,
+        "tab_seguranca": 1,
+        "tab_saude": 1,
+        "tab_pesquisas": 1,
+        "tab_comparar": 1,
+        "tab_predicao": 1,
+        "chat_ai": 1,
+        "export_data": 1,
+        "shap_detail": 1,
+        "bias_metrics": 1,
+        "model_confidence": 1,
+        "raw_api": 1,
+    },
 }  # fallback when Firestore unavailable — matches frontend ACCESS_DEFAULTS
 _FIRESTORE_PROJECT = os.environ.get("GCP_PROJECT_ID", "")
 
@@ -2862,8 +2895,10 @@ async def admin_save_access(request: Request) -> JSONResponse:
     if db:
         try:
             # Store flat (not nested under "matrix") to avoid double-nesting on read
-            await db.collection("spepe_admin").document("access_matrix").set(
-                {"matrix": data, "updated_at": str(__import__("datetime").datetime.utcnow())}
+            await (
+                db.collection("spepe_admin")
+                .document("access_matrix")
+                .set({"matrix": data, "updated_at": str(__import__("datetime").datetime.utcnow())})
             )
             _ACCESS_MATRIX = data
             return JSONResponse({"ok": True, "source": "firestore"})
@@ -3065,7 +3100,12 @@ async def admin_sentinel_status() -> Response:
         {"agent": a, "status": "ok", "calls_24h": 0, "p99_latency_s": 0.0, "cost_24h_usd": 0.0}
         for a in AGENT_NAMES
     ]
-    _stub_mlops: dict = {"brier_score": None, "js_divergence": None, "eval_score": None, "bias_metrics": []}
+    _stub_mlops: dict = {
+        "brier_score": None,
+        "js_divergence": None,
+        "eval_score": None,
+        "bias_metrics": [],
+    }
 
     if not use_bq:
         return _json_safe_response(
@@ -3109,7 +3149,11 @@ async def admin_sentinel_status() -> Response:
 
     logger.info(
         "Sentinel: %d gold, %d silver, %d views, %d jobs, %d services",
-        len(gold_tables), len(silver_tables), len(views), len(jobs), len(services),
+        len(gold_tables),
+        len(silver_tables),
+        len(views),
+        len(jobs),
+        len(services),
     )
 
     maturity = compute_maturity_score(jobs, gold_tables, silver_tables, mlops_metrics, agents)
@@ -3151,8 +3195,12 @@ async def admin_catalog() -> JSONResponse:
                                 "size_mb": round(t.num_bytes / 1e6, 1) if t.num_bytes else 0,
                                 "last_modified": str(t.modified) if t.modified else None,
                                 "description": t.description or "",
-                                "partitioning": str(t.time_partitioning.type_) if t.time_partitioning else None,
-                                "clustering": list(t.clustering_fields) if t.clustering_fields else [],
+                                "partitioning": str(t.time_partitioning.type_)
+                                if t.time_partitioning
+                                else None,
+                                "clustering": list(t.clustering_fields)
+                                if t.clustering_fields
+                                else [],
                             }
                         )
                 except Exception as exc:
@@ -3164,36 +3212,106 @@ async def admin_catalog() -> JSONResponse:
             logger.warning("Catalog BQ query failed: %s", exc)
 
     stub_catalog = [
-        {"dataset_id": "spepe_gold", "table_id": "fact_municipio_eleicao",
-         "num_rows": None, "size_mb": None, "last_modified": None, "partitioning": "DAY (ano_eleicao)",
-         "clustering": ["sg_uf", "cd_cargo", "nr_turno"], "description": "Resultados eleitorais por município × eleição"},
-        {"dataset_id": "spepe_gold", "table_id": "fact_secao_eleicao",
-         "num_rows": None, "size_mb": None, "last_modified": None, "partitioning": None,
-         "clustering": ["sg_uf"], "description": "Granular seção × candidato (139M+ rows)"},
-        {"dataset_id": "spepe_gold", "table_id": "fact_municipio_candidato_eleicao",
-         "num_rows": None, "size_mb": None, "last_modified": None, "partitioning": None,
-         "clustering": ["sg_uf", "candidato"], "description": "Desempenho candidato × município"},
-        {"dataset_id": "spepe_gold", "table_id": "fact_ibge_municipio",
-         "num_rows": None, "size_mb": None, "last_modified": None, "partitioning": "RANGE (ano)",
-         "clustering": ["sg_uf"], "description": "Indicadores socioeconômicos IBGE por município"},
-        {"dataset_id": "spepe_gold", "table_id": "fact_seguranca_municipio",
-         "num_rows": None, "size_mb": None, "last_modified": None, "partitioning": None,
-         "clustering": ["sg_uf"], "description": "IVS + Atlas da Violência + SINESP"},
-        {"dataset_id": "spepe_gold", "table_id": "fact_saude_municipio",
-         "num_rows": None, "size_mb": None, "last_modified": None, "partitioning": None,
-         "clustering": ["sg_uf"], "description": "DataSUS SIM + ANS cobertura"},
-        {"dataset_id": "spepe_gold", "table_id": "fact_pesquisa",
-         "num_rows": None, "size_mb": None, "last_modified": None, "partitioning": None,
-         "clustering": ["sg_uf"], "description": "Pesquisas eleitorais TSE/institutos"},
-        {"dataset_id": "spepe_mlops", "table_id": "model_evaluations",
-         "num_rows": None, "size_mb": None, "last_modified": None, "partitioning": "DAY (evaluated_at)",
-         "clustering": ["model_version"], "description": "Backtests e canary evaluation por versão"},
-        {"dataset_id": "spepe_mlops", "table_id": "fact_predictions",
-         "num_rows": None, "size_mb": None, "last_modified": None, "partitioning": "DAY (prediction_date)",
-         "clustering": ["candidato", "sg_uf", "model_version"], "description": "Predições com IC 95%"},
-        {"dataset_id": "spepe_mlops", "table_id": "bias_metrics",
-         "num_rows": None, "size_mb": None, "last_modified": None, "partitioning": "DAY (measured_at)",
-         "clustering": ["model_version"], "description": "Fairness metrics por sg_uf e quintil de renda"},
+        {
+            "dataset_id": "spepe_gold",
+            "table_id": "fact_municipio_eleicao",
+            "num_rows": None,
+            "size_mb": None,
+            "last_modified": None,
+            "partitioning": "DAY (ano_eleicao)",
+            "clustering": ["sg_uf", "cd_cargo", "nr_turno"],
+            "description": "Resultados eleitorais por município × eleição",
+        },
+        {
+            "dataset_id": "spepe_gold",
+            "table_id": "fact_secao_eleicao",
+            "num_rows": None,
+            "size_mb": None,
+            "last_modified": None,
+            "partitioning": None,
+            "clustering": ["sg_uf"],
+            "description": "Granular seção × candidato (139M+ rows)",
+        },
+        {
+            "dataset_id": "spepe_gold",
+            "table_id": "fact_municipio_candidato_eleicao",
+            "num_rows": None,
+            "size_mb": None,
+            "last_modified": None,
+            "partitioning": None,
+            "clustering": ["sg_uf", "candidato"],
+            "description": "Desempenho candidato × município",
+        },
+        {
+            "dataset_id": "spepe_gold",
+            "table_id": "fact_ibge_municipio",
+            "num_rows": None,
+            "size_mb": None,
+            "last_modified": None,
+            "partitioning": "RANGE (ano)",
+            "clustering": ["sg_uf"],
+            "description": "Indicadores socioeconômicos IBGE por município",
+        },
+        {
+            "dataset_id": "spepe_gold",
+            "table_id": "fact_seguranca_municipio",
+            "num_rows": None,
+            "size_mb": None,
+            "last_modified": None,
+            "partitioning": None,
+            "clustering": ["sg_uf"],
+            "description": "IVS + Atlas da Violência + SINESP",
+        },
+        {
+            "dataset_id": "spepe_gold",
+            "table_id": "fact_saude_municipio",
+            "num_rows": None,
+            "size_mb": None,
+            "last_modified": None,
+            "partitioning": None,
+            "clustering": ["sg_uf"],
+            "description": "DataSUS SIM + ANS cobertura",
+        },
+        {
+            "dataset_id": "spepe_gold",
+            "table_id": "fact_pesquisa",
+            "num_rows": None,
+            "size_mb": None,
+            "last_modified": None,
+            "partitioning": None,
+            "clustering": ["sg_uf"],
+            "description": "Pesquisas eleitorais TSE/institutos",
+        },
+        {
+            "dataset_id": "spepe_mlops",
+            "table_id": "model_evaluations",
+            "num_rows": None,
+            "size_mb": None,
+            "last_modified": None,
+            "partitioning": "DAY (evaluated_at)",
+            "clustering": ["model_version"],
+            "description": "Backtests e canary evaluation por versão",
+        },
+        {
+            "dataset_id": "spepe_mlops",
+            "table_id": "fact_predictions",
+            "num_rows": None,
+            "size_mb": None,
+            "last_modified": None,
+            "partitioning": "DAY (prediction_date)",
+            "clustering": ["candidato", "sg_uf", "model_version"],
+            "description": "Predições com IC 95%",
+        },
+        {
+            "dataset_id": "spepe_mlops",
+            "table_id": "bias_metrics",
+            "num_rows": None,
+            "size_mb": None,
+            "last_modified": None,
+            "partitioning": "DAY (measured_at)",
+            "clustering": ["model_version"],
+            "description": "Fairness metrics por sg_uf e quintil de renda",
+        },
     ]
     return JSONResponse(
         {"tables": stub_catalog, "source": "stub", "note": "BigQuery unavailable or disabled"}
