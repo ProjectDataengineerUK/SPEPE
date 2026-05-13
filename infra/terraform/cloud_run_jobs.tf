@@ -28,6 +28,7 @@ locals {
     sentiment_geocode     = { timeout = "3600s", memory = "2Gi",   cpu = "2", args = ["--days", "1"] }
     dim_territorio_sync   = { timeout = "300s",  memory = "512Mi", cpu = "1", args = [] }
     agencies_ingest       = { timeout = "1800s", memory = "1Gi",   cpu = "1", args = [] }
+    pymc_train            = { timeout = "3600s", memory = "4Gi",   cpu = "2", args = [] }
   }
 
   # Env vars adicionais por job (além das compartilhadas)
@@ -84,6 +85,13 @@ locals {
     }
     dim_territorio_sync = {}
     agencies_ingest     = { PESQUISAS_YEARS = "2024,2025,2026" }
+    pymc_train = {
+      PYMC_DRAWS       = "1000"
+      PYMC_TUNE        = "500"
+      PYMC_CHAINS      = "2"
+      PYMC_TARGET_ACCEPT = "0.9"
+      VERTEX_LOCATION  = "us-central1"
+    }
   }
 
   job_entrypoints = {
@@ -111,6 +119,7 @@ locals {
     sentiment_geocode       = ["python", "-m", "dataops.jobs.sentiment_geocode_job"]
     dim_territorio_sync     = ["python", "-m", "dataops.jobs.dim_territorio_sync_job"]
     agencies_ingest         = ["python", "-m", "dataops.jobs.agencies_ingest_job"]
+    pymc_train              = ["python", "-m", "mlops.pymc_train"]
   }
 }
 
