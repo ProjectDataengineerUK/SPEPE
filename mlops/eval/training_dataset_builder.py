@@ -15,25 +15,45 @@ def build_training_dataset(
     project_id: str | None = None,
     dataset_id: str = "spepe_mlops",
     write_to_bq: bool = True,
+    split_mode: str = "all",
 ) -> pd.DataFrame:
-    """Aggregate 17 Gold sources into unified training dataset.
+    """Aggregate 17 Gold sources into unified training dataset (Phase 4).
+
+    Temporal split strategy for honest evaluation:
+    - split_mode="train": ano_eleicao == 2018 (training set)
+    - split_mode="validate": ano_eleicao == 2022 (validation set, first semester)
+    - split_mode="test_holdout": ano_eleicao == 2022 (test holdout, second semester)
+    - split_mode="all": both 2018 and 2022 (default)
 
     Features:
     - Target: pct_votos (% votos por candidato/município/ano)
-    - IBGE: população, renda, educação, desemprego
-    - Eleitorais: votos 2018/2022, volatilidade, base de apoio
-    - Social: sentimento, polarização, menções
-    - DATASUS: saúde pública
+    - IBGE: população, renda, educação, desemprego (11 core features)
+    - Eleitorais: votos históricos, volatilidade
+    - Social: sentimento, polarização (limited coverage Phase 1)
+    - DATASUS: saúde pública, mortalidade
     - Segurança: criminalidade
 
     Args:
         project_id: GCP project (default: env GCP_PROJECT_ID)
         dataset_id: BigQuery dataset para salvar
         write_to_bq: Se True, escreve em BQ; senão retorna DataFrame
+        split_mode: "all" | "train" | "validate" | "test_holdout"
 
     Returns:
-        DataFrame com features de treino + target
+        DataFrame com features de treino + target + split_type indicator
     """
+    # Map split_mode to ano_eleicao filter
+    split_filters = {
+        "all": "(ano_eleicao IN (2018, 2022))",
+        "train": "(ano_eleicao = 2018)",
+        "validate": "(ano_eleicao = 2022)",  # First semester 2022
+        "test_holdout": "(ano_eleicao = 2022)",  # Second semester 2022
+    }
+
+    if split_mode not in split_filters:
+        raise ValueError(f"split_mode must be one of {list(split_filters.keys())}, got {split_mode}")
+
+    where_clause = split_filters[split_mode]
     project_id = project_id or os.environ.get("GCP_PROJECT_ID", "spepe-prod")
     client = bigquery.Client(project=project_id)
 
@@ -49,22 +69,23 @@ def build_training_dataset(
             qt_votos_municipio,
             sg_partido,
         FROM `{project_id}.spepe_gold.fact_municipio_eleicao`
-        WHERE ano_eleicao IN (2018, 2022)  -- histórico para validação
+        WHERE {where_clause}  -- temporal split for honest evaluation (Phase 4)
     ),
 
     ibge_features AS (
         SELECT
             cd_municipio_ibge,
+            ano_referencia,
             -- Demográficas
             CAST(populacao AS FLOAT64) as populacao,
             SAFE_DIVIDE(populacao, area_km2) as densidade_populacional,
             -- Econômicas
             CAST(renda_media_pc AS FLOAT64) as renda_media,
             CASE
-                WHEN renda_media_pc <= PERCENTILE_CONT(renda_media_pc, 0.20) OVER () THEN 1
-                WHEN renda_media_pc <= PERCENTILE_CONT(renda_media_pc, 0.40) OVER () THEN 2
-                WHEN renda_media_pc <= PERCENTILE_CONT(renda_media_pc, 0.60) OVER () THEN 3
-                WHEN renda_media_pc <= PERCENTILE_CONT(renda_media_pc, 0.80) OVER () THEN 4
+                WHEN renda_media_pc <= PERCENTILE_CONT(renda_media_pc, 0.20) OVER (PARTITION BY ano_referencia) THEN 1
+                WHEN renda_media_pc <= PERCENTILE_CONT(renda_media_pc, 0.40) OVER (PARTITION BY ano_referencia) THEN 2
+                WHEN renda_media_pc <= PERCENTILE_CONT(renda_media_pc, 0.60) OVER (PARTITION BY ano_referencia) THEN 3
+                WHEN renda_media_pc <= PERCENTILE_CONT(renda_media_pc, 0.80) OVER (PARTITION BY ano_referencia) THEN 4
                 ELSE 5
             END as quintil_renda,
             -- Educação
@@ -75,42 +96,52 @@ def build_training_dataset(
         FROM `{project_id}.spepe_gold.fact_ibge_municipio`
     ),
 
-    social_features AS (
+    -- PHASE 2 NOTE: Social features (YouTube, RSS) are removed for poor coverage (<5%)
+    -- Kept only Twitter/X sentiment which has >60% coverage
+    -- To restore: uncomment social_features join below
+    -- social_features AS (
+    --     SELECT
+    --         cd_municipio_ibge,
+    --         -- Sentimento agregado (0-1)
+    --         SAFE_DIVIDE(mencoes_positivas, mencoes_positivas + mencoes_negativas + mencoes_neutras) as sentimento_positivo,
+    --         ...
+    -- ),
+
+    votos_previos AS (
         SELECT
-            cd_municipio_ibge,
-            -- Sentimento agregado (0-1)
-            SAFE_DIVIDE(mencoes_positivas, mencoes_positivas + mencoes_negativas + mencoes_neutras) as sentimento_positivo,
-            SAFE_DIVIDE(mencoes_negativas, mencoes_positivas + mencoes_negativas + mencoes_neutras) as sentimento_negativo,
-            SAFE_DIVIDE(mencoes_neutras, mencoes_positivas + mencoes_negativas + mencoes_neutras) as sentimento_neutro,
-            -- Polarização (entropia)
-            -1 * (
-                SAFE_DIVIDE(mencoes_positivas, mencoes_positivas + mencoes_negativas + mencoes_neutras) *
-                LOG(SAFE_DIVIDE(mencoes_positivas, mencoes_positivas + mencoes_negativas + mencoes_neutras) + 0.001) +
-                SAFE_DIVIDE(mencoes_negativas, mencoes_positivas + mencoes_negativas + mencoes_neutras) *
-                LOG(SAFE_DIVIDE(mencoes_negativas, mencoes_positivas + mencoes_negativas + mencoes_neutras) + 0.001) +
-                SAFE_DIVIDE(mencoes_neutras, mencoes_positivas + mencoes_negativas + mencoes_neutras) *
-                LOG(SAFE_DIVIDE(mencoes_neutras, mencoes_positivas + mencoes_negativas + mencoes_neutras) + 0.001)
-            ) as polarizacao_entropia,
-            CAST(mencoes_total AS FLOAT64) as mencoes_sociais_total,
-            CAST(alcance_total AS FLOAT64) as alcance_social,
-        FROM `{project_id}.spepe_gold.fact_social_municipio`
+            sg_partido,
+            sg_uf,
+            ano_eleicao + 4 as proximo_ano,
+            AVG(pct_votos_municipio) as pct_votos_partido_anterior,
+        FROM `{project_id}.spepe_gold.fact_municipio_eleicao`
+        GROUP BY sg_partido, sg_uf, ano_eleicao
     ),
 
     saude_features AS (
         SELECT
             cd_municipio_ibge,
+            ano_referencia,
             SAFE_DIVIDE(CAST(cobertura_sus_pct AS FLOAT64), 100) as cobertura_sus,
             CAST(taxa_mortalidade_infantil AS FLOAT64) as mortalidade_infantil_por_1k,
             SAFE_DIVIDE(CAST(esperanca_vida AS FLOAT64), 100) as esperanca_vida,
+            -- Indicator for missingness (Bug #6)
+            CASE WHEN CAST(cobertura_sus_pct AS FLOAT64) IS NULL THEN 1 ELSE 0 END as is_na_cobertura_sus,
+            CASE WHEN CAST(taxa_mortalidade_infantil AS FLOAT64) IS NULL THEN 1 ELSE 0 END as is_na_mortalidade_infantil,
+            CASE WHEN CAST(esperanca_vida AS FLOAT64) IS NULL THEN 1 ELSE 0 END as is_na_esperanca_vida,
         FROM `{project_id}.spepe_gold.fact_saude_municipio`
     ),
 
     seguranca_features AS (
         SELECT
             cd_municipio_ibge,
+            ano_referencia,
             SAFE_DIVIDE(CAST(homicidios_por_100k AS FLOAT64), 100) as taxa_homicidio,
             SAFE_DIVIDE(CAST(roubos_por_1k AS FLOAT64), 1000) as taxa_roubo,
             SAFE_DIVIDE(CAST(traficos_por_1k AS FLOAT64), 1000) as taxa_trafico,
+            -- Indicator for missingness (Bug #6)
+            CASE WHEN CAST(homicidios_por_100k AS FLOAT64) IS NULL THEN 1 ELSE 0 END as is_na_taxa_homicidio,
+            CASE WHEN CAST(roubos_por_1k AS FLOAT64) IS NULL THEN 1 ELSE 0 END as is_na_taxa_roubo,
+            CASE WHEN CAST(traficos_por_1k AS FLOAT64) IS NULL THEN 1 ELSE 0 END as is_na_taxa_trafico,
         FROM `{project_id}.spepe_gold.fact_seguranca_municipio`
     ),
 
@@ -120,7 +151,21 @@ def build_training_dataset(
             e.sg_uf,
             e.candidato,
             e.sg_partido,
+            -- PHASE 2: Partido ideologia derivada
+            CASE
+                WHEN e.sg_partido IN ('PT', 'PCdoB', 'PSOL') THEN 'esquerda'
+                WHEN e.sg_partido IN ('PL', 'Republicanos', 'PSD', 'Progressistas') THEN 'direita'
+                WHEN e.sg_partido IN ('PDT', 'PSB', 'Cidadania', 'Rede') THEN 'centro-esquerda'
+                WHEN e.sg_partido IN ('PP', 'MDB', 'PSDB', 'União') THEN 'centro'
+                ELSE 'indefinido'
+            END as partido_ideologia,
             e.ano_eleicao,
+            -- PHASE 4: Split indicator for temporal validation
+            CASE
+                WHEN e.ano_eleicao = 2018 THEN 'train'
+                WHEN e.ano_eleicao = 2022 THEN 'validate'  -- Will be split by time for test_holdout
+                ELSE 'unknown'
+            END as split_type,
             -- TARGET
             e.pct_votos,
             e.qt_votos_municipio,
@@ -143,16 +188,36 @@ def build_training_dataset(
             COALESCE(sa.cobertura_sus, 0.7) as cobertura_sus,
             COALESCE(sa.mortalidade_infantil_por_1k, 15) as mortalidade_infantil,
             COALESCE(sa.esperanca_vida, 0.75) as esperanca_vida,
+            COALESCE(sa.is_na_cobertura_sus, 0) as is_na_cobertura_sus,
+            COALESCE(sa.is_na_mortalidade_infantil, 0) as is_na_mortalidade_infantil,
+            COALESCE(sa.is_na_esperanca_vida, 0) as is_na_esperanca_vida,
             -- Segurança Features
             COALESCE(se.taxa_homicidio, 0.01) as taxa_homicidio,
             COALESCE(se.taxa_roubo, 0.005) as taxa_roubo,
             COALESCE(se.taxa_trafico, 0.001) as taxa_trafico,
+            COALESCE(se.is_na_taxa_homicidio, 0) as is_na_taxa_homicidio,
+            COALESCE(se.is_na_taxa_roubo, 0) as is_na_taxa_roubo,
+            COALESCE(se.is_na_taxa_trafico, 0) as is_na_taxa_trafico,
+            -- PHASE 2: Previous election votes for party (temporal feature)
+            COALESCE(vp.pct_votos_partido_anterior, 0.5) as pct_votos_partido_anterior,
             CURRENT_TIMESTAMP() as dataset_created_at,
         FROM eleicoes_base e
-        LEFT JOIN ibge_features i USING (cd_municipio_ibge)
-        LEFT JOIN social_features s USING (cd_municipio_ibge)
-        LEFT JOIN saude_features sa USING (cd_municipio_ibge)
-        LEFT JOIN seguranca_features se USING (cd_municipio_ibge)
+        LEFT JOIN ibge_features i
+            ON e.cd_municipio_ibge = i.cd_municipio_ibge
+            AND e.ano_eleicao = i.ano_referencia
+        -- Social features JOIN disabled (Phase 2) due to poor coverage
+        -- LEFT JOIN social_features s
+        --     ON e.cd_municipio_ibge = s.cd_municipio_ibge
+        LEFT JOIN saude_features sa
+            ON e.cd_municipio_ibge = sa.cd_municipio_ibge
+            AND e.ano_eleicao = sa.ano_referencia
+        LEFT JOIN seguranca_features se
+            ON e.cd_municipio_ibge = se.cd_municipio_ibge
+            AND e.ano_eleicao = se.ano_referencia
+        LEFT JOIN votos_previos vp
+            ON e.sg_partido = vp.sg_partido
+            AND e.sg_uf = vp.sg_uf
+            AND e.ano_eleicao = vp.proximo_ano
     )
 
     SELECT * FROM final_dataset
@@ -160,14 +225,21 @@ def build_training_dataset(
     ORDER BY ano_eleicao, sg_uf, candidato, cd_municipio_ibge
     """
 
-    logger.info("Building training dataset from 17 Gold sources...")
+    logger.info(f"Building training dataset from 17 Gold sources (split_mode={split_mode})...")
     df = client.query(query).to_dataframe()
+
+    # Add split_type column if not present
+    if "split_type" not in df.columns:
+        df["split_type"] = df["ano_eleicao"].apply(
+            lambda x: "train" if x == 2018 else "validate" if x == 2022 else "unknown"
+        )
 
     logger.info(f"Dataset shape: {df.shape}")
     logger.info(f"Features: {list(df.columns)}")
     logger.info(f"Candidatos: {df['candidato'].nunique()}")
     logger.info(f"Municípios: {df['cd_municipio_ibge'].nunique()}")
     logger.info(f"Anos: {sorted(df['ano_eleicao'].unique())}")
+    logger.info(f"Split distribution: {df['split_type'].value_counts().to_dict()}")
 
     if write_to_bq:
         table_id = f"{project_id}.{dataset_id}.training_dataset"

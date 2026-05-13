@@ -19,6 +19,7 @@ umap-learn==0.5.7
 # ML — Bayesian & Statistical
 statsmodels==0.14.6
 pymc==5.19.1
+arviz>=0.17.0
 scipy==1.17.1
 
 # ML — Explainability
