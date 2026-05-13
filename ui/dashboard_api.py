@@ -267,7 +267,11 @@ async def serve_dashboard() -> FileResponse:
     from pathlib import Path
 
     html_path = Path(__file__).parent / "static" / "spepe-app.html"
-    return FileResponse(str(html_path), media_type="text/html")
+    return FileResponse(
+        str(html_path),
+        media_type="text/html",
+        headers={"Cache-Control": "no-cache, no-store, must-revalidate"},
+    )
 
 
 # ── Auth (stub — trocar por Firebase Auth / IAP em prod) ──────────────────

@@ -49,7 +49,6 @@ def build_hierarchical_model(
     """
     try:
         import pymc as pm
-        import pytensor.tensor as pt
     except ImportError:
         raise ImportError(
             "PyMC não instalado. Execute: pip install pymc pytensor\n"
@@ -63,52 +62,43 @@ def build_hierarchical_model(
     assert np.all((uf_idx >= 0) & (uf_idx < n_uf)), "uf_idx must be in [0, n_uf)"
     assert np.all((y > 0) & (y < 1)), "y must be proportions in (0, 1)"
 
+    # Feature sigmas: populacao, renda_media, pct_ensino_superior, pct_analfabetos (+ legacy)
+    _FEATURE_SIGMAS = np.array([1.0, 1.0, 0.3, 0.3, 0.3, 0.2, 0.8])
+    feature_sigma = (
+        _FEATURE_SIGMAS[:n_features]
+        if n_features <= len(_FEATURE_SIGMAS)
+        else np.full(n_features, 0.5)
+    )
+
     with pm.Model() as model:
-        # ── Hyperpriors: Intercepts (population mean + variation) ──────────────
+        # MutableData allows pm.set_data() for out-of-sample posterior predictive
+        X_data = pm.MutableData("X_data", X)
+        uf_data = pm.MutableData("uf_idx_data", uf_idx)
+
+        # ── Hyperpriors: Intercepts ─────────────────────────────────────────
         mu_a = pm.Normal("mu_a", mu=0, sigma=1)
         s_a = pm.HalfNormal("s_a", sigma=1)
 
-        # ── Hyperpriors: Slopes (feature-aware domain priors) ──────────────────
-        # Order matches pymc_train.py feature_cols:
-        # populacao, densidade, renda, ensino, analfabetos, desemprego, votos_anterior
-        feature_sigma = np.array(
-            [
-                1.0,  # populacao
-                0.5,  # densidade_populacional
-                1.0,  # renda_media
-                0.3,  # pct_ensino_superior
-                0.3,  # pct_analfabetos
-                0.2,  # taxa_desemprego
-                0.8,  # pct_votos_partido_anterior
-            ]
-        )
-
+        # ── Hyperpriors: Slopes ─────────────────────────────────────────────
         mu_b = pm.Normal("mu_b", mu=0, sigma=feature_sigma, shape=n_features)
         s_b = pm.HalfNormal("s_b", sigma=0.5, shape=n_features)
 
-        # ── Raw effects (unit normal, will be scaled by hyperpriors) ───────────
-        # Non-centered: these are N(0,1), then multiplied by s_a / s_b
+        # ── Non-centered raw effects (N(0,1), scaled by hyperpriors) ────────
         a_raw = pm.Normal("a_raw", mu=0, sigma=1, shape=n_uf)
         b_raw = pm.Normal("b_raw", mu=0, sigma=1, shape=(n_uf, n_features))
 
-        # ── Non-centered construction ──────────────────────────────────────────
-        # This avoids the "funnel" where posterior correlation between hyperpriors
-        # and raw effects causes NUTS sampler to struggle
+        # ── Non-centered construction ────────────────────────────────────────
         alpha = pm.Deterministic("alpha", mu_a + s_a * a_raw)
         beta = pm.Deterministic("beta", mu_b[None, :] + s_b[None, :] * b_raw)
 
-        # ── Linear predictor + sigmoid ─────────────────────────────────────────
-        X_tensor = pt.as_tensor_variable(X)
-        eta = alpha[uf_idx] + (X_tensor * beta[uf_idx]).sum(axis=1)
+        # ── Linear predictor + sigmoid ───────────────────────────────────────
+        eta = alpha[uf_data] + (X_data * beta[uf_data]).sum(axis=1)
         p = pm.Deterministic("p", pm.math.sigmoid(eta))
 
-        # ── Learned dispersion (concentration for Beta likelihood) ─────────────
-        # Gamma(2, 0.1) → E[phi]=20, but with high variance for flexibility
+        # ── Learned dispersion ───────────────────────────────────────────────
         phi = pm.Gamma("phi", alpha=2, beta=0.1)
 
-        # ── Likelihood: Beta distribution for proportions ────────────────────
-        # More appropriate than Bernoulli for continuous targets in [0,1]
-        # alpha=p*phi, beta=(1-p)*phi ensures E[y]=p and concentration ~ phi
+        # ── Beta likelihood for proportions ─────────────────────────────────
         pm.Beta("y_obs", alpha=p * phi, beta=(1 - p) * phi, observed=y)
 
     return model
