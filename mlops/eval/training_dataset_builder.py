@@ -298,8 +298,8 @@ def build_training_dataset(
 if __name__ == "__main__":
     logging.basicConfig(level=logging.INFO)
     df = build_training_dataset()
-    print(f"\nDataset summary:")
+    print("\nDataset summary:")
     print(f"Shape: {df.shape}")
     print(f"Columns: {list(df.columns)}")
-    print(f"\nFirst rows:")
+    print("\nFirst rows:")
     print(df.head())
