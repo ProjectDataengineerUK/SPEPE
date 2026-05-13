@@ -170,7 +170,8 @@ def evaluate_pymc_convergence(idata, y_test: np.ndarray, model_version: str = "u
     try:
         import arviz as az
         import matplotlib
-        matplotlib.use('Agg')  # Non-interactive backend for cloud
+
+        matplotlib.use("Agg")  # Non-interactive backend for cloud
         import matplotlib.pyplot as plt
     except ImportError:
         logger.error("ArviZ and matplotlib required: pip install arviz matplotlib")
@@ -187,14 +188,18 @@ def evaluate_pymc_convergence(idata, y_test: np.ndarray, model_version: str = "u
     # 2. ESS bulk: > 1000 for critical parameters
     check_ess = (summary["ess_bulk"] > 1000).all()
     ess_bulk_min = float(summary["ess_bulk"].min())
-    logger.info(f"  [2/9] ESS bulk: {ess_bulk_min:.0f} (target > 1000) — {'✅' if check_ess else '❌'}")
+    logger.info(
+        f"  [2/9] ESS bulk: {ess_bulk_min:.0f} (target > 1000) — {'✅' if check_ess else '❌'}"
+    )
 
     # 3. BFMI (Bayesian Fraction of Missing Information): > 0.3
     try:
         bfmi_vals = az.bfmi(idata)
         check_bfmi = bfmi_vals.mean() > 0.3
         bfmi_mean = float(bfmi_vals.mean())
-        logger.info(f"  [3/9] BFMI: {bfmi_mean:.3f} (target > 0.3) — {'✅' if check_bfmi else '❌'}")
+        logger.info(
+            f"  [3/9] BFMI: {bfmi_mean:.3f} (target > 0.3) — {'✅' if check_bfmi else '❌'}"
+        )
     except Exception as e:
         logger.warning(f"  [3/9] BFMI: skipped ({e})")
         check_bfmi = True
@@ -205,14 +210,18 @@ def evaluate_pymc_convergence(idata, y_test: np.ndarray, model_version: str = "u
     n_total = idata.posterior.sizes["draw"] * idata.posterior.sizes["chain"]
     pct_divergent = 100.0 * float(n_divergent / n_total)
     check_divergences = (n_divergent / n_total) < 0.001
-    logger.info(f"  [4/9] Divergences: {pct_divergent:.2f}% (target < 0.1%) — {'✅' if check_divergences else '❌'}")
+    logger.info(
+        f"  [4/9] Divergences: {pct_divergent:.2f}% (target < 0.1%) — {'✅' if check_divergences else '❌'}"
+    )
 
     # 5. LOO Pareto-k: < 0.7 for >= 95% of samples
     try:
         loo = az.loo(idata, pointwise=True)
         pct_ok_pareto_k = float((loo.pareto_k < 0.7).sum() / len(y_test))
         check_pareto_k = pct_ok_pareto_k > 0.95
-        logger.info(f"  [5/9] Pareto-k: {100*pct_ok_pareto_k:.1f}% OK (target > 95%) — {'✅' if check_pareto_k else '❌'}")
+        logger.info(
+            f"  [5/9] Pareto-k: {100 * pct_ok_pareto_k:.1f}% OK (target > 95%) — {'✅' if check_pareto_k else '❌'}"
+        )
     except Exception as e:
         logger.warning(f"  [5/9] Pareto-k: skipped ({e})")
         check_pareto_k = True
@@ -226,7 +235,9 @@ def evaluate_pymc_convergence(idata, y_test: np.ndarray, model_version: str = "u
 
     # 7. CRPS on test holdout: < 0.04
     y_pred_samples = idata.posterior["p"].values.reshape(-1, len(y_test))
-    crps_vals = [float(np.mean(np.abs(y_pred_samples[:, i] - y_test[i]))) for i in range(len(y_test))]
+    crps_vals = [
+        float(np.mean(np.abs(y_pred_samples[:, i] - y_test[i]))) for i in range(len(y_test))
+    ]
     crps_mean = float(np.mean(crps_vals))
     check_crps = crps_mean < 0.04
     logger.info(f"  [7/9] CRPS: {crps_mean:.4f} (target < 0.04) — {'✅' if check_crps else '❌'}")
@@ -236,7 +247,9 @@ def evaluate_pymc_convergence(idata, y_test: np.ndarray, model_version: str = "u
     p_975 = idata.posterior["p"].quantile(0.975, dim=["chain", "draw"]).values
     coverage = float(((p_025 <= y_test) & (y_test <= p_975)).mean())
     check_coverage = 0.92 <= coverage <= 0.98
-    logger.info(f"  [8/9] Coverage: {100*coverage:.1f}% (target 92-98%) — {'✅' if check_coverage else '❌'}")
+    logger.info(
+        f"  [8/9] Coverage: {100 * coverage:.1f}% (target 92-98%) — {'✅' if check_coverage else '❌'}"
+    )
 
     # 9. ECE (Expected Calibration Error): < 0.03
     y_pred_prob = y_pred_mean
@@ -303,7 +316,7 @@ def evaluate_pymc_convergence(idata, y_test: np.ndarray, model_version: str = "u
             "crps": crps_mean,
             "coverage": 100.0 * coverage,
             "ece": ece,
-        }
+        },
     }
 
 

@@ -151,9 +151,11 @@ if __name__ == "__main__":
     print(df_candidatos)
 
     # Example: validate predictions (dummy data)
-    dummy_predictions = pd.DataFrame({
-        "candidato": ["Lula", "Bolsonaro", "Ciro Gomes", "Fantasma"],
-        "sg_partido": ["PT", "PL", "PDT", "FAKE"],
-    })
+    dummy_predictions = pd.DataFrame(
+        {
+            "candidato": ["Lula", "Bolsonaro", "Ciro Gomes", "Fantasma"],
+            "sg_partido": ["PT", "PL", "PDT", "FAKE"],
+        }
+    )
     validation_result = validate_2026_candidates(dummy_predictions)
     print(f"\nValidation result: {validation_result}")

@@ -51,7 +51,9 @@ def build_training_dataset(
     }
 
     if split_mode not in split_filters:
-        raise ValueError(f"split_mode must be one of {list(split_filters.keys())}, got {split_mode}")
+        raise ValueError(
+            f"split_mode must be one of {list(split_filters.keys())}, got {split_mode}"
+        )
 
     where_clause = split_filters[split_mode]
     project_id = project_id or os.environ.get("GCP_PROJECT_ID", "spepe-prod")

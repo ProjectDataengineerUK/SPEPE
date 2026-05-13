@@ -1,0 +1,468 @@
+# PIPELINE DEFINITION
+# Name: spepe-ml-pipeline
+# Description: SPEPE Electoral ML Pipeline: Feature Extract -> Train -> Evaluate -> Promote
+# Inputs:
+#    ano_eleicao: int [Default: 2022.0]
+#    cd_cargo: int [Default: 3.0]
+#    gold_dataset: str [Default: 'spepe_gold']
+#    gold_table: str [Default: 'fact_municipio_candidato_eleicao']
+#    mae_threshold: float [Default: 0.1]
+#    n_bootstrap: int [Default: 1000.0]
+#    project_id: str [Default: 'spepe-prod']
+components:
+  comp-evaluate-component:
+    executorLabel: exec-evaluate-component
+    inputDefinitions:
+      artifacts:
+        input_dataset:
+          artifactType:
+            schemaTitle: system.Dataset
+            schemaVersion: 0.0.1
+        input_model:
+          artifactType:
+            schemaTitle: system.Model
+            schemaVersion: 0.0.1
+    outputDefinitions:
+      artifacts:
+        output_metrics:
+          artifactType:
+            schemaTitle: system.Metrics
+            schemaVersion: 0.0.1
+  comp-extract-features-component:
+    executorLabel: exec-extract-features-component
+    inputDefinitions:
+      parameters:
+        ano_eleicao:
+          parameterType: NUMBER_INTEGER
+        cd_cargo:
+          parameterType: NUMBER_INTEGER
+        gold_dataset:
+          parameterType: STRING
+        gold_table:
+          parameterType: STRING
+        project_id:
+          parameterType: STRING
+    outputDefinitions:
+      artifacts:
+        output_dataset:
+          artifactType:
+            schemaTitle: system.Dataset
+            schemaVersion: 0.0.1
+  comp-promote-component:
+    executorLabel: exec-promote-component
+    inputDefinitions:
+      artifacts:
+        eval_metrics:
+          artifactType:
+            schemaTitle: system.Metrics
+            schemaVersion: 0.0.1
+        input_dataset:
+          artifactType:
+            schemaTitle: system.Dataset
+            schemaVersion: 0.0.1
+        input_model:
+          artifactType:
+            schemaTitle: system.Model
+            schemaVersion: 0.0.1
+      parameters:
+        ano_eleicao:
+          parameterType: NUMBER_INTEGER
+        mae_threshold:
+          parameterType: NUMBER_DOUBLE
+        project_id:
+          parameterType: STRING
+    outputDefinitions:
+      artifacts:
+        output_promoted:
+          artifactType:
+            schemaTitle: system.Model
+            schemaVersion: 0.0.1
+  comp-train-bootstrap-component:
+    executorLabel: exec-train-bootstrap-component
+    inputDefinitions:
+      artifacts:
+        input_dataset:
+          artifactType:
+            schemaTitle: system.Dataset
+            schemaVersion: 0.0.1
+      parameters:
+        n_bootstrap:
+          parameterType: NUMBER_INTEGER
+    outputDefinitions:
+      artifacts:
+        output_metrics:
+          artifactType:
+            schemaTitle: system.Metrics
+            schemaVersion: 0.0.1
+        output_model:
+          artifactType:
+            schemaTitle: system.Model
+            schemaVersion: 0.0.1
+defaultPipelineRoot: gs://spepe-prod-data/vertex-pipelines
+deploymentSpec:
+  executors:
+    exec-evaluate-component:
+      container:
+        args:
+        - --executor_input
+        - '{{$}}'
+        - --function_to_execute
+        - evaluate_component
+        command:
+        - sh
+        - -c
+        - "\nif ! [ -x \"$(command -v pip)\" ]; then\n    python3 -m ensurepip ||\
+          \ python3 -m ensurepip --user || apt-get install python3-pip\nfi\n\nPIP_DISABLE_PIP_VERSION_CHECK=1\
+          \ python3 -m pip install --quiet --no-warn-script-location 'kfp==2.11.0'\
+          \ '--no-deps' 'typing-extensions>=3.7.4,<5; python_version<\"3.9\"'  &&\
+          \  python3 -m pip install --quiet --no-warn-script-location 'pandas' 'pyarrow'\
+          \ 'scikit-learn' 'numpy' && \"$0\" \"$@\"\n"
+        - sh
+        - -ec
+        - 'program_path=$(mktemp -d)
+
+
+          printf "%s" "$0" > "$program_path/ephemeral_component.py"
+
+          _KFP_RUNTIME=true python3 -m kfp.dsl.executor_main                         --component_module_path                         "$program_path/ephemeral_component.py"                         "$@"
+
+          '
+        - "\nimport kfp\nfrom kfp import dsl\nfrom kfp.dsl import *\nfrom typing import\
+          \ *\n\ndef evaluate_component(\n    input_dataset: Input[Dataset],\n   \
+          \ input_model: Input[Model],\n    output_metrics: Output[Metrics],\n) ->\
+          \ None:\n    import logging\n    import pandas as pd\n    import pickle\n\
+          \    from pathlib import Path\n    from sklearn.metrics import r2_score,\
+          \ mean_absolute_error\n\n    _logger = logging.getLogger(\"spepe.evaluate_component\"\
+          )\n\n    df = pd.read_parquet(input_dataset.path)\n    raw = Path(input_model.path).read_bytes()\n\
+          \    if len(raw) < 4:\n        raise RuntimeError(\"Arquivo de modelo corrompido\"\
+          )\n    model_dict = pickle.loads(raw)\n\n    model = model_dict[\"model\"\
+          ]\n    feature_cols = model_dict[\"feature_cols\"]\n    # Bug 2 fix: target_col\
+          \ is the continuous regression target, not a binary label\n    target_col\
+          \ = model_dict.get(\"target_col\", \"pct_votos_municipio\")\n\n    if target_col\
+          \ not in df.columns:\n        _logger.error(\n            \"target_col %s\
+          \ n\xE3o encontrado. Colunas: %s\", target_col, df.columns.tolist()\n  \
+          \      )\n        output_metrics.log_metric(\"error\", 1.0)\n        output_metrics.log_metric(\"\
+          error_reason\", 0.0)\n        return\n\n    avail = [c for c in feature_cols\
+          \ if c in df.columns]\n    if not avail:\n        _logger.error(\"Nenhuma\
+          \ feature dispon\xEDvel no dataset de avalia\xE7\xE3o.\")\n        output_metrics.log_metric(\"\
+          error\", 1.0)\n        return\n\n    X = df[avail].fillna(0).values\n  \
+          \  # Bug 2 fix: y_true is the continuous target column directly (regression,\
+          \ not classification)\n    y_true = df[target_col].values\n    y_pred =\
+          \ model.predict(X)\n\n    # Regression metrics: R\xB2 and MAE (not Brier/accuracy\
+          \ \u2014 those are for classifiers)\n    output_metrics.log_metric(\"eval_r2_score\"\
+          , float(r2_score(y_true, y_pred)))\n    output_metrics.log_metric(\"eval_mae\"\
+          , float(mean_absolute_error(y_true, y_pred)))\n    output_metrics.log_metric(\"\
+          eval_n_samples\", float(len(y_true)))\n\n"
+        image: python:3.12-slim
+    exec-extract-features-component:
+      container:
+        args:
+        - --executor_input
+        - '{{$}}'
+        - --function_to_execute
+        - extract_features_component
+        command:
+        - sh
+        - -c
+        - "\nif ! [ -x \"$(command -v pip)\" ]; then\n    python3 -m ensurepip ||\
+          \ python3 -m ensurepip --user || apt-get install python3-pip\nfi\n\nPIP_DISABLE_PIP_VERSION_CHECK=1\
+          \ python3 -m pip install --quiet --no-warn-script-location 'kfp==2.11.0'\
+          \ '--no-deps' 'typing-extensions>=3.7.4,<5; python_version<\"3.9\"'  &&\
+          \  python3 -m pip install --quiet --no-warn-script-location 'google-cloud-bigquery'\
+          \ 'pandas' 'pyarrow' 'scikit-learn' && \"$0\" \"$@\"\n"
+        - sh
+        - -ec
+        - 'program_path=$(mktemp -d)
+
+
+          printf "%s" "$0" > "$program_path/ephemeral_component.py"
+
+          _KFP_RUNTIME=true python3 -m kfp.dsl.executor_main                         --component_module_path                         "$program_path/ephemeral_component.py"                         "$@"
+
+          '
+        - "\nimport kfp\nfrom kfp import dsl\nfrom kfp.dsl import *\nfrom typing import\
+          \ *\n\ndef extract_features_component(\n    project_id: str,\n    gold_dataset:\
+          \ str,\n    gold_table: str,\n    cd_cargo: int,\n    ano_eleicao: int,\n\
+          \    output_dataset: Output[Dataset],\n) -> None:\n    import re\n    from\
+          \ google.cloud import bigquery\n\n    _ALLOWED_DATASETS = {\"spepe_gold\"\
+          , \"spepe_silver\", \"spepe_mlops\"}\n    _NAME_RE = re.compile(r\"^[a-zA-Z][a-zA-Z0-9_]{0,127}$\"\
+          )\n    _PROJECT_RE = re.compile(r\"^[a-z][a-z0-9-]{4,29}$\")\n\n    if not\
+          \ _PROJECT_RE.match(project_id):\n        raise ValueError(f\"project_id\
+          \ inv\xE1lido: {project_id}\")\n    if gold_dataset not in _ALLOWED_DATASETS:\n\
+          \        raise ValueError(f\"dataset n\xE3o permitido: {gold_dataset}\"\
+          )\n    if not _NAME_RE.match(gold_table):\n        raise ValueError(f\"\
+          nome de tabela inv\xE1lido: {gold_table}\")\n\n    client = bigquery.Client(project=project_id)\n\
+          \    query = \"\"\"\n        SELECT\n            f.sg_uf,\n            f.cd_municipio,\n\
+          \            f.nm_candidato,\n            f.sg_partido,\n            f.cd_cargo,\n\
+          \            f.ano_eleicao,\n            f.pct_votos_municipio,\n      \
+          \      i.populacao_total,\n            i.taxa_alfabetizacao,\n         \
+          \   i.idhm,\n            i.renda_per_capita,\n            i.taxa_analfabetismo\n\
+          \        FROM `{project}.{dataset}.{table}` f\n        LEFT JOIN `{project}.spepe_gold.fact_ibge_municipio`\
+          \ i\n            ON f.cd_municipio_ibge = i.cd_municipio_ibge\n        WHERE\
+          \ f.cd_cargo = @cd_cargo\n          AND f.ano_eleicao = @ano_eleicao\n \
+          \         AND f.pct_votos_municipio IS NOT NULL\n    \"\"\".format(project=project_id,\
+          \ dataset=gold_dataset, table=gold_table)\n\n    job_config = bigquery.QueryJobConfig(\n\
+          \        query_parameters=[\n            bigquery.ScalarQueryParameter(\"\
+          cd_cargo\", \"INT64\", cd_cargo),\n            bigquery.ScalarQueryParameter(\"\
+          ano_eleicao\", \"INT64\", ano_eleicao),\n        ]\n    )\n    df = client.query(query,\
+          \ job_config=job_config).to_dataframe()\n    df.to_parquet(output_dataset.path,\
+          \ index=False)\n\n"
+        image: python:3.12-slim
+    exec-promote-component:
+      container:
+        args:
+        - --executor_input
+        - '{{$}}'
+        - --function_to_execute
+        - promote_component
+        command:
+        - sh
+        - -c
+        - "\nif ! [ -x \"$(command -v pip)\" ]; then\n    python3 -m ensurepip ||\
+          \ python3 -m ensurepip --user || apt-get install python3-pip\nfi\n\nPIP_DISABLE_PIP_VERSION_CHECK=1\
+          \ python3 -m pip install --quiet --no-warn-script-location 'kfp==2.11.0'\
+          \ '--no-deps' 'typing-extensions>=3.7.4,<5; python_version<\"3.9\"'  &&\
+          \  python3 -m pip install --quiet --no-warn-script-location 'google-cloud-bigquery'\
+          \ 'pandas' 'pyarrow' 'scikit-learn' 'db-dtypes' && \"$0\" \"$@\"\n"
+        - sh
+        - -ec
+        - 'program_path=$(mktemp -d)
+
+
+          printf "%s" "$0" > "$program_path/ephemeral_component.py"
+
+          _KFP_RUNTIME=true python3 -m kfp.dsl.executor_main                         --component_module_path                         "$program_path/ephemeral_component.py"                         "$@"
+
+          '
+        - "\nimport kfp\nfrom kfp import dsl\nfrom kfp.dsl import *\nfrom typing import\
+          \ *\n\ndef promote_component(\n    input_dataset: Input[Dataset],\n    input_model:\
+          \ Input[Model],\n    eval_metrics: Input[Metrics],\n    project_id: str,\n\
+          \    ano_eleicao: int,\n    mae_threshold: float,\n    output_promoted:\
+          \ Output[Model],\n) -> None:\n    import logging\n    import pickle\n  \
+          \  import uuid\n    from datetime import datetime, timezone\n    from pathlib\
+          \ import Path\n\n    import pandas as pd\n    from sklearn.metrics import\
+          \ r2_score, mean_absolute_error\n\n    _logger = logging.getLogger(\"spepe.promote_component\"\
+          )\n\n    raw = Path(input_model.path).read_bytes()\n    if len(raw) < 4:\n\
+          \        raise RuntimeError(\"Arquivo de modelo corrompido\")\n    model_dict\
+          \ = pickle.loads(raw)\n\n    model = model_dict[\"model\"]\n    feature_cols\
+          \ = model_dict[\"feature_cols\"]\n    target_col = model_dict.get(\"target_col\"\
+          , \"pct_votos_municipio\")\n\n    df = pd.read_parquet(input_dataset.path)\n\
+          \    avail = [c for c in feature_cols if c in df.columns]\n    X = df[avail].fillna(0).values\n\
+          \    y_true = df[target_col].values\n    y_pred = model.predict(X)\n\n \
+          \   eval_mae = float(mean_absolute_error(y_true, y_pred))\n    eval_r2 =\
+          \ float(r2_score(y_true, y_pred))\n    _logger.info(\"Gate: MAE=%.4f threshold=%.4f\
+          \ R\xB2=%.4f\", eval_mae, mae_threshold, eval_r2)\n\n    if eval_mae > mae_threshold:\n\
+          \        _logger.warning(\n            \"Modelo reprovado no gate de qualidade:\
+          \ MAE %.4f > %.4f\", eval_mae, mae_threshold\n        )\n        # Still\
+          \ write the model artifact so the step succeeds, but skip BQ write\n   \
+          \     import shutil\n\n        shutil.copy2(input_model.path, output_promoted.path)\n\
+          \        return\n\n    # Promote: copy model artifact\n    import shutil\n\
+          \n    shutil.copy2(input_model.path, output_promoted.path)\n\n    # Write\
+          \ fact_predictions to BigQuery (one row per municipality per candidate)\n\
+          \    try:\n        from google.cloud import bigquery\n\n        client =\
+          \ bigquery.Client(project=project_id)\n\n        model_id = (\n        \
+          \    f\"spepe-ridge-{ano_eleicao}-{datetime.now(timezone.utc).strftime('%Y%m%d%H%M%S')}\"\
+          \n        )\n        now_ts = datetime.now(timezone.utc).isoformat()\n\n\
+          \        # Bootstrap IC 95% via residual percentiles as a lightweight approximation\n\
+          \        import numpy as np\n\n        residuals = y_true - y_pred\n   \
+          \     ic_low_offset = float(np.percentile(residuals, 2.5))\n        ic_high_offset\
+          \ = float(np.percentile(residuals, 97.5))\n\n        candidato_col = \"\
+          nm_candidato\" if \"nm_candidato\" in df.columns else None\n        uf_col\
+          \ = \"sg_uf\" if \"sg_uf\" in df.columns else None\n\n        rows = []\n\
+          \        session_id = str(uuid.uuid4())\n        for i, (pred_val, row)\
+          \ in enumerate(zip(y_pred, df.itertuples(index=False))):\n            rows.append(\n\
+          \                {\n                    \"prediction_id\": str(uuid.uuid4()),\n\
+          \                    \"session_id\": session_id,\n                    \"\
+          candidato\": str(getattr(row, candidato_col, \"\")) if candidato_col else\
+          \ \"\",\n                    \"sg_uf\": str(getattr(row, uf_col, \"\"))\
+          \ if uf_col else None,\n                    \"prediction_date\": now_ts,\n\
+          \                    \"p_mean\": float(pred_val),\n                    \"\
+          p_lower\": float(max(0.0, pred_val + ic_low_offset)),\n                \
+          \    \"p_upper\": float(min(1.0, pred_val + ic_high_offset)),\n        \
+          \            \"model_version\": model_id,\n                    \"features_hash\"\
+          : None,\n                    \"actual_result\": None,\n                \
+          \    \"brier_score\": None,\n                    \"evaluated_at\": None,\n\
+          \                }\n            )\n\n        if rows:\n            predictions_df\
+          \ = pd.DataFrame(rows)\n            table_id = f\"{project_id}.spepe_mlops.fact_predictions\"\
+          \n            job_config = bigquery.LoadJobConfig(\n                write_disposition=bigquery.WriteDisposition.WRITE_APPEND,\n\
+          \                schema_update_options=[],\n                time_partitioning=bigquery.TimePartitioning(field=\"\
+          prediction_date\"),\n            )\n            load_job = client.load_table_from_dataframe(\n\
+          \                predictions_df, table_id, job_config=job_config\n     \
+          \       )\n            load_job.result()\n            _logger.info(\n  \
+          \              \"fact_predictions: %d linhas gravadas em %s (model=%s)\"\
+          ,\n                len(rows),\n                table_id,\n             \
+          \   model_id,\n            )\n    except Exception as exc:\n        _logger.error(\"\
+          Falha ao gravar fact_predictions: %s\", exc)\n        raise\n\n"
+        image: python:3.12-slim
+    exec-train-bootstrap-component:
+      container:
+        args:
+        - --executor_input
+        - '{{$}}'
+        - --function_to_execute
+        - train_bootstrap_component
+        command:
+        - sh
+        - -c
+        - "\nif ! [ -x \"$(command -v pip)\" ]; then\n    python3 -m ensurepip ||\
+          \ python3 -m ensurepip --user || apt-get install python3-pip\nfi\n\nPIP_DISABLE_PIP_VERSION_CHECK=1\
+          \ python3 -m pip install --quiet --no-warn-script-location 'kfp==2.11.0'\
+          \ '--no-deps' 'typing-extensions>=3.7.4,<5; python_version<\"3.9\"'  &&\
+          \  python3 -m pip install --quiet --no-warn-script-location 'pandas' 'pyarrow'\
+          \ 'statsmodels' 'scikit-learn' 'numpy' && \"$0\" \"$@\"\n"
+        - sh
+        - -ec
+        - 'program_path=$(mktemp -d)
+
+
+          printf "%s" "$0" > "$program_path/ephemeral_component.py"
+
+          _KFP_RUNTIME=true python3 -m kfp.dsl.executor_main                         --component_module_path                         "$program_path/ephemeral_component.py"                         "$@"
+
+          '
+        - "\nimport kfp\nfrom kfp import dsl\nfrom kfp.dsl import *\nfrom typing import\
+          \ *\n\ndef train_bootstrap_component(\n    input_dataset: Input[Dataset],\n\
+          \    n_bootstrap: int,\n    output_model: Output[Model],\n    output_metrics:\
+          \ Output[Metrics],\n) -> None:\n    import pandas as pd\n    import pickle\n\
+          \    from sklearn.linear_model import Ridge\n    from sklearn.metrics import\
+          \ r2_score, mean_absolute_error\n\n    TARGET_COL = \"pct_votos_municipio\"\
+          \n    FEATURE_COLS = [\n        \"populacao_total\",\n        \"taxa_alfabetizacao\"\
+          ,\n        \"idhm\",\n        \"renda_per_capita\",\n        \"taxa_analfabetismo\"\
+          ,\n    ]\n\n    df = pd.read_parquet(input_dataset.path)\n    feature_cols\
+          \ = [c for c in FEATURE_COLS if c in df.columns]\n\n    if TARGET_COL not\
+          \ in df.columns or not feature_cols:\n        return\n\n    X = df[feature_cols].fillna(0).values\n\
+          \    y = df[TARGET_COL].values\n\n    model = Ridge(alpha=1.0)\n    model.fit(X,\
+          \ y)\n\n    with open(output_model.path, \"wb\") as f:\n        pickle.dump({\"\
+          model\": model, \"feature_cols\": feature_cols, \"target_col\": TARGET_COL},\
+          \ f)\n\n    output_metrics.log_metric(\"r2_score\", float(r2_score(y, model.predict(X))))\n\
+          \    output_metrics.log_metric(\"mae\", float(mean_absolute_error(y, model.predict(X))))\n\
+          \    output_metrics.log_metric(\"n_train\", len(X))\n\n"
+        image: python:3.12-slim
+pipelineInfo:
+  description: 'SPEPE Electoral ML Pipeline: Feature Extract -> Train -> Evaluate
+    -> Promote'
+  name: spepe-ml-pipeline
+root:
+  dag:
+    tasks:
+      evaluate-component:
+        cachingOptions:
+          enableCache: true
+        componentRef:
+          name: comp-evaluate-component
+        dependentTasks:
+        - extract-features-component
+        - train-bootstrap-component
+        inputs:
+          artifacts:
+            input_dataset:
+              taskOutputArtifact:
+                outputArtifactKey: output_dataset
+                producerTask: extract-features-component
+            input_model:
+              taskOutputArtifact:
+                outputArtifactKey: output_model
+                producerTask: train-bootstrap-component
+        taskInfo:
+          name: evaluate-component
+      extract-features-component:
+        cachingOptions:
+          enableCache: true
+        componentRef:
+          name: comp-extract-features-component
+        inputs:
+          parameters:
+            ano_eleicao:
+              componentInputParameter: ano_eleicao
+            cd_cargo:
+              componentInputParameter: cd_cargo
+            gold_dataset:
+              componentInputParameter: gold_dataset
+            gold_table:
+              componentInputParameter: gold_table
+            project_id:
+              componentInputParameter: project_id
+        taskInfo:
+          name: extract-features-component
+      promote-component:
+        cachingOptions:
+          enableCache: true
+        componentRef:
+          name: comp-promote-component
+        dependentTasks:
+        - evaluate-component
+        - extract-features-component
+        - train-bootstrap-component
+        inputs:
+          artifacts:
+            eval_metrics:
+              taskOutputArtifact:
+                outputArtifactKey: output_metrics
+                producerTask: evaluate-component
+            input_dataset:
+              taskOutputArtifact:
+                outputArtifactKey: output_dataset
+                producerTask: extract-features-component
+            input_model:
+              taskOutputArtifact:
+                outputArtifactKey: output_model
+                producerTask: train-bootstrap-component
+          parameters:
+            ano_eleicao:
+              componentInputParameter: ano_eleicao
+            mae_threshold:
+              componentInputParameter: mae_threshold
+            project_id:
+              componentInputParameter: project_id
+        taskInfo:
+          name: promote-component
+      train-bootstrap-component:
+        cachingOptions:
+          enableCache: true
+        componentRef:
+          name: comp-train-bootstrap-component
+        dependentTasks:
+        - extract-features-component
+        inputs:
+          artifacts:
+            input_dataset:
+              taskOutputArtifact:
+                outputArtifactKey: output_dataset
+                producerTask: extract-features-component
+          parameters:
+            n_bootstrap:
+              componentInputParameter: n_bootstrap
+        taskInfo:
+          name: train-bootstrap-component
+  inputDefinitions:
+    parameters:
+      ano_eleicao:
+        defaultValue: 2022.0
+        isOptional: true
+        parameterType: NUMBER_INTEGER
+      cd_cargo:
+        defaultValue: 3.0
+        isOptional: true
+        parameterType: NUMBER_INTEGER
+      gold_dataset:
+        defaultValue: spepe_gold
+        isOptional: true
+        parameterType: STRING
+      gold_table:
+        defaultValue: fact_municipio_candidato_eleicao
+        isOptional: true
+        parameterType: STRING
+      mae_threshold:
+        defaultValue: 0.1
+        isOptional: true
+        parameterType: NUMBER_DOUBLE
+      n_bootstrap:
+        defaultValue: 1000.0
+        isOptional: true
+        parameterType: NUMBER_INTEGER
+      project_id:
+        defaultValue: spepe-prod
+        isOptional: true
+        parameterType: STRING
+schemaVersion: 2.1.0
+sdkVersion: kfp-2.11.0
