@@ -932,9 +932,14 @@ async def get_socioeconomico(
 ) -> JSONResponse:
     if settings.gcp_project_id and os.environ.get("USE_BIGQUERY", "").lower() == "true":
         try:
-            return JSONResponse({"municipios": await _bq_socioeconomico(uf, ano, limit)})
+            result = await _bq_socioeconomico(uf, ano, limit)
+            if result:
+                return JSONResponse({"municipios": result})
+            logger.warning("BigQuery socioeconomico: Gold vazio para UF=%s ano=%s", uf, ano)
+            return JSONResponse({"municipios": [], "fonte": "gold_empty", "hint": "Execute spepe-gold-build para popular fact_ibge_municipio"})
         except Exception as exc:
             logger.warning("BigQuery socioeconomico falhou: %s", exc)
+            return JSONResponse({"municipios": [], "fonte": "bq_error", "error": str(exc)})
     data = _local_socioeconomico(uf, ano, limit)
     return JSONResponse({"municipios": data, "fonte": "local" if data else "indisponivel"})
 
@@ -946,11 +951,12 @@ async def _bq_socioeconomico(uf: str, ano: int, limit: int) -> list[dict]:
     gold = f"{settings.gcp_project_id}.{settings.bigquery_dataset_gold}"
     query = f"""
         SELECT nm_municipio,
-               idhm, renda_per_capita, gini, pct_extrema_pobreza,
-               taxa_analfabetismo, pct_urbano, populacao_total
+               populacao_total, taxa_alfabetizacao, taxa_analfabetismo,
+               pct_urbano, pct_0_14, pct_60_mais,
+               idhm, renda_per_capita, gini, pct_extrema_pobreza
         FROM `{gold}.fact_ibge_municipio`
         WHERE sg_uf = @uf AND ano = @ano
-        ORDER BY idhm DESC NULLS LAST
+        ORDER BY populacao_total DESC NULLS LAST
         LIMIT @lim
     """
     job_config = bigquery.QueryJobConfig(
@@ -964,13 +970,15 @@ async def _bq_socioeconomico(uf: str, ano: int, limit: int) -> list[dict]:
     return [
         {
             "nm": r.get("nm_municipio", ""),
+            "populacao": r.get("populacao_total") or 0,
+            "taxa_alfabetizacao": round((r.get("taxa_alfabetizacao") or 0), 1),
+            "taxa_analfabetismo": round((r.get("taxa_analfabetismo") or 0), 1),
+            "pct_urbano": round((r.get("pct_urbano") or 0), 1),
+            "pct_0_14": round((r.get("pct_0_14") or 0), 1),
+            "pct_60_mais": round((r.get("pct_60_mais") or 0), 1),
             "idhm": round(r.get("idhm") or 0, 3),
             "renda_per_capita": round(r.get("renda_per_capita") or 0, 0),
             "gini": round(r.get("gini") or 0, 3),
-            "pct_extrema_pobreza": round((r.get("pct_extrema_pobreza") or 0) * 100, 1),
-            "taxa_analfabetismo": round((r.get("taxa_analfabetismo") or 0) * 100, 1),
-            "pct_urbano": round((r.get("pct_urbano") or 0) * 100, 1),
-            "populacao": r.get("populacao_total") or 0,
         }
         for r in rows
     ]
@@ -1031,9 +1039,13 @@ async def get_seguranca(
 ) -> JSONResponse:
     if settings.gcp_project_id and os.environ.get("USE_BIGQUERY", "").lower() == "true":
         try:
-            return JSONResponse({"municipios": await _bq_seguranca(uf, ano, limit)})
+            result = await _bq_seguranca(uf, ano, limit)
+            if result:
+                return JSONResponse({"municipios": result})
+            return JSONResponse({"municipios": [], "fonte": "gold_empty", "hint": "fact_seguranca_municipio vazia — execute spepe-gold-build"})
         except Exception as exc:
             logger.warning("BigQuery seguranca falhou: %s", exc)
+            return JSONResponse({"municipios": [], "fonte": "bq_error", "error": str(exc)})
     data = _local_seguranca(uf, ano, limit)
     return JSONResponse({"municipios": data, "fonte": "local" if data else "indisponivel"})
 
@@ -1056,7 +1068,7 @@ async def _bq_seguranca(uf: str, ano: int, limit: int) -> list[dict]:
             FROM `{gold}.fact_ibge_municipio`
         ) i USING (cd_municipio_ibge)
         WHERE s.sg_uf = @uf AND s.ano = @ano
-        ORDER BY s.taxa_homicidio_100k DESC NULLS LAST
+        ORDER BY s.ivs_total DESC NULLS LAST
         LIMIT @lim
     """
     job_config = bigquery.QueryJobConfig(
@@ -1135,9 +1147,13 @@ async def get_saude(
 ) -> JSONResponse:
     if settings.gcp_project_id and os.environ.get("USE_BIGQUERY", "").lower() == "true":
         try:
-            return JSONResponse({"municipios": await _bq_saude(uf, ano, limit)})
+            result = await _bq_saude(uf, ano, limit)
+            if result:
+                return JSONResponse({"municipios": result})
+            return JSONResponse({"municipios": [], "fonte": "gold_empty", "hint": "fact_saude_municipio vazia — DataSUS Bronze não exportou colunas esperadas"})
         except Exception as exc:
             logger.warning("BigQuery saude falhou: %s", exc)
+            return JSONResponse({"municipios": [], "fonte": "bq_error", "error": str(exc)})
     data = _local_saude(uf, ano, limit)
     return JSONResponse({"municipios": data, "fonte": "local" if data else "indisponivel"})
 
@@ -1645,6 +1661,7 @@ async def get_perfis(
             return JSONResponse(await _bq_perfis(uf, ano))
         except Exception as exc:
             logger.warning("BigQuery perfis falhou: %s", exc)
+            return JSONResponse({"genero": [], "faixa_etaria": [], "escolaridade": [], "fonte": "bq_error", "error": str(exc)})
     return JSONResponse(
         {"genero": [], "faixa_etaria": [], "escolaridade": [], "fonte": "indisponivel"}
     )
@@ -3114,6 +3131,47 @@ async def get_parlamentares(
             except Exception as exc2:
                 logger.warning("BigQuery parlamentares Silver falhou: %s", exc2)
     return JSONResponse({"data": []})
+
+
+# ── Diagnóstico de dados — quais tabelas Gold/Silver têm dados ───────────────
+
+
+@app.get("/api/debug/tables", dependencies=[Depends(require_auth)])
+async def debug_tables() -> JSONResponse:
+    """Retorna row_count de todas as tabelas Gold e Silver. Útil para diagnosticar abas vazias."""
+    if not (settings.gcp_project_id and os.environ.get("USE_BIGQUERY", "").lower() == "true"):
+        return JSONResponse({"error": "USE_BIGQUERY não habilitado", "tables": []})
+    try:
+        from google.cloud import bigquery
+
+        client = bigquery.Client(project=settings.gcp_project_id)
+        gold = settings.bigquery_dataset_gold
+        silver = settings.bigquery_dataset_silver
+        mlops = settings.bigquery_dataset_mlops
+        results = []
+        for dataset in [gold, silver, mlops]:
+            try:
+                query = f"""
+                    SELECT table_id, row_count, size_bytes,
+                           TIMESTAMP_MILLIS(last_modified_time) AS last_modified
+                    FROM `{settings.gcp_project_id}.{dataset}.__TABLES__`
+                    ORDER BY table_id
+                """
+                rows = list(client.query(query).result())
+                for r in rows:
+                    results.append({
+                        "dataset": dataset,
+                        "table": r.get("table_id", ""),
+                        "rows": r.get("row_count", 0),
+                        "size_mb": round((r.get("size_bytes") or 0) / 1_048_576, 2),
+                        "last_modified": str(r.get("last_modified", "")),
+                        "status": "ok" if (r.get("row_count") or 0) > 0 else "empty",
+                    })
+            except Exception as exc:
+                results.append({"dataset": dataset, "error": str(exc)})
+        return JSONResponse({"tables": results, "total": len(results)})
+    except Exception as exc:
+        return JSONResponse({"error": str(exc), "tables": []}, status_code=500)
 
 
 # ── Config: Google Maps Key ───────────────────────────────────────────────────

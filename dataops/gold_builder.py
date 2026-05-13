@@ -193,11 +193,18 @@ def _build_gold_via_bigquery_sql() -> dict:
                     SAFE_CAST(valor AS FLOAT64), NULL))                     AS taxa_alfabetizacao,
                 MAX(IF(indicador='pct_analfabetos',
                     SAFE_CAST(valor AS FLOAT64), NULL))                     AS taxa_analfabetismo,
+                MAX(IF(indicador='pct_urbano',
+                    SAFE_CAST(valor AS FLOAT64), NULL))                     AS pct_urbano,
+                MAX(IF(indicador='pct_0_14',
+                    SAFE_CAST(valor AS FLOAT64), NULL))                     AS pct_0_14,
+                MAX(IF(indicador='pct_60_mais',
+                    SAFE_CAST(valor AS FLOAT64), NULL))                     AS pct_60_mais,
+                MAX(IF(indicador='pct_catolico',
+                    SAFE_CAST(valor AS FLOAT64), NULL))                     AS pct_catolico,
                 CAST(NULL AS FLOAT64)                                       AS idhm,
                 CAST(NULL AS FLOAT64)                                       AS renda_per_capita,
                 CAST(NULL AS FLOAT64)                                       AS gini,
                 CAST(NULL AS FLOAT64)                                       AS pct_extrema_pobreza,
-                CAST(NULL AS FLOAT64)                                       AS pct_urbano,
                 CURRENT_TIMESTAMP() AS ingested_at
             FROM {silver_wc}
             WHERE cd_municipio_ibge IS NOT NULL
