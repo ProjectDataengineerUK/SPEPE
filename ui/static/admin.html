@@ -721,54 +721,102 @@ function initSentinelWS() {
 async function loadSentinel() {
   try {
     const r = await apiFetch('/admin/api/sentinel/status');
-    if (!r) return; // 401 — signOut already called
+    if (!r) return;
     const data = await r.json();
-    // Build flat watcher list from structured API response
     const watchers = [];
+
+    // ── DataOps: Gold tables ──────────────────────────────────────────────
     for (const t of (data.dataops?.gold || [])) {
+      const fh = t.freshness_hours != null ? `${t.freshness_hours}h atrás` : 'sem data';
+      const rows = (t.row_count||0).toLocaleString('pt-BR');
+      const msg = t.alert_message || `${rows} rows · ${fh}`;
       watchers.push({ watcher: `Gold: ${t.table}`, status: t.status || 'warn',
-        category: 'dataops', last_check: null,
-        alert_message: `${(t.row_count||0).toLocaleString('pt-BR')} rows · ${t.freshness_hours}h atrás` });
+        category: 'dataops', last_check: t.last_modified || null,
+        alert_message: msg, detail: `${rows} linhas · atualizado ${fh}` });
     }
+
+    // ── DataOps: Silver tables ────────────────────────────────────────────
     for (const t of (data.dataops?.silver || [])) {
+      const fh = t.freshness_hours != null ? `${t.freshness_hours}h atrás` : 'sem data';
+      const rows = (t.row_count||0).toLocaleString('pt-BR');
+      const msg = t.alert_message || `${rows} rows · ${fh}`;
       watchers.push({ watcher: `Silver: ${t.table}`, status: t.status || 'warn',
-        category: 'dataops', last_check: null,
-        alert_message: `${(t.row_count||0).toLocaleString('pt-BR')} rows · ${t.freshness_hours}h atrás` });
+        category: 'dataops', last_check: t.last_modified || null,
+        alert_message: msg, detail: `${rows} linhas · atualizado ${fh}` });
     }
+
+    // ── DataOps: Semantic views ───────────────────────────────────────────
     for (const v of (data.dataops?.views || [])) {
-      watchers.push({ watcher: `View: ${v.view}`, status: v.exists ? 'ok' : 'breach',
+      const st = v.status === 'ok' ? 'ok' : 'breach';
+      watchers.push({ watcher: `View: ${v.view}`, status: st,
         category: 'dataops', last_check: null,
-        alert_message: v.exists ? 'View disponível' : 'View ausente' });
+        alert_message: v.alert_message || (v.exists ? 'View disponível' : 'View ausente') });
     }
+
+    // ── Cloud Run Jobs ────────────────────────────────────────────────────
     for (const j of (data.jobs || [])) {
+      const lastRun = j.last_run_at ? new Date(j.last_run_at).toLocaleString('pt-BR') : '—';
+      const msg = j.alert_message || j.last_status || '—';
       watchers.push({ watcher: j.job, status: j.status || 'warn',
-        category: 'jobs', last_check: null, alert_message: j.last_status || '—' });
+        category: 'infra', last_check: j.last_run_at || null,
+        alert_message: msg, detail: `Última execução: ${lastRun}` });
     }
+
+    // ── Cloud Run Services ────────────────────────────────────────────────
+    for (const s of (data.services || [])) {
+      const msg = s.alert_message || (s.status === 'ok' ? 'Serviço ativo' : 'Serviço com problema');
+      watchers.push({ watcher: `Serviço: ${s.service}`, status: s.status || 'warn',
+        category: 'infra', last_check: null,
+        alert_message: msg, detail: s.url || '' });
+    }
+
+    // ── LLMOps: Agents ───────────────────────────────────────────────────
     for (const a of (data.llmops || [])) {
+      const calls = a.calls_24h || 0;
+      const p99 = (a.p99_latency_s || 0).toFixed(2);
+      const errs = a.errors_24h || 0;
       watchers.push({ watcher: a.agent || a.name, status: a.status || 'ok',
-        category: 'llmops', last_check: null,
-        alert_message: `${a.calls_24h||0} calls/24h · latência p99: ${(a.p99_latency_s||0).toFixed(2)}s` });
+        category: 'crews', last_check: a.last_run_at || null,
+        alert_message: `${calls} calls/24h · p99 ${p99}s · ${errs} erros`,
+        detail: `Custo 24h: $${(a.cost_24h_usd||0).toFixed(4)}` });
     }
-    // maturity scores as watchers
+
+    // ── Maturity scores ───────────────────────────────────────────────────
     if (data.maturity) {
       const m = data.maturity;
-      ['dataops','mlops','llmops'].forEach(k => {
+      const labels = { dataops: 'DataOps', mlops: 'MLOps', llmops: 'LLMOps' };
+      const cats   = { dataops: 'dataops', mlops: 'mlops', llmops: 'crews' };
+      Object.entries(labels).forEach(([k, label]) => {
         if (m[k] !== undefined)
-          watchers.push({ watcher: `Maturidade ${k}`, status: m[k]>=70?'ok':m[k]>=40?'warn':'breach',
-            category: k, last_check: null, alert_message: `Score: ${m[k]}%` });
+          watchers.push({ watcher: `Maturidade ${label}`, status: m[k]>=70?'ok':m[k]>=40?'warn':'breach',
+            category: cats[k] || k, last_check: null, alert_message: `Score de maturidade: ${m[k]}%` });
       });
+      // Update score cards
+      const el = id => document.getElementById(id);
+      if (el('dataops-score')) el('dataops-score').textContent = (m.dataops||0) + '%';
+      if (el('mlops-score'))   el('mlops-score').textContent   = (m.mlops||0)   + '%';
+      if (el('llmops-score'))  el('llmops-score').textContent  = (m.llmops||0)  + '%';
     }
+
+    // ── MLOps model ───────────────────────────────────────────────────────
+    if (data.mlops) {
+      const ml = data.mlops;
+      const brier = ml.brier_score != null ? ml.brier_score.toFixed(4) : 'N/A';
+      const drift = ml.js_divergence != null ? ml.js_divergence.toFixed(4) : 'N/A';
+      const mlSt = ml.brier_score == null ? 'warn'
+                 : ml.brier_score < 0.20  ? 'ok'
+                 : ml.brier_score < 0.30  ? 'warn' : 'breach';
+      watchers.push({ watcher: 'Modelo PyMC — Brier Score', status: mlSt,
+        category: 'mlops', last_check: ml.computed_at || null,
+        alert_message: `Brier: ${brier} · Drift JS: ${drift}`,
+        detail: ml.model_version ? `Versão: ${ml.model_version}` : 'Modelo não treinado' });
+    }
+
     sentinelData = watchers;
     renderSentinel();
-    // Update summary cards from maturity
-    if (data.maturity) {
-      const el = id => document.getElementById(id);
-      if (el('dataops-score')) el('dataops-score').textContent = (data.maturity.dataops||0) + '%';
-      if (el('mlops-score'))   el('mlops-score').textContent   = (data.maturity.mlops||0) + '%';
-      if (el('llmops-score'))  el('llmops-score').textContent  = (data.maturity.llmops||0) + '%';
-    }
   } catch (e) {
-    document.getElementById('sentinel-grid').innerHTML = '<div style="color:var(--red);font-size:.78rem">Erro ao carregar dados do Sentinel.</div>';
+    document.getElementById('sentinel-grid').innerHTML =
+      '<div style="color:var(--red);font-size:.78rem">Erro ao carregar dados do Sentinel.</div>';
     console.error('loadSentinel error:', e);
   }
 }

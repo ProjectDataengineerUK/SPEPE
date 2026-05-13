@@ -3011,169 +3011,88 @@ _SENTINEL_AGENTS = [
 
 
 @app.get("/admin/api/sentinel/status", dependencies=[Depends(require_auth)])
-async def admin_sentinel_status() -> JSONResponse:
-    """Snapshot no formato esperado por applySnapshot() no admin panel."""
+async def admin_sentinel_status() -> Response:
+    """Real-time Sentinel snapshot — uses sentinel_queries for all data sources."""
     from datetime import datetime, timezone
 
+    from ui.sentinel_queries import (
+        AGENT_NAMES,
+        JOB_NAMES,
+        compute_maturity_score,
+        query_agents_telemetry,
+        query_cloud_run_services,
+        query_gold_storage,
+        query_jobs_executions,
+        query_mlops_metrics,
+        query_silver_storage,
+        query_views_existence,
+    )
+
     ts = datetime.now(timezone.utc).isoformat()
-    gold_tables: list[dict] = []
-    silver_tables: list[dict] = []
-    jobs: list[dict] = []
+    use_bq = bool(settings.gcp_project_id and os.environ.get("USE_BIGQUERY", "").lower() == "true")
 
-    def _query_bq_tables() -> tuple[list[dict], list[dict]]:
-        """Blocking BQ call — run in thread to avoid blocking event loop."""
-        from google.cloud import bigquery
+    _stub_jobs = [{"job": j, "status": "warn", "last_status": "unknown"} for j in JOB_NAMES]
+    _stub_agents = [
+        {"agent": a, "status": "ok", "calls_24h": 0, "p99_latency_s": 0.0, "cost_24h_usd": 0.0}
+        for a in AGENT_NAMES
+    ]
+    _stub_mlops: dict = {"brier_score": None, "js_divergence": None, "eval_score": None, "bias_metrics": []}
 
-        bq = bigquery.Client(project=settings.gcp_project_id)
-        now_ms = datetime.now(timezone.utc).timestamp() * 1000
-        _gold: list[dict] = []
-        _silver: list[dict] = []
-        for layer, dataset in [
-            ("gold", settings.bigquery_dataset_gold),
-            ("silver", settings.bigquery_dataset_silver),
-        ]:
-            try:
-                rows = list(
-                    bq.query(
-                        f"SELECT table_id, row_count, last_modified_time "
-                        f"FROM `{settings.gcp_project_id}.{dataset}.__TABLES__`"
-                        f" WHERE table_id NOT LIKE 'vw_%'"
-                    ).result()
-                )
-                for r in rows:
-                    fh = round((now_ms - (r.last_modified_time or now_ms)) / 3_600_000, 1)
-                    rc = r.row_count or 0
-                    st = "ok" if rc > 0 and fh < 48 else ("warn" if rc > 0 else "error")
-                    entry = {
-                        "table": r.table_id,
-                        "layer": layer,
-                        "row_count": rc,
-                        "freshness_hours": fh,
-                        "dq_score": None,
-                        "status": st,
-                    }
-                    (_gold if layer == "gold" else _silver).append(entry)
-            except Exception as e:
-                logger.warning("__TABLES__ %s failed: %s", dataset, e)
-        return _gold, _silver
+    if not use_bq:
+        return _json_safe_response(
+            {
+                "source": "stub",
+                "ts": ts,
+                "dataops": {"gold": [], "silver": [], "views": []},
+                "jobs": _stub_jobs,
+                "services": [],
+                "llmops": _stub_agents,
+                "maturity": {"dataops": 0, "mlops": 0, "llmops": 0},
+                "mlops": _stub_mlops,
+            }
+        )
 
-    def _query_run_jobs() -> list[dict]:
-        """Blocking Cloud Run API call — run in thread."""
-        from google.cloud import run_v2
+    # Run all blocking queries concurrently in the thread pool
+    results = await asyncio.gather(
+        asyncio.to_thread(query_gold_storage),
+        asyncio.to_thread(query_silver_storage),
+        asyncio.to_thread(query_views_existence),
+        asyncio.to_thread(query_jobs_executions),
+        asyncio.to_thread(query_agents_telemetry),
+        asyncio.to_thread(query_mlops_metrics),
+        asyncio.to_thread(query_cloud_run_services),
+        return_exceptions=True,
+    )
 
-        region = os.environ.get("GCP_REGION", "southamerica-east1")
-        exec_client = run_v2.ExecutionsClient()
-        result: list[dict] = []
-        for jname in _SENTINEL_JOBS:
-            try:
-                parent = f"projects/{settings.gcp_project_id}/locations/{region}/jobs/{jname}"
-                execs = list(exec_client.list_executions(parent=parent, page_size=1))
-                if execs:
-                    cond = next((c for c in execs[0].conditions if c.type_ == "Completed"), None)
-                    ok = cond and cond.status == "True"
-                    last, st = (
-                        ("Completed", "ok")
-                        if ok
-                        else (("Failed", "error") if cond else ("Running", "warn"))
-                    )
-                else:
-                    last, st = "never", "warn"
-            except Exception:
-                last, st = "unknown", "warn"
-            result.append({"job": jname, "status": st, "last_status": last})
-        return result
+    def _safe(r: Any, fallback: Any) -> Any:
+        if isinstance(r, Exception):
+            logger.warning("sentinel query failed: %s", r)
+            return fallback
+        return r
 
-    if settings.gcp_project_id and os.environ.get("USE_BIGQUERY", "").lower() == "true":
-        try:
-            gold_tables, silver_tables = await asyncio.to_thread(_query_bq_tables)
-            logger.debug(
-                "BQ tables query: %d gold, %d silver", len(gold_tables), len(silver_tables)
-            )
-        except Exception as exc:
-            logger.warning("BQ tables query failed: %s", exc)
-        try:
-            jobs = await asyncio.to_thread(_query_run_jobs)
-            logger.debug("Cloud Run executions query: %d jobs", len(jobs))
-        except Exception as exc:
-            logger.warning("Cloud Run executions query failed: %s", exc)
+    gold_tables = _safe(results[0], [])
+    silver_tables = _safe(results[1], [])
+    views = _safe(results[2], [])
+    jobs = _safe(results[3], _stub_jobs)
+    agents = _safe(results[4], _stub_agents)
+    mlops_metrics = _safe(results[5], _stub_mlops)
+    services = _safe(results[6], [])
 
-    # Check each view's existence in BQ rather than hardcoding "ok"
-    if settings.gcp_project_id and os.environ.get("USE_BIGQUERY", "").lower() == "true":
+    logger.info(
+        "Sentinel: %d gold, %d silver, %d views, %d jobs, %d services",
+        len(gold_tables), len(silver_tables), len(views), len(jobs), len(services),
+    )
 
-        async def _check_views() -> list[dict]:
-            from google.cloud import bigquery
-
-            def _blocking() -> list[dict]:
-                bq = bigquery.Client(project=settings.gcp_project_id)
-                results: list[dict] = []
-                for v in _SENTINEL_VIEWS:
-                    try:
-                        bq.get_table(
-                            f"{settings.gcp_project_id}.{settings.bigquery_dataset_gold}.{v}"
-                        )
-                        results.append({"view": v, "status": "ok"})
-                    except Exception:
-                        results.append({"view": v, "status": "missing"})
-                return results
-
-            return await asyncio.to_thread(_blocking)
-
-        try:
-            views = await _check_views()
-        except Exception as exc:
-            logger.warning("Views existence check failed: %s", exc)
-            views = [{"view": v, "status": "ok"} for v in _SENTINEL_VIEWS]
-    else:
-        views = [{"view": v, "status": "ok"} for v in _SENTINEL_VIEWS]
-
-    llmops: list[dict] = []
-    mlops_metrics: dict = {
-        "brier_score": None,
-        "js_divergence": None,
-        "eval_score": None,
-        "bias_metrics": [],
-    }
-    costs: dict = {"bq_total_30d_usd": 0.0, "llm_total_30d_usd": 0.0, "bq_daily": []}
-
-    if settings.gcp_project_id and os.environ.get("USE_BIGQUERY", "").lower() == "true":
-        try:
-            from ui.sentinel_queries import (
-                compute_maturity_score,
-                query_agents_telemetry,
-                query_costs,
-                query_mlops_metrics,
-            )
-
-            llmops = await asyncio.to_thread(query_agents_telemetry)
-            mlops_metrics = await asyncio.to_thread(query_mlops_metrics)
-            costs = await asyncio.to_thread(query_costs)
-        except Exception as exc:
-            logger.warning("sentinel_queries telemetry/mlops/costs failed: %s", exc)
-
-    if not llmops:
-        llmops = [
-            {"agent": a, "status": "ok", "calls_24h": 0, "p99_latency_s": 0.0, "cost_24h_usd": 0.0}
-            for a in _SENTINEL_AGENTS
-        ]
-
-    # Compute maturity from real data when available
-    try:
-        from ui.sentinel_queries import compute_maturity_score
-
-        maturity = compute_maturity_score(jobs, gold_tables, silver_tables, mlops_metrics, llmops)
-    except Exception:
-        maturity = {"dataops": 0, "mlops": 0, "llmops": 0}
+    maturity = compute_maturity_score(jobs, gold_tables, silver_tables, mlops_metrics, agents)
 
     return _json_safe_response(
         {
-            "source": "live" if (gold_tables or jobs) else "stub",
+            "source": "live",
             "ts": ts,
             "dataops": {"gold": gold_tables, "silver": silver_tables, "views": views},
-            "jobs": jobs
-            if jobs
-            else [{"job": j, "status": "warn", "last_status": "unknown"} for j in _SENTINEL_JOBS],
-            "llmops": llmops,
-            "costs": costs,
+            "jobs": jobs,
+            "services": services,
+            "llmops": agents,
             "maturity": maturity,
             "mlops": mlops_metrics,
         }

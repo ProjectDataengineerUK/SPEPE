@@ -70,6 +70,11 @@ SEMANTIC_VIEWS: list[str] = [
     "vw_mapa_prioridade_campanha",
 ]
 
+SERVICE_NAMES: list[str] = [
+    "spepe-prod",
+    "spepe-staging",
+]
+
 JOB_NAMES: list[str] = [
     "spepe-tse-ingest",
     "spepe-ibge-sync",
@@ -290,6 +295,66 @@ def query_jobs_executions() -> list[dict[str, Any]]:
                 "last_status": last_status,
                 "last_run_at": str(e.completion_time) if e.completion_time else None,
                 "alert_message": None if succeeded else f"última execução: {last_status}",
+            }
+        )
+    return out
+
+
+# ---------------------------------------------------------------------------
+# Cloud Run Services health
+# ---------------------------------------------------------------------------
+
+
+def query_cloud_run_services() -> list[dict[str, Any]]:
+    """Return health status for each declared Cloud Run service."""
+    from google.cloud import run_v2
+
+    region = "southamerica-east1"
+    services_client = run_v2.ServicesClient()
+    parent = f"projects/{_PROJECT}/locations/{region}"
+
+    deployed: dict[str, Any] = {}
+    try:
+        for svc in services_client.list_services(parent=parent):
+            deployed[svc.name.split("/")[-1]] = svc
+    except Exception as exc:
+        logger.warning("Cloud Run services list failed: %s", exc)
+        return [
+            {
+                "service": n,
+                "status": "warn",
+                "url": None,
+                "alert_message": "não foi possível verificar",
+            }
+            for n in SERVICE_NAMES
+        ]
+
+    out: list[dict[str, Any]] = []
+    for name in SERVICE_NAMES:
+        if name not in deployed:
+            out.append(
+                {
+                    "service": name,
+                    "status": "error",
+                    "url": None,
+                    "alert_message": "serviço não encontrado",
+                }
+            )
+            continue
+        svc = deployed[name]
+        ready = next((c for c in svc.conditions if c.type_ == "Ready"), None)
+        is_ready = (
+            ready is not None
+            and ready.state == run_v2.Condition.State.CONDITION_SUCCEEDED
+        )
+        out.append(
+            {
+                "service": name,
+                "status": "ok" if is_ready else "error",
+                "url": svc.uri or None,
+                "alert_message": None
+                if is_ready
+                else (ready.message if ready else "serviço não pronto"),
             }
         )
     return out
