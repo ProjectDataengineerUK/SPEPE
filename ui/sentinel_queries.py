@@ -376,7 +376,7 @@ def query_mlops_metrics() -> dict[str, Any]:
     try:
         client = _bq()
         eval_sql = f"""
-        SELECT model_version, brier_score, eval_score, evaluated_at
+        SELECT model_version, brier_score, accuracy AS eval_score, evaluated_at
         FROM `{_PROJECT}.{_MLOPS}.model_evaluations`
         ORDER BY evaluated_at DESC
         LIMIT 1
@@ -393,10 +393,11 @@ def query_mlops_metrics() -> dict[str, Any]:
     try:
         client = _bq()
         bias_sql = f"""
-        SELECT sg_uf, bias_score, computed_at
+        SELECT group_value AS sg_uf, ratio AS bias_score, measured_at AS computed_at
         FROM `{_PROJECT}.{_MLOPS}.bias_metrics`
-        WHERE computed_at >= TIMESTAMP_SUB(CURRENT_TIMESTAMP(), INTERVAL 7 DAY)
-        ORDER BY computed_at DESC
+        WHERE measured_at >= TIMESTAMP_SUB(CURRENT_TIMESTAMP(), INTERVAL 7 DAY)
+          AND group_type = 'uf'
+        ORDER BY measured_at DESC
         """
         bias_rows = [dict(r) for r in client.query(bias_sql).result()]
         out["bias_metrics"] = bias_rows

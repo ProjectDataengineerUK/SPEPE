@@ -1449,7 +1449,7 @@ async def _bq_indicadores(
             SELECT cd_municipio_ibge, candidato, cargo,
                    p_mean AS pct_previsto, p_lower AS ic_low_95, p_upper AS ic_high_95
             FROM `{mlops}.fact_predictions`
-            WHERE prediction_date >= DATE_SUB(CURRENT_DATE(), INTERVAL 30 DAY)
+            WHERE prediction_date >= TIMESTAMP(DATE_SUB(CURRENT_DATE(), INTERVAL 30 DAY))
               AND (@candidato IS NULL OR LOWER(candidato) LIKE CONCAT('%', LOWER(@candidato), '%'))
         """
         job_config = bigquery.QueryJobConfig(
@@ -2206,19 +2206,26 @@ async def get_social_sentimento(
             from google.cloud import bigquery
 
             client = bigquery.Client(project=settings.gcp_project_id)
-            gold = f"{settings.gcp_project_id}.{settings.bigquery_dataset_gold}"
-            params = []
-            where_clauses = ["data_ref >= DATE_SUB(CURRENT_DATE(), INTERVAL 12 WEEK)"]
+            silver = f"{settings.gcp_project_id}.{settings.bigquery_dataset_silver}"
+            params: list = []
+            where_clauses = ["data_referencia >= DATE_SUB(CURRENT_DATE(), INTERVAL 12 WEEK)"]
             if uf:
                 where_clauses.append("sg_uf = @uf")
                 params.append(bigquery.ScalarQueryParameter("uf", "STRING", uf.upper()))
             where_sql = " AND ".join(where_clauses)
             query = f"""
-                SELECT candidato, semana, sentimento_score_medio,
-                       total_mencoes, engajamento_total
-                FROM `{gold}.vw_social_candidato_sentimento`
+                SELECT
+                    candidato,
+                    FORMAT_DATE('%Y-%m-%d', data_referencia) AS semana,
+                    ROUND(AVG(sentimento_score), 3)          AS sentimento_score_medio,
+                    COUNT(*)                                 AS total_mencoes,
+                    SUM(COALESCE(like_count, 0) + COALESCE(view_count, 0) + COALESCE(comment_count, 0))
+                                                             AS engajamento_total
+                FROM `{silver}.social_mencoes_br`
                 WHERE {where_sql}
-                ORDER BY semana DESC, total_mencoes DESC
+                  AND candidato IS NOT NULL
+                GROUP BY candidato, data_referencia
+                ORDER BY data_referencia DESC, total_mencoes DESC
                 LIMIT 200
             """
             job_config = bigquery.QueryJobConfig(query_parameters=params)
@@ -2292,7 +2299,7 @@ async def get_social_plataformas(uf: str = "SP", ano: int = 2026) -> JSONRespons
                            SUM(qt_likes) AS total_likes,
                            AVG(sentimento_score) AS sentimento_medio
                     FROM `{silver}.social_mencoes_br`
-                    WHERE sg_uf = @uf AND EXTRACT(YEAR FROM data_ref) = @ano
+                    WHERE sg_uf = @uf AND EXTRACT(YEAR FROM data_referencia) = @ano
                     GROUP BY fonte
                     ORDER BY total_posts DESC
                 """
