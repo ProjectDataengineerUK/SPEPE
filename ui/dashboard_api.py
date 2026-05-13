@@ -2800,18 +2800,22 @@ async def get_previsao(
             mlops = f"{settings.gcp_project_id}.{settings.bigquery_dataset_mlops}"
             cd_cargo = _CARGO_CD.get(cargo, 3)
             try:
+                # fact_predictions schema: candidato, sg_uf, prediction_date, p_mean, p_lower,
+                # p_upper, model_version — table has require_partition_filter on prediction_date
                 query = f"""
-                    SELECT candidato, prob_vitoria, intervalo_inferior, intervalo_superior
+                    SELECT candidato,
+                           ROUND(p_mean, 4)  AS prob_vitoria,
+                           ROUND(p_lower, 4) AS intervalo_inferior,
+                           ROUND(p_upper, 4) AS intervalo_superior
                     FROM `{mlops}.fact_predictions`
-                    WHERE sg_uf = @uf AND cd_cargo = @cd_cargo AND ano_eleicao = @ano
-                    ORDER BY prob_vitoria DESC
+                    WHERE sg_uf = @uf
+                      AND DATE(prediction_date) >= DATE_SUB(CURRENT_DATE(), INTERVAL 2 YEAR)
+                    ORDER BY p_mean DESC
                     LIMIT 10
                 """
                 job_config = bigquery.QueryJobConfig(
                     query_parameters=[
                         bigquery.ScalarQueryParameter("uf", "STRING", uf.upper()),
-                        bigquery.ScalarQueryParameter("cd_cargo", "INT64", cd_cargo),
-                        bigquery.ScalarQueryParameter("ano", "INT64", ano),
                     ]
                 )
                 rows = list(client.query(query, job_config=job_config).result())
