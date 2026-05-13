@@ -140,9 +140,9 @@ jobs:
               --project "${{ vars.GCP_PROJECT_ID }}" 2>&1 || echo "Warning: could not update ${JOB}"
           done
           gcloud run jobs update spepe-pymc-train \
-            --image "${IMAGE}" \
-            --command "python" \
-            --args "-m,mlops.pymc_train" \
+            --image="${IMAGE}" \
+            --command="python" \
+            --args="-m,mlops.pymc_train" \
             --region "${{ env.GCP_REGION }}" \
             --project "${{ vars.GCP_PROJECT_ID }}" 2>&1 || echo "Warning: could not update spepe-pymc-train"
 
@@ -235,16 +235,16 @@ jobs:
           done
           if gcloud run jobs describe spepe-pymc-train --region "${REGION}" --project spepe-prod &>/dev/null; then
             gcloud run jobs update spepe-pymc-train \
-              --image "${IMAGE}" \
-              --command "python" \
-              --args "-m,mlops.pymc_train" \
+              --image="${IMAGE}" \
+              --command="python" \
+              --args="-m,mlops.pymc_train" \
               --region "${REGION}" \
               --project spepe-prod 2>&1 || echo "Warning: could not update spepe-pymc-train"
           else
             gcloud run jobs create spepe-pymc-train \
-              --image "${IMAGE}" \
-              --command "python" \
-              --args "-m,mlops.pymc_train" \
+              --image="${IMAGE}" \
+              --command="python" \
+              --args="-m,mlops.pymc_train" \
               --region "${REGION}" \
               --service-account "${SA}" \
               --memory "4Gi" --cpu "2" --task-timeout "7200" \

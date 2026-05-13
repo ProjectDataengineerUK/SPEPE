@@ -110,16 +110,17 @@ def build_training_dataset(
     query = f"""
     WITH tse_aggregated AS (
         -- TSE by municipio (aggregate by candidate across seções)
+        -- sg_partido not available in Silver seção-level tables; set NULL (partido_ideologia will be 'unknown')
         SELECT
             CAST(cd_municipio_ibge AS STRING) as cd_municipio_ibge,
             COALESCE(sg_uf_y, sg_uf_x) as sg_uf,
             nm_candidato as candidato,
-            COALESCE(sg_partido_x, sg_partido_y) as sg_partido,
+            CAST(NULL AS STRING) as sg_partido,
             ano_eleicao,
             SUM(CAST(qt_votos AS FLOAT64)) as votos_candidato,
         FROM `{project_id}.spepe_silver.tse_sp_2018`
         WHERE {where_clause}
-        GROUP BY cd_municipio_ibge, sg_uf_y, sg_uf_x, sg_partido_x, sg_partido_y, nm_candidato, ano_eleicao
+        GROUP BY cd_municipio_ibge, sg_uf_y, sg_uf_x, nm_candidato, ano_eleicao
 
         UNION ALL
 
@@ -127,12 +128,12 @@ def build_training_dataset(
             CAST(cd_municipio_ibge AS STRING) as cd_municipio_ibge,
             COALESCE(sg_uf_y, sg_uf_x) as sg_uf,
             nm_candidato as candidato,
-            COALESCE(sg_partido_x, sg_partido_y) as sg_partido,
+            CAST(NULL AS STRING) as sg_partido,
             ano_eleicao,
             SUM(CAST(qt_votos AS FLOAT64)) as votos_candidato,
         FROM `{project_id}.spepe_silver.tse_mg_2018`
         WHERE {where_clause}
-        GROUP BY cd_municipio_ibge, sg_uf_y, sg_uf_x, sg_partido_x, sg_partido_y, nm_candidato, ano_eleicao
+        GROUP BY cd_municipio_ibge, sg_uf_y, sg_uf_x, nm_candidato, ano_eleicao
 
         UNION ALL
 
@@ -140,12 +141,12 @@ def build_training_dataset(
             CAST(cd_municipio_ibge AS STRING) as cd_municipio_ibge,
             COALESCE(sg_uf_y, sg_uf_x) as sg_uf,
             nm_candidato as candidato,
-            COALESCE(sg_partido_x, sg_partido_y) as sg_partido,
+            CAST(NULL AS STRING) as sg_partido,
             ano_eleicao,
             SUM(CAST(qt_votos AS FLOAT64)) as votos_candidato,
         FROM `{project_id}.spepe_silver.tse_rj_2018`
         WHERE {where_clause}
-        GROUP BY cd_municipio_ibge, sg_uf_y, sg_uf_x, sg_partido_x, sg_partido_y, nm_candidato, ano_eleicao
+        GROUP BY cd_municipio_ibge, sg_uf_y, sg_uf_x, nm_candidato, ano_eleicao
 
         UNION ALL
 
@@ -153,12 +154,12 @@ def build_training_dataset(
             CAST(cd_municipio_ibge AS STRING) as cd_municipio_ibge,
             COALESCE(sg_uf_y, sg_uf_x) as sg_uf,
             nm_candidato as candidato,
-            COALESCE(sg_partido_x, sg_partido_y) as sg_partido,
+            CAST(NULL AS STRING) as sg_partido,
             ano_eleicao,
             SUM(CAST(qt_votos AS FLOAT64)) as votos_candidato,
         FROM `{project_id}.spepe_silver.tse_sp_2022`
         WHERE {where_clause}
-        GROUP BY cd_municipio_ibge, sg_uf_y, sg_uf_x, sg_partido_x, sg_partido_y, nm_candidato, ano_eleicao
+        GROUP BY cd_municipio_ibge, sg_uf_y, sg_uf_x, nm_candidato, ano_eleicao
 
         UNION ALL
 
@@ -166,12 +167,12 @@ def build_training_dataset(
             CAST(cd_municipio_ibge AS STRING) as cd_municipio_ibge,
             COALESCE(sg_uf_y, sg_uf_x) as sg_uf,
             nm_candidato as candidato,
-            COALESCE(sg_partido_x, sg_partido_y) as sg_partido,
+            CAST(NULL AS STRING) as sg_partido,
             ano_eleicao,
             SUM(CAST(qt_votos AS FLOAT64)) as votos_candidato,
         FROM `{project_id}.spepe_silver.tse_mg_2022`
         WHERE {where_clause}
-        GROUP BY cd_municipio_ibge, sg_uf_y, sg_uf_x, sg_partido_x, sg_partido_y, nm_candidato, ano_eleicao
+        GROUP BY cd_municipio_ibge, sg_uf_y, sg_uf_x, nm_candidato, ano_eleicao
 
         UNION ALL
 
@@ -179,12 +180,12 @@ def build_training_dataset(
             CAST(cd_municipio_ibge AS STRING) as cd_municipio_ibge,
             COALESCE(sg_uf_y, sg_uf_x) as sg_uf,
             nm_candidato as candidato,
-            COALESCE(sg_partido_x, sg_partido_y) as sg_partido,
+            CAST(NULL AS STRING) as sg_partido,
             ano_eleicao,
             SUM(CAST(qt_votos AS FLOAT64)) as votos_candidato,
         FROM `{project_id}.spepe_silver.tse_rj_2022`
         WHERE {where_clause}
-        GROUP BY cd_municipio_ibge, sg_uf_y, sg_uf_x, sg_partido_x, sg_partido_y, nm_candidato, ano_eleicao
+        GROUP BY cd_municipio_ibge, sg_uf_y, sg_uf_x, nm_candidato, ano_eleicao
     ),
 
     eleicoes_normalized AS (
