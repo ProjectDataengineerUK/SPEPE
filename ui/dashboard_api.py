@@ -3260,18 +3260,24 @@ async def admin_architecture() -> Response:
     services: list[dict] = []
     gold_summary: list[dict] = []
     if use_bq:
+        from ui.sentinel_queries import (
+            query_cloud_run_services,
+            query_gold_storage,
+            query_jobs_executions,
+        )
+
         results = await asyncio.gather(
-            asyncio.to_thread(__import__("ui.sentinel_queries", fromlist=["query_jobs_executions"]).query_jobs_executions),
-            asyncio.to_thread(__import__("ui.sentinel_queries", fromlist=["query_cloud_run_services"]).query_cloud_run_services),
-            asyncio.to_thread(__import__("ui.sentinel_queries", fromlist=["query_gold_storage"]).query_gold_storage),
+            asyncio.to_thread(query_jobs_executions),
+            asyncio.to_thread(query_cloud_run_services),
+            asyncio.to_thread(query_gold_storage),
             return_exceptions=True,
         )
         jobs = results[0] if not isinstance(results[0], Exception) else []
         services = results[1] if not isinstance(results[1], Exception) else []
         gold_summary = results[2] if not isinstance(results[2], Exception) else []
-        for r in results:
+        for i, r in enumerate(results):
             if isinstance(r, Exception):
-                logger.warning("architecture query failed: %s", r)
+                logger.warning("architecture query[%d] failed: %s", i, r)
 
     job_map = {j["job"]: j for j in jobs}
 
@@ -3332,22 +3338,30 @@ async def admin_kpis() -> JSONResponse:
                 query_silver_storage,
             )
 
-            async def _safe(fn, default=None):
-                if default is None:
-                    default = []
-                try:
-                    return await asyncio.to_thread(fn)
-                except Exception as exc:
-                    logger.warning("kpis %s failed: %s", fn.__name__, exc)
-                    return default
+            # Run all queries in parallel — sequential approach was causing timeouts
+            kpi_results = await asyncio.gather(
+                asyncio.to_thread(query_gold_storage),
+                asyncio.to_thread(query_silver_storage),
+                asyncio.to_thread(query_jobs_executions),
+                asyncio.to_thread(query_mlops_metrics),
+                asyncio.to_thread(query_costs),
+                asyncio.to_thread(query_agents_telemetry),
+                return_exceptions=True,
+            )
 
-            gold = await _safe(query_gold_storage)
-            silver = await _safe(query_silver_storage)
-            jobs = await _safe(query_jobs_executions)
-            mlops = await _safe(query_mlops_metrics, default={})
-            costs = await _safe(query_costs, default={})
-            agents = await _safe(query_agents_telemetry)
-            maturity = compute_maturity_score(jobs, gold, silver, mlops or {}, agents)
+            def _kpi_safe(r: Any, default: Any) -> Any:
+                if isinstance(r, Exception):
+                    logger.warning("kpis query failed: %s", r)
+                    return default
+                return r or default
+
+            gold = _kpi_safe(kpi_results[0], [])
+            silver = _kpi_safe(kpi_results[1], [])
+            jobs = _kpi_safe(kpi_results[2], [])
+            mlops = _kpi_safe(kpi_results[3], {})
+            costs = _kpi_safe(kpi_results[4], {})
+            agents = _kpi_safe(kpi_results[5], [])
+            maturity = compute_maturity_score(jobs, gold, silver, mlops, agents)
             source = "bigquery" if (gold or jobs) else "partial"
         except Exception as exc:
             logger.warning("admin_kpis failed: %s", exc)

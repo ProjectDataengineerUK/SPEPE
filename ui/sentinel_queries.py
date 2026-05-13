@@ -96,6 +96,7 @@ JOB_NAMES: list[str] = [
     "spepe-silver-transform",
     "spepe-gold-build",
     "spepe-candidatos-discovery",
+    "spepe-pymc-train",
 ]
 
 AGENT_NAMES: list[str] = [
