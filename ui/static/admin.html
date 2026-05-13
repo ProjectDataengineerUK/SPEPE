@@ -721,11 +721,55 @@ function initSentinelWS() {
 async function loadSentinel() {
   try {
     const r = await apiFetch('/admin/api/sentinel/status');
+    if (!r) return; // 401 — signOut already called
     const data = await r.json();
-    sentinelData = data.resources || data.watchers || [];
+    // Build flat watcher list from structured API response
+    const watchers = [];
+    for (const t of (data.dataops?.gold || [])) {
+      watchers.push({ watcher: `Gold: ${t.table}`, status: t.status || 'warn',
+        category: 'dataops', last_check: null,
+        alert_message: `${(t.row_count||0).toLocaleString('pt-BR')} rows · ${t.freshness_hours}h atrás` });
+    }
+    for (const t of (data.dataops?.silver || [])) {
+      watchers.push({ watcher: `Silver: ${t.table}`, status: t.status || 'warn',
+        category: 'dataops', last_check: null,
+        alert_message: `${(t.row_count||0).toLocaleString('pt-BR')} rows · ${t.freshness_hours}h atrás` });
+    }
+    for (const v of (data.dataops?.views || [])) {
+      watchers.push({ watcher: `View: ${v.view}`, status: v.exists ? 'ok' : 'breach',
+        category: 'dataops', last_check: null,
+        alert_message: v.exists ? 'View disponível' : 'View ausente' });
+    }
+    for (const j of (data.jobs || [])) {
+      watchers.push({ watcher: j.job, status: j.status || 'warn',
+        category: 'jobs', last_check: null, alert_message: j.last_status || '—' });
+    }
+    for (const a of (data.llmops || [])) {
+      watchers.push({ watcher: a.agent || a.name, status: a.status || 'ok',
+        category: 'llmops', last_check: null,
+        alert_message: `${a.calls_24h||0} calls/24h · latência p99: ${(a.p99_latency_s||0).toFixed(2)}s` });
+    }
+    // maturity scores as watchers
+    if (data.maturity) {
+      const m = data.maturity;
+      ['dataops','mlops','llmops'].forEach(k => {
+        if (m[k] !== undefined)
+          watchers.push({ watcher: `Maturidade ${k}`, status: m[k]>=70?'ok':m[k]>=40?'warn':'breach',
+            category: k, last_check: null, alert_message: `Score: ${m[k]}%` });
+      });
+    }
+    sentinelData = watchers;
     renderSentinel();
+    // Update summary cards from maturity
+    if (data.maturity) {
+      const el = id => document.getElementById(id);
+      if (el('dataops-score')) el('dataops-score').textContent = (data.maturity.dataops||0) + '%';
+      if (el('mlops-score'))   el('mlops-score').textContent   = (data.maturity.mlops||0) + '%';
+      if (el('llmops-score'))  el('llmops-score').textContent  = (data.maturity.llmops||0) + '%';
+    }
   } catch (e) {
     document.getElementById('sentinel-grid').innerHTML = '<div style="color:var(--red);font-size:.78rem">Erro ao carregar dados do Sentinel.</div>';
+    console.error('loadSentinel error:', e);
   }
 }
 
@@ -1126,11 +1170,13 @@ function renderCatalog(tables) {
 async function loadArchitecture() {
   try {
     const r = await apiFetch('/admin/api/architecture');
+    if (!r) return;
     const data = await r.json();
     renderArchPipeline(data.stages || []);
     renderArchJobs(data.jobs || {});
-  } catch {
+  } catch(e) {
     document.getElementById('arch-jobs').innerHTML = '<div style="color:var(--red);font-size:.78rem">Erro ao carregar arquitetura.</div>';
+    console.error('loadArchitecture error:', e);
   }
 }
 
@@ -1175,10 +1221,12 @@ function renderArchJobs(jobGroups) {
 async function loadKpis() {
   try {
     const r = await apiFetch('/admin/api/kpis');
+    if (!r) return;
     const d = await r.json();
     renderKpis(d);
-  } catch {
+  } catch(e) {
     document.getElementById('kpis-grid').innerHTML = '<div style="color:var(--red);font-size:.78rem">Erro ao carregar KPIs.</div>';
+    console.error('loadKpis error:', e);
   }
 }
 

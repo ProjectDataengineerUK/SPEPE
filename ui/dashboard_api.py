@@ -54,6 +54,32 @@ from security.output_validators import validate_input_injection
 _sentinel_subscribers: list[asyncio.Queue] = []
 
 
+def _json_safe_response(data: Any) -> Response:
+    """Return a Response with JSON content, safely serializing BQ/numpy types."""
+    import datetime as _dt
+
+    def _default(obj: Any) -> Any:
+        if isinstance(obj, (_dt.datetime, _dt.date)):
+            return obj.isoformat()
+        try:
+            import numpy as np
+
+            if isinstance(obj, (np.integer,)):
+                return int(obj)
+            if isinstance(obj, (np.floating,)):
+                return float(obj)
+            if isinstance(obj, np.ndarray):
+                return obj.tolist()
+        except ImportError:
+            pass
+        return str(obj)
+
+    return Response(
+        content=json.dumps(data, default=_default),
+        media_type="application/json",
+    )
+
+
 @asynccontextmanager
 async def lifespan(application: FastAPI):
     setup_logging(log_level=settings.log_level, console_log_level="WARNING")
@@ -3138,7 +3164,7 @@ async def admin_sentinel_status() -> JSONResponse:
     except Exception:
         maturity = {"dataops": 0, "mlops": 0, "llmops": 0}
 
-    return JSONResponse(
+    return _json_safe_response(
         {
             "source": "live" if (gold_tables or jobs) else "stub",
             "ts": ts,
@@ -3183,7 +3209,7 @@ async def admin_catalog() -> JSONResponse:
                     logger.debug("Failed to read dataset %s: %s", ds, exc)
             if catalog:
                 source = "bigquery"
-                return JSONResponse({"tables": catalog, "source": source})
+                return _json_safe_response({"tables": catalog, "source": source})
         except Exception as exc:
             logger.warning("Catalog BQ query failed: %s", exc)
 
@@ -3400,7 +3426,7 @@ async def admin_kpis() -> JSONResponse:
     n_tables_ok = sum(1 for t in gold if t.get("status") == "ok")
     n_agents_calls = sum(int(a.get("calls_24h", 0) or 0) for a in agents)
 
-    return JSONResponse(
+    return _json_safe_response(
         {
             "source": source,
             "maturity": maturity,
@@ -3542,7 +3568,7 @@ async def admin_model_overview() -> JSONResponse:
             logger.debug("feature_importance table not found or empty: %s", exc)
 
     trained = mlops.get("model_version") is not None or mlops.get("brier_score") is not None
-    return JSONResponse(
+    return _json_safe_response(
         {
             "trained": trained,
             "source": source,
