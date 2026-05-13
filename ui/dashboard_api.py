@@ -2821,13 +2821,16 @@ async def get_previsao(
                 pass
             gold = f"{settings.gcp_project_id}.{settings.bigquery_dataset_gold}"
             query = f"""
-                SELECT nm_candidato AS candidato,
-                       ROUND(pct_uf / 100.0, 4) AS prob_vitoria,
-                       NULL AS intervalo_inferior,
-                       NULL AS intervalo_superior
-                FROM `{gold}.vw_intencao_voto_uf`
-                WHERE sg_uf = @uf AND cd_cargo = @cd_cargo AND ano_eleicao = @ano
-                ORDER BY prob_vitoria DESC
+                SELECT candidato_normalizado                          AS candidato,
+                       ROUND(AVG(intencao_ponderada) / 100.0, 4)     AS prob_vitoria,
+                       ROUND((AVG(intencao_ponderada) - STDDEV(intencao_ponderada)) / 100.0, 4) AS intervalo_inferior,
+                       ROUND((AVG(intencao_ponderada) + STDDEV(intencao_ponderada)) / 100.0, 4) AS intervalo_superior
+                FROM `{gold}.fact_intencao_voto`
+                WHERE (uf = @uf OR @uf = 'BR' OR uf = 'BR')
+                  AND cd_cargo = @cd_cargo
+                  AND ano_eleitoral = @ano
+                GROUP BY candidato_normalizado
+                ORDER BY AVG(intencao_ponderada) DESC
                 LIMIT 10
             """
             job_config = bigquery.QueryJobConfig(
@@ -2949,6 +2952,32 @@ async def get_endividamento(
             return JSONResponse({"data": [dict(r) for r in rows]})
         except Exception as exc:
             logger.warning("BigQuery endividamento falhou: %s", exc)
+            # Fallback: Silver endividamento_nacional
+            try:
+                silver = f"{settings.gcp_project_id}.{settings.bigquery_dataset_silver}"
+                query3 = f"""
+                    SELECT SAFE_CAST(ano AS INT64) AS ano,
+                           SAFE_CAST(mes AS INT64) AS mes,
+                           CAST(data_referencia AS DATE) AS data_referencia,
+                           SAFE_CAST(endividamento_familias_pct AS FLOAT64) AS endividamento_familias_pct,
+                           SAFE_CAST(comprometimento_renda_pct AS FLOAT64) AS comprometimento_renda_pct,
+                           SAFE_CAST(inadimplencia_pf_pct AS FLOAT64) AS inadimplencia_pf_pct,
+                           fontes
+                    FROM `{silver}.endividamento_nacional`
+                    WHERE SAFE_CAST(ano AS INT64) BETWEEN @ano_start AND @ano_end
+                    ORDER BY data_referencia
+                """
+                job_config3 = bigquery.QueryJobConfig(
+                    query_parameters=[
+                        bigquery.ScalarQueryParameter("ano_start", "INT64", ano_start),
+                        bigquery.ScalarQueryParameter("ano_end", "INT64", ano_end),
+                    ]
+                )
+                rows3 = list(client.query(query3, job_config=job_config3).result())
+                if rows3:
+                    return JSONResponse({"data": [dict(r) for r in rows3], "fonte": "silver"})
+            except Exception as exc3:
+                logger.warning("BigQuery endividamento Silver falhou: %s", exc3)
     return JSONResponse({"data": []})
 
 
@@ -2992,7 +3021,40 @@ async def get_parlamentares(
             rows = list(client.query(query, job_config=job_config).result())
             return JSONResponse({"data": [dict(r) for r in rows]})
         except Exception as exc:
-            logger.warning("BigQuery parlamentares falhou: %s", exc)
+            logger.warning("BigQuery parlamentares falhou (Gold): %s", exc)
+            # Fallback: try Silver votacoes_parlamentares directly
+            try:
+                silver = f"{settings.gcp_project_id}.{settings.bigquery_dataset_silver}"
+                params2: list = [bigquery.ScalarQueryParameter("year", "INT64", year)]
+                uf_filter2 = "" if uf.upper() == "BR" else "AND sg_uf = @uf"
+                if uf.upper() != "BR":
+                    params2.append(bigquery.ScalarQueryParameter("uf", "STRING", uf.upper()))
+                query2 = f"""
+                    SELECT COALESCE(sg_uf, 'BR') AS sg_uf,
+                           COALESCE(sg_partido, 'N/A') AS sg_partido,
+                           COALESCE(casa, 'Câmara') AS casa,
+                           COALESCE(tema, 'Geral') AS tema,
+                           COUNT(*) AS qt_votacoes,
+                           COUNTIF(voto = 'Sim') AS qt_sim,
+                           COUNTIF(LOWER(voto) LIKE '%não%' OR LOWER(voto) LIKE '%nao%') AS qt_nao,
+                           COUNTIF(LOWER(voto) LIKE '%absten%') AS qt_abstencao,
+                           ROUND(COUNTIF(voto='Sim') / NULLIF(COUNT(*), 0) * 100, 1) AS pct_favoravel
+                    FROM `{silver}.votacoes_parlamentares`
+                    WHERE SAFE_CAST(ano AS INT64) = @year {uf_filter2}
+                    GROUP BY sg_uf, sg_partido, casa, tema
+                    ORDER BY qt_votacoes DESC
+                    LIMIT 200
+                """
+                rows2 = list(
+                    client.query(
+                        query2,
+                        job_config=bigquery.QueryJobConfig(query_parameters=params2),
+                    ).result()
+                )
+                if rows2:
+                    return JSONResponse({"data": [dict(r) for r in rows2], "fonte": "silver"})
+            except Exception as exc2:
+                logger.warning("BigQuery parlamentares Silver falhou: %s", exc2)
     return JSONResponse({"data": []})
 
 

@@ -58,7 +58,7 @@ def _build_gold_via_bigquery_sql() -> dict:
             SELECT
                 {_s}sg_uf,
                 SAFE_CAST({_s}cd_municipio AS INT64)        AS cd_municipio,
-                {_s}nm_municipio_x                           AS nm_municipio,
+                {_s}nm_municipio                           AS nm_municipio,
                 SAFE_CAST({_s}cd_municipio_ibge AS INT64)   AS cd_municipio_ibge,
                 {_s}nm_candidato,
                 {_partido_cols}
@@ -74,7 +74,7 @@ def _build_gold_via_bigquery_sql() -> dict:
                 CURRENT_TIMESTAMP()                          AS ingested_at
             FROM {_from_tse_s}
             {_partido_join}
-            GROUP BY {_s}sg_uf, {_s}cd_municipio, {_s}nm_municipio_x, {_s}cd_municipio_ibge,
+            GROUP BY {_s}sg_uf, {_s}cd_municipio, {_s}nm_municipio, {_s}cd_municipio_ibge,
                      {_s}nm_candidato, {_partido_grp}
                      {_s}cd_cargo, {_s}ds_cargo, {_s}ano_eleicao
         """,
@@ -83,7 +83,7 @@ def _build_gold_via_bigquery_sql() -> dict:
             SELECT
                 {_s}sg_uf,
                 SAFE_CAST({_s}cd_municipio AS INT64)    AS cd_municipio,
-                {_s}nm_municipio_x                       AS nm_municipio,
+                {_s}nm_municipio                       AS nm_municipio,
                 SAFE_CAST({_s}nr_zona AS INT64)          AS nr_zona,
                 SAFE_CAST({_s}nr_secao AS INT64)         AS nr_secao,
                 {_s}nm_candidato,
@@ -96,7 +96,7 @@ def _build_gold_via_bigquery_sql() -> dict:
                 CURRENT_TIMESTAMP()                      AS ingested_at
             FROM {_from_tse_s}
             {_partido_join}
-            GROUP BY {_s}sg_uf, {_s}cd_municipio, {_s}nm_municipio_x, {_s}nr_zona, {_s}nr_secao,
+            GROUP BY {_s}sg_uf, {_s}cd_municipio, {_s}nm_municipio, {_s}nr_zona, {_s}nr_secao,
                      {_s}nm_candidato, {_partido_grp}
                      {_s}cd_cargo, {_s}ds_cargo, {_s}nr_turno, {_s}ano_eleicao
         """,
@@ -136,7 +136,7 @@ def _build_gold_via_bigquery_sql() -> dict:
                 SELECT
                     {_s}sg_uf,
                     SAFE_CAST({_s}cd_municipio AS INT64)        AS cd_municipio,
-                    {_s}nm_municipio_x                           AS nm_municipio,
+                    {_s}nm_municipio                           AS nm_municipio,
                     SAFE_CAST({_s}cd_municipio_ibge AS INT64)   AS cd_municipio_ibge,
                     {_s}nm_candidato,
                     {_partido_cols}
@@ -148,7 +148,7 @@ def _build_gold_via_bigquery_sql() -> dict:
                     CURRENT_TIMESTAMP()                          AS ingested_at
                 FROM {_from_tse_s}
                 {_partido_join}
-                GROUP BY {_s}sg_uf, {_s}cd_municipio, {_s}nm_municipio_x, {_s}cd_municipio_ibge,
+                GROUP BY {_s}sg_uf, {_s}cd_municipio, {_s}nm_municipio, {_s}cd_municipio_ibge,
                          {_s}nm_candidato, {_partido_grp}
                          {_s}cd_cargo, {_s}ds_cargo, {_s}nr_turno, {_s}ano_eleicao
             )
@@ -158,7 +158,7 @@ def _build_gold_via_bigquery_sql() -> dict:
             SELECT
                 sg_uf,
                 SAFE_CAST(cd_municipio AS INT64)        AS cd_municipio,
-                COALESCE(nm_municipio_x, nm_municipio)  AS nm_municipio,
+                nm_municipio,
                 SAFE_CAST(cd_municipio_ibge AS INT64)   AS cd_municipio_ibge,
                 nm_candidato,
                 SAFE_CAST(nr_candidato AS INT64)        AS nr_candidato,
@@ -177,7 +177,7 @@ def _build_gold_via_bigquery_sql() -> dict:
             WHERE nm_candidato IS NOT NULL
               AND qt_votos IS NOT NULL
             GROUP BY
-                sg_uf, cd_municipio, nm_municipio_x, nm_municipio, cd_municipio_ibge,
+                sg_uf, cd_municipio, nm_municipio, cd_municipio_ibge,
                 nm_candidato, nr_candidato, cd_cargo, ds_cargo, nr_turno, ano_eleicao
         """,
         "fact_ibge_municipio": f"""
@@ -185,7 +185,7 @@ def _build_gold_via_bigquery_sql() -> dict:
             SELECT
                 SAFE_CAST(cd_municipio_ibge AS INT64)                       AS cd_municipio_ibge,
                 sg_uf,
-                ANY_VALUE(nm_municipio_x)                                   AS nm_municipio,
+                ANY_VALUE(nm_municipio)                                   AS nm_municipio,
                 2022                                                        AS ano,
                 MAX(IF(indicador='populacao',
                     SAFE_CAST(valor AS FLOAT64), NULL))                     AS populacao_total,
@@ -279,19 +279,18 @@ def _build_gold_via_bigquery_sql() -> dict:
             FROM `{silver}.seguranca_municipal`
             WHERE cd_municipio_ibge IS NOT NULL
         """,
-        # Silver saude_municipal schema (atual): cd_municipio_ibge, sg_uf, ano, fontes — demais colunas como NULL
         "fact_saude_municipio": f"""
             CREATE OR REPLACE TABLE `{gold}.fact_saude_municipio` AS
             SELECT
                 CAST(cd_municipio_ibge AS INT64)                              AS cd_municipio_ibge,
                 sg_uf,
                 COALESCE(SAFE_CAST(ano AS INT64), 2022)                       AS ano,
-                CAST(NULL AS FLOAT64)                                         AS taxa_mortalidade_infantil_1000,
-                CAST(NULL AS FLOAT64)                                         AS taxa_mortalidade_materna_100k,
-                CAST(NULL AS FLOAT64)                                         AS pct_cobertura_plano_saude,
-                CAST(NULL AS FLOAT64)                                         AS qt_obitos_total,
-                CAST(NULL AS FLOAT64)                                         AS qt_nascimentos,
-                CAST(NULL AS FLOAT64)                                         AS idsus_score,
+                SAFE_CAST(taxa_mortalidade_infantil_1000 AS FLOAT64)          AS taxa_mortalidade_infantil_1000,
+                SAFE_CAST(taxa_mortalidade_materna_100k AS FLOAT64)           AS taxa_mortalidade_materna_100k,
+                SAFE_CAST(pct_cobertura_plano_saude AS FLOAT64)               AS pct_cobertura_plano_saude,
+                SAFE_CAST(qt_obitos_total AS FLOAT64)                         AS qt_obitos_total,
+                SAFE_CAST(qt_nascimentos AS FLOAT64)                          AS qt_nascimentos,
+                SAFE_CAST(COALESCE(idsus, NULL) AS FLOAT64)                   AS idsus_score,
                 CURRENT_TIMESTAMP() AS ingested_at
             FROM `{silver}.saude_municipal`
             WHERE cd_municipio_ibge IS NOT NULL

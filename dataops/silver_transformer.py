@@ -1139,6 +1139,19 @@ def transform_saude_to_silver(
     if "fontes" in df.columns:
         df["fontes"] = df["fontes"].astype(str).str[:500]  # Limit length
 
+    # Ensure all expected Gold columns exist (with NaN if missing from Bronze)
+    _SAUDE_COLS = [
+        "taxa_mortalidade_infantil_1000",
+        "taxa_mortalidade_materna_100k",
+        "pct_cobertura_plano_saude",
+        "qt_obitos_total",
+        "qt_nascimentos",
+        "idsus",
+    ]
+    for col in _SAUDE_COLS:
+        if col not in df.columns:
+            df[col] = float("nan")
+
     df["ingested_at"] = pd.Timestamp.utcnow()
 
     table_name = f"saude_municipal_{uf.lower()}_{year}"
@@ -2158,44 +2171,18 @@ def transform_tse_perfil_to_silver(
 
 
 def transform_presidente_to_silver(year: int, use_bigquery: bool = False) -> dict:
-    """Transform Bronze TSE Presidente (nacional) → Silver (expandido para UFs).
+    """Transform Bronze TSE Presidente (nacional) → Silver.
 
     Reads: raw/tse_presidente/{year}/BR/presidente_{year}.parquet
-    Writes: Silver table `tse_presidente_{year}` (nacional expandido por UF)
+    Writes: Silver table `tse_presidente_{year}` (com sg_uf por seção)
 
-    Estratégia: Presidente é cargo nacional (BR).
-    Expandir para UFs proporcionalmente aos votos.
+    Usa pyarrow streaming (batch_size=50_000) para evitar OOM em arquivos 200 MB+.
     """
+    import pyarrow.parquet as pq
+
     LOCAL_SILVER_DIR.mkdir(parents=True, exist_ok=True)
 
-    df_pres = pd.DataFrame()
-
-    # 1. Ler Bronze presidente (nacional BR)
-    if GCS_BUCKET:
-        prefix = f"raw/tse_presidente/{year}/BR/"
-        try:
-            df_pres = _read_gcs_parquet_glob(GCS_BUCKET, prefix)
-        except Exception as exc:
-            logger.warning("GCS tse_presidente read %d: %s", year, exc)
-
-    if df_pres.empty:
-        bronze_path = LOCAL_BRONZE_DIR / "tse_presidente" / str(year) / "BR"
-        files = list(bronze_path.glob(f"presidente_{year}.parquet")) if bronze_path.exists() else []
-        if files:
-            df_pres = pd.concat([pd.read_parquet(f) for f in files], ignore_index=True)
-
-    if df_pres.empty:
-        logger.warning("Bronze tse_presidente vazio para %d", year)
-        return {"status": "error", "message": f"Bronze TSE presidente vazio para {year}"}
-
-    df_pres = df_pres.copy()
-
-    # 2. Normalizar colunas para schema Silver (TSE)
-    df_pres = _normalize_tse(df_pres, year)
-
-    # 3. O arquivo BR já contém sg_uf por seção — não replicar artificialmente.
-    # Garantir colunas mínimas de Silver (mesmas das tabelas tse_{uf}_{year})
-    required_cols = [
+    _REQUIRED_COLS = [
         "sg_uf",
         "cd_municipio",
         "nm_municipio",
@@ -2208,28 +2195,81 @@ def transform_presidente_to_silver(year: int, use_bigquery: bool = False) -> dic
         "ano_eleicao",
         "nr_turno",
     ]
-    for col in required_cols:
-        if col not in df_pres.columns:
-            if col in ("cd_municipio", "nr_zona", "nr_secao", "nr_turno"):
-                df_pres[col] = 0
-            elif col == "nm_municipio":
-                df_pres[col] = ""
-            elif col == "ano_eleicao":
-                df_pres[col] = year
-            elif col == "cd_cargo":
-                df_pres[col] = 1
-            elif col == "ds_cargo":
-                df_pres[col] = "Presidente"
-            else:
-                df_pres[col] = ""
+    _COL_DEFAULTS: dict = {
+        "cd_municipio": 0,
+        "nr_zona": 0,
+        "nr_secao": 0,
+        "nr_turno": 0,
+        "nm_municipio": "",
+        "ano_eleicao": year,
+        "cd_cargo": 1,
+        "ds_cargo": "Presidente",
+        "sg_uf": "",
+        "nm_candidato": "",
+        "qt_votos": 0,
+    }
 
-    df_pres = df_pres[[c for c in required_cols if c in df_pres.columns]]
+    # Locate Bronze file
+    bronze_path: Path | None = None
+    if GCS_BUCKET:
+        # For GCS: download to a temp local file, then read with pyarrow
+        try:
+            from google.cloud import storage as gcs_lib
+
+            gcs_c = gcs_lib.Client()
+            bucket_obj = gcs_c.bucket(GCS_BUCKET)
+            blob_name = f"raw/tse_presidente/{year}/BR/presidente_{year}.parquet"
+            blob = bucket_obj.blob(blob_name)
+            if blob.exists():
+                import tempfile
+
+                tmp_f = tempfile.NamedTemporaryFile(suffix=".parquet", delete=False)
+                blob.download_to_filename(tmp_f.name)
+                bronze_path = Path(tmp_f.name)
+                logger.info("GCS tse_presidente baixado para %s", tmp_f.name)
+        except Exception as exc:
+            logger.warning("GCS tse_presidente download %d: %s", year, exc)
+
+    if bronze_path is None:
+        local_candidate = LOCAL_BRONZE_DIR / "tse_presidente" / str(year) / "BR" / f"presidente_{year}.parquet"
+        if local_candidate.exists():
+            bronze_path = local_candidate
+
+    if bronze_path is None:
+        logger.warning("Bronze tse_presidente vazio para %d", year)
+        return {"status": "error", "message": f"Bronze TSE presidente vazio para {year}"}
+
+    # Stream-process in batches to avoid OOM
+    path_local = LOCAL_SILVER_DIR / f"tse_presidente_{year}.parquet"
+    total_rows = 0
+    batches_out: list[pd.DataFrame] = []
+
+    try:
+        pq_file = pq.ParquetFile(str(bronze_path))
+        for batch in pq_file.iter_batches(batch_size=50_000):
+            df_batch = batch.to_pandas()
+            df_batch = _normalize_tse(df_batch, year)
+            for col, default in _COL_DEFAULTS.items():
+                if col not in df_batch.columns:
+                    df_batch[col] = default
+            df_batch = df_batch[[c for c in _REQUIRED_COLS if c in df_batch.columns]]
+            batches_out.append(df_batch)
+            total_rows += len(df_batch)
+            logger.debug("Presidente batch %d rows (total %d)", len(df_batch), total_rows)
+    except Exception as exc:
+        logger.error("Erro lendo Bronze presidente %d: %s", year, exc)
+        return {"status": "error", "message": str(exc)}
+
+    if not batches_out:
+        logger.warning("Bronze tse_presidente: nenhum batch para %d", year)
+        return {"status": "error", "message": f"Bronze TSE presidente vazio para {year}"}
+
+    df_pres = pd.concat(batches_out, ignore_index=True)
 
     # 4a. Salvar local
-    path_local = LOCAL_SILVER_DIR / f"tse_presidente_{year}.parquet"
     df_pres.to_parquet(path_local, index=False, compression="zstd")
     path = str(path_local)
-    logger.info("TSE Presidente Silver local: %s (%d rows)", path, len(df_pres))
+    logger.info("TSE Presidente Silver local: %s (%d rows)", path, total_rows)
 
     # 4b. Escrever em BigQuery quando habilitado
     if use_bigquery and GCS_BUCKET:
@@ -2262,11 +2302,11 @@ def transform_presidente_to_silver(year: int, use_bigquery: bool = False) -> dic
                 f"gs://{GCS_BUCKET}/{staging_blob}", table_id, job_config=job_config
             ).result()
             bucket_obj.blob(staging_blob).delete()
-            logger.info("TSE Presidente Silver BQ: %s (%d rows)", table_id, len(df_pres))
+            logger.info("TSE Presidente Silver BQ: %s (%d rows)", table_id, total_rows)
         except Exception as exc:
             logger.warning("TSE Presidente BQ write falhou: %s", exc)
 
-    return {"status": "ok", "path": path, "rows": len(df_pres)}
+    return {"status": "ok", "path": path, "rows": total_rows}
 
 
 def _dataframe_to_bq_schema(df: pd.DataFrame) -> list:

@@ -35,10 +35,16 @@ _X_MAX_RESULTS = 100  # max per request on free tier
 _FB_BASE = "https://graph.facebook.com/v19.0"
 
 # ── YouTube Data API v3 ─────────────────────────────────────────────────────
-_YT_API_KEY = os.environ.get("YOUTUBE_API_KEY", "")
+# Note: _YT_API_KEY is resolved at call time via _get_yt_key() so that Secret Manager
+# values set after module import are picked up correctly.
 _YT_SEARCH_URL = "https://www.googleapis.com/youtube/v3/search"
 _YT_VIDEOS_URL = "https://www.googleapis.com/youtube/v3/videos"
 _YT_MAX_RESULTS = 50  # max per request
+
+
+def _get_yt_key() -> str:
+    """Resolve YouTube API key: Secret Manager first, then env var."""
+    return get_secret("YOUTUBE_API_KEY") or os.environ.get("YOUTUBE_API_KEY", "")
 
 
 # ── Sentiment labels (rule-based — substituir por Vertex AI NLP na Fase 2+) ─
@@ -366,7 +372,8 @@ def fetch_youtube_videos(
     Requer YOUTUBE_API_KEY (Google Cloud Console, YouTube Data API v3 habilitada).
     Quota: 10.000 unidades/dia grátis; search.list = 100 unidades/chamada.
     """
-    if not _YT_API_KEY:
+    yt_key = _get_yt_key()
+    if not yt_key:
         logger.warning("YOUTUBE_API_KEY ausente — retornando lista vazia")
         return []
 
@@ -381,7 +388,7 @@ def fetch_youtube_videos(
 
         while collected < max_por_candidato:
             params: dict[str, Any] = {
-                "key": _YT_API_KEY,
+                "key": yt_key,
                 "q": candidato,
                 "part": "snippet",
                 "type": "video",
@@ -426,7 +433,7 @@ def fetch_youtube_videos(
                 stats_resp = requests.get(
                     _YT_VIDEOS_URL,
                     params={
-                        "key": _YT_API_KEY,
+                        "key": yt_key,
                         "id": ",".join(batch),
                         "part": "snippet,statistics",
                     },
