@@ -388,6 +388,26 @@ async def _bq_candidatos(cargo: str, uf: str, ano: int) -> list[dict]:
                 bigquery.ScalarQueryParameter("ano", "INT64", ano),
             ]
         )
+    elif cd_cargo == 1:
+        # Presidente: usa fact_presidente_resultado (nacional, sem filtro de UF)
+        query = f"""
+            SELECT
+                nm_candidato                                    AS nm,
+                CAST(NULL AS STRING)                            AS partido,
+                ROUND(SUM(total_votos) / SUM(SUM(total_votos)) OVER () * 100, 1) AS pct_t1,
+                CAST(SUM(total_votos) AS STRING)                AS votos
+            FROM `{gold}.fact_presidente_resultado`
+            WHERE ano_eleicao = @ano
+              AND nr_turno = 1
+            GROUP BY nm_candidato
+            ORDER BY pct_t1 DESC
+            LIMIT 50
+        """
+        job_config = bigquery.QueryJobConfig(
+            query_parameters=[
+                bigquery.ScalarQueryParameter("ano", "INT64", ano),
+            ]
+        )
     else:
         query = f"""
             SELECT

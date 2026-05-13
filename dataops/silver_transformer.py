@@ -2193,49 +2193,8 @@ def transform_presidente_to_silver(year: int, use_bigquery: bool = False) -> dic
     # 2. Normalizar colunas para schema Silver (TSE)
     df_pres = _normalize_tse(df_pres, year)
 
-    # 3. Expandir presidente nacional para UFs (replicar para cada UF)
-    all_ufs = [
-        "AC",
-        "AL",
-        "AP",
-        "AM",
-        "BA",
-        "CE",
-        "DF",
-        "ES",
-        "GO",
-        "MA",
-        "MT",
-        "MS",
-        "MG",
-        "PA",
-        "PB",
-        "PR",
-        "PE",
-        "PI",
-        "RJ",
-        "RN",
-        "RS",
-        "RO",
-        "RR",
-        "SC",
-        "SP",
-        "SE",
-        "TO",
-    ]
-    df_pres_expandido = []
-    for uf in all_ufs:
-        df_temp = df_pres.copy()
-        df_temp["sg_uf"] = uf
-        # Dividir votos proporcionalmente por UF
-        num_ufs = len(all_ufs)
-        if "qt_votos" in df_temp.columns:
-            df_temp["qt_votos"] = (df_temp["qt_votos"] / num_ufs).astype(int)
-        df_pres_expandido.append(df_temp)
-
-    df_pres = pd.concat(df_pres_expandido, ignore_index=True)
-
-    # 4. Garantir colunas mínimas de Silver
+    # 3. O arquivo BR já contém sg_uf por seção — não replicar artificialmente.
+    # Garantir colunas mínimas de Silver (mesmas das tabelas tse_{uf}_{year})
     required_cols = [
         "sg_uf",
         "cd_municipio",
@@ -2247,25 +2206,65 @@ def transform_presidente_to_silver(year: int, use_bigquery: bool = False) -> dic
         "ds_cargo",
         "cd_cargo",
         "ano_eleicao",
+        "nr_turno",
     ]
     for col in required_cols:
         if col not in df_pres.columns:
-            if col in ("cd_municipio", "nr_zona", "nr_secao"):
+            if col in ("cd_municipio", "nr_zona", "nr_secao", "nr_turno"):
                 df_pres[col] = 0
             elif col == "nm_municipio":
                 df_pres[col] = ""
             elif col == "ano_eleicao":
                 df_pres[col] = year
+            elif col == "cd_cargo":
+                df_pres[col] = 1
+            elif col == "ds_cargo":
+                df_pres[col] = "Presidente"
             else:
                 df_pres[col] = ""
 
-    df_pres = df_pres[required_cols]
+    df_pres = df_pres[[c for c in required_cols if c in df_pres.columns]]
 
-    # 5. Salvar em Silver (local apenas, sem BQ para simplificar)
+    # 4a. Salvar local
     path_local = LOCAL_SILVER_DIR / f"tse_presidente_{year}.parquet"
     df_pres.to_parquet(path_local, index=False, compression="zstd")
     path = str(path_local)
     logger.info("TSE Presidente Silver local: %s (%d rows)", path, len(df_pres))
+
+    # 4b. Escrever em BigQuery quando habilitado
+    if use_bigquery and GCS_BUCKET:
+        try:
+            import io
+            import uuid
+
+            from google.cloud import bigquery, storage
+
+            project = os.environ.get("GCP_PROJECT_ID", "spepe-dev")
+            dataset = os.environ.get("BIGQUERY_DATASET_SILVER", "spepe_silver")
+            table_id = f"{project}.{dataset}.tse_presidente_{year}"
+            run_id = uuid.uuid4().hex[:8]
+            staging_blob = f"tmp/silver/presidente_{year}_{run_id}.parquet"
+
+            gcs_client = storage.Client()
+            bucket_obj = gcs_client.bucket(GCS_BUCKET)
+            buf = io.BytesIO()
+            df_pres.to_parquet(buf, index=False, compression="zstd")
+            buf.seek(0)
+            bucket_obj.blob(staging_blob).upload_from_file(buf)
+
+            bq_client = bigquery.Client(project=project)
+            job_config = bigquery.LoadJobConfig(
+                write_disposition="WRITE_TRUNCATE",
+                source_format=bigquery.SourceFormat.PARQUET,
+                autodetect=True,
+            )
+            bq_client.load_table_from_uri(
+                f"gs://{GCS_BUCKET}/{staging_blob}", table_id, job_config=job_config
+            ).result()
+            bucket_obj.blob(staging_blob).delete()
+            logger.info("TSE Presidente Silver BQ: %s (%d rows)", table_id, len(df_pres))
+        except Exception as exc:
+            logger.warning("TSE Presidente BQ write falhou: %s", exc)
 
     return {"status": "ok", "path": path, "rows": len(df_pres)}
 

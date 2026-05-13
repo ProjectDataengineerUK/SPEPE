@@ -158,7 +158,7 @@ def _build_gold_via_bigquery_sql() -> dict:
             SELECT
                 sg_uf,
                 SAFE_CAST(cd_municipio AS INT64)        AS cd_municipio,
-                nm_municipio_x                          AS nm_municipio,
+                COALESCE(nm_municipio_x, nm_municipio)  AS nm_municipio,
                 SAFE_CAST(cd_municipio_ibge AS INT64)   AS cd_municipio_ibge,
                 nm_candidato,
                 SAFE_CAST(nr_candidato AS INT64)        AS nr_candidato,
@@ -169,16 +169,15 @@ def _build_gold_via_bigquery_sql() -> dict:
                 SAFE_CAST(SUM(qt_votos) AS INT64)       AS total_votos,
                 ROUND(
                     SUM(qt_votos) / NULLIF(SUM(SUM(qt_votos)) OVER (
-                        PARTITION BY sg_uf, cd_municipio, nr_turno, ano_eleicao
+                        PARTITION BY sg_uf, nr_turno, ano_eleicao
                     ), 0) * 100, 1
-                )                                       AS pct_votos_municipio,
+                )                                       AS pct_votos_uf,
                 CURRENT_TIMESTAMP()                     AS ingested_at
-            FROM `{silver}.tse_presidente`
-            WHERE cd_municipio IS NOT NULL
-              AND nm_candidato IS NOT NULL
+            FROM `{silver}.tse_presidente_*`
+            WHERE nm_candidato IS NOT NULL
               AND qt_votos IS NOT NULL
             GROUP BY
-                sg_uf, cd_municipio, nm_municipio_x, cd_municipio_ibge,
+                sg_uf, cd_municipio, nm_municipio_x, nm_municipio, cd_municipio_ibge,
                 nm_candidato, nr_candidato, cd_cargo, ds_cargo, nr_turno, ano_eleicao
         """,
         "fact_ibge_municipio": f"""
