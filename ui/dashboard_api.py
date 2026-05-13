@@ -3390,9 +3390,9 @@ async def admin_architecture() -> Response:
             asyncio.to_thread(query_gold_storage),
             return_exceptions=True,
         )
-        jobs = results[0] if not isinstance(results[0], Exception) else []
-        services = results[1] if not isinstance(results[1], Exception) else []
-        gold_summary = results[2] if not isinstance(results[2], Exception) else []
+        jobs = results[0] if not isinstance(results[0], BaseException) else []  # type: ignore[assignment]
+        services = results[1] if not isinstance(results[1], BaseException) else []  # type: ignore[assignment]
+        gold_summary = results[2] if not isinstance(results[2], BaseException) else []  # type: ignore[assignment]
         for i, r in enumerate(results):
             if isinstance(r, Exception):
                 logger.warning("architecture query[%d] failed: %s", i, r)
