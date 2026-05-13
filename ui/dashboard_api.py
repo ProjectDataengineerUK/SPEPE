@@ -3261,19 +3261,48 @@ async def admin_catalog() -> JSONResponse:
 # ── Admin Fase 2 — Arquitetura, KPIs, Explorer, Modelo ───────────────────────
 
 _PIPELINE_STAGES = [
-    {"stage": "Bronze", "layer": "gcs", "color": "#b45309", "description": "Raw parquet imutável no GCS"},
-    {"stage": "Silver", "layer": "bigquery", "color": "#1d4ed8", "description": "Limpo + joined TSE+IBGE no BQ"},
-    {"stage": "Gold", "layer": "bigquery", "color": "#15803d", "description": "Fatos agregados, particionado por ano/UF"},
-    {"stage": "MLOps", "layer": "vertex", "color": "#7c3aed", "description": "Treinamento PyMC + predições IC 95%"},
+    {
+        "stage": "Bronze",
+        "layer": "gcs",
+        "color": "#b45309",
+        "description": "Raw parquet imutável no GCS",
+    },
+    {
+        "stage": "Silver",
+        "layer": "bigquery",
+        "color": "#1d4ed8",
+        "description": "Limpo + joined TSE+IBGE no BQ",
+    },
+    {
+        "stage": "Gold",
+        "layer": "bigquery",
+        "color": "#15803d",
+        "description": "Fatos agregados, particionado por ano/UF",
+    },
+    {
+        "stage": "MLOps",
+        "layer": "vertex",
+        "color": "#7c3aed",
+        "description": "Treinamento PyMC + predições IC 95%",
+    },
 ]
 
 _ARCH_JOBS = {
     "ingestion": [
-        "spepe-tse-ingest", "spepe-tse-candidaturas-ingest", "spepe-tse-perfil-ingest",
-        "spepe-ibge-sync", "spepe-security-ingest", "spepe-datasus-ingest",
-        "spepe-dieese-ingest", "spepe-cetic-ingest", "spepe-social-ingest",
-        "spepe-pesquisas-ingest", "spepe-digital-ingest", "spepe-camara-senado-ingest",
-        "spepe-cadunico-ingest", "spepe-emendas-ingest",
+        "spepe-tse-ingest",
+        "spepe-tse-candidaturas-ingest",
+        "spepe-tse-perfil-ingest",
+        "spepe-ibge-sync",
+        "spepe-security-ingest",
+        "spepe-datasus-ingest",
+        "spepe-dieese-ingest",
+        "spepe-cetic-ingest",
+        "spepe-social-ingest",
+        "spepe-pesquisas-ingest",
+        "spepe-digital-ingest",
+        "spepe-camara-senado-ingest",
+        "spepe-cadunico-ingest",
+        "spepe-emendas-ingest",
     ],
     "transform": ["spepe-silver-transform"],
     "aggregation": ["spepe-gold-build"],
@@ -3289,6 +3318,7 @@ async def admin_architecture() -> JSONResponse:
     if use_bq:
         try:
             from ui.sentinel_queries import query_jobs_executions
+
             jobs = await asyncio.to_thread(query_jobs_executions)
         except Exception as exc:
             logger.warning("architecture query_jobs_executions failed: %s", exc)
@@ -3306,14 +3336,15 @@ async def admin_architecture() -> JSONResponse:
             "alert_message": info.get("alert_message"),
         }
 
-    return JSONResponse({
-        "stages": _PIPELINE_STAGES,
-        "jobs": {
-            group: [_enrich(j) for j in job_list]
-            for group, job_list in _ARCH_JOBS.items()
-        },
-        "source": "cloud_run" if jobs else "stub",
-    })
+    return JSONResponse(
+        {
+            "stages": _PIPELINE_STAGES,
+            "jobs": {
+                group: [_enrich(j) for j in job_list] for group, job_list in _ARCH_JOBS.items()
+            },
+            "source": "cloud_run" if jobs else "stub",
+        }
+    )
 
 
 @app.get("/admin/api/kpis", dependencies=[Depends(require_auth)])
@@ -3322,7 +3353,12 @@ async def admin_kpis() -> JSONResponse:
     use_bq = settings.gcp_project_id and os.environ.get("USE_BIGQUERY", "").lower() == "true"
     maturity = {"dataops": 0, "mlops": 0, "llmops": 0}
     costs: dict = {"bq_total_30d_usd": 0.0, "llm_total_30d_usd": 0.0, "bq_daily": []}
-    mlops: dict = {"brier_score": None, "js_divergence": None, "eval_score": None, "bias_metrics": []}
+    mlops: dict = {
+        "brier_score": None,
+        "js_divergence": None,
+        "eval_score": None,
+        "bias_metrics": [],
+    }
     agents: list = []
     gold: list = []
     jobs: list = []
@@ -3364,39 +3400,42 @@ async def admin_kpis() -> JSONResponse:
     n_tables_ok = sum(1 for t in gold if t.get("status") == "ok")
     n_agents_calls = sum(int(a.get("calls_24h", 0) or 0) for a in agents)
 
-    return JSONResponse({
-        "source": source,
-        "maturity": maturity,
-        "dataops": {
-            "score": maturity.get("dataops", 0),
-            "jobs_ok": n_jobs_ok,
-            "jobs_total": len(jobs),
-            "tables_ok": n_tables_ok,
-            "tables_total": len(gold),
-        },
-        "mlops": {
-            "score": maturity.get("mlops", 0),
-            "brier_score": mlops.get("brier_score") if mlops else None,
-            "js_divergence": mlops.get("js_divergence") if mlops else None,
-            "eval_score": mlops.get("eval_score") if mlops else None,
-            "model_version": mlops.get("model_version") if mlops else None,
-        },
-        "llmops": {
-            "score": maturity.get("llmops", 0),
-            "calls_24h": n_agents_calls,
-            "agents": len(agents),
-            "agents_ok": sum(1 for a in agents if a.get("status") == "ok"),
-        },
-        "finops": {
-            "bq_total_30d_usd": costs.get("bq_total_30d_usd", 0.0),
-            "llm_total_30d_usd": costs.get("llm_total_30d_usd", 0.0),
-            "total_30d_usd": round(
-                float(costs.get("bq_total_30d_usd") or 0.0) +
-                float(costs.get("llm_total_30d_usd") or 0.0), 2
-            ),
-            "bq_daily": costs.get("bq_daily", []),
-        },
-    })
+    return JSONResponse(
+        {
+            "source": source,
+            "maturity": maturity,
+            "dataops": {
+                "score": maturity.get("dataops", 0),
+                "jobs_ok": n_jobs_ok,
+                "jobs_total": len(jobs),
+                "tables_ok": n_tables_ok,
+                "tables_total": len(gold),
+            },
+            "mlops": {
+                "score": maturity.get("mlops", 0),
+                "brier_score": mlops.get("brier_score") if mlops else None,
+                "js_divergence": mlops.get("js_divergence") if mlops else None,
+                "eval_score": mlops.get("eval_score") if mlops else None,
+                "model_version": mlops.get("model_version") if mlops else None,
+            },
+            "llmops": {
+                "score": maturity.get("llmops", 0),
+                "calls_24h": n_agents_calls,
+                "agents": len(agents),
+                "agents_ok": sum(1 for a in agents if a.get("status") == "ok"),
+            },
+            "finops": {
+                "bq_total_30d_usd": costs.get("bq_total_30d_usd", 0.0),
+                "llm_total_30d_usd": costs.get("llm_total_30d_usd", 0.0),
+                "total_30d_usd": round(
+                    float(costs.get("bq_total_30d_usd") or 0.0)
+                    + float(costs.get("llm_total_30d_usd") or 0.0),
+                    2,
+                ),
+                "bq_daily": costs.get("bq_daily", []),
+            },
+        }
+    )
 
 
 @app.get("/admin/api/explorer/tables", dependencies=[Depends(require_auth)])
@@ -3406,9 +3445,12 @@ async def admin_explorer_tables() -> JSONResponse:
     if use_bq:
         try:
             from ui.sentinel_queries import query_gold_storage, query_silver_storage
+
             gold = await asyncio.to_thread(query_gold_storage)
             silver = await asyncio.to_thread(query_silver_storage)
-            tables = [{"layer": "gold", **t} for t in gold] + [{"layer": "silver", **t} for t in silver]
+            tables = [{"layer": "gold", **t} for t in gold] + [
+                {"layer": "silver", **t} for t in silver
+            ]
             return JSONResponse({"tables": tables, "source": "bigquery"})
         except Exception as exc:
             logger.warning("explorer/tables failed: %s", exc)
@@ -3455,26 +3497,35 @@ async def admin_explorer_data(
         return JSONResponse({**data, "source": "bigquery"})
     except Exception as exc:
         logger.warning("explorer/data %s.%s failed: %s", layer, table, exc)
-        return JSONResponse({"rows": [], "columns": [], "total": 0, "source": "error", "error": str(exc)})
+        return JSONResponse(
+            {"rows": [], "columns": [], "total": 0, "source": "error", "error": str(exc)}
+        )
 
 
 @app.get("/admin/api/model/overview", dependencies=[Depends(require_auth)])
 async def admin_model_overview() -> JSONResponse:
     """Return model validation overview (MLOps metrics + feature importance)."""
     use_bq = settings.gcp_project_id and os.environ.get("USE_BIGQUERY", "").lower() == "true"
-    mlops: dict = {"brier_score": None, "js_divergence": None, "eval_score": None, "bias_metrics": []}
+    mlops: dict = {
+        "brier_score": None,
+        "js_divergence": None,
+        "eval_score": None,
+        "bias_metrics": [],
+    }
     features: list = []
     source = "stub"
 
     if use_bq:
         try:
             from ui.sentinel_queries import query_mlops_metrics
+
             mlops = await asyncio.to_thread(query_mlops_metrics)
             source = "bigquery"
         except Exception as exc:
             logger.warning("model/overview mlops failed: %s", exc)
         try:
             from google.cloud import bigquery as _bq_mod
+
             client = _bq_mod.Client(project=settings.gcp_project_id)
 
             def _features() -> list:
@@ -3491,19 +3542,21 @@ async def admin_model_overview() -> JSONResponse:
             logger.debug("feature_importance table not found or empty: %s", exc)
 
     trained = mlops.get("model_version") is not None or mlops.get("brier_score") is not None
-    return JSONResponse({
-        "trained": trained,
-        "source": source,
-        "metrics": {
-            "model_version": mlops.get("model_version"),
-            "brier_score": mlops.get("brier_score"),
-            "js_divergence": mlops.get("js_divergence"),
-            "eval_score": mlops.get("eval_score"),
-            "computed_at": mlops.get("computed_at"),
-        },
-        "feature_importance": features,
-        "bias_metrics": mlops.get("bias_metrics", []),
-    })
+    return JSONResponse(
+        {
+            "trained": trained,
+            "source": source,
+            "metrics": {
+                "model_version": mlops.get("model_version"),
+                "brier_score": mlops.get("brier_score"),
+                "js_divergence": mlops.get("js_divergence"),
+                "eval_score": mlops.get("eval_score"),
+                "computed_at": mlops.get("computed_at"),
+            },
+            "feature_importance": features,
+            "bias_metrics": mlops.get("bias_metrics", []),
+        }
+    )
 
 
 # ── Sentinel WebSocket ────────────────────────────────────────────────────────
