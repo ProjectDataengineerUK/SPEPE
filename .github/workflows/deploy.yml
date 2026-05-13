@@ -146,6 +146,12 @@ jobs:
             --args="-m,mlops.pymc_train" \
             --region "${{ env.GCP_REGION }}" \
             --project "${{ vars.GCP_PROJECT_ID }}" 2>&1 || echo "Warning: could not update spepe-pymc-train"
+          gcloud run jobs update spepe-pymc-electoral-train \
+            --image="${IMAGE}" \
+            --command="python" \
+            --args="-m,mlops.pymc_electoral_train" \
+            --region "${{ env.GCP_REGION }}" \
+            --project "${{ vars.GCP_PROJECT_ID }}" 2>&1 || echo "Warning: could not update spepe-pymc-electoral-train"
 
       - name: Smoke test — staging health check
         run: |
@@ -235,23 +241,26 @@ jobs:
                 --project spepe-prod 2>&1 || echo "Warning: could not create ${JOB}"
             fi
           done
-          if gcloud run jobs describe spepe-pymc-train --region "${REGION}" --project spepe-prod &>/dev/null; then
-            gcloud run jobs update spepe-pymc-train \
-              --image="${IMAGE}" \
-              --command="python" \
-              --args="-m,mlops.pymc_train" \
-              --region "${REGION}" \
-              --project spepe-prod 2>&1 || echo "Warning: could not update spepe-pymc-train"
-          else
-            gcloud run jobs create spepe-pymc-train \
-              --image="${IMAGE}" \
-              --command="python" \
-              --args="-m,mlops.pymc_train" \
-              --region "${REGION}" \
-              --service-account "${SA}" \
-              --memory "4Gi" --cpu "2" --task-timeout "7200" \
-              --project spepe-prod 2>&1 || echo "Warning: could not create spepe-pymc-train"
-          fi
+          for PYMC_JOB in spepe-pymc-train spepe-pymc-electoral-train; do
+            PYMC_MODULE=$([ "$PYMC_JOB" = "spepe-pymc-train" ] && echo "mlops.pymc_train" || echo "mlops.pymc_electoral_train")
+            if gcloud run jobs describe "${PYMC_JOB}" --region "${REGION}" --project spepe-prod &>/dev/null; then
+              gcloud run jobs update "${PYMC_JOB}" \
+                --image="${IMAGE}" \
+                --command="python" \
+                --args="-m,${PYMC_MODULE}" \
+                --region "${REGION}" \
+                --project spepe-prod 2>&1 || echo "Warning: could not update ${PYMC_JOB}"
+            else
+              gcloud run jobs create "${PYMC_JOB}" \
+                --image="${IMAGE}" \
+                --command="python" \
+                --args="-m,${PYMC_MODULE}" \
+                --region "${REGION}" \
+                --service-account "${SA}" \
+                --memory "8Gi" --cpu "4" --task-timeout "7200" \
+                --project spepe-prod 2>&1 || echo "Warning: could not create ${PYMC_JOB}"
+            fi
+          done
 
       - name: Smoke test — prod health check
         run: |

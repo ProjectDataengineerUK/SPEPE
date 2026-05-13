@@ -32,6 +32,7 @@ locals {
     gdelt_ingest          = { timeout = "1800s", memory = "1Gi",   cpu = "1", args = [] }
     bluesky_ingest        = { timeout = "1800s", memory = "1Gi",   cpu = "1", args = [] }
     pymc_train            = { timeout = "7200s", memory = "8Gi",   cpu = "4", args = [] }
+    pymc_electoral_train  = { timeout = "7200s", memory = "8Gi",   cpu = "4", args = [] }
   }
 
   # Env vars adicionais por job (além das compartilhadas)
@@ -99,6 +100,14 @@ locals {
       PYMC_MAX_ROWS      = "10000"
       VERTEX_LOCATION    = "us-central1"
     }
+    pymc_electoral_train = {
+      PYMC_DRAWS         = "1000"
+      PYMC_TUNE          = "2000"
+      PYMC_CHAINS        = "4"
+      PYMC_TARGET_ACCEPT = "0.95"
+      PYMC_MAX_ROWS      = "20000"
+      VERTEX_LOCATION    = "us-central1"
+    }
   }
 
   job_entrypoints = {
@@ -130,6 +139,7 @@ locals {
     gdelt_ingest            = ["python", "-m", "dataops.jobs.gdelt_ingest_job"]
     bluesky_ingest          = ["python", "-m", "dataops.jobs.bluesky_ingest_job"]
     pymc_train              = ["python", "-m", "mlops.pymc_train"]
+    pymc_electoral_train    = ["python", "-m", "mlops.pymc_electoral_train"]
   }
 }
 

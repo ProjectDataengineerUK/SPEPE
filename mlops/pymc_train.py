@@ -12,7 +12,7 @@ import pandas as pd
 
 logger = logging.getLogger("spepe.mlops.pymc_train")
 
-_MODEL_VERSION = "pymc-hierarchical-noncentered-v3"
+_MODEL_VERSION = "pymc-demographic-baseline-v3"
 
 
 def train_pymc_model(
