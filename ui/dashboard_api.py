@@ -1121,10 +1121,10 @@ async def _bq_pesquisas(cargo: str, sg_uf: str, ano: int, tipo: str = "corrente"
     query = f"""
         SELECT data_pesquisa_inicio, instituto, candidato, tipo_pesquisa,
                intencao_pct, intencao_ajustada, house_effect, margem_erro
-        FROM `{gold}.fact_pesquisa`
+        FROM `{gold}.vw_pesquisa_intencao_detalhada`
         WHERE cd_cargo = @cd_cargo
-          AND (uf = @sg_uf OR uf IS NULL OR @sg_uf = 'BR')
-          AND EXTRACT(YEAR FROM data_pesquisa_inicio) = @ano
+          AND (uf = @sg_uf OR @sg_uf = 'BR')
+          AND ano_eleitoral = @ano
           {tipo_filter}
         ORDER BY candidato, data_pesquisa_inicio
     """
