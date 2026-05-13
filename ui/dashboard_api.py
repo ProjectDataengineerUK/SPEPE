@@ -3100,10 +3100,43 @@ async def admin_sentinel_status() -> JSONResponse:
     else:
         views = [{"view": v, "status": "ok"} for v in _SENTINEL_VIEWS]
 
-    llmops = [
-        {"agent": a, "status": "ok", "calls_24h": 0, "p99_latency_s": 0.0, "cost_24h_usd": 0.0}
-        for a in _SENTINEL_AGENTS
-    ]
+    llmops: list[dict] = []
+    mlops_metrics: dict = {
+        "brier_score": None,
+        "js_divergence": None,
+        "eval_score": None,
+        "bias_metrics": [],
+    }
+    costs: dict = {"bq_total_30d_usd": 0.0, "llm_total_30d_usd": 0.0, "bq_daily": []}
+
+    if settings.gcp_project_id and os.environ.get("USE_BIGQUERY", "").lower() == "true":
+        try:
+            from ui.sentinel_queries import (
+                compute_maturity_score,
+                query_agents_telemetry,
+                query_costs,
+                query_mlops_metrics,
+            )
+
+            llmops = await asyncio.to_thread(query_agents_telemetry)
+            mlops_metrics = await asyncio.to_thread(query_mlops_metrics)
+            costs = await asyncio.to_thread(query_costs)
+        except Exception as exc:
+            logger.warning("sentinel_queries telemetry/mlops/costs failed: %s", exc)
+
+    if not llmops:
+        llmops = [
+            {"agent": a, "status": "ok", "calls_24h": 0, "p99_latency_s": 0.0, "cost_24h_usd": 0.0}
+            for a in _SENTINEL_AGENTS
+        ]
+
+    # Compute maturity from real data when available
+    try:
+        from ui.sentinel_queries import compute_maturity_score
+
+        maturity = compute_maturity_score(jobs, gold_tables, silver_tables, mlops_metrics, llmops)
+    except Exception:
+        maturity = {"dataops": 0, "mlops": 0, "llmops": 0}
 
     return JSONResponse(
         {
@@ -3114,14 +3147,9 @@ async def admin_sentinel_status() -> JSONResponse:
             if jobs
             else [{"job": j, "status": "warn", "last_status": "unknown"} for j in _SENTINEL_JOBS],
             "llmops": llmops,
-            "costs": {"bq_total_30d_usd": 0.0, "llm_total_30d_usd": 0.0, "bq_daily": []},
-            "maturity": {"dataops": 75, "mlops": 35, "llmops": 60},
-            "mlops": {
-                "brier_score": None,
-                "js_divergence": None,
-                "eval_score": 0.995,
-                "bias_metrics": [],
-            },
+            "costs": costs,
+            "maturity": maturity,
+            "mlops": mlops_metrics,
         }
     )
 
@@ -3294,7 +3322,11 @@ async def _sentinel_broadcast(event_type: str, payload: dict) -> None:
 
 
 async def _build_full_snapshot() -> dict:
-    """Collect a full snapshot for the initial SSE event."""
+    """Collect a full snapshot for the initial SSE event.
+
+    Each sub-query is wrapped individually — one API failure (e.g. Cloud Run
+    Jobs permission) does not erase BQ data that is already available.
+    """
     use_bq = settings.gcp_project_id and os.environ.get("USE_BIGQUERY", "").lower() == "true"
     if not use_bq:
         return {
@@ -3307,49 +3339,45 @@ async def _build_full_snapshot() -> dict:
             "source": "stub",
             "ts": time.time(),
         }
-    try:
-        from ui.sentinel_queries import (
-            compute_maturity_score,
-            query_agents_telemetry,
-            query_costs,
-            query_gold_storage,
-            query_jobs_executions,
-            query_mlops_metrics,
-            query_silver_storage,
-            query_views_existence,
-        )
+    from ui.sentinel_queries import (
+        compute_maturity_score,
+        query_agents_telemetry,
+        query_costs,
+        query_gold_storage,
+        query_jobs_executions,
+        query_mlops_metrics,
+        query_silver_storage,
+        query_views_existence,
+    )
 
-        gold = await asyncio.to_thread(query_gold_storage)
-        silver = await asyncio.to_thread(query_silver_storage)
-        views = await asyncio.to_thread(query_views_existence)
-        jobs = await asyncio.to_thread(query_jobs_executions)
-        mlops = await asyncio.to_thread(query_mlops_metrics)
-        costs = await asyncio.to_thread(query_costs)
-        agents = await asyncio.to_thread(query_agents_telemetry)
-        maturity = compute_maturity_score(jobs, gold, silver, mlops, agents)
-        return {
-            "dataops": {"gold": gold, "silver": silver, "views": views},
-            "jobs": jobs,
-            "mlops": mlops,
-            "llmops": agents,
-            "costs": costs,
-            "maturity": maturity,
-            "source": "bigquery",
-            "ts": time.time(),
-        }
-    except Exception as exc:
-        logger.warning("snapshot build failed: %s", exc)
-        return {
-            "dataops": {"gold": [], "silver": [], "views": []},
-            "jobs": [],
-            "mlops": {},
-            "llmops": [],
-            "costs": {},
-            "maturity": {"dataops": 0, "mlops": 0, "llmops": 0},
-            "source": "stub",
-            "error": str(exc),
-            "ts": time.time(),
-        }
+    async def _safe(fn, default=None):
+        if default is None:
+            default = []
+        try:
+            return await asyncio.to_thread(fn)
+        except Exception as exc:
+            logger.warning("%s failed: %s", fn.__name__, exc)
+            return default
+
+    gold = await _safe(query_gold_storage)
+    silver = await _safe(query_silver_storage)
+    views = await _safe(query_views_existence)
+    jobs = await _safe(query_jobs_executions)
+    mlops = await _safe(query_mlops_metrics, default={})
+    costs = await _safe(query_costs, default={})
+    agents = await _safe(query_agents_telemetry)
+    maturity = compute_maturity_score(jobs, gold, silver, mlops, agents)
+    source = "bigquery" if (gold or jobs) else "partial"
+    return {
+        "dataops": {"gold": gold, "silver": silver, "views": views},
+        "jobs": jobs,
+        "mlops": mlops,
+        "llmops": agents,
+        "costs": costs,
+        "maturity": maturity,
+        "source": source,
+        "ts": time.time(),
+    }
 
 
 async def _poll_table_freshness(interval: int) -> None:
