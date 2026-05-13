@@ -1,3 +1,11 @@
-# Minimal deps for llm-eval CI job — eval runner only needs anthropic + yaml
+# Minimal deps for llm-eval CI job
 anthropic>=0.49.0
 pyyaml>=6.0
+
+# Data processing (needed by eval_runner.py)
+numpy>=1.26.4,<2
+pandas>=2.0
+
+# ML evaluation (arviz for diagnostics, pymc for model training eval)
+arviz>=0.17.0
+pymc==5.19.1
