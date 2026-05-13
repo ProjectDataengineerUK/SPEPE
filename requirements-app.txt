@@ -24,6 +24,10 @@ google-cloud-secret-manager==2.23.0
 google-cloud-logging==3.11.3
 google-cloud-run>=0.10.0
 
+# ML — PyMC hierarchical Bayesian model (used by spepe-pymc-train Cloud Run Job)
+pymc==5.19.1
+arviz>=0.17.0
+
 # Utilities
 pyyaml==6.0.3
 python-dotenv==1.2.2
