@@ -18,11 +18,12 @@ def main():
         gdelt_df = fetch_gdelt_events(lookback_days=30)
         logger.info(f"GDELT: {len(gdelt_df)} eventos baixados")
 
-        # Salvar em Bronze
+        # Write under source="social" so transform_social_to_silver picks it up
         write_bronze(
             df=gdelt_df,
-            source="gdelt",
+            source="social",
             year=2026,
+            uf="BR",
             filename="gdelt_eventos_2026.parquet",
             use_gcs=bool(os.environ.get("GCS_BUCKET")),
         )

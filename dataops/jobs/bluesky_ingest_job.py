@@ -18,11 +18,12 @@ def main():
         bluesky_df = fetch_bluesky_posts(lookback_days=30)
         logger.info(f"BlueSky: {len(bluesky_df)} posts baixados")
 
-        # Salvar em Bronze
+        # Write under source="social" so transform_social_to_silver picks it up
         write_bronze(
             df=bluesky_df,
-            source="bluesky",
+            source="social",
             year=2026,
+            uf="BR",
             filename="bluesky_posts_2026.parquet",
             use_gcs=bool(os.environ.get("GCS_BUCKET")),
         )

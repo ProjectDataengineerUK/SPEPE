@@ -55,7 +55,7 @@ def main(uf: str, year: int) -> None:
     # ---- NOVA FUNÇÃO: baixar e processar o arquivo BR (presidente) ----
     # Só faz download do arquivo nacional quando o ano é 2022 e o UF é "ALL"
     # (o arquivo BR não tem UF, ele contém cargos nacionais)
-    if uf.upper() == "ALL" and year == 2022:
+    if uf.upper() == "ALL" and year in (2018, 2022):
         try:
             br_parquet_path = download_br_presidente(year)
             # Escrita da camada Bronze para a tabela de presidente

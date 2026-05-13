@@ -1,4 +1,4 @@
-"""Cloud Run Job: TSE Pesquisas Eleitorais → Bronze (Polls source)."""
+"""Cloud Run Job: TSE Pesquisas Eleitorais → Bronze (pesquisas source)."""
 
 import logging
 import os
@@ -11,25 +11,26 @@ logger = logging.getLogger("spepe.jobs.polls_ingest")
 
 def main():
     """Ingest pesquisas eleitorais 2026 from TSE."""
-    logger.info("Pesquisas eleitorais ingest job (polls): começando")
+    year = int(os.environ.get("POLLS_YEAR", "2026"))
+    logger.info("Pesquisas eleitorais ingest job: começando ano=%d", year)
 
     try:
-        # Baixar pesquisas do TSE (pesquisa_eleitoral_2026.zip)
-        pesquisas_df = fetch_tse_pesquisas_eleitorais(year=2026)
-        logger.info(f"TSE pesquisas: {len(pesquisas_df)} registros baixados")
+        pesquisas_df = fetch_tse_pesquisas_eleitorais(year=year)
+        logger.info("TSE pesquisas: %d registros baixados", len(pesquisas_df))
 
-        # Salvar em Bronze
+        # Write under source="pesquisas" so transform_pesquisas_to_silver picks it up
         write_bronze(
             df=pesquisas_df,
-            source="polls",
-            year=2026,
-            filename="pesquisas_eleitorais_2026.parquet",
+            source="pesquisas",
+            year=year,
+            uf="BR",
+            filename=f"pesquisas_tse_{year}.parquet",
             use_gcs=bool(os.environ.get("GCS_BUCKET")),
         )
         logger.info("Bronze escrito com sucesso")
 
     except Exception as e:
-        logger.error(f"Erro no job: {e}", exc_info=True)
+        logger.error("Erro no job: %s", e, exc_info=True)
         raise
 
 

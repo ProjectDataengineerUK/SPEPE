@@ -133,7 +133,8 @@ jobs:
                      spepe-social-ingest spepe-pesquisas-ingest spepe-security-ingest spepe-datasus-ingest \
                      spepe-dieese-ingest spepe-cetic-ingest spepe-reddit-ingest spepe-camara-senado-ingest \
                      spepe-endividamento-ingest spepe-cadunico-ingest spepe-emendas-ingest \
-                     spepe-sancoes-ingest spepe-candidatos-discovery; do
+                     spepe-sancoes-ingest spepe-candidatos-discovery \
+                     spepe-polls-ingest spepe-gdelt-ingest spepe-bluesky-ingest; do
             gcloud run jobs update "${JOB}" \
               --image "${IMAGE}" \
               --region "${{ env.GCP_REGION }}" \
@@ -216,7 +217,8 @@ jobs:
                      spepe-social-ingest spepe-pesquisas-ingest spepe-security-ingest spepe-datasus-ingest \
                      spepe-dieese-ingest spepe-cetic-ingest spepe-reddit-ingest spepe-camara-senado-ingest \
                      spepe-endividamento-ingest spepe-cadunico-ingest spepe-emendas-ingest \
-                     spepe-sancoes-ingest spepe-candidatos-discovery; do
+                     spepe-sancoes-ingest spepe-candidatos-discovery \
+                     spepe-polls-ingest spepe-gdelt-ingest spepe-bluesky-ingest; do
             MEM="512Mi"; CPU="1"; TIMEOUT="3600"
             if gcloud run jobs describe "${JOB}" --region "${REGION}" --project spepe-prod &>/dev/null; then
               gcloud run jobs update "${JOB}" \

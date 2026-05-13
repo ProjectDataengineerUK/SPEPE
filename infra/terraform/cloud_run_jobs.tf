@@ -28,6 +28,9 @@ locals {
     sentiment_geocode     = { timeout = "3600s", memory = "2Gi",   cpu = "2", args = ["--days", "1"] }
     dim_territorio_sync   = { timeout = "300s",  memory = "512Mi", cpu = "1", args = [] }
     agencies_ingest       = { timeout = "1800s", memory = "1Gi",   cpu = "1", args = [] }
+    polls_ingest          = { timeout = "1800s", memory = "1Gi",   cpu = "1", args = [] }
+    gdelt_ingest          = { timeout = "1800s", memory = "1Gi",   cpu = "1", args = [] }
+    bluesky_ingest        = { timeout = "1800s", memory = "1Gi",   cpu = "1", args = [] }
     pymc_train            = { timeout = "3600s", memory = "4Gi",   cpu = "2", args = [] }
   }
 
@@ -85,6 +88,9 @@ locals {
     }
     dim_territorio_sync = {}
     agencies_ingest     = { PESQUISAS_YEARS = "2024,2025,2026" }
+    polls_ingest        = { POLLS_YEAR = "2026", POLLS_LOOKBACK_DAYS = "30" }
+    gdelt_ingest        = { GDELT_LOOKBACK_DAYS = "30" }
+    bluesky_ingest      = { BLUESKY_LOOKBACK_DAYS = "30" }
     pymc_train = {
       PYMC_DRAWS       = "1000"
       PYMC_TUNE        = "500"
@@ -119,6 +125,9 @@ locals {
     sentiment_geocode       = ["python", "-m", "dataops.jobs.sentiment_geocode_job"]
     dim_territorio_sync     = ["python", "-m", "dataops.jobs.dim_territorio_sync_job"]
     agencies_ingest         = ["python", "-m", "dataops.jobs.agencies_ingest_job"]
+    polls_ingest            = ["python", "-m", "dataops.jobs.polls_ingest_job"]
+    gdelt_ingest            = ["python", "-m", "dataops.jobs.gdelt_ingest_job"]
+    bluesky_ingest          = ["python", "-m", "dataops.jobs.bluesky_ingest_job"]
     pymc_train              = ["python", "-m", "mlops.pymc_train"]
   }
 }
