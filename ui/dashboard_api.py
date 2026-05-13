@@ -3264,22 +3264,7 @@ async def serve_admin() -> FileResponse:
     return FileResponse(str(html_path), media_type="text/html")
 
 
-_USER_STORE: list[dict] = [
-    {
-        "id": "admin-001",
-        "name": "Admin SPEPE",
-        "email": "admin@***.***",
-        "role": "admin",
-        "created_at": "2026-05-01",
-    },
-    {
-        "id": "analyst-001",
-        "name": "Analista Senior",
-        "email": "analyst@***.***",
-        "role": "analyst",
-        "created_at": "2026-05-01",
-    },
-]  # fallback when Firestore unavailable
+_USER_STORE: list[dict] = []  # populated by Firestore spepe_users collection
 _ACCESS_MATRIX: dict = {
     "jornalista": {"tab_mapa": 1, "tab_socioeconomico": 1, "chat_ai": 1, "export_data": 1},
     "consultor": {
@@ -3339,17 +3324,23 @@ def _fs_client():
 
 @app.get("/admin/api/users", dependencies=[Depends(require_auth)])
 async def admin_list_users() -> JSONResponse:
-    """List users from Firestore spepe_users collection with fallback to local store."""
+    """List users from Firestore spepe_users collection. Returns empty list when unavailable."""
     db = _fs_client()
     if db:
         try:
             docs = db.collection("spepe_users").stream()
             users = [doc.to_dict() async for doc in docs]
-            if users:
-                return JSONResponse({"users": users, "source": "firestore"})
+            return JSONResponse({"users": users, "source": "firestore"})
         except Exception as exc:
-            logger.debug("Firestore users query failed: %s", exc)
-    return JSONResponse({"users": _USER_STORE, "source": "local" if _USER_STORE else "empty"})
+            logger.warning("Firestore users query failed: %s", exc)
+            return JSONResponse(
+                {"users": [], "source": "unavailable", "error": "Firestore indisponível"},
+                status_code=503,
+            )
+    return JSONResponse(
+        {"users": [], "source": "unavailable", "error": "Firestore não configurado (GCP_PROJECT_ID ausente)"},
+        status_code=503,
+    )
 
 
 @app.post("/admin/api/users", dependencies=[Depends(require_auth)])
@@ -3364,10 +3355,16 @@ async def admin_create_user(request: Request) -> JSONResponse:
         try:
             await db.collection("spepe_users").document(user["id"]).set(user)
             return JSONResponse({"ok": True, "user": user})
-        except Exception:
-            pass
-    _USER_STORE.append(user)
-    return JSONResponse({"ok": True, "user": user})
+        except Exception as exc:
+            logger.warning("Firestore create user failed: %s", exc)
+            return JSONResponse(
+                {"ok": False, "error": "Firestore indisponível — usuário não persistido"},
+                status_code=503,
+            )
+    return JSONResponse(
+        {"ok": False, "error": "Firestore não configurado (GCP_PROJECT_ID ausente)"},
+        status_code=503,
+    )
 
 
 @app.put("/admin/api/users/{user_id}", dependencies=[Depends(require_auth)])
@@ -3382,27 +3379,35 @@ async def admin_update_user(user_id: str, request: Request) -> JSONResponse:
                 return JSONResponse({"ok": False, "error": "not found"}, status_code=404)
             await ref.update({**body, "id": user_id})
             return JSONResponse({"ok": True})
-        except Exception:
-            pass
-    for i, u in enumerate(_USER_STORE):
-        if u["id"] == user_id:
-            _USER_STORE[i] = {**u, **body, "id": user_id}
-            return JSONResponse({"ok": True})
-    return JSONResponse({"ok": False, "error": "not found"}, status_code=404)
+        except Exception as exc:
+            logger.warning("Firestore update user %s failed: %s", user_id, exc)
+            return JSONResponse(
+                {"ok": False, "error": "Firestore indisponível — alteração não persistida"},
+                status_code=503,
+            )
+    return JSONResponse(
+        {"ok": False, "error": "Firestore não configurado (GCP_PROJECT_ID ausente)"},
+        status_code=503,
+    )
 
 
 @app.delete("/admin/api/users/{user_id}", dependencies=[Depends(require_auth)])
 async def admin_delete_user(user_id: str) -> JSONResponse:
-    global _USER_STORE
     db = _fs_client()
     if db:
         try:
             await db.collection("spepe_users").document(user_id).delete()
             return JSONResponse({"ok": True})
-        except Exception:
-            pass
-    _USER_STORE = [u for u in _USER_STORE if u["id"] != user_id]
-    return JSONResponse({"ok": True})
+        except Exception as exc:
+            logger.warning("Firestore delete user %s failed: %s", user_id, exc)
+            return JSONResponse(
+                {"ok": False, "error": "Firestore indisponível — exclusão não persistida"},
+                status_code=503,
+            )
+    return JSONResponse(
+        {"ok": False, "error": "Firestore não configurado (GCP_PROJECT_ID ausente)"},
+        status_code=503,
+    )
 
 
 @app.get("/admin/api/access", dependencies=[Depends(require_auth)])
@@ -3747,110 +3752,8 @@ async def admin_catalog() -> JSONResponse:
         except Exception as exc:
             logger.warning("Catalog BQ query failed: %s", exc)
 
-    stub_catalog = [
-        {
-            "dataset_id": "spepe_gold",
-            "table_id": "fact_municipio_eleicao",
-            "num_rows": None,
-            "size_mb": None,
-            "last_modified": None,
-            "partitioning": "DAY (ano_eleicao)",
-            "clustering": ["sg_uf", "cd_cargo", "nr_turno"],
-            "description": "Resultados eleitorais por município × eleição",
-        },
-        {
-            "dataset_id": "spepe_gold",
-            "table_id": "fact_secao_eleicao",
-            "num_rows": None,
-            "size_mb": None,
-            "last_modified": None,
-            "partitioning": None,
-            "clustering": ["sg_uf"],
-            "description": "Granular seção × candidato (139M+ rows)",
-        },
-        {
-            "dataset_id": "spepe_gold",
-            "table_id": "fact_municipio_candidato_eleicao",
-            "num_rows": None,
-            "size_mb": None,
-            "last_modified": None,
-            "partitioning": None,
-            "clustering": ["sg_uf", "candidato"],
-            "description": "Desempenho candidato × município",
-        },
-        {
-            "dataset_id": "spepe_gold",
-            "table_id": "fact_ibge_municipio",
-            "num_rows": None,
-            "size_mb": None,
-            "last_modified": None,
-            "partitioning": "RANGE (ano)",
-            "clustering": ["sg_uf"],
-            "description": "Indicadores socioeconômicos IBGE por município",
-        },
-        {
-            "dataset_id": "spepe_gold",
-            "table_id": "fact_seguranca_municipio",
-            "num_rows": None,
-            "size_mb": None,
-            "last_modified": None,
-            "partitioning": None,
-            "clustering": ["sg_uf"],
-            "description": "IVS + Atlas da Violência + SINESP",
-        },
-        {
-            "dataset_id": "spepe_gold",
-            "table_id": "fact_saude_municipio",
-            "num_rows": None,
-            "size_mb": None,
-            "last_modified": None,
-            "partitioning": None,
-            "clustering": ["sg_uf"],
-            "description": "DataSUS SIM + ANS cobertura",
-        },
-        {
-            "dataset_id": "spepe_gold",
-            "table_id": "fact_pesquisa",
-            "num_rows": None,
-            "size_mb": None,
-            "last_modified": None,
-            "partitioning": None,
-            "clustering": ["sg_uf"],
-            "description": "Pesquisas eleitorais TSE/institutos",
-        },
-        {
-            "dataset_id": "spepe_mlops",
-            "table_id": "model_evaluations",
-            "num_rows": None,
-            "size_mb": None,
-            "last_modified": None,
-            "partitioning": "DAY (evaluated_at)",
-            "clustering": ["model_version"],
-            "description": "Backtests e canary evaluation por versão",
-        },
-        {
-            "dataset_id": "spepe_mlops",
-            "table_id": "fact_predictions",
-            "num_rows": None,
-            "size_mb": None,
-            "last_modified": None,
-            "partitioning": "DAY (prediction_date)",
-            "clustering": ["candidato", "sg_uf", "model_version"],
-            "description": "Predições com IC 95%",
-        },
-        {
-            "dataset_id": "spepe_mlops",
-            "table_id": "bias_metrics",
-            "num_rows": None,
-            "size_mb": None,
-            "last_modified": None,
-            "partitioning": "DAY (measured_at)",
-            "clustering": ["model_version"],
-            "description": "Fairness metrics por sg_uf e quintil de renda",
-        },
-    ]
     return JSONResponse(
-        {"tables": stub_catalog, "source": "stub", "note": "BigQuery unavailable or disabled"}
+        {"tables": [], "source": "unavailable", "note": "BigQuery indisponível ou desabilitado (USE_BIGQUERY=false)"}
     )
 
 
