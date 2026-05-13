@@ -345,7 +345,7 @@ def gate_model_promotion(eval_results: dict, model_version: str = "unknown"):
         print(f"\n❌ REJECTED — Failed checks: {', '.join(failed_checks)}")
         print("→ Action: Increase draws/tune/chains and resample")
     else:
-        print(f"\n✅ PROMOTED — Model ready for deployment")
+        print("\n✅ PROMOTED — Model ready for deployment")
         print("→ Next: Deploy to Vertex AI and set up auto-retrain")
 
     # Save to BigQuery audit trail
