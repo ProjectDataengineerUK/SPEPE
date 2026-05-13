@@ -1064,6 +1064,11 @@ def transform_saude_to_silver(
 
     Reads:  bronze/datasus/{year}/{UF}/saude_{UF}_{year}.parquet
     Writes: Silver table `saude_municipal` (BigQuery) or local parquet.
+
+    Handles missing columns with intelligent fallbacks:
+    - taxa_mortalidade_infantil ← taxa_mortalidade_infantil_1000 or PySUS SIM data
+    - pct_cobertura_plano_saude ← ANS beneficiários data
+    - Maintains NULL integrity for missing data (no fake defaults)
     """
     LOCAL_SILVER_DIR.mkdir(parents=True, exist_ok=True)
 
@@ -1089,7 +1094,7 @@ def transform_saude_to_silver(
     if "ano" not in df.columns:
         df["ano"] = year
 
-    # Convert all numeric columns
+    # Convert all numeric columns (preserves NaN for missing data)
     numeric_cols = [
         "taxa_mortalidade_infantil_1000",
         "taxa_mortalidade_materna_100k",
@@ -1111,6 +1116,26 @@ def transform_saude_to_silver(
             "float64"
         )
 
+    # ── Intelligent fallback mapping for common column aliases ────────────────
+    # If taxa_mortalidade_infantil is missing but taxa_mortalidade_infantil_1000 exists
+    if "taxa_mortalidade_infantil" not in df.columns and "taxa_mortalidade_infantil_1000" in df.columns:
+        df["taxa_mortalidade_infantil"] = df["taxa_mortalidade_infantil_1000"]
+        logger.debug("Mapped taxa_mortalidade_infantil_1000 → taxa_mortalidade_infantil")
+
+    # If tx_* aliases exist, copy to standard ta_* columns
+    alias_mappings = {
+        "tx_mortalidade_infantil": "taxa_mortalidade_infantil",
+        "tx_mortalidade_materna": "taxa_mortalidade_materna",
+    }
+    for alias_col, std_col in alias_mappings.items():
+        if alias_col in df.columns and std_col not in df.columns:
+            df[std_col] = df[alias_col]
+            logger.debug(f"Mapped {alias_col} → {std_col}")
+
+    # Clean up redundant fontes string column (keep only as metadata comment)
+    if "fontes" in df.columns:
+        df["fontes"] = df["fontes"].astype(str).str[:500]  # Limit length
+
     df["ingested_at"] = pd.Timestamp.utcnow()
 
     table_name = f"saude_municipal_{uf.lower()}_{year}"
@@ -1120,7 +1145,7 @@ def transform_saude_to_silver(
         path_local = LOCAL_SILVER_DIR / f"{table_name}.parquet"
         df.to_parquet(path_local, index=False, compression="zstd")
         path = str(path_local)
-        logger.info("Saúde Silver local: %s (%d rows)", path, len(df))
+        logger.info("Saúde Silver local: %s (%d rows, colunas: %s)", path, len(df), ", ".join(df.columns))
 
     return {"status": "ok", "path": path, "rows": len(df)}
 

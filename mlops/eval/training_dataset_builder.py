@@ -11,6 +11,49 @@ from google.cloud import bigquery
 logger = logging.getLogger("spepe.mlops.training_dataset_builder")
 
 
+# ── Partido → Ideologia mapping ──────────────────────────────────────────────
+_PARTIDO_IDEOLOGIA = {
+    # Left (Esquerda)
+    "PT": "left",
+    "PC do B": "left",
+    "PSOL": "left",
+    "PDT": "left",
+    # Center-left (Centro-esquerda)
+    "PSB": "center-left",
+    "PV": "center-left",
+    # Center
+    "PSDB": "center",
+    "MDB": "center",
+    "PP": "center",
+    "DEM": "center",
+    "União Brasil": "center",
+    # Center-right (Centro-direita)
+    "PSD": "center-right",
+    "PL": "center-right",
+    # Right (Direita)
+    "Republicanos": "right",
+    "Novo": "right",
+    "Patriota": "right",
+    "PTB": "right",
+}
+
+
+def _get_partido_ideologia(partido_name: str) -> str:
+    """Map party name to ideology category.
+
+    Args:
+        partido_name: Party name (e.g., 'PT', 'PSDB')
+
+    Returns:
+        Ideology category: 'left', 'center-left', 'center', 'center-right', 'right', or 'unknown'
+    """
+    if not partido_name or pd.isna(partido_name):
+        return "unknown"
+
+    party_normalized = str(partido_name).strip().upper()
+    return _PARTIDO_IDEOLOGIA.get(party_normalized, "unknown")
+
+
 def build_training_dataset(
     project_id: str | None = None,
     dataset_id: str = "spepe_mlops",
@@ -25,7 +68,7 @@ def build_training_dataset(
     - split_mode="test_holdout": ano_eleicao == 2022
     - split_mode="all": both 2018 and 2022 (default)
 
-    Features (12 total):
+    Features (13 total):
     1. pct_votos (target)
     2. populacao
     3. densidade_populacional
@@ -35,7 +78,8 @@ def build_training_dataset(
     7. pct_analfabetos
     8. taxa_desemprego
     9. pct_votos_partido_anterior (temporal)
-    10-12. dummy features for missing data fields
+    10. partido_ideologia (categorical: left/center-left/center/center-right/right)
+    11-13. dummy features for missing data fields
 
     Args:
         project_id: GCP project (default: env GCP_PROJECT_ID)
@@ -44,7 +88,7 @@ def build_training_dataset(
         split_mode: "all" | "train" | "validate" | "test_holdout"
 
     Returns:
-        DataFrame com 12 features + metadata
+        DataFrame com 13 features + metadata
     """
     split_filters = {
         "all": "(ano_eleicao IN (2018, 2022))",
@@ -70,11 +114,12 @@ def build_training_dataset(
             CAST(cd_municipio_ibge AS STRING) as cd_municipio_ibge,
             COALESCE(sg_uf_y, sg_uf_x) as sg_uf,
             nm_candidato as candidato,
+            COALESCE(sg_partido_x, sg_partido_y) as sg_partido,
             ano_eleicao,
             SUM(CAST(qt_votos AS FLOAT64)) as votos_candidato,
         FROM `{project_id}.spepe_silver.tse_sp_2018`
         WHERE {where_clause}
-        GROUP BY cd_municipio_ibge, sg_uf_y, sg_uf_x, nm_candidato, ano_eleicao
+        GROUP BY cd_municipio_ibge, sg_uf_y, sg_uf_x, sg_partido_x, sg_partido_y, nm_candidato, ano_eleicao
 
         UNION ALL
 
@@ -82,11 +127,12 @@ def build_training_dataset(
             CAST(cd_municipio_ibge AS STRING) as cd_municipio_ibge,
             COALESCE(sg_uf_y, sg_uf_x) as sg_uf,
             nm_candidato as candidato,
+            COALESCE(sg_partido_x, sg_partido_y) as sg_partido,
             ano_eleicao,
             SUM(CAST(qt_votos AS FLOAT64)) as votos_candidato,
         FROM `{project_id}.spepe_silver.tse_mg_2018`
         WHERE {where_clause}
-        GROUP BY cd_municipio_ibge, sg_uf_y, sg_uf_x, nm_candidato, ano_eleicao
+        GROUP BY cd_municipio_ibge, sg_uf_y, sg_uf_x, sg_partido_x, sg_partido_y, nm_candidato, ano_eleicao
 
         UNION ALL
 
@@ -94,11 +140,12 @@ def build_training_dataset(
             CAST(cd_municipio_ibge AS STRING) as cd_municipio_ibge,
             COALESCE(sg_uf_y, sg_uf_x) as sg_uf,
             nm_candidato as candidato,
+            COALESCE(sg_partido_x, sg_partido_y) as sg_partido,
             ano_eleicao,
             SUM(CAST(qt_votos AS FLOAT64)) as votos_candidato,
         FROM `{project_id}.spepe_silver.tse_rj_2018`
         WHERE {where_clause}
-        GROUP BY cd_municipio_ibge, sg_uf_y, sg_uf_x, nm_candidato, ano_eleicao
+        GROUP BY cd_municipio_ibge, sg_uf_y, sg_uf_x, sg_partido_x, sg_partido_y, nm_candidato, ano_eleicao
 
         UNION ALL
 
@@ -106,11 +153,12 @@ def build_training_dataset(
             CAST(cd_municipio_ibge AS STRING) as cd_municipio_ibge,
             COALESCE(sg_uf_y, sg_uf_x) as sg_uf,
             nm_candidato as candidato,
+            COALESCE(sg_partido_x, sg_partido_y) as sg_partido,
             ano_eleicao,
             SUM(CAST(qt_votos AS FLOAT64)) as votos_candidato,
         FROM `{project_id}.spepe_silver.tse_sp_2022`
         WHERE {where_clause}
-        GROUP BY cd_municipio_ibge, sg_uf_y, sg_uf_x, nm_candidato, ano_eleicao
+        GROUP BY cd_municipio_ibge, sg_uf_y, sg_uf_x, sg_partido_x, sg_partido_y, nm_candidato, ano_eleicao
 
         UNION ALL
 
@@ -118,11 +166,12 @@ def build_training_dataset(
             CAST(cd_municipio_ibge AS STRING) as cd_municipio_ibge,
             COALESCE(sg_uf_y, sg_uf_x) as sg_uf,
             nm_candidato as candidato,
+            COALESCE(sg_partido_x, sg_partido_y) as sg_partido,
             ano_eleicao,
             SUM(CAST(qt_votos AS FLOAT64)) as votos_candidato,
         FROM `{project_id}.spepe_silver.tse_mg_2022`
         WHERE {where_clause}
-        GROUP BY cd_municipio_ibge, sg_uf_y, sg_uf_x, nm_candidato, ano_eleicao
+        GROUP BY cd_municipio_ibge, sg_uf_y, sg_uf_x, sg_partido_x, sg_partido_y, nm_candidato, ano_eleicao
 
         UNION ALL
 
@@ -130,11 +179,12 @@ def build_training_dataset(
             CAST(cd_municipio_ibge AS STRING) as cd_municipio_ibge,
             COALESCE(sg_uf_y, sg_uf_x) as sg_uf,
             nm_candidato as candidato,
+            COALESCE(sg_partido_x, sg_partido_y) as sg_partido,
             ano_eleicao,
             SUM(CAST(qt_votos AS FLOAT64)) as votos_candidato,
         FROM `{project_id}.spepe_silver.tse_rj_2022`
         WHERE {where_clause}
-        GROUP BY cd_municipio_ibge, sg_uf_y, sg_uf_x, nm_candidato, ano_eleicao
+        GROUP BY cd_municipio_ibge, sg_uf_y, sg_uf_x, sg_partido_x, sg_partido_y, nm_candidato, ano_eleicao
     ),
 
     eleicoes_normalized AS (
@@ -142,6 +192,7 @@ def build_training_dataset(
             cd_municipio_ibge,
             sg_uf,
             candidato,
+            sg_partido,
             CAST(ano_eleicao AS INT64) as ano_eleicao,
             -- TARGET: % votos
             SAFE_DIVIDE(votos_candidato, SUM(votos_candidato) OVER (PARTITION BY cd_municipio_ibge, CAST(ano_eleicao AS INT64))) as pct_votos,
@@ -171,6 +222,7 @@ def build_training_dataset(
             e.cd_municipio_ibge,
             e.sg_uf,
             e.candidato,
+            e.sg_partido,
             e.ano_eleicao,
             -- PHASE 4: Split indicator
             CASE
@@ -190,10 +242,12 @@ def build_training_dataset(
             COALESCE(i.taxa_desemprego, 0.05) as taxa_desemprego,
             -- Temporal Feature (#9)
             0.5 as pct_votos_partido_anterior,
-            -- Dummy features (#10-12) for missing data handling
-            0 as dummy_feature_10,
+            -- Party ideology feature (#10) — will be mapped in Python post-processing
+            UPPER(e.sg_partido) as partido_ideologia_raw,
+            -- Dummy features (#11-13) for missing data handling
             0 as dummy_feature_11,
             0 as dummy_feature_12,
+            0 as dummy_feature_13,
             CURRENT_TIMESTAMP() as dataset_created_at,
         FROM eleicoes_normalized e
         LEFT JOIN ibge_base i
@@ -214,6 +268,14 @@ def build_training_dataset(
         logger.info(f"Candidatos: {df['candidato'].nunique()}")
         logger.info(f"Anos: {sorted(df['ano_eleicao'].unique())}")
         logger.info(f"Split distribution: {df['split_type'].value_counts().to_dict()}")
+
+        # ── Post-processing: Map partido → ideologia ──────────────────────────
+        if "partido_ideologia_raw" in df.columns:
+            df["partido_ideologia"] = df["partido_ideologia_raw"].apply(_get_partido_ideologia)
+            df = df.drop(columns=["partido_ideologia_raw", "sg_partido"], errors="ignore")
+            logger.info(f"Partido ideologia distribution: {df['partido_ideologia'].value_counts().to_dict()}")
+        else:
+            logger.warning("partido_ideologia_raw not found in query result — skipping mapping")
 
         if write_to_bq:
             table_id = f"{project_id}.{dataset_id}.training_dataset"
