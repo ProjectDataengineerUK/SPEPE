@@ -334,6 +334,7 @@ tr.rhl td{background:rgba(0,200,83,.07)!important}
     </div>
     <div class="g_id_signin" data-type="standard" data-theme="filled_black" data-size="large" data-text="signin_with" data-shape="rectangular" data-logo_alignment="left" style="margin-top:16px"></div>
     <div class="login-hint" style="margin-top:12px">Acesso via conta Google</div>
+    <p id="login-error" style="display:none;color:#ff5252;font-size:.75rem;margin-top:12px;padding:8px 10px;background:rgba(255,82,82,.1);border-radius:6px;border:1px solid rgba(255,82,82,.3);text-align:center"></p>
   </div>
 </div>
 
@@ -966,8 +967,30 @@ async function apiFetch(url, opts = {}) {
   if (res.status === 401) { doLogout(); return null; }
   return res;
 }
-function handleGoogleCredential(response) {
-  _idToken = response.credential;
+async function handleGoogleCredential(response) {
+  const token = response.credential;
+  const errEl = document.getElementById('login-error');
+  errEl.style.display = 'none';
+  // Valida com backend — rejeita se email não cadastrado no SPEPE
+  try {
+    const r = await _nativeFetch('/api/auth/me', { headers: { 'Authorization': 'Bearer ' + token } });
+    if (r.status === 401 || r.status === 403) {
+      const body = await r.json().catch(() => ({}));
+      errEl.textContent = body.detail || 'Acesso não autorizado. Conta não cadastrada no SPEPE.';
+      errEl.style.display = 'block';
+      return;
+    }
+    if (!r.ok) {
+      errEl.textContent = 'Erro ao verificar autorização. Tente novamente.';
+      errEl.style.display = 'block';
+      return;
+    }
+  } catch (e) {
+    errEl.textContent = 'Erro de conexão. Tente novamente.';
+    errEl.style.display = 'block';
+    return;
+  }
+  _idToken = token;
   const payload = JSON.parse(atob(_idToken.split('.')[1]));
   const name = payload.name || payload.email || 'Usuário';
   document.getElementById('unm').textContent = name.split(' ')[0];

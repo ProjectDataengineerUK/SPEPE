@@ -167,12 +167,15 @@ async def dashboard_auth_middleware(request: Request, call_next):
         from google.auth.transport import requests as grequests
         from google.oauth2 import id_token as gid
 
-        gid.verify_oauth2_token(
+        info = gid.verify_oauth2_token(
             auth[7:],
             grequests.Request(),
             audience=settings.google_client_id or None,
             clock_skew_in_seconds=10,
         )
+        await _assert_user_authorized(info.get("email", ""))
+    except HTTPException as exc:
+        return JSONResponse({"detail": exc.detail}, status_code=exc.status_code)
     except Exception:
         return JSONResponse({"detail": "Invalid or expired token"}, status_code=401)
     return await call_next(request)
@@ -182,6 +185,51 @@ async def dashboard_auth_middleware(request: Request, call_next):
 
 _bearer = HTTPBearer(auto_error=False)
 
+# Cache de emails autorizados para evitar hit no Firestore a cada request
+_AUTH_CACHE: dict[str, float] = {}
+_AUTH_CACHE_TTL = 300  # 5 minutos
+
+
+async def _assert_user_authorized(email: str) -> None:
+    """Rejeita com 403 se o email não está cadastrado em spepe_users.
+
+    Verifica primeiro a env var SPEPE_ALLOWED_EMAILS (CSV) para bootstrap,
+    depois o cache em memória, depois Firestore. Fail-closed: nega acesso
+    se Firestore indisponível e email não está no env var.
+    """
+    import time
+
+    if not email:
+        raise HTTPException(status_code=403, detail="Acesso não autorizado.")
+
+    # Bootstrap: lista de emails permitidos via env var (CSV)
+    allowed_env = os.environ.get("SPEPE_ALLOWED_EMAILS", "")
+    if allowed_env and email in [e.strip() for e in allowed_env.split(",")]:
+        return
+
+    # Cache hit
+    now = time.monotonic()
+    if email in _AUTH_CACHE and now - _AUTH_CACHE[email] < _AUTH_CACHE_TTL:
+        return
+
+    # Firestore check
+    db = _fs_client()
+    if db:
+        try:
+            docs = db.collection("spepe_users").where("email", "==", email).limit(1).stream()
+            async for _doc in docs:
+                _AUTH_CACHE[email] = now
+                return
+        except HTTPException:
+            raise
+        except Exception as exc:
+            logger.warning("Firestore auth check failed for %s: %s", email, exc)
+
+    raise HTTPException(
+        status_code=403,
+        detail="Acesso não autorizado. Conta não cadastrada no SPEPE.",
+    )
+
 
 async def require_auth(
     credentials: HTTPAuthorizationCredentials = Security(_bearer),
@@ -189,7 +237,7 @@ async def require_auth(
     """Validate Bearer token for admin API routes.
 
     In local dev (no GCP_PROJECT_ID or set to 'local') auth is skipped.
-    In GCP the token must be a valid Google OAuth2 ID token.
+    In GCP validates Google OAuth2 ID token AND checks email in spepe_users.
     """
     if not settings.gcp_project_id or settings.gcp_project_id in ("", "local"):
         return {"email": "dev@local", "sub": "dev"}
@@ -205,9 +253,11 @@ async def require_auth(
             audience=settings.google_client_id or None,
             clock_skew_in_seconds=10,
         )
-        return info
     except Exception:
         raise HTTPException(status_code=401, detail="Invalid or expired token")
+
+    await _assert_user_authorized(info.get("email", ""))
+    return info
 
 
 _HELP_TEXT = """\
@@ -279,31 +329,35 @@ async def serve_dashboard() -> FileResponse:
 
 @app.get("/api/auth/me")
 async def auth_me(authorization: str = Header(default=None)) -> JSONResponse:
-    """Retorna perfil do usuário autenticado. Valida Firebase ID token em produção."""
-    import os
+    """Valida token Google OAuth2 e verifica se email está cadastrado no SPEPE."""
+    if not settings.gcp_project_id or settings.gcp_project_id in ("", "local"):
+        return JSONResponse({"uid": "dev", "email": "dev@local", "name": "Dev", "plan": "pro"})
 
-    if os.environ.get("FIREBASE_PROJECT_ID"):
-        if not authorization or not authorization.startswith("Bearer "):
-            raise HTTPException(status_code=401, detail="Token não fornecido")
-        token = authorization[7:]
-        try:
-            from google.auth.transport import requests as grequests
-            from google.oauth2 import id_token
+    if not authorization or not authorization.startswith("Bearer "):
+        raise HTTPException(status_code=401, detail="Token não fornecido")
+    token = authorization[7:]
+    try:
+        from google.auth.transport import requests as grequests
+        from google.oauth2 import id_token
 
-            decoded = id_token.verify_firebase_token(token, grequests.Request())
-            return JSONResponse(
-                {
-                    "uid": decoded["uid"],
-                    "email": decoded.get("email", ""),
-                    "name": decoded.get("name", ""),
-                    "plan": "pro",
-                }
-            )
-        except Exception:
-            raise HTTPException(status_code=401, detail="Token inválido")
+        info = id_token.verify_oauth2_token(
+            token,
+            grequests.Request(),
+            audience=settings.google_client_id or None,
+            clock_skew_in_seconds=10,
+        )
+    except Exception:
+        raise HTTPException(status_code=401, detail="Token inválido")
 
-    # Dev/local: stub sem auth
-    return JSONResponse({"uid": "demo-user", "email": "", "name": "Demo", "plan": "pro"})
+    await _assert_user_authorized(info.get("email", ""))
+    return JSONResponse(
+        {
+            "uid": info.get("sub", ""),
+            "email": info.get("email", ""),
+            "name": info.get("name", ""),
+            "plan": "pro",
+        }
+    )
 
 
 # ── Candidatos por cargo / UF / ano ───────────────────────────────────────
@@ -3458,15 +3512,15 @@ async def admin_auth_me(user_info: dict = Depends(require_auth)) -> JSONResponse
     """Return current authenticated user info and their SPEPE profile."""
     email = user_info.get("email", "")
     name = user_info.get("name", email)
-    # Look up profile in Firestore or fallback to admin
-    profile = "admin"
+    # Look up profile in Firestore — user already verified by require_auth
+    profile = "viewer"
     db = _fs_client()
     if db and email:
         try:
             docs = db.collection("spepe_users").where("email", "==", email).limit(1).stream()
             async for doc in docs:
                 d = doc.to_dict() or {}
-                profile = d.get("profile") or d.get("role") or "admin"
+                profile = d.get("profile") or d.get("role") or "viewer"
                 name = d.get("name") or name
                 break
         except Exception:
