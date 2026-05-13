@@ -64,8 +64,7 @@ def train_pymc_model(
     # ── Step 2: Prepare features for modeling ──────────────────────────────
     logger.info("Preparing features...")
 
-    # Select feature columns (exclude ID, target, metadata)
-    # PHASE 2: Removed low-coverage social features (YouTube, RSS < 5%); added temporal feature
+    # Feature columns — must match columns produced by training_dataset_builder.py
     feature_cols = [
         "populacao",
         "densidade_populacional",
@@ -73,10 +72,6 @@ def train_pymc_model(
         "pct_ensino_superior",
         "pct_analfabetos",
         "taxa_desemprego",
-        "cobertura_sus",
-        "mortalidade_infantil",
-        "taxa_homicidio",
-        "taxa_roubo",
         "pct_votos_partido_anterior",
     ]
     # Normalize features (z-score)

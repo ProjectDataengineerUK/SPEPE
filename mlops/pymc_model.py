@@ -69,9 +69,8 @@ def build_hierarchical_model(
         s_a = pm.HalfNormal("s_a", sigma=1)
 
         # ── Hyperpriors: Slopes (feature-aware domain priors) ──────────────────
-        # Order matches training_dataset_builder: populacao, densidade, renda, ensino,
-        # analfabetos, desemprego, sentimento_pos, sentimento_neg, polarizacao,
-        # cobertura_sus, mortalidade
+        # Order matches pymc_train.py feature_cols:
+        # populacao, densidade, renda, ensino, analfabetos, desemprego, votos_anterior
         feature_sigma = np.array(
             [
                 1.0,  # populacao
@@ -80,11 +79,7 @@ def build_hierarchical_model(
                 0.3,  # pct_ensino_superior
                 0.3,  # pct_analfabetos
                 0.2,  # taxa_desemprego
-                0.2,  # sentimento_positivo
-                0.5,  # sentimento_negativo
-                0.7,  # polarizacao_entropia
-                0.3,  # cobertura_sus
-                0.8,  # mortalidade_infantil
+                0.8,  # pct_votos_partido_anterior
             ]
         )
 
