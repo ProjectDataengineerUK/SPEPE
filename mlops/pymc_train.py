@@ -64,6 +64,17 @@ def train_pymc_model(
     # ── Step 2: Prepare features for modeling ──────────────────────────────
     logger.info("Preparing features...")
 
+    # Sub-sample for NUTS efficiency: stratified by UF + split_type (max 10k rows)
+    max_rows = int(os.environ.get("PYMC_MAX_ROWS", "10000"))
+    if len(df) > max_rows:
+        df = df.groupby(["sg_uf", "split_type"], group_keys=False).apply(
+            lambda g: g.sample(
+                min(len(g), max(1, max_rows // df["sg_uf"].nunique())), random_state=42
+            )
+        )
+        df = df.sample(min(len(df), max_rows), random_state=42).reset_index(drop=True)
+        logger.info("Sub-sampled to %d rows (stratified by UF)", len(df))
+
     # Feature columns — must match columns produced by training_dataset_builder.py
     feature_cols = [
         "populacao",
@@ -227,10 +238,10 @@ if __name__ == "__main__":
     )
 
     result = train_pymc_model(
-        draws=2000,
-        tune=1500,
-        chains=4,
-        target_accept=0.95,
+        draws=int(os.environ.get("PYMC_DRAWS", "500")),
+        tune=int(os.environ.get("PYMC_TUNE", "500")),
+        chains=int(os.environ.get("PYMC_CHAINS", "2")),
+        target_accept=float(os.environ.get("PYMC_TARGET_ACCEPT", "0.9")),
         save_trace=True,
     )
 

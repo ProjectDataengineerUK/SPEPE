@@ -257,8 +257,8 @@ def build_training_dataset(
 
     SELECT * FROM final_dataset
     WHERE pct_votos IS NOT NULL
-    ORDER BY ano_eleicao, sg_uf, candidato, cd_municipio_ibge
-    LIMIT 100000
+    ORDER BY RAND()
+    LIMIT 20000
     """
 
     logger.info(f"Building training dataset (split_mode={split_mode})...")

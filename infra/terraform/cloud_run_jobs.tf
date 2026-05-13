@@ -92,11 +92,12 @@ locals {
     gdelt_ingest        = { GDELT_LOOKBACK_DAYS = "30" }
     bluesky_ingest      = { BLUESKY_LOOKBACK_DAYS = "30" }
     pymc_train = {
-      PYMC_DRAWS       = "1000"
-      PYMC_TUNE        = "500"
-      PYMC_CHAINS      = "2"
+      PYMC_DRAWS         = "500"
+      PYMC_TUNE          = "500"
+      PYMC_CHAINS        = "2"
       PYMC_TARGET_ACCEPT = "0.9"
-      VERTEX_LOCATION  = "us-central1"
+      PYMC_MAX_ROWS      = "10000"
+      VERTEX_LOCATION    = "us-central1"
     }
   }
 
