@@ -264,7 +264,9 @@ def build_training_dataset(
     try:
         df = client.query(query).to_dataframe()
         logger.info(f"Dataset shape: {df.shape}")
-        logger.info(f"Features: {[c for c in df.columns if c not in ['dataset_created_at', 'split_type', 'cd_municipio_ibge', 'sg_uf', 'candidato', 'ano_eleicao']]}")
+        logger.info(
+            f"Features: {[c for c in df.columns if c not in ['dataset_created_at', 'split_type', 'cd_municipio_ibge', 'sg_uf', 'candidato', 'ano_eleicao']]}"
+        )
         logger.info(f"Candidatos: {df['candidato'].nunique()}")
         logger.info(f"Anos: {sorted(df['ano_eleicao'].unique())}")
         logger.info(f"Split distribution: {df['split_type'].value_counts().to_dict()}")
@@ -273,7 +275,9 @@ def build_training_dataset(
         if "partido_ideologia_raw" in df.columns:
             df["partido_ideologia"] = df["partido_ideologia_raw"].apply(_get_partido_ideologia)
             df = df.drop(columns=["partido_ideologia_raw", "sg_partido"], errors="ignore")
-            logger.info(f"Partido ideologia distribution: {df['partido_ideologia'].value_counts().to_dict()}")
+            logger.info(
+                f"Partido ideologia distribution: {df['partido_ideologia'].value_counts().to_dict()}"
+            )
         else:
             logger.warning("partido_ideologia_raw not found in query result — skipping mapping")
 

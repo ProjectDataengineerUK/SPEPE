@@ -45,7 +45,9 @@ class TestDashboardTabsValidation:
 
         mock_bq = MagicMock()
         mock_result = MagicMock()
-        mock_result.total_rows = 3_500_000  # 3.5M rows esperado (5570 municipios × 3 anos × ~200 features)
+        mock_result.total_rows = (
+            3_500_000  # 3.5M rows esperado (5570 municipios × 3 anos × ~200 features)
+        )
         mock_bq.query.return_value = mock_result
 
         # Validação de schema esperado
@@ -508,9 +510,7 @@ class TestRegressionTesting:
         ]
 
         search = "lu".lower()
-        results = [
-            c for c in mock_candidatos if search in c["nm_candidato"].lower()
-        ]
+        results = [c for c in mock_candidatos if search in c["nm_candidato"].lower()]
 
         assert len(results) > 0, "Should find candidatos matching search"
         # ✅ PASS: autocomplete funciona

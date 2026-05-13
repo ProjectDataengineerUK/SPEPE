@@ -1118,7 +1118,10 @@ def transform_saude_to_silver(
 
     # ── Intelligent fallback mapping for common column aliases ────────────────
     # If taxa_mortalidade_infantil is missing but taxa_mortalidade_infantil_1000 exists
-    if "taxa_mortalidade_infantil" not in df.columns and "taxa_mortalidade_infantil_1000" in df.columns:
+    if (
+        "taxa_mortalidade_infantil" not in df.columns
+        and "taxa_mortalidade_infantil_1000" in df.columns
+    ):
         df["taxa_mortalidade_infantil"] = df["taxa_mortalidade_infantil_1000"]
         logger.debug("Mapped taxa_mortalidade_infantil_1000 → taxa_mortalidade_infantil")
 
@@ -1145,7 +1148,9 @@ def transform_saude_to_silver(
         path_local = LOCAL_SILVER_DIR / f"{table_name}.parquet"
         df.to_parquet(path_local, index=False, compression="zstd")
         path = str(path_local)
-        logger.info("Saúde Silver local: %s (%d rows, colunas: %s)", path, len(df), ", ".join(df.columns))
+        logger.info(
+            "Saúde Silver local: %s (%d rows, colunas: %s)", path, len(df), ", ".join(df.columns)
+        )
 
     return {"status": "ok", "path": path, "rows": len(df)}
 
