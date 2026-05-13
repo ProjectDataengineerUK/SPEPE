@@ -106,11 +106,11 @@ def build_training_dataset(
     project_id = project_id or os.environ.get("GCP_PROJECT_ID", "spepe-prod")
     client = bigquery.Client(project=project_id)
 
-    # Simplified query using only available data
+    # Wildcard query: tse_* matches all tse_{uf}_{year} tables across all 27 UFs.
+    # _TABLE_SUFFIX regex ^[a-z]{2}_(2018|2022)$ excludes tse_candidaturas, tse_perfil, etc.
     query = f"""
     WITH tse_aggregated AS (
-        -- TSE by municipio (aggregate by candidate across seções)
-        -- sg_partido not available in Silver seção-level tables; set NULL (partido_ideologia will be 'unknown')
+        -- All UFs via wildcard: picks up tse_sp_2018, tse_mg_2022, tse_ac_2018, etc.
         SELECT
             CAST(cd_municipio_ibge AS STRING) as cd_municipio_ibge,
             COALESCE(sg_uf_y, sg_uf_x) as sg_uf,
@@ -118,73 +118,9 @@ def build_training_dataset(
             CAST(NULL AS STRING) as sg_partido,
             ano_eleicao,
             SUM(CAST(qt_votos AS FLOAT64)) as votos_candidato,
-        FROM `{project_id}.spepe_silver.tse_sp_2018`
-        WHERE {where_clause}
-        GROUP BY cd_municipio_ibge, sg_uf_y, sg_uf_x, nm_candidato, ano_eleicao
-
-        UNION ALL
-
-        SELECT
-            CAST(cd_municipio_ibge AS STRING) as cd_municipio_ibge,
-            COALESCE(sg_uf_y, sg_uf_x) as sg_uf,
-            nm_candidato as candidato,
-            CAST(NULL AS STRING) as sg_partido,
-            ano_eleicao,
-            SUM(CAST(qt_votos AS FLOAT64)) as votos_candidato,
-        FROM `{project_id}.spepe_silver.tse_mg_2018`
-        WHERE {where_clause}
-        GROUP BY cd_municipio_ibge, sg_uf_y, sg_uf_x, nm_candidato, ano_eleicao
-
-        UNION ALL
-
-        SELECT
-            CAST(cd_municipio_ibge AS STRING) as cd_municipio_ibge,
-            COALESCE(sg_uf_y, sg_uf_x) as sg_uf,
-            nm_candidato as candidato,
-            CAST(NULL AS STRING) as sg_partido,
-            ano_eleicao,
-            SUM(CAST(qt_votos AS FLOAT64)) as votos_candidato,
-        FROM `{project_id}.spepe_silver.tse_rj_2018`
-        WHERE {where_clause}
-        GROUP BY cd_municipio_ibge, sg_uf_y, sg_uf_x, nm_candidato, ano_eleicao
-
-        UNION ALL
-
-        SELECT
-            CAST(cd_municipio_ibge AS STRING) as cd_municipio_ibge,
-            COALESCE(sg_uf_y, sg_uf_x) as sg_uf,
-            nm_candidato as candidato,
-            CAST(NULL AS STRING) as sg_partido,
-            ano_eleicao,
-            SUM(CAST(qt_votos AS FLOAT64)) as votos_candidato,
-        FROM `{project_id}.spepe_silver.tse_sp_2022`
-        WHERE {where_clause}
-        GROUP BY cd_municipio_ibge, sg_uf_y, sg_uf_x, nm_candidato, ano_eleicao
-
-        UNION ALL
-
-        SELECT
-            CAST(cd_municipio_ibge AS STRING) as cd_municipio_ibge,
-            COALESCE(sg_uf_y, sg_uf_x) as sg_uf,
-            nm_candidato as candidato,
-            CAST(NULL AS STRING) as sg_partido,
-            ano_eleicao,
-            SUM(CAST(qt_votos AS FLOAT64)) as votos_candidato,
-        FROM `{project_id}.spepe_silver.tse_mg_2022`
-        WHERE {where_clause}
-        GROUP BY cd_municipio_ibge, sg_uf_y, sg_uf_x, nm_candidato, ano_eleicao
-
-        UNION ALL
-
-        SELECT
-            CAST(cd_municipio_ibge AS STRING) as cd_municipio_ibge,
-            COALESCE(sg_uf_y, sg_uf_x) as sg_uf,
-            nm_candidato as candidato,
-            CAST(NULL AS STRING) as sg_partido,
-            ano_eleicao,
-            SUM(CAST(qt_votos AS FLOAT64)) as votos_candidato,
-        FROM `{project_id}.spepe_silver.tse_rj_2022`
-        WHERE {where_clause}
+        FROM `{project_id}.spepe_silver.tse_*`
+        WHERE REGEXP_CONTAINS(_TABLE_SUFFIX, r'^[a-z]{{2}}_(2018|2022)$')
+          AND {where_clause}
         GROUP BY cd_municipio_ibge, sg_uf_y, sg_uf_x, nm_candidato, ano_eleicao
     ),
 
