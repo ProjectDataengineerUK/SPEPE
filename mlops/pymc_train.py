@@ -88,15 +88,15 @@ def train_pymc_model(
     df_features = df[feature_cols].fillna(0)
     df_features_norm = (df_features - df_features.mean()) / (df_features.std() + 1e-6)
 
-    # Create binary target: votos > mediana (top half) = 1, else = 0
-    # More discriminative than raw percentages for hierarchical modeling
-    df["y_binary"] = (df["pct_votos"] > df["pct_votos"].median()).astype(int)
+    # Use continuous target: pct_votos (0-1) com link logit
+    # Regressão logística contínua preserva informação vs binary classification
+    df["y_continuous"] = df["pct_votos"].clip(0.001, 0.999)  # evitar log(0) e log(1)
 
     # Group by UF for hierarchical structure
     df["uf_idx"] = pd.Categorical(df["sg_uf"]).codes
 
     logger.info(f"Features shape: {df_features_norm.shape}")
-    logger.info(f"Target distribution: {df['y_binary'].value_counts().to_dict()}")
+    logger.info(f"Target: min={y.min():.4f}, max={y.max():.4f}, mean={y.mean():.4f}")
     logger.info(f"UF groups: {df['uf_idx'].nunique()}")
     logger.info(f"Candidates: {df['candidato'].nunique()}")
 
@@ -104,7 +104,7 @@ def train_pymc_model(
     logger.info("Building hierarchical Bayesian model...")
 
     X = df_features_norm.values
-    y = df["y_binary"].values
+    y_obs = y  # usar y_continuous já preparado acima
     uf_groups = df["uf_idx"].values
     n_uf = df["uf_idx"].nunique()
     n_features = X.shape[1]
@@ -126,13 +126,14 @@ def train_pymc_model(
             shape=(n_uf, n_features),
         )
 
-        # Linear predictor
+        # Linear predictor + sigmoid para proporções (0-1)
         X_tensor = pt.as_tensor_variable(X)
         logit_p = alpha[uf_groups] + pm.math.dot(X_tensor, beta[uf_groups].T).diagonal()
         p = pm.Deterministic("p", pm.math.sigmoid(logit_p))
 
-        # Likelihood
-        pm.Bernoulli("y_obs", p=p, observed=y)
+        # Likelihood: Beta distribution para proporções (mais apropriado que Bernoulli)
+        # mu=p, kappa=10 (concentração) → adequado para dados proporção
+        pm.Beta("y_obs", alpha=p * 10, beta=(1 - p) * 10, observed=y_obs)
 
     logger.info("Model compiled successfully")
 
