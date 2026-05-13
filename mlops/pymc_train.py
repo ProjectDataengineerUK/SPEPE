@@ -45,7 +45,6 @@ def train_pymc_model(
     try:
         import pymc as pm
         import arviz as az
-        import pytensor.tensor as pt
     except ImportError:
         raise ImportError(
             "PyMC dependencies missing. Install: pip install pymc arviz pytensor"
@@ -108,8 +107,7 @@ def train_pymc_model(
     n_uf = df["uf_idx"].nunique()
     n_features = X.shape[1]
 
-    # Use new non-centered hierarchical model from pymc_model.py
-    from mlops.pymc_model import build_hierarchical_model
+    # Use non-centered hierarchical model from pymc_model.py
     model = build_hierarchical_model(
         X=X,
         y=y_obs,
