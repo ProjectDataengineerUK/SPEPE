@@ -120,19 +120,7 @@ def train_pymc_model(
             "Sub-sampled train to %d rows (stratified by %d UFs)", len(df_train), n_uf_train
         )
 
-    # ── Step 6: Normalize features using train statistics ────────────────────
-    train_mean = (
-        train_raw.loc[df_train.index, feature_cols].mean()
-        if len(df_train) < len(train_raw)
-        else train_raw.mean()
-    )
-    train_std = (
-        train_raw.loc[df_train.index, feature_cols].std()
-        if len(df_train) < len(train_raw)
-        else train_raw.std()
-    )
-
-    # Recompute on sub-sampled df_train
+    # ── Step 6: Normalize features using sub-sampled train statistics ────────
     train_feat = df_train[feature_cols].fillna(0)
     train_mean = train_feat.mean()
     train_std = train_feat.std()
@@ -224,9 +212,16 @@ def train_pymc_model(
         brier_oos = float(np.mean((y_pred_val - y_val) ** 2))
         logger.info("Brier score (val 2022, out-of-sample): %.4f", brier_oos)
 
-        # Restore model to train data after val evaluation
-        with model:
-            pm.set_data({"X_data": X_train, "uf_idx_data": uf_train})
+        # Restore model to train data (try/finally guards against partial state)
+        try:
+            with model:
+                pm.set_data({"X_data": X_train, "uf_idx_data": uf_train})
+        except Exception:
+            pass  # restore is best-effort; model won't be reused after this
+
+    # Gate OOS Brier as promotion criterion (0.25 = fail-safe upper bound)
+    if brier_oos is not None:
+        checks["brier_oos_acceptable"] = brier_oos < 0.25
 
     # ── Step 11: Persist idata + normalization stats to GCS ─────────────────
     artifact_path: str | None = None
@@ -250,23 +245,45 @@ def train_pymc_model(
             artifact_path = f"gs://{gcs_bucket}/{blob_idata}"
             logger.info("idata saved → %s", artifact_path)
 
-            # Save normalization stats + UF mapping (required for inference)
+            # Save normalization stats + UF mapping as explicit key→value dict
             norm_stats = {
                 "model_version": _MODEL_VERSION,
                 "feature_cols": feature_cols,
-                "train_mean": train_mean.tolist(),
-                "train_std": train_std.tolist(),
+                # Explicit key→value mapping avoids positional-alignment fragility
+                "train_mean": dict(zip(feature_cols, train_mean.tolist())),
+                "train_std": dict(zip(feature_cols, train_std.tolist())),
                 "uf_categories": uf_categories,
                 "n_uf": n_uf,
                 "n_features": n_features,
                 "trained_at": ts,
             }
-            bucket.blob(f"{model_prefix}/norm_stats.json").upload_from_string(
+            blob_norm = f"{model_prefix}/norm_stats.json"
+            bucket.blob(blob_norm).upload_from_string(
                 json.dumps(norm_stats, indent=2), content_type="application/json"
             )
-            logger.info(
-                "Normalization stats saved → gs://%s/%s/norm_stats.json", gcs_bucket, model_prefix
+            logger.info("Normalization stats saved → gs://%s/%s", gcs_bucket, blob_norm)
+
+            # Manifest written last — atomic marker; inference reads this first
+            manifest = {
+                "model_version": _MODEL_VERSION,
+                "trained_at": ts,
+                "blobs": {
+                    "idata": blob_idata,
+                    "norm_stats": blob_norm,
+                },
+                "artifact_path": artifact_path,
+                "complete": True,
+            }
+            bucket.blob(f"{model_prefix}/manifest.json").upload_from_string(
+                json.dumps(manifest, indent=2), content_type="application/json"
             )
+            logger.info("Manifest written → gs://%s/%s/manifest.json", gcs_bucket, model_prefix)
+
+            # Cleanup temp file
+            try:
+                os.remove(idata_path)
+            except OSError:
+                pass
 
         except Exception as exc:
             logger.error("Failed to save idata to GCS: %s — metadata still saved to BQ", exc)

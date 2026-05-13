@@ -31,7 +31,7 @@ locals {
     polls_ingest          = { timeout = "1800s", memory = "1Gi",   cpu = "1", args = [] }
     gdelt_ingest          = { timeout = "1800s", memory = "1Gi",   cpu = "1", args = [] }
     bluesky_ingest        = { timeout = "1800s", memory = "1Gi",   cpu = "1", args = [] }
-    pymc_train            = { timeout = "3600s", memory = "4Gi",   cpu = "2", args = [] }
+    pymc_train            = { timeout = "7200s", memory = "8Gi",   cpu = "4", args = [] }
   }
 
   # Env vars adicionais por job (além das compartilhadas)

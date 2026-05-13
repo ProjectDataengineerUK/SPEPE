@@ -146,7 +146,7 @@ def sample_posterior(
             target_accept=target_accept,
             init=init,
             random_seed=random_seed,
-            cores=4,
+            cores=chains,
             return_inferencedata=True,
             progressbar=True,
         )
