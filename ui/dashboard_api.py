@@ -150,6 +150,7 @@ _PUBLIC_API_PATHS = {
     "/api/municipios",
     "/api/kpi",
     "/api/mapa/locais",
+    "/api/model/status",
 }
 
 
@@ -5082,3 +5083,79 @@ def _extract_dashboard_update(response_text: str, query: str) -> dict[str, Any]:
         update["syncPulse"] = True
 
     return update
+
+
+# ── Model status ───────────────────────────────────────────────────────────
+
+
+@app.get("/api/model/status")
+async def get_model_status() -> Response:
+    """Status dos modelos M1 (demográfico) e M2 (eleitoral) do SPEPE."""
+    if not (settings.gcp_project_id and os.environ.get("USE_BIGQUERY", "").lower() == "true"):
+        return _json_safe_response(
+            {
+                "m1": {"active": False, "status": "pending", "version": None, "brier_score": None},
+                "m2": {"active": False, "status": "pending", "version": None, "brier_score": None},
+            }
+        )
+    try:
+        result = await _bq_model_status()
+        return _json_safe_response(result)
+    except Exception as exc:
+        logger.warning("model_status BQ falhou: %s", exc)
+        return _json_safe_response(
+            {
+                "m1": {"active": False, "status": "pending", "version": None, "brier_score": None},
+                "m2": {"active": False, "status": "pending", "version": None, "brier_score": None},
+            }
+        )
+
+
+async def _bq_model_status() -> dict:
+    from google.cloud import bigquery
+
+    client = bigquery.Client(project=settings.gcp_project_id)
+    mlops = f"{settings.gcp_project_id}.spepe_mlops"
+
+    query = f"""
+        SELECT
+          model_type,
+          MAX(model_version)  AS version,
+          MAX(brier_score)    AS brier_score,
+          MAX(created_at)     AS last_run,
+          COUNT(*)            AS n_evals
+        FROM `{mlops}.model_evaluations`
+        GROUP BY model_type
+    """
+    rows = await asyncio.to_thread(lambda: list(client.query(query).result()))
+
+    m1 = {"active": False, "status": "pending", "version": None, "brier_score": None}
+    m2 = {"active": False, "status": "pending", "version": None, "brier_score": None}
+
+    for r in rows:
+        mtype = str(r.get("model_type") or "").lower()
+        info = {
+            "active": True,
+            "status": "ready",
+            "version": r.get("version"),
+            "brier_score": float(r["brier_score"]) if r.get("brier_score") is not None else None,
+            "last_run": r["last_run"].isoformat() if r.get("last_run") else None,
+            "n_evals": int(r.get("n_evals") or 0),
+        }
+        if "demographic" in mtype or mtype == "m1":
+            m1 = info
+        elif "electoral" in mtype or mtype == "m2":
+            m2 = info
+
+    # Also check fact_predictions for any M1 data
+    if not m1["active"]:
+        pred_q = f"SELECT COUNT(*) AS n FROM `{mlops}.fact_predictions` LIMIT 1"
+        try:
+            pred_rows = await asyncio.to_thread(lambda: list(client.query(pred_q).result()))
+            if pred_rows and int(pred_rows[0]["n"] or 0) > 0:
+                m1["active"] = True
+                m1["status"] = "ready"
+        except Exception:
+            pass
+
+    return {"m1": m1, "m2": m2}
