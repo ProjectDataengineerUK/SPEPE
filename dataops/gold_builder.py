@@ -573,7 +573,7 @@ def _build_gold_via_bigquery_sql() -> dict:
             CREATE OR REPLACE TABLE `{gold}.fact_sancoes_uf` AS
             SELECT
                 COALESCE(fonte_sistema, 'CEIS') AS fonte_sistema,
-                COALESCE(sg_uf_orgao, 'DESCONHECIDO') AS sg_uf,
+                COALESCE(NULLIF(sg_uf_sancionado, ''), NULLIF(sg_uf_orgao, ''), 'NACIONAL') AS sg_uf,
                 tp_sancao,
                 tp_pessoa,
                 EXTRACT(YEAR FROM dt_inicio_sancao) AS ano_sancao,
@@ -583,9 +583,11 @@ def _build_gold_via_bigquery_sql() -> dict:
                 COUNT(DISTINCT nm_orgao_sancionador) AS qt_orgaos_sancionadores,
                 CURRENT_TIMESTAMP()                 AS ingested_at
             FROM `{silver}.sancoes_empresas`
-            WHERE sg_uf_orgao IS NOT NULL AND sg_uf_orgao != ''
+            WHERE tp_sancao IS NOT NULL
             GROUP BY
-                COALESCE(fonte_sistema, 'CEIS'), COALESCE(sg_uf_orgao, 'DESCONHECIDO'), tp_sancao, tp_pessoa,
+                COALESCE(fonte_sistema, 'CEIS'),
+                COALESCE(NULLIF(sg_uf_sancionado, ''), NULLIF(sg_uf_orgao, ''), 'NACIONAL'),
+                tp_sancao, tp_pessoa,
                 EXTRACT(YEAR FROM dt_inicio_sancao)
         """,
         # ── Endividamento familiar BACEN (série nacional mensal) ─────────────────
