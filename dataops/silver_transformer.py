@@ -2231,7 +2231,9 @@ def transform_presidente_to_silver(year: int, use_bigquery: bool = False) -> dic
             logger.warning("GCS tse_presidente download %d: %s", year, exc)
 
     if bronze_path is None:
-        local_candidate = LOCAL_BRONZE_DIR / "tse_presidente" / str(year) / "BR" / f"presidente_{year}.parquet"
+        local_candidate = (
+            LOCAL_BRONZE_DIR / "tse_presidente" / str(year) / "BR" / f"presidente_{year}.parquet"
+        )
         if local_candidate.exists():
             bronze_path = local_candidate
 

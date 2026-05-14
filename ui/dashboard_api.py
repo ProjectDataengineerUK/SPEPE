@@ -936,7 +936,13 @@ async def get_socioeconomico(
             if result:
                 return JSONResponse({"municipios": result})
             logger.warning("BigQuery socioeconomico: Gold vazio para UF=%s ano=%s", uf, ano)
-            return JSONResponse({"municipios": [], "fonte": "gold_empty", "hint": "Execute spepe-gold-build para popular fact_ibge_municipio"})
+            return JSONResponse(
+                {
+                    "municipios": [],
+                    "fonte": "gold_empty",
+                    "hint": "Execute spepe-gold-build para popular fact_ibge_municipio",
+                }
+            )
         except Exception as exc:
             logger.warning("BigQuery socioeconomico falhou: %s", exc)
             return JSONResponse({"municipios": [], "fonte": "bq_error", "error": str(exc)})
@@ -1042,7 +1048,13 @@ async def get_seguranca(
             result = await _bq_seguranca(uf, ano, limit)
             if result:
                 return JSONResponse({"municipios": result})
-            return JSONResponse({"municipios": [], "fonte": "gold_empty", "hint": "fact_seguranca_municipio vazia — execute spepe-gold-build"})
+            return JSONResponse(
+                {
+                    "municipios": [],
+                    "fonte": "gold_empty",
+                    "hint": "fact_seguranca_municipio vazia — execute spepe-gold-build",
+                }
+            )
         except Exception as exc:
             logger.warning("BigQuery seguranca falhou: %s", exc)
             return JSONResponse({"municipios": [], "fonte": "bq_error", "error": str(exc)})
@@ -1150,7 +1162,13 @@ async def get_saude(
             result = await _bq_saude(uf, ano, limit)
             if result:
                 return JSONResponse({"municipios": result})
-            return JSONResponse({"municipios": [], "fonte": "gold_empty", "hint": "fact_saude_municipio vazia — DataSUS Bronze não exportou colunas esperadas"})
+            return JSONResponse(
+                {
+                    "municipios": [],
+                    "fonte": "gold_empty",
+                    "hint": "fact_saude_municipio vazia — DataSUS Bronze não exportou colunas esperadas",
+                }
+            )
         except Exception as exc:
             logger.warning("BigQuery saude falhou: %s", exc)
             return JSONResponse({"municipios": [], "fonte": "bq_error", "error": str(exc)})
@@ -1317,7 +1335,9 @@ async def _bq_pesquisas(cargo: str, sg_uf: str, ano: int, tipo: str = "corrente"
                         "data": str(r.get("data_pesquisa_inicio", ""))[:7],
                         "instituto": r.get("instituto", ""),
                         "intencao": round(r.get("intencao_pct") or 0, 1),
-                        "ajustada": round(r.get("intencao_ajustada") or r.get("intencao_pct") or 0, 1),
+                        "ajustada": round(
+                            r.get("intencao_ajustada") or r.get("intencao_pct") or 0, 1
+                        ),
                         "tipo": r.get("tipo_pesquisa", ""),
                     }
                 )
@@ -1326,9 +1346,16 @@ async def _bq_pesquisas(cargo: str, sg_uf: str, ano: int, tipo: str = "corrente"
                     institutes[inst] = round(r.get("house_effect") or 0, 2)
             series = [{"candidato": c, "pontos": pts} for c, pts in by_candidato.items()]
             house_effects = [{"instituto": k, "house_effect": v} for k, v in institutes.items()]
-            return {"series": series, "house_effects": house_effects, "tipo": tipo, "fonte": "vw_detalhada"}
+            return {
+                "series": series,
+                "house_effects": house_effects,
+                "tipo": tipo,
+                "fonte": "vw_detalhada",
+            }
     except Exception as exc:
-        logger.debug("vw_pesquisa_intencao_detalhada indisponível (%s) — usando fact_intencao_voto", exc)
+        logger.debug(
+            "vw_pesquisa_intencao_detalhada indisponível (%s) — usando fact_intencao_voto", exc
+        )
 
     # Fallback: fact_intencao_voto (aggregated polls, always available after gold-build)
     params_fb = [
@@ -1382,7 +1409,12 @@ async def _bq_pesquisas(cargo: str, sg_uf: str, ano: int, tipo: str = "corrente"
             all_institutes.add(inst)
     series = [{"candidato": c, "pontos": pts} for c, pts in by_cand.items()]
     house_effects = [{"instituto": inst, "house_effect": 0.0} for inst in sorted(all_institutes)]
-    return {"series": series, "house_effects": house_effects, "tipo": tipo, "fonte": "fact_intencao_voto"}
+    return {
+        "series": series,
+        "house_effects": house_effects,
+        "tipo": tipo,
+        "fonte": "fact_intencao_voto",
+    }
 
 
 def _local_pesquisas(cargo: str, sg_uf: str, ano: int, tipo: str) -> dict:
@@ -1661,7 +1693,15 @@ async def get_perfis(
             return JSONResponse(await _bq_perfis(uf, ano))
         except Exception as exc:
             logger.warning("BigQuery perfis falhou: %s", exc)
-            return JSONResponse({"genero": [], "faixa_etaria": [], "escolaridade": [], "fonte": "bq_error", "error": str(exc)})
+            return JSONResponse(
+                {
+                    "genero": [],
+                    "faixa_etaria": [],
+                    "escolaridade": [],
+                    "fonte": "bq_error",
+                    "error": str(exc),
+                }
+            )
     return JSONResponse(
         {"genero": [], "faixa_etaria": [], "escolaridade": [], "fonte": "indisponivel"}
     )
@@ -1987,13 +2027,33 @@ async def _bq_mapa_regiao(cargo: str, ano: int, turno: int, candidato: str = "")
     cd_cargo = _CARGO_CD.get(cargo, 1)
     _REGIAO_CODE = {"Norte": "1", "Nordeste": "2", "Centro-Oeste": "5", "Sudeste": "3", "Sul": "4"}
     _UF_TO_REGIAO = {
-        "AC": "Norte", "AM": "Norte", "AP": "Norte", "PA": "Norte",
-        "RO": "Norte", "RR": "Norte", "TO": "Norte",
-        "AL": "Nordeste", "BA": "Nordeste", "CE": "Nordeste", "MA": "Nordeste",
-        "PB": "Nordeste", "PE": "Nordeste", "PI": "Nordeste", "RN": "Nordeste", "SE": "Nordeste",
-        "DF": "Centro-Oeste", "GO": "Centro-Oeste", "MS": "Centro-Oeste", "MT": "Centro-Oeste",
-        "ES": "Sudeste", "MG": "Sudeste", "RJ": "Sudeste", "SP": "Sudeste",
-        "PR": "Sul", "RS": "Sul", "SC": "Sul",
+        "AC": "Norte",
+        "AM": "Norte",
+        "AP": "Norte",
+        "PA": "Norte",
+        "RO": "Norte",
+        "RR": "Norte",
+        "TO": "Norte",
+        "AL": "Nordeste",
+        "BA": "Nordeste",
+        "CE": "Nordeste",
+        "MA": "Nordeste",
+        "PB": "Nordeste",
+        "PE": "Nordeste",
+        "PI": "Nordeste",
+        "RN": "Nordeste",
+        "SE": "Nordeste",
+        "DF": "Centro-Oeste",
+        "GO": "Centro-Oeste",
+        "MS": "Centro-Oeste",
+        "MT": "Centro-Oeste",
+        "ES": "Sudeste",
+        "MG": "Sudeste",
+        "RJ": "Sudeste",
+        "SP": "Sudeste",
+        "PR": "Sul",
+        "RS": "Sul",
+        "SC": "Sul",
     }
     gold = f"{settings.gcp_project_id}.{settings.bigquery_dataset_gold}"
 
@@ -2001,9 +2061,7 @@ async def _bq_mapa_regiao(cargo: str, ano: int, turno: int, candidato: str = "")
     if ano >= 2026:
         cand_filter_2026 = "AND candidato_normalizado = @candidato" if candidato else ""
         # Use CASE expression to map UF → Region inside BQ
-        uf_regiao_cases = " ".join(
-            f"WHEN '{uf}' THEN '{reg}'" for uf, reg in _UF_TO_REGIAO.items()
-        )
+        uf_regiao_cases = " ".join(f"WHEN '{uf}' THEN '{reg}'" for uf, reg in _UF_TO_REGIAO.items())
         query_2026 = f"""
             WITH uf_agg AS (
                 SELECT uf,
@@ -3159,14 +3217,16 @@ async def debug_tables() -> JSONResponse:
                 """
                 rows = list(client.query(query).result())
                 for r in rows:
-                    results.append({
-                        "dataset": dataset,
-                        "table": r.get("table_id", ""),
-                        "rows": r.get("row_count", 0),
-                        "size_mb": round((r.get("size_bytes") or 0) / 1_048_576, 2),
-                        "last_modified": str(r.get("last_modified", "")),
-                        "status": "ok" if (r.get("row_count") or 0) > 0 else "empty",
-                    })
+                    results.append(
+                        {
+                            "dataset": dataset,
+                            "table": r.get("table_id", ""),
+                            "rows": r.get("row_count", 0),
+                            "size_mb": round((r.get("size_bytes") or 0) / 1_048_576, 2),
+                            "last_modified": str(r.get("last_modified", "")),
+                            "status": "ok" if (r.get("row_count") or 0) > 0 else "empty",
+                        }
+                    )
             except Exception as exc:
                 results.append({"dataset": dataset, "error": str(exc)})
         return JSONResponse({"tables": results, "total": len(results)})
@@ -3454,7 +3514,11 @@ async def admin_list_users() -> JSONResponse:
                 status_code=503,
             )
     return JSONResponse(
-        {"users": [], "source": "unavailable", "error": "Firestore não configurado (GCP_PROJECT_ID ausente)"},
+        {
+            "users": [],
+            "source": "unavailable",
+            "error": "Firestore não configurado (GCP_PROJECT_ID ausente)",
+        },
         status_code=503,
     )
 
@@ -3869,7 +3933,11 @@ async def admin_catalog() -> JSONResponse:
             logger.warning("Catalog BQ query failed: %s", exc)
 
     return JSONResponse(
-        {"tables": [], "source": "unavailable", "note": "BigQuery indisponível ou desabilitado (USE_BIGQUERY=false)"}
+        {
+            "tables": [],
+            "source": "unavailable",
+            "note": "BigQuery indisponível ou desabilitado (USE_BIGQUERY=false)",
+        }
     )
 
 
