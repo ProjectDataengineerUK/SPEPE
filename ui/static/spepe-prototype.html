@@ -1,0 +1,851 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SPEPE — Protótipo Dashboard Integrado</title>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+:root{
+  --bg:#0d1117;--bg2:#161b22;--bg3:#1c2128;--bg4:#21262d;
+  --border:#30363d;--border2:#3d444d;
+  --text:#e6edf3;--text2:#8d96a0;--text3:#57606a;
+  --green:#00c853;--green2:#00e676;--green-dim:#003d19;
+  --blue:#1565c0;--blue2:#1976d2;--blue-dim:#0a2540;
+  --purple:#7c3aed;--purple-dim:#2e1065;
+  --red:#ef4444;--red-dim:#3f0f0f;
+  --yellow:#f59e0b;
+  --teal:#00bcd4;
+  --radius:8px;--radius2:12px;
+}
+html,body{height:100%;background:var(--bg);color:var(--text);font-family:'Inter',sans-serif;font-size:13px;line-height:1.5;overflow:hidden}
+
+/* ── TOPNAV ── */
+.topnav{height:46px;background:var(--bg2);border-bottom:1px solid var(--border);display:flex;align-items:center;padding:0 14px;gap:10px;flex-shrink:0;z-index:30}
+.logo{font-size:1.05rem;font-weight:800;letter-spacing:-.02em}
+.logo span{color:var(--green)}
+.proto-tag{background:#f59e0b22;color:#f59e0b;border:1px solid #f59e0b;font-size:.6rem;font-weight:700;padding:2px 8px;border-radius:20px;letter-spacing:.07em}
+.nav-filters{display:flex;align-items:center;gap:8px;margin-left:14px}
+.nav-filters select{background:var(--bg3);border:1px solid var(--border2);border-radius:6px;padding:4px 9px;color:var(--text);font-size:.76rem;outline:none;appearance:none}
+.nav-filters select:focus{border-color:var(--green)}
+.topnav-right{margin-left:auto;display:flex;align-items:center;gap:8px}
+.badge-live{background:var(--green-dim);color:var(--green2);font-size:.6rem;font-weight:700;padding:2px 8px;border-radius:20px;letter-spacing:.07em;border:1px solid var(--green)}
+.model-status{font-size:.7rem;color:var(--text2);display:flex;align-items:center;gap:5px}
+.model-dot{width:7px;height:7px;border-radius:50%;background:var(--green)}
+.model-dot.yellow{background:var(--yellow)}
+
+/* ── LAYER TOGGLES (horizontal bar) ── */
+.layer-bar{height:36px;background:var(--bg2);border-bottom:1px solid var(--border);display:flex;align-items:center;padding:0 14px;gap:6px;flex-shrink:0}
+.layer-btn{padding:4px 12px;font-size:.71rem;font-weight:500;border:1px solid var(--border2);border-radius:20px;color:var(--text2);background:transparent;cursor:pointer;transition:all .15s}
+.layer-btn.active{background:var(--green-dim);border-color:var(--green);color:var(--green2)}
+.layer-btn:hover:not(.active){border-color:var(--border);color:var(--text)}
+.layer-sep{width:1px;height:18px;background:var(--border);margin:0 2px}
+.overlay-selector{display:flex;align-items:center;gap:6px;margin-left:auto}
+.overlay-selector label{font-size:.68rem;color:var(--text3)}
+.overlay-selector select{background:var(--bg3);border:1px solid var(--border2);border-radius:6px;padding:3px 8px;color:var(--text);font-size:.71rem;outline:none}
+
+/* ── MAIN LAYOUT ── */
+.shell{display:flex;height:calc(100vh - 82px);overflow:hidden}
+
+/* ── MAP PANE ── */
+.map-pane{flex:1;position:relative;min-width:0}
+#leaflet-map{width:100%;height:100%}
+.map-overlay-hint{position:absolute;top:10px;left:50%;transform:translateX(-50%);background:rgba(13,17,23,.85);border:1px solid var(--border2);border-radius:20px;padding:4px 14px;font-size:.68rem;color:var(--text2);pointer-events:none;z-index:10;white-space:nowrap}
+
+/* bivariate legend */
+.biv-legend{position:absolute;bottom:28px;left:12px;background:rgba(13,17,23,.92);border:1px solid var(--border2);border-radius:var(--radius);padding:10px 12px;z-index:10;min-width:170px}
+.biv-legend h5{font-size:.63rem;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:var(--text3);margin-bottom:8px}
+.biv-grid{display:grid;grid-template-columns:repeat(3,22px);grid-template-rows:repeat(3,22px);gap:2px;margin-bottom:6px}
+.biv-cell{border-radius:3px}
+.biv-axis{display:flex;justify-content:space-between;font-size:.58rem;color:var(--text3);margin-top:3px}
+.biv-y-label{position:absolute;left:-18px;top:50%;transform:translateY(-50%) rotate(-90deg);font-size:.58rem;color:var(--text3);white-space:nowrap}
+.biv-legend-wrap{position:relative;padding-left:22px}
+.biv-x-label{font-size:.58rem;color:var(--text3);text-align:center;margin-top:2px}
+
+/* single metric legend */
+.metric-legend{position:absolute;bottom:28px;left:12px;background:rgba(13,17,23,.92);border:1px solid var(--border2);border-radius:var(--radius);padding:10px 12px;z-index:10;min-width:140px;display:none}
+.metric-legend h5{font-size:.63rem;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:var(--text3);margin-bottom:8px}
+.leg-item{display:flex;align-items:center;gap:7px;margin-bottom:4px;font-size:.7rem}
+.leg-dot{width:12px;height:12px;border-radius:3px;flex-shrink:0}
+
+/* municipality tooltip */
+.mun-tooltip{position:absolute;background:rgba(13,17,23,.96);border:1px solid var(--border2);border-radius:var(--radius);padding:10px 12px;z-index:20;pointer-events:none;display:none;max-width:220px}
+.mun-tooltip h4{font-size:.8rem;font-weight:700;margin-bottom:6px;color:var(--text)}
+.mun-row{display:flex;justify-content:space-between;gap:12px;font-size:.69rem;margin-bottom:2px}
+.mun-row span:first-child{color:var(--text2)}
+.mun-row span:last-child{font-weight:600}
+
+/* ── RIGHT PANEL ── */
+.right-panel{width:340px;background:var(--bg2);border-left:1px solid var(--border);display:flex;flex-direction:column;flex-shrink:0}
+.panel-tabs{display:flex;border-bottom:1px solid var(--border);flex-shrink:0}
+.ptab{flex:1;padding:8px 4px;font-size:.68rem;font-weight:600;text-align:center;color:var(--text2);cursor:pointer;border-bottom:2px solid transparent;transition:all .15s;text-transform:uppercase;letter-spacing:.05em}
+.ptab.active{color:var(--green2);border-bottom-color:var(--green)}
+.panel-body{flex:1;overflow-y:auto;padding:12px}
+.panel-body::-webkit-scrollbar{width:4px}
+.panel-body::-webkit-scrollbar-thumb{background:var(--border2)}
+
+/* cards */
+.pcard{background:var(--bg3);border:1px solid var(--border);border-radius:var(--radius);padding:10px 12px;margin-bottom:8px}
+.pcard h4{font-size:.68rem;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:var(--text3);margin-bottom:8px}
+.kpi-row{display:flex;justify-content:space-between;align-items:center;margin-bottom:5px}
+.kpi-label{font-size:.72rem;color:var(--text2)}
+.kpi-val{font-size:.82rem;font-weight:700}
+.kpi-val.green{color:var(--green2)}
+.kpi-val.red{color:var(--red)}
+.kpi-val.yellow{color:var(--yellow)}
+.kpi-val.blue{color:#60a5fa}
+.kpi-val.purple{color:#a78bfa}
+.bar-track{height:5px;background:var(--bg4);border-radius:3px;margin-top:2px;margin-bottom:6px}
+.bar-fill{height:5px;border-radius:3px}
+
+/* model output */
+.model-card{background:var(--bg3);border:1px solid var(--border);border-radius:var(--radius);padding:10px 12px;margin-bottom:8px}
+.model-card h4{font-size:.68rem;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:var(--text3);margin-bottom:8px}
+.cand-row{display:flex;align-items:center;gap:8px;margin-bottom:8px}
+.cand-avatar{width:28px;height:28px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:.65rem;font-weight:700;flex-shrink:0}
+.cand-info{flex:1;min-width:0}
+.cand-name{font-size:.76rem;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.cand-pct{font-size:.8rem;font-weight:700;flex-shrink:0}
+.ic-bar{height:4px;background:var(--bg4);border-radius:2px;position:relative;margin-top:2px}
+.ic-range{height:4px;border-radius:2px;position:absolute}
+.ic-point{width:8px;height:8px;border-radius:50%;position:absolute;top:-2px;border:1px solid var(--bg3)}
+.ic-labels{display:flex;justify-content:space-between;font-size:.58rem;color:var(--text3);margin-top:3px}
+.delta-badge{font-size:.62rem;padding:2px 6px;border-radius:10px;font-weight:600}
+.delta-pos{background:#003d1933;color:var(--green2)}
+.delta-neg{background:#3f0f0f33;color:var(--red)}
+
+/* model toggle */
+.model-toggle{display:flex;gap:6px;margin-bottom:10px}
+.mtog-btn{flex:1;padding:5px;font-size:.68rem;font-weight:600;border:1px solid var(--border2);border-radius:6px;color:var(--text2);background:transparent;cursor:pointer;text-align:center}
+.mtog-btn.active{background:var(--blue-dim);border-color:var(--blue2);color:#60a5fa}
+
+/* chat */
+.chat-area{display:flex;flex-direction:column;height:100%;gap:0}
+.chat-msgs{flex:1;overflow-y:auto;padding:8px 0;display:flex;flex-direction:column;gap:8px}
+.chat-msgs::-webkit-scrollbar{width:4px}
+.chat-msgs::-webkit-scrollbar-thumb{background:var(--border2)}
+.msg{padding:8px 10px;border-radius:var(--radius);font-size:.75rem;line-height:1.5;max-width:95%}
+.msg.user{background:var(--blue-dim);border:1px solid var(--blue2);align-self:flex-end}
+.msg.agent{background:var(--bg3);border:1px solid var(--border2);align-self:flex-start}
+.msg .msg-meta{font-size:.6rem;color:var(--text3);margin-bottom:3px;font-weight:600;text-transform:uppercase;letter-spacing:.06em}
+.msg strong{color:var(--green2)}
+.chat-input-wrap{border-top:1px solid var(--border);padding:8px;flex-shrink:0}
+.chat-input-row{display:flex;gap:6px}
+.chat-input{flex:1;background:var(--bg3);border:1px solid var(--border2);border-radius:var(--radius);padding:8px 10px;color:var(--text);font-size:.78rem;outline:none;resize:none;font-family:inherit;height:56px}
+.chat-input:focus{border-color:var(--green)}
+.chat-send{background:var(--green-dim);border:1px solid var(--green);border-radius:var(--radius);padding:8px 12px;color:var(--green2);font-size:.72rem;font-weight:600;cursor:pointer}
+.chat-send:hover{background:var(--green);color:#000}
+.chat-context{font-size:.63rem;color:var(--text3);margin-top:5px}
+.chat-context strong{color:var(--text2)}
+
+/* scatter panel */
+.scatter-note{font-size:.68rem;color:var(--text3);margin-bottom:8px;font-style:italic}
+
+/* source indicators */
+.src-tags{display:flex;flex-wrap:wrap;gap:4px;margin-top:6px}
+.src-tag{font-size:.6rem;padding:2px 6px;border-radius:10px;font-weight:600}
+.src-tse{background:#1e3a5f;color:#60a5fa}
+.src-ibge{background:#1a3a1a;color:#4ade80}
+.src-datasus{background:#2d1a1a;color:#f87171}
+.src-polls{background:#2d2a1a;color:#fbbf24}
+.src-social{background:#2a1a3a;color:#c084fc}
+
+/* SHAP bar */
+.shap-list{display:flex;flex-direction:column;gap:4px}
+.shap-row{display:flex;align-items:center;gap:6px;font-size:.68rem}
+.shap-name{width:80px;color:var(--text2);flex-shrink:0;font-size:.65rem}
+.shap-bar-track{flex:1;height:10px;background:var(--bg4);border-radius:2px;position:relative}
+.shap-bar-fill{height:10px;border-radius:2px;position:absolute}
+.shap-val{width:35px;text-align:right;font-size:.65rem;font-weight:600}
+
+/* scrollbar */
+::-webkit-scrollbar{width:5px;height:5px}
+::-webkit-scrollbar-track{background:var(--bg2)}
+::-webkit-scrollbar-thumb{background:var(--border2);border-radius:3px}
+</style>
+</head>
+<body>
+
+<!-- TOPNAV -->
+<nav class="topnav">
+  <div class="logo">SP<span>E</span>PE</div>
+  <span class="proto-tag">PROTÓTIPO</span>
+  <div style="width:1px;height:18px;background:var(--border);margin:0 4px"></div>
+  <div class="nav-filters">
+    <select id="f-cargo">
+      <option value="1">Presidente</option>
+      <option value="3">Governador</option>
+      <option value="5">Senador</option>
+    </select>
+    <select id="f-uf">
+      <option value="BR">Brasil (nacional)</option>
+      <option value="SP" selected>SP — São Paulo</option>
+      <option value="MG">MG — Minas Gerais</option>
+      <option value="RJ">RJ — Rio de Janeiro</option>
+      <option value="BA">BA — Bahia</option>
+      <option value="RS">RS — Rio Grande do Sul</option>
+    </select>
+    <select id="f-ano">
+      <option value="2026">2026</option>
+      <option value="2022" selected>2022</option>
+      <option value="2018">2018</option>
+    </select>
+    <select id="f-candidato">
+      <option value="">— candidato —</option>
+      <option value="LUIZ INÁCIO LULA DA SILVA" selected>Lula (PT)</option>
+      <option value="JAIR MESSIAS BOLSONARO">Bolsonaro (PL)</option>
+    </select>
+  </div>
+  <div class="topnav-right">
+    <div class="model-status"><div class="model-dot"></div>Modelo 1 ativo</div>
+    <div class="model-status" style="margin-left:6px"><div class="model-dot yellow"></div>Modelo 2 aguardando polls</div>
+    <span class="badge-live">LIVE</span>
+  </div>
+</nav>
+
+<!-- LAYER BAR -->
+<div class="layer-bar">
+  <button class="layer-btn active" data-layer="bivariate">Resultado × Indicador</button>
+  <button class="layer-btn" data-layer="eleitoral">Resultado Eleitoral</button>
+  <button class="layer-btn" data-layer="socio">IBGE / IDH</button>
+  <button class="layer-btn" data-layer="saude">Saúde</button>
+  <button class="layer-btn" data-layer="seguranca">Segurança</button>
+  <button class="layer-btn" data-layer="pesquisas">Pesquisas</button>
+  <button class="layer-btn" data-layer="predicao">Predição 2026</button>
+  <div class="layer-sep"></div>
+  <div class="overlay-selector">
+    <label>Indicador overlay:</label>
+    <select id="overlay-indicador">
+      <option value="idhm">IDH Municipal</option>
+      <option value="pct_bolsa_familia">% Bolsa Família</option>
+      <option value="taxa_homicidio">Homicídio /100k</option>
+      <option value="mortalidade_infantil">Mortalidade Infantil</option>
+      <option value="gini">Índice Gini</option>
+      <option value="pct_extrema_pobreza">% Extrema Pobreza</option>
+    </select>
+  </div>
+</div>
+
+<!-- SHELL -->
+<div class="shell">
+
+  <!-- MAP -->
+  <div class="map-pane">
+    <div id="leaflet-map"></div>
+    <div class="map-overlay-hint" id="map-hint">Clique em um município para análise contextual</div>
+
+    <!-- BIVARIATE LEGEND -->
+    <div class="biv-legend" id="biv-legend">
+      <h5>Resultado × IDH Municipal</h5>
+      <div class="biv-legend-wrap">
+        <div class="biv-y-label">IDH →</div>
+        <div class="biv-grid" id="biv-grid">
+          <!-- filled by JS -->
+        </div>
+        <div class="biv-x-label">← Resultado eleitoral →</div>
+      </div>
+      <div class="biv-axis">
+        <span>Baixo</span><span>Médio</span><span>Alto</span>
+      </div>
+      <div style="margin-top:8px;font-size:.6rem;color:var(--text3)">
+        <span style="display:inline-block;width:9px;height:9px;background:#2d6a4f;border-radius:2px;margin-right:3px"></span>Alto resultado + Alto IDH
+        <span style="display:inline-block;width:9px;height:9px;background:#d62828;border-radius:2px;margin-right:3px;margin-left:6px"></span>Alto resultado + Baixo IDH
+      </div>
+    </div>
+
+    <!-- SINGLE METRIC LEGEND (shown when not bivariate) -->
+    <div class="metric-legend" id="metric-legend">
+      <h5 id="metric-legend-title">IDH Municipal</h5>
+      <div id="metric-legend-items"></div>
+    </div>
+
+    <!-- MUNICIPALITY TOOLTIP -->
+    <div class="mun-tooltip" id="mun-tooltip">
+      <h4 id="tt-nome">—</h4>
+      <div class="mun-row"><span>Resultado eleitoral</span><span id="tt-result" class="kpi-val green">—</span></div>
+      <div class="mun-row"><span>IDH Municipal</span><span id="tt-idh">—</span></div>
+      <div class="mun-row"><span>% Bolsa Família</span><span id="tt-bf">—</span></div>
+      <div class="mun-row"><span>Homicídio /100k</span><span id="tt-hom">—</span></div>
+      <div class="mun-row"><span>Predição 2026</span><span id="tt-pred" class="kpi-val blue">—</span></div>
+      <div style="margin-top:6px;font-size:.6rem;color:var(--text3)">Clique para análise completa →</div>
+    </div>
+  </div>
+
+  <!-- RIGHT PANEL -->
+  <div class="right-panel">
+    <div class="panel-tabs">
+      <div class="ptab active" data-ptab="modelo">Modelo</div>
+      <div class="ptab" data-ptab="contexto">Contexto</div>
+      <div class="ptab" data-ptab="shap">SHAP</div>
+      <div class="ptab" data-ptab="chat">Chat</div>
+    </div>
+
+    <!-- MODELO TAB -->
+    <div class="panel-body" id="ptab-modelo">
+      <div class="model-toggle">
+        <button class="mtog-btn active" data-model="1">Modelo 1 — Estrutural</button>
+        <button class="mtog-btn" data-model="2">Modelo 2 — Dinâmico</button>
+      </div>
+
+      <div class="model-card">
+        <h4>Predição 2026 — IC 95% <span id="model-region-badge" style="font-size:.65rem;font-weight:400;color:var(--text2)">Brasil</span></h4>
+        <div id="model-candidates">
+          <!-- rendered by JS -->
+        </div>
+        <div style="margin-top:8px;font-size:.63rem;color:var(--text3)">
+          IC 95% via PyMC · 10.000 amostras MCMC · features: 12 estruturais
+        </div>
+      </div>
+
+      <div class="pcard">
+        <h4>Evolução de Intenção de Voto</h4>
+        <canvas id="chart-polls-proto" height="120"></canvas>
+        <div class="src-tags">
+          <span class="src-tag src-polls">Datafolha</span>
+          <span class="src-tag src-polls">IPEC/Quaest</span>
+          <span class="src-tag src-polls">AtlasIntel</span>
+        </div>
+      </div>
+
+      <div class="pcard">
+        <h4>Modelo 2 — Status</h4>
+        <div style="font-size:.72rem;color:var(--text2);line-height:1.6">
+          <div style="margin-bottom:6px">
+            <span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:var(--yellow);margin-right:6px"></span>
+            <strong style="color:var(--yellow)">Aguardando</strong> — Polls/Social jobs em andamento
+          </div>
+          <div style="background:var(--bg4);border-radius:6px;padding:8px;font-size:.68rem">
+            <div>✓ Modelo 1 baseline: <strong style="color:var(--green2)">ativo</strong></div>
+            <div>⏳ Polls Silver: <strong style="color:var(--yellow)">processando</strong></div>
+            <div>⏳ Social sentimento: <strong style="color:var(--yellow)">aguarda tokens</strong></div>
+            <div>⏳ GDELT notícias: <strong style="color:var(--text3)">pendente</strong></div>
+          </div>
+          <div style="margin-top:6px;font-size:.65rem;color:var(--text3)">
+            Modelo 2 ativo quando Polls + Social ≥ 2 fontes disponíveis.
+            Delta esperado: ±3-7pp sobre Modelo 1.
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- CONTEXTO TAB -->
+    <div class="panel-body" id="ptab-contexto" style="display:none">
+      <div id="mun-selected-header" style="margin-bottom:10px;padding-bottom:8px;border-bottom:1px solid var(--border)">
+        <div style="font-size:.72rem;color:var(--text3)">Município selecionado</div>
+        <div style="font-size:.95rem;font-weight:700" id="ctx-mun-name">Clique no mapa →</div>
+        <div style="font-size:.68rem;color:var(--text2)" id="ctx-mun-uf">selecione um município</div>
+      </div>
+
+      <div class="pcard">
+        <h4>Resultado Eleitoral</h4>
+        <div class="kpi-row"><span class="kpi-label">Vencedor T1</span><span class="kpi-val green" id="ctx-winner">—</span></div>
+        <div class="kpi-row"><span class="kpi-label">% votos T1</span><span class="kpi-val" id="ctx-pct-t1">—</span></div>
+        <div class="kpi-row"><span class="kpi-label">% votos T2</span><span class="kpi-val" id="ctx-pct-t2">—</span></div>
+        <div class="kpi-row"><span class="kpi-label">Comparecimento</span><span class="kpi-val" id="ctx-comp">—</span></div>
+        <div class="src-tags"><span class="src-tag src-tse">TSE 2022</span></div>
+      </div>
+
+      <div class="pcard">
+        <h4>Socioeconômico — IBGE</h4>
+        <div class="kpi-row"><span class="kpi-label">IDH Municipal</span><span class="kpi-val blue" id="ctx-idhm">—</span></div>
+        <div class="kpi-row"><span class="kpi-label">Renda per capita</span><span class="kpi-val" id="ctx-renda">—</span></div>
+        <div class="kpi-row"><span class="kpi-label">Gini</span><span class="kpi-val" id="ctx-gini">—</span></div>
+        <div class="kpi-row"><span class="kpi-label">Analfabetismo</span><span class="kpi-val" id="ctx-analf">—</span></div>
+        <div class="kpi-row"><span class="kpi-label">% Urbano</span><span class="kpi-val" id="ctx-urbano">—</span></div>
+        <div class="src-tags"><span class="src-tag src-ibge">IBGE Censo</span></div>
+      </div>
+
+      <div class="pcard">
+        <h4>Transferências Sociais</h4>
+        <div class="kpi-row"><span class="kpi-label">% BF / CadÚnico</span><span class="kpi-val yellow" id="ctx-bf">—</span></div>
+        <div class="kpi-row"><span class="kpi-label">Famílias beneficiadas</span><span class="kpi-val" id="ctx-fam-bf">—</span></div>
+        <div class="kpi-row"><span class="kpi-label">Valor médio BF (R$)</span><span class="kpi-val" id="ctx-val-bf">—</span></div>
+        <div class="src-tags"><span class="src-tag src-ibge">CadÚnico 2022</span></div>
+      </div>
+
+      <div class="pcard">
+        <h4>Saúde — DataSUS</h4>
+        <div class="kpi-row"><span class="kpi-label">Mort. Infantil/1k</span><span class="kpi-val red" id="ctx-mort-inf">—</span></div>
+        <div class="kpi-row"><span class="kpi-label">Cobertura APS</span><span class="kpi-val" id="ctx-aps">—</span></div>
+        <div class="src-tags"><span class="src-tag src-datasus">DataSUS</span></div>
+      </div>
+
+      <div class="pcard">
+        <h4>Segurança</h4>
+        <div class="kpi-row"><span class="kpi-label">Homicídio /100k</span><span class="kpi-val red" id="ctx-hom">—</span></div>
+        <div class="kpi-row"><span class="kpi-label">IVS — Vulnerab. Social</span><span class="kpi-val" id="ctx-ivs">—</span></div>
+        <div class="src-tags"><span class="src-tag src-tse">Atlas Violência</span></div>
+      </div>
+
+      <div class="pcard" style="background:#0a2540;border-color:#1976d2">
+        <h4 style="color:#60a5fa">Predição 2026 — Este Município</h4>
+        <div class="kpi-row"><span class="kpi-label">Candidato projetado</span><span class="kpi-val green" id="ctx-pred-cand">—</span></div>
+        <div class="kpi-row"><span class="kpi-label">Prob. vitória (M1)</span><span class="kpi-val blue" id="ctx-pred-pct">—</span></div>
+        <div class="kpi-row"><span class="kpi-label">IC 95%</span><span class="kpi-val" id="ctx-pred-ic" style="font-size:.7rem">—</span></div>
+        <div class="kpi-row"><span class="kpi-label">Delta vs 2022</span><span class="kpi-val" id="ctx-pred-delta">—</span></div>
+      </div>
+    </div>
+
+    <!-- SHAP TAB -->
+    <div class="panel-body" id="ptab-shap" style="display:none">
+      <div style="font-size:.72rem;color:var(--text2);margin-bottom:10px;line-height:1.5">
+        Importância de features (SHAP) para a predição 2026. Barras positivas aumentam a probabilidade do candidato selecionado.
+      </div>
+      <div class="pcard">
+        <h4>SHAP — Brasil (média)</h4>
+        <div class="shap-list" id="shap-global"></div>
+        <div class="src-tags" style="margin-top:8px">
+          <span class="src-tag src-tse">TSE</span>
+          <span class="src-tag src-ibge">IBGE</span>
+          <span class="src-tag src-ibge">CadÚnico</span>
+        </div>
+      </div>
+      <div class="pcard" id="shap-mun-card" style="display:none">
+        <h4>SHAP — <span id="shap-mun-name">—</span></h4>
+        <div class="shap-list" id="shap-mun"></div>
+      </div>
+      <div style="font-size:.65rem;color:var(--text3);line-height:1.5;margin-top:6px">
+        Método: TreeSHAP sobre PyMC posterior médio.
+        Clique em município para ver SHAP local.
+      </div>
+    </div>
+
+    <!-- CHAT TAB -->
+    <div class="panel-body" id="ptab-chat" style="display:none;padding:0;height:100%">
+      <div class="chat-area" style="height:100%;display:flex;flex-direction:column;padding:0">
+        <div class="chat-msgs" id="chat-msgs" style="padding:10px">
+          <div class="msg agent">
+            <div class="msg-meta">SPEPE · Analista</div>
+            Olá! Sou o SPEPE. Analisando o mapa atual: <strong>Brasil, Eleição 2022, Presidente — T1</strong>.<br><br>
+            Posso responder perguntas como:<br>
+            • "Por que Lula foi mais forte no Nordeste?"<br>
+            • "Quais municípios têm alto IDH mas votaram Bolsonaro?"<br>
+            • "Qual a predição para SP em 2026?"<br><br>
+            Clique num município no mapa para contexto específico.
+          </div>
+          <div class="msg user">
+            <div class="msg-meta">Você</div>
+            Quais municípios têm alta dependência de Bolsa Família e votaram Lula?
+          </div>
+          <div class="msg agent">
+            <div class="msg-meta">SPEPE · Analista</div>
+            Identifiquei <strong>1.847 municípios</strong> com % BF &gt; 40% que votaram Lula no T1 2022.<br><br>
+            <strong>Concentração:</strong> Nordeste (BA, CE, MA, PI) e Norte (PA, AM).<br>
+            <strong>Correlação:</strong> % BF × voto Lula = <strong>+0.73</strong> — alta correlação estrutural.<br><br>
+            Este padrão está <strong>estável desde 2006</strong>. O modelo prevê manutenção para 2026 com IC 95%: 68–74%.
+          </div>
+          <div class="msg agent" id="typing-msg" style="display:none">
+            <div class="msg-meta">SPEPE · Analista</div>
+            <span id="typing-dots">▋</span>
+          </div>
+        </div>
+        <div class="chat-input-wrap">
+          <div class="chat-context">
+            Contexto atual: <strong id="chat-ctx-text">Brasil · 2022 · Presidente · Lula</strong>
+            <span id="chat-mun-ctx" style="color:var(--green2)"></span>
+          </div>
+          <div class="chat-input-row" style="margin-top:6px">
+            <textarea class="chat-input" id="chat-input" placeholder="Pergunte sobre o eleitorado, indicadores ou predições..."></textarea>
+            <button class="chat-send" id="chat-send-btn">Enviar</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </div><!-- /right-panel -->
+</div><!-- /shell -->
+
+<script>
+// ── Mock data ──────────────────────────────────────────────────────────────
+const MOCK_CANDIDATES = [
+  { name:"Luiz Inácio Lula da Silva", partido:"PT", color:"#d32f2f", base_pct:53.1, base_lo:50.2, base_hi:55.9, delta:"+1.8pp", delta_pos:true },
+  { name:"Jair Messias Bolsonaro",    partido:"PL", color:"#1565c0", base_pct:42.4, base_lo:39.7, base_hi:45.1, delta:"-1.8pp", delta_pos:false },
+];
+
+const MOCK_POLLS = {
+  labels:["Jan","Fev","Mar","Abr","Mai","Jun","Jul","Ago","Set","Out","Nov"],
+  lula:  [45,   46,   48,   47,   49,   50,   51,   52,   53,   52,   53],
+  bolso: [38,   37,   36,   37,   36,   35,   35,   36,   37,   43,   44],
+};
+
+const MOCK_SHAP = [
+  { name:"% BF 2022",         val:+0.18, color:"#00c853" },
+  { name:"Hist. 2018",        val:+0.15, color:"#00c853" },
+  { name:"IDH Municipal",     val:+0.09, color:"#00c853" },
+  { name:"% Extrem. Pobreza", val:+0.12, color:"#00c853" },
+  { name:"Gini",              val:+0.07, color:"#00c853" },
+  { name:"Taxa Analfab.",     val:+0.06, color:"#00c853" },
+  { name:"Mort. Infantil",    val:+0.05, color:"#00c853" },
+  { name:"Renda per capita",  val:-0.11, color:"#ef4444" },
+  { name:"% Urbano",          val:-0.08, color:"#ef4444" },
+  { name:"IDH rank UF",       val:-0.06, color:"#ef4444" },
+  { name:"Hist. 2014",        val:+0.04, color:"#00c853" },
+  { name:"Emendas R$/hab",    val:+0.03, color:"#00c853" },
+];
+
+const MOCK_MUNICIPALITIES = [
+  { nome:"São Paulo - SP", uf:"SP", result:"Lula 42%", pct_t1:42.1, idhm:0.805, renda:1650, gini:0.58, analf:3.2, urbano:99.1, bf:18.4, hom:10.2, ivs:"0.21 (Baixo)", mort_inf:8.1, aps:"82%", pred_pct:"44% (M1)", pred_ic:"41–47%", pred_delta:"+2.1pp", winner:"Bolsonaro T1 / Lula T2" },
+  { nome:"Salvador - BA", uf:"BA", result:"Lula 71%", pct_t1:71.2, idhm:0.759, renda:890,  gini:0.62, analf:6.1, urbano:98.7, bf:41.2, hom:47.8, ivs:"0.39 (Médio)", mort_inf:13.4, aps:"68%", pred_pct:"73% (M1)", pred_ic:"70–76%", pred_delta:"+2.3pp", winner:"Lula T1" },
+  { nome:"Belo Horizonte - MG", uf:"MG", result:"Lula 51%", pct_t1:51.4, idhm:0.810, renda:1580, gini:0.55, analf:2.8, urbano:99.2, bf:22.1, hom:21.3, ivs:"0.25 (Baixo)", mort_inf:9.2, aps:"79%", pred_pct:"54% (M1)", pred_ic:"51–57%", pred_delta:"+3.1pp", winner:"Lula T1" },
+];
+let _selMun = null;
+
+// ── Bivariate color matrix 3×3 ──────────────────────────────────────────
+// X: resultado eleitoral candidato (baixo/médio/alto)
+// Y: IDH (baixo/médio/alto)
+// Cor: combinação
+const BIV_COLORS = [
+  // Y alto (row 0 = top)
+  ["#2d6a4f","#52b788","#8ecae6"],  // IDH alto × resultado baixo/médio/alto
+  ["#e76f51","#f4a261","#90e0ef"],  // IDH médio
+  ["#d62828","#c77dff","#023e8a"],  // IDH baixo
+];
+
+function buildBivGrid() {
+  const grid = document.getElementById("biv-grid");
+  if(!grid) return;
+  let html = "";
+  for(let y=0;y<3;y++) {
+    for(let x=0;x<3;x++) {
+      html += `<div class="biv-cell" style="background:${BIV_COLORS[y][x]};title='IDH:${['Alto','Médio','Baixo'][y]} × Res:${['Baixo','Médio','Alto'][x]}'"></div>`;
+    }
+  }
+  grid.innerHTML = html;
+}
+
+// ── Render model predictions ───────────────────────────────────────────
+function renderModelCandidates(data) {
+  const el = document.getElementById("model-candidates");
+  if(!el) return;
+  const maxPct = Math.max(...data.map(d=>d.base_pct));
+  el.innerHTML = data.map(d => {
+    const loPos = (d.base_lo/100)*100;
+    const hiPos = (d.base_hi/100)*100;
+    const ptPos = (d.base_pct/100)*100;
+    return `
+      <div class="cand-row">
+        <div class="cand-avatar" style="background:${d.color}22;border:1px solid ${d.color}">${d.name.split(" ").map(w=>w[0]).slice(0,2).join("")}</div>
+        <div class="cand-info">
+          <div class="cand-name">${d.name} <span style="font-size:.64rem;color:var(--text3)">(${d.partido})</span></div>
+          <div class="ic-bar" title="IC 95%: ${d.base_lo}%–${d.base_hi}%">
+            <div class="ic-range" style="left:${loPos}%;width:${hiPos-loPos}%;background:${d.color}44"></div>
+            <div class="ic-point" style="left:calc(${ptPos}% - 4px);background:${d.color}"></div>
+          </div>
+          <div class="ic-labels"><span>${d.base_lo}%</span><span>${d.base_hi}%</span></div>
+        </div>
+        <div>
+          <div class="cand-pct" style="color:${d.color}">${d.base_pct}%</div>
+          <div class="delta-badge ${d.delta_pos?'delta-pos':'delta-neg'}" style="margin-top:3px">${d.delta}</div>
+        </div>
+      </div>`;
+  }).join("");
+}
+
+// ── Polls chart ───────────────────────────────────────────────────────
+let pollsChart = null;
+function renderPollsChart() {
+  const ctx = document.getElementById("chart-polls-proto");
+  if(!ctx) return;
+  if(pollsChart) pollsChart.destroy();
+  pollsChart = new Chart(ctx, {
+    type:"line",
+    data:{
+      labels: MOCK_POLLS.labels,
+      datasets:[
+        { label:"Lula (PT)", data:MOCK_POLLS.lula, borderColor:"#ef5350", backgroundColor:"#ef535011", tension:.4, pointRadius:3 },
+        { label:"Bolsonaro (PL)", data:MOCK_POLLS.bolso, borderColor:"#42a5f5", backgroundColor:"#42a5f511", tension:.4, pointRadius:3 },
+      ]
+    },
+    options:{ plugins:{legend:{labels:{color:"#8d96a0",font:{size:10}}}}, scales:{x:{ticks:{color:"#57606a",font:{size:9}},grid:{color:"#21262d"}},y:{ticks:{color:"#57606a",font:{size:9},callback:v=>v+"%"},grid:{color:"#21262d"},min:30,max:60}}, responsive:true, maintainAspectRatio:true }
+  });
+}
+
+// ── SHAP ──────────────────────────────────────────────────────────────
+function renderShap(containerId, data) {
+  const el = document.getElementById(containerId);
+  if(!el) return;
+  const maxAbs = Math.max(...data.map(d=>Math.abs(d.val)));
+  el.innerHTML = data.sort((a,b)=>Math.abs(b.val)-Math.abs(a.val)).map(d => {
+    const pct = (Math.abs(d.val)/maxAbs)*100;
+    const pos = d.val >= 0;
+    return `
+      <div class="shap-row">
+        <span class="shap-name">${d.name}</span>
+        <div class="shap-bar-track">
+          <div class="shap-bar-fill" style="width:${pct}%;background:${d.color};left:${pos?0:'auto'};right:${pos?'auto':0}"></div>
+        </div>
+        <span class="shap-val" style="color:${d.color}">${pos?'+':''}${d.val.toFixed(2)}</span>
+      </div>`;
+  }).join("");
+}
+
+// ── Layer / overlay switching ─────────────────────────────────────────
+let _activeLayer = "bivariate";
+
+document.querySelectorAll(".layer-btn").forEach(btn => {
+  btn.addEventListener("click", () => {
+    document.querySelectorAll(".layer-btn").forEach(b=>b.classList.remove("active"));
+    btn.classList.add("active");
+    _activeLayer = btn.dataset.layer;
+    updateLegendVisibility();
+    updateMapHint();
+    if(window._geoLayer) recolorMap();
+  });
+});
+
+function updateLegendVisibility() {
+  const bivEl = document.getElementById("biv-legend");
+  const metEl = document.getElementById("metric-legend");
+  if(_activeLayer === "bivariate") {
+    bivEl.style.display = "block";
+    metEl.style.display = "none";
+  } else {
+    bivEl.style.display = "none";
+    metEl.style.display = "block";
+    updateMetricLegend(_activeLayer);
+  }
+}
+
+function updateMetricLegend(layer) {
+  const titles = { eleitoral:"Resultado Eleitoral", socio:"IDH Municipal", saude:"Mortalidade Infantil", seguranca:"Homicídio /100k", pesquisas:"Intenção de Voto (%)", predicao:"Predição 2026 (%)" };
+  const legends = {
+    eleitoral: [{c:"#1a9641",l:">50%"},{c:"#a6d96a",l:"45–50%"},{c:"#ffffbf",l:"35–45%"},{c:"#fdae61",l:"30–35%"},{c:"#d7191c",l:"<30%"}],
+    socio: [{c:"#08519c",l:"IDH >0.80"},{c:"#3182bd",l:"0.70–0.80"},{c:"#6baed6",l:"0.60–0.70"},{c:"#bdd7e7",l:"0.50–0.60"},{c:"#ffffd4",l:"<0.50"}],
+    saude: [{c:"#08519c",l:"<5/1k"},{c:"#3182bd",l:"5–10"},{c:"#6baed6",l:"10–15"},{c:"#fdae61",l:"15–25"},{c:"#d7191c",l:">25"}],
+    seguranca: [{c:"#08519c",l:"<10"},{c:"#6baed6",l:"10–20"},{c:"#ffffbf",l:"20–40"},{c:"#fdae61",l:"40–60"},{c:"#d7191c",l:">60"}],
+    pesquisas: [{c:"#1a9641",l:">50%"},{c:"#a6d96a",l:"45–50%"},{c:"#ffffbf",l:"35–45%"},{c:"#fdae61",l:"30–35%"},{c:"#d7191c",l:"<30%"}],
+    predicao: [{c:"#1a9641",l:">55%"},{c:"#a6d96a",l:"50–55%"},{c:"#ffffbf",l:"45–50%"},{c:"#fdae61",l:"40–45%"},{c:"#d7191c",l:"<40%"}],
+  };
+  document.getElementById("metric-legend-title").textContent = titles[layer] || layer;
+  const items = legends[layer] || [];
+  document.getElementById("metric-legend-items").innerHTML = items.map(i=>`<div class="leg-item"><div class="leg-dot" style="background:${i.c}"></div><span>${i.l}</span></div>`).join("");
+}
+
+function updateMapHint() {
+  const hints = {
+    bivariate:"Resultado × IDH — Clique num município para análise contextual",
+    eleitoral:"Resultado eleitoral por município — Clique para detalhes",
+    socio:"IDH Municipal — Clique para comparar com resultado eleitoral",
+    saude:"Mortalidade Infantil por município",
+    seguranca:"Taxa de homicídio por 100k hab",
+    pesquisas:"Última pesquisa municipal disponível",
+    predicao:"Predição Modelo 1 para 2026 — IC 95%",
+  };
+  document.getElementById("map-hint").textContent = hints[_activeLayer] || "Clique num município";
+}
+
+// ── Panel tabs ─────────────────────────────────────────────────────────
+document.querySelectorAll(".ptab").forEach(tab => {
+  tab.addEventListener("click", () => {
+    document.querySelectorAll(".ptab").forEach(t=>t.classList.remove("active"));
+    tab.classList.add("active");
+    document.querySelectorAll(".panel-body").forEach(b=>b.style.display="none");
+    document.getElementById(`ptab-${tab.dataset.ptab}`).style.display="block";
+  });
+});
+
+// ── Model toggle ──────────────────────────────────────────────────────
+document.querySelectorAll(".mtog-btn").forEach(btn => {
+  btn.addEventListener("click", () => {
+    document.querySelectorAll(".mtog-btn").forEach(b=>b.classList.remove("active"));
+    btn.classList.add("active");
+    const m = btn.dataset.model;
+    if(m==="2") {
+      // Show M2 as pending with note
+      document.getElementById("model-candidates").innerHTML = `
+        <div style="text-align:center;padding:16px;color:var(--text2);font-size:.74rem">
+          <div style="font-size:1.3rem;margin-bottom:8px">⏳</div>
+          Modelo 2 aguarda dados de Polls e Social<br>
+          <span style="color:var(--text3);font-size:.66rem">Estimativa: +3 dias</span>
+        </div>`;
+    } else {
+      renderModelCandidates(MOCK_CANDIDATES);
+    }
+  });
+});
+
+// ── Municipality click → context panel ───────────────────────────────
+function selectMunicipality(mun) {
+  _selMun = mun;
+  // Activate contexto tab
+  document.querySelectorAll(".ptab").forEach(t=>t.classList.remove("active"));
+  document.querySelector('[data-ptab="contexto"]').classList.add("active");
+  document.querySelectorAll(".panel-body").forEach(b=>b.style.display="none");
+  document.getElementById("ptab-contexto").style.display="block";
+
+  document.getElementById("ctx-mun-name").textContent = mun.nome;
+  document.getElementById("ctx-mun-uf").textContent = `${mun.uf} · Eleição 2022`;
+  document.getElementById("ctx-winner").textContent = mun.winner;
+  document.getElementById("ctx-pct-t1").textContent = mun.pct_t1 + "%";
+  document.getElementById("ctx-pct-t2").textContent = "—";
+  document.getElementById("ctx-comp").textContent = "—";
+  document.getElementById("ctx-idhm").textContent = mun.idhm;
+  document.getElementById("ctx-renda").textContent = "R$ " + mun.renda;
+  document.getElementById("ctx-gini").textContent = mun.gini;
+  document.getElementById("ctx-analf").textContent = mun.analf + "%";
+  document.getElementById("ctx-urbano").textContent = mun.urbano + "%";
+  document.getElementById("ctx-bf").textContent = mun.bf + "%";
+  document.getElementById("ctx-fam-bf").textContent = "—";
+  document.getElementById("ctx-val-bf").textContent = "—";
+  document.getElementById("ctx-mort-inf").textContent = mun.mort_inf;
+  document.getElementById("ctx-aps").textContent = mun.aps;
+  document.getElementById("ctx-hom").textContent = mun.hom;
+  document.getElementById("ctx-ivs").textContent = mun.ivs;
+  document.getElementById("ctx-pred-cand").textContent = "Lula";
+  document.getElementById("ctx-pred-pct").textContent = mun.pred_pct;
+  document.getElementById("ctx-pred-ic").textContent = mun.pred_ic;
+  const deltaEl = document.getElementById("ctx-pred-delta");
+  deltaEl.textContent = mun.pred_delta;
+  deltaEl.className = "kpi-val " + (mun.pred_delta.startsWith("+")?"green":"red");
+
+  // Update chat context
+  document.getElementById("chat-mun-ctx").textContent = ` · ${mun.nome}`;
+
+  // Update SHAP mun card
+  document.getElementById("shap-mun-name").textContent = mun.nome;
+  document.getElementById("shap-mun-card").style.display = "block";
+  renderShap("shap-mun", MOCK_SHAP.map(s=>({...s, val:s.val*(0.8+Math.random()*0.4)})));
+}
+
+// ── Leaflet map setup ─────────────────────────────────────────────────
+let gMap = null, _geoLayer = null;
+
+function initMap() {
+  if(gMap) return;
+  gMap = L.map("leaflet-map", { zoomControl:true, attributionControl:false }).setView([-15.78,-47.93],4);
+  L.tileLayer("https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png",{
+    attribution:"© CARTO",maxZoom:18,subdomains:"abcd"
+  }).addTo(gMap);
+
+  // Load GeoJSON Brazil states as proxy (simplified)
+  fetch("https://raw.githubusercontent.com/codeforamerica/click_that_hood/master/public/data/brazil-states.geojson")
+    .then(r=>r.json())
+    .then(data=>{
+      _geoLayer = L.geoJSON(data, {
+        style: feature => getLayerStyle(feature),
+        onEachFeature:(feature, layer)=>{
+          layer.on({
+            mouseover: e => {
+              const p = feature.properties;
+              showTooltip(e, p.name || p.sigla || "Estado");
+            },
+            mouseout: () => { document.getElementById("mun-tooltip").style.display="none"; },
+            click: e => {
+              const mun = MOCK_MUNICIPALITIES[Math.floor(Math.random()*MOCK_MUNICIPALITIES.length)];
+              selectMunicipality(mun);
+            }
+          });
+        }
+      }).addTo(gMap);
+    })
+    .catch(()=>{
+      // fallback: show placeholder if GeoJSON unavailable
+      document.getElementById("leaflet-map").innerHTML = `
+        <div style="display:flex;flex-direction:column;align-items:center;justify-content:center;height:100%;gap:12px;color:var(--text3)">
+          <div style="font-size:2rem">🗺️</div>
+          <div style="font-size:.84rem">Mapa GeoJSON indisponível em modo standalone</div>
+          <div style="font-size:.72rem;color:var(--text3)">Em produção: GeoJSON carregado via /static/geojson/municipios.json</div>
+          <div style="display:flex;gap:12px;margin-top:12px">
+            ${MOCK_MUNICIPALITIES.map(m=>`
+              <button onclick="selectMunicipality(${JSON.stringify(m).replace(/"/g,"'")})" style="
+                background:var(--bg3);border:1px solid var(--border2);border-radius:8px;
+                padding:10px 14px;color:var(--text);font-size:.75rem;cursor:pointer;font-family:inherit">
+                ${m.nome}
+              </button>`).join("")}
+          </div>
+          <div style="font-size:.65rem;color:var(--text3)">Clique em um município para ver análise contextual</div>
+        </div>`;
+    });
+}
+
+function getLayerStyle(feature) {
+  // Mock color by state name hash
+  const name = (feature.properties && (feature.properties.sigla||feature.properties.name)) || "";
+  const hash = name.split("").reduce((a,c)=>a+c.charCodeAt(0),0);
+  const colors = BIV_COLORS.flat();
+  return {
+    fillColor: colors[hash % colors.length],
+    fillOpacity: 0.65,
+    color: "#4b6878",
+    weight: 1
+  };
+}
+
+function recolorMap() {
+  if(!_geoLayer) return;
+  _geoLayer.setStyle(f=>getLayerStyle(f));
+}
+
+function showTooltip(e, nome) {
+  const tt = document.getElementById("mun-tooltip");
+  tt.style.display = "block";
+  tt.style.top = (e.containerPoint.y + 10) + "px";
+  tt.style.left = (e.containerPoint.x + 10) + "px";
+  document.getElementById("tt-nome").textContent = nome;
+  const mun = MOCK_MUNICIPALITIES[0];
+  document.getElementById("tt-result").textContent = mun.result;
+  document.getElementById("tt-idh").textContent = mun.idhm;
+  document.getElementById("tt-bf").textContent = mun.bf + "%";
+  document.getElementById("tt-hom").textContent = mun.hom;
+  document.getElementById("tt-pred").textContent = mun.pred_pct;
+}
+
+// ── Chat simulation ───────────────────────────────────────────────────
+const CHAT_RESPONSES = [
+  "Com base nos dados Gold (2022), a correlação entre <strong>% BF e voto Lula</strong> é <strong>+0.73</strong> (p<0.001). Municípios com >40% BF votaram Lula com média de 68% T1.",
+  "A predição do Modelo 1 para este perfil (estrutural) indica <strong>53–58% de probabilidade</strong> de vitória no T1 2026. O Modelo 2 (pesquisas + social) refinará esta estimativa quando disponível.",
+  "Identifico <strong>3 clusters de eleitorado</strong> para este padrão:<br>1) Alto IDH + voto oscilante (248 municípios)<br>2) Baixo IDH + fidelidade histórica (1.203 municípios)<br>3) Interior rural + voto religioso (394 municípios)",
+];
+let chatRespIdx = 0;
+
+document.getElementById("chat-send-btn").addEventListener("click", sendChat);
+document.getElementById("chat-input").addEventListener("keydown", e => {
+  if(e.key==="Enter" && !e.shiftKey) { e.preventDefault(); sendChat(); }
+});
+
+function sendChat() {
+  const input = document.getElementById("chat-input");
+  const msg = input.value.trim();
+  if(!msg) return;
+  input.value = "";
+  appendMsg("user", msg);
+  const typing = document.getElementById("typing-msg");
+  typing.style.display = "block";
+  scrollChat();
+  setTimeout(()=>{
+    typing.style.display = "none";
+    appendMsg("agent", CHAT_RESPONSES[chatRespIdx % CHAT_RESPONSES.length]);
+    chatRespIdx++;
+    scrollChat();
+  }, 1200 + Math.random()*800);
+}
+
+function appendMsg(role, text) {
+  const msgs = document.getElementById("chat-msgs");
+  const div = document.createElement("div");
+  div.className = `msg ${role}`;
+  div.innerHTML = `<div class="msg-meta">${role==="user"?"Você":"SPEPE · Analista"}</div>${text}`;
+  msgs.insertBefore(div, document.getElementById("typing-msg"));
+}
+
+function scrollChat() {
+  const msgs = document.getElementById("chat-msgs");
+  msgs.scrollTop = msgs.scrollHeight;
+}
+
+// ── Init ──────────────────────────────────────────────────────────────
+window.addEventListener("load", () => {
+  buildBivGrid();
+  renderModelCandidates(MOCK_CANDIDATES);
+  renderPollsChart();
+  renderShap("shap-global", MOCK_SHAP);
+  initMap();
+  updateLegendVisibility();
+});
+</script>
+</body>
+</html>

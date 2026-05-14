@@ -325,6 +325,19 @@ async def serve_dashboard() -> FileResponse:
     )
 
 
+@app.get("/prototype")
+async def serve_prototype() -> FileResponse:
+    """Serve o protótipo visual standalone (sem backend)."""
+    from pathlib import Path
+
+    html_path = Path(__file__).parent / "static" / "spepe-prototype.html"
+    return FileResponse(
+        str(html_path),
+        media_type="text/html",
+        headers={"Cache-Control": "no-cache, no-store, must-revalidate"},
+    )
+
+
 # ── Auth (stub — trocar por Firebase Auth / IAP em prod) ──────────────────
 
 
