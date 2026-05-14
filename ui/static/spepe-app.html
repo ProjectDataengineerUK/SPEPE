@@ -7,23 +7,19 @@
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
 <script defer src="/static/js/dashboard_actions.js"></script>
 <script defer src="/static/js/map_layers.js"></script>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script src="https://accounts.google.com/gsi/client" async defer></script>
 <script>
-async function initGoogleMaps() {
-  try {
-    const res = await apiFetch('/api/config/maps-key');
-    const { key } = await res.json();
-    if (!key) { initMapFallback(); return; }
-    const s = document.createElement('script');
-    s.src = `https://maps.googleapis.com/maps/api/js?key=${key}&callback=initMap&v=weekly`;
-    s.async = true;
-    s.onerror = initMapFallback;
-    document.head.appendChild(s);
-  } catch(e) { initMapFallback(); }
-}
-function initMapFallback() {
-  const el = document.getElementById('leaflet-map');
-  if (el) el.innerHTML = '<div class="flex items-center justify-center h-full text-gray-500 text-sm" style="display:flex;align-items:center;justify-content:center;height:100%;color:#57606a;font-size:.85rem">Mapa indisponível — configure GOOGLE_MAPS_API_KEY</div>';
+function initLeafletMap() {
+  if (gMap) return;
+  const mapEl = document.getElementById('leaflet-map');
+  if (!mapEl) return;
+  if (typeof L === 'undefined') {
+    mapEl.innerHTML = '<div style="display:flex;align-items:center;justify-content:center;height:100%;color:#57606a;font-size:.85rem">Mapa indisponível — Leaflet não carregado</div>';
+    return;
+  }
+  initMap();
 }
 </script>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
@@ -1045,7 +1041,7 @@ function switchTab(el,nm){
     const mapa=document.getElementById('tab-mapa');
     if(mapa){ mapa.style.display='flex'; mapa.classList.add('active'); }
     loadCandidatoList();
-    setTimeout(()=>{ if(!gMap) initGoogleMaps(); else reloadMap(); },50);
+    setTimeout(()=>{ if(!gMap) initLeafletMap(); else reloadMap(); },50);
   } else if(_TAB_PANEL_MAP[nm]){
     if(dash) dash.style.display='none';
     const panelId='tab-'+_TAB_PANEL_MAP[nm];
@@ -1849,7 +1845,7 @@ function toast(msg){
 }
 
 // ═══════════════════════════════════════════════════════════
-// MAPA ELEITORAL — Google Maps + IBGE GeoJSON + Drill-down
+// MAPA ELEITORAL — Leaflet.js + IBGE GeoJSON + Drill-down
 // ═══════════════════════════════════════════════════════════
 
 let _map = null;
@@ -1877,18 +1873,6 @@ function setMapMode(mode) {
   reloadMap();
 }
 
-const MAP_DARK_STYLE = [
-  {elementType:'geometry',stylers:[{color:'#1a1a2e'}]},
-  {elementType:'labels',stylers:[{visibility:'on'}]},
-  {elementType:'labels.text.fill',stylers:[{color:'#c9d1d9'}]},
-  {elementType:'labels.text.stroke',stylers:[{color:'#0d1117',weight:2}]},
-  {featureType:'administrative',elementType:'labels.text.fill',stylers:[{color:'#e6edf3'}]},
-  {featureType:'administrative.province',elementType:'geometry.stroke',stylers:[{color:'#4b6878'}]},
-  {featureType:'administrative.locality',elementType:'labels.text.fill',stylers:[{color:'#adbac7'}]},
-  {featureType:'water',elementType:'geometry',stylers:[{color:'#0e1626'}]},
-  {featureType:'road',stylers:[{visibility:'simplified'}]},
-  {featureType:'poi',elementType:'labels',stylers:[{visibility:'off'}]},
-];
 
 function handleMapClick(cod, nome) {
   const d = _mapData[String(cod)] || null;
@@ -1925,25 +1909,17 @@ function initMap(){
   if(gMap) return;
   const mapEl = document.getElementById('leaflet-map');
   if(!mapEl) return;
-  if(typeof google === 'undefined' || !google.maps) {
-    initMapFallback();
-    return;
-  }
-  gMap = new google.maps.Map(mapEl, {
-    center:{lat:-14.235,lng:-51.925}, zoom:4,
-    mapTypeId:'roadmap', styles:MAP_DARK_STYLE,
-    disableDefaultUI:false, zoomControl:true
-  });
-  dataLayer = new google.maps.Data({map:gMap});
-  dataLayer.addListener('click', ev => {
-    const cod = ev.feature.getProperty('codarea') || ev.feature.getProperty('CD_MUN') || ev.feature.getProperty('CD_UF') || '';
-    const nome = ev.feature.getProperty('nome') || cod;
-    handleMapClick(cod, nome);
-    const d = _mapData[String(cod)];
-    if(d) _drillDown(null, d);
-  });
-  _map = gMap; // alias for legacy references
-  if (typeof initMapLayers === "function") initMapLayers();
+
+  gMap = L.map(mapEl, {zoomControl:true}).setView([-14.235,-51.925], 4);
+  _map = gMap;
+
+  L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
+    attribution:'&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> &copy; <a href="https://carto.com/">CARTO</a>',
+    subdomains:'abcd', maxZoom:19
+  }).addTo(gMap);
+
+  dataLayer = null;
+  if (typeof initMapLayers === 'function') initMapLayers();
   reloadMap();
 }
 
@@ -1951,38 +1927,57 @@ function renderGeoJSON(geojsonData, colorBy, layer) {
   _clearBubbles();
   const _zonaPanel = document.getElementById('zona-panel');
   if(_zonaPanel) _zonaPanel.style.display = 'none';
-  if(!dataLayer) return;
-  dataLayer.forEach(f => dataLayer.remove(f));
+  if(!gMap) return;
+
+  if(_geoLayer){ _geoLayer.removeFrom(gMap); _geoLayer = null; }
   if(!geojsonData) return;
-  dataLayer.addGeoJson(geojsonData);
-  dataLayer.setStyle(feature => {
-    const cod = String(feature.getProperty('codarea') || feature.getProperty('CD_MUN') || feature.getProperty('CD_UF') || feature.getProperty('CD_REGIAO') || '');
-    const d = _mapData[cod] || _mapData[cod.slice(0,2)];
-    if(!d) return {fillColor:'#21262d', fillOpacity:0.25, strokeColor:'#4b6878', strokeWeight:1};
-    let color = '#21262d';
-    if(layer && layer !== 'electoral'){
-      const val = (d.pct||50) / 100;
-      if(layer === 'archetype'){
-        const r=Math.round(124-val*90), g=Math.round(58+val*130), b=Math.round(237-val*50);
-        color = `rgb(${r},${g},${b})`;
-      } else if(layer === 'security'){
-        const i=Math.round(val*200+55);
-        color = `rgb(${i},${Math.round(68-val*40)},${Math.round(68-val*40)})`;
-      } else if(layer === 'health'){
-        color = val>0.7?'#00c853':val>0.5?'#66bb6a':val>0.35?'#ffd54f':'#ef9a9a';
-      } else if(layer === 'economic'){
-        color = val>0.7?'#00c853':val>0.5?'#c6e400':val>0.35?'#ffd54f':'#ff8f00';
+
+  const currentLayer = layer;
+  _geoLayer = L.geoJSON(geojsonData, {
+    style: function(feature){
+      const props = feature.properties||{};
+      const cod = String(props.codarea||props.CD_MUN||props.CD_UF||props.CD_REGIAO||'');
+      const d = _mapData[cod] || _mapData[cod.slice(0,2)];
+      if(!d) return {fillColor:'#21262d', fillOpacity:0.25, color:'#4b6878', weight:1};
+      let color = '#21262d';
+      if(currentLayer && currentLayer !== 'electoral'){
+        const val = (d.pct||50) / 100;
+        if(currentLayer === 'archetype'){
+          const r=Math.round(124-val*90), g=Math.round(58+val*130), b=Math.round(237-val*50);
+          color = `rgb(${r},${g},${b})`;
+        } else if(currentLayer === 'security'){
+          const i=Math.round(val*200+55);
+          color = `rgb(${i},${Math.round(68-val*40)},${Math.round(68-val*40)})`;
+        } else if(currentLayer === 'health'){
+          color = val>0.7?'#00c853':val>0.5?'#66bb6a':val>0.35?'#ffd54f':'#ef9a9a';
+        } else if(currentLayer === 'economic'){
+          color = val>0.7?'#00c853':val>0.5?'#c6e400':val>0.35?'#ffd54f':'#ff8f00';
+        }
+      } else {
+        if(colorBy === 'partido' || colorBy === 'lider'){
+          color = d.partido ? (PARTIDO_COR[d.partido]||_candidateColor(d.lider)) : _candidateColor(d.lider);
+        } else if(colorBy === 'margem'){
+          const margem = Math.abs((d.pct||0)-(d.pct2||0));
+          color = margem>20?'#ef4444':margem>10?'#f59e0b':'#22c55e';
+        }
       }
-    } else {
-      if(colorBy === 'partido' || colorBy === 'lider'){
-        color = d.partido ? (PARTIDO_COR[d.partido] || _candidateColor(d.lider)) : _candidateColor(d.lider);
-      } else if(colorBy === 'margem'){
-        const margem = Math.abs((d.pct||0) - (d.pct2||0));
-        color = margem > 20 ? '#ef4444' : margem > 10 ? '#f59e0b' : '#22c55e';
-      }
+      return {fillColor:color, fillOpacity:0.60, color:'#4b6878', weight:1};
+    },
+    onEachFeature: function(feature, lyr){
+      lyr.on('click', function(ev){
+        const props = feature.properties||{};
+        const cod = props.codarea||props.CD_MUN||props.CD_UF||props.CD_REGIAO||'';
+        const nome = props.nome||props.NM_MUN||props.NM_UF||String(cod);
+        handleMapClick(cod, nome);
+        const d = _mapData[String(cod)];
+        if(d) _drillDown(feature, d);
+        L.popup({maxWidth:220})
+          .setLatLng(ev.latlng)
+          .setContent(_buildTooltip(d||{label:nome,lider:'—',pct:0,segundo:'—',pct2:0}, currentLayer||'electoral'))
+          .openOn(gMap);
+      });
     }
-    return {fillColor:color, fillOpacity:0.60, strokeColor:'#4b6878', strokeWeight:1};
-  });
+  }).addTo(gMap);
 }
 
 async function setMapLevel(level){
@@ -2106,7 +2101,7 @@ function _polygonCentroid(coords){
 
 let _bubbleOverlays = [];
 function _clearBubbles(){
-  _bubbleOverlays.forEach(o=>o.setMap(null));
+  _bubbleOverlays.forEach(o=>{ if(o && gMap && typeof o.removeFrom==='function') o.removeFrom(gMap); });
   _bubbleOverlays = [];
 }
 
@@ -2121,28 +2116,20 @@ function _renderBubbleMap(geoJSON, colorBy){
     const d = _mapData[cod];
     if(!d) return;
     const center = _polygonCentroid(feat.geometry.coordinates);
-    const r = 800 + Math.sqrt((d.total_votos||0)/maxVotos) * 25000;
+    const pixelRadius = 4 + Math.sqrt((d.total_votos||0)/maxVotos) * 28;
     const color = d.partido ? (PARTIDO_COR[d.partido]||_candidateColor(d.lider)) : _candidateColor(d.lider);
-    const circle = new google.maps.Circle({
-      map: gMap,
-      center,
-      radius: r,
-      fillColor: color,
-      fillOpacity: 0.72,
-      strokeColor: '#fff',
-      strokeOpacity: 0.4,
-      strokeWeight: 1,
-      clickable: true,
-    });
-    const info = new google.maps.InfoWindow({
-      content: _buildTooltip(d, 'electoral'),
-    });
-    circle.addListener('click', ()=>{
-      info.setPosition(center);
-      info.open(gMap);
+    const circle = L.circleMarker([center.lat, center.lng], {
+      radius: pixelRadius,
+      fillColor: color, fillOpacity: 0.72,
+      color: '#fff', opacity: 0.4, weight: 1,
+    }).addTo(gMap);
+    circle.on('click', function(ev){
+      L.popup({maxWidth:220})
+        .setLatLng(ev.latlng)
+        .setContent(_buildTooltip(d, 'electoral'))
+        .openOn(gMap);
     });
     _bubbleOverlays.push(circle);
-    _bubbleOverlays.push(info);
   });
 }
 
@@ -2199,8 +2186,7 @@ function _updateBreadcrumb(){
 function resetMap(){
   _mapCtx = {};
   _mapLevel = 'uf';
-  if(gMap) gMap.setCenter({lat:-14.235,lng:-51.925});
-  if(gMap) gMap.setZoom(4);
+  if(gMap) gMap.setView([-14.235,-51.925], 4);
   reloadMap();
 }
 
