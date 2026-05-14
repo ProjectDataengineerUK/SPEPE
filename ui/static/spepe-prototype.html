@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>SPEPE — Protótipo Dashboard v2</title>
+<title>SPEPE — Protótipo Dashboard v3</title>
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
@@ -16,10 +16,7 @@
   --text:#e6edf3;--text2:#8d96a0;--text3:#57606a;
   --green:#00c853;--green2:#00e676;--green-dim:#003d19;
   --blue:#1565c0;--blue2:#1976d2;--blue-dim:#0a2540;
-  --purple:#7c3aed;--purple-dim:#2e1065;
-  --red:#ef4444;--red-dim:#3f0f0f;
-  --yellow:#f59e0b;--teal:#00bcd4;
-  --r:8px;--r2:12px;
+  --r:8px;
 }
 html,body{height:100%;background:var(--bg);color:var(--text);font-family:'Inter',sans-serif;font-size:13px;line-height:1.5;overflow:hidden}
 button{cursor:pointer;font-family:inherit}
@@ -27,219 +24,180 @@ button{cursor:pointer;font-family:inherit}
 ::-webkit-scrollbar-track{background:var(--bg2)}
 ::-webkit-scrollbar-thumb{background:var(--border2);border-radius:3px}
 
-/* TOPNAV */
 .topnav{height:46px;background:var(--bg2);border-bottom:1px solid var(--border);display:flex;align-items:center;padding:0 14px;gap:8px;flex-shrink:0;z-index:30}
-.logo{font-size:1.05rem;font-weight:800;letter-spacing:-.02em;white-space:nowrap}
+.logo{font-size:1.05rem;font-weight:800;letter-spacing:-.02em}
 .logo span{color:var(--green)}
-.proto-tag{background:#f59e0b22;color:#f59e0b;border:1px solid #f59e0b44;font-size:.58rem;font-weight:700;padding:2px 7px;border-radius:20px;letter-spacing:.07em;white-space:nowrap}
+.proto-tag{background:#f59e0b22;color:#f59e0b;border:1px solid #f59e0b44;font-size:.58rem;font-weight:700;padding:2px 7px;border-radius:20px}
 .nav-filters{display:flex;align-items:center;gap:6px;margin-left:8px}
-.nav-filters select,.nav-filters input{background:var(--bg3);border:1px solid var(--border2);border-radius:6px;padding:4px 8px;color:var(--text);font-size:.74rem;outline:none;appearance:none}
-.nav-filters select:focus,.nav-filters input:focus{border-color:var(--green)}
+.nav-filters select{background:var(--bg3);border:1px solid var(--border2);border-radius:6px;padding:4px 8px;color:var(--text);font-size:.74rem;outline:none;appearance:none}
+.nav-filters select:focus{border-color:var(--green)}
 .topnav-right{margin-left:auto;display:flex;align-items:center;gap:8px;flex-shrink:0}
-.badge-live{background:var(--green-dim);color:var(--green2);font-size:.58rem;font-weight:700;padding:2px 7px;border-radius:20px;letter-spacing:.07em;border:1px solid var(--green)}
-.model-pill{font-size:.67rem;color:var(--text2);display:flex;align-items:center;gap:4px;background:var(--bg3);border:1px solid var(--border);border-radius:20px;padding:2px 8px}
-.model-dot{width:6px;height:6px;border-radius:50%;background:var(--green);flex-shrink:0}
-.model-dot.y{background:var(--yellow)}
-.model-dot.r{background:var(--red)}
+.badge-live{background:var(--green-dim);color:var(--green2);font-size:.58rem;font-weight:700;padding:2px 7px;border-radius:20px;border:1px solid var(--green)}
+.model-pill{font-size:.66rem;color:var(--text2);display:flex;align-items:center;gap:4px;background:var(--bg3);border:1px solid var(--border);border-radius:20px;padding:2px 8px}
+.mdot{width:6px;height:6px;border-radius:50%;background:var(--green);flex-shrink:0}
+.mdot.y{background:#f59e0b}.mdot.r{background:#ef4444}
 
-/* LAYER BAR */
 .layer-bar{height:35px;background:var(--bg2);border-bottom:1px solid var(--border);display:flex;align-items:center;padding:0 12px;gap:5px;flex-shrink:0;overflow-x:auto}
 .layer-bar::-webkit-scrollbar{height:3px}
-.lbtn{padding:3px 10px;font-size:.68rem;font-weight:500;border:1px solid var(--border2);border-radius:20px;color:var(--text2);background:transparent;white-space:nowrap;transition:all .15s}
+.lbtn{padding:3px 11px;font-size:.68rem;font-weight:500;border:1px solid var(--border2);border-radius:20px;color:var(--text2);background:transparent;white-space:nowrap;transition:all .15s}
 .lbtn.active{background:var(--green-dim);border-color:var(--green);color:var(--green2)}
-.lbtn:hover:not(.active){border-color:var(--border);color:var(--text)}
-.lsep{width:1px;height:16px;background:var(--border);flex-shrink:0}
-.overlay-wrap{display:flex;align-items:center;gap:5px;margin-left:auto;flex-shrink:0}
-.overlay-wrap label{font-size:.65rem;color:var(--text3);white-space:nowrap}
-.overlay-wrap select{background:var(--bg3);border:1px solid var(--border2);border-radius:6px;padding:2px 7px;color:var(--text);font-size:.68rem;outline:none}
+.lbtn:hover:not(.active){color:var(--text);border-color:var(--border2)}
+.lsep{width:1px;height:16px;background:var(--border);flex-shrink:0;margin:0 2px}
 
-/* SHELL */
 .shell{display:flex;height:calc(100vh - 81px);overflow:hidden}
 
-/* MAP */
 .map-pane{flex:1;position:relative;min-width:0}
 #leaflet-map{width:100%;height:100%}
-.map-hint{position:absolute;top:9px;left:50%;transform:translateX(-50%);background:rgba(13,17,23,.88);border:1px solid var(--border2);border-radius:20px;padding:3px 12px;font-size:.65rem;color:var(--text2);pointer-events:none;z-index:10;white-space:nowrap}
-.zoom-btn-wrap{position:absolute;bottom:60px;right:12px;z-index:10;display:flex;flex-direction:column;gap:4px}
-.zoom-uf-btn{background:rgba(13,17,23,.9);border:1px solid var(--border2);border-radius:6px;padding:5px 10px;font-size:.65rem;color:var(--text2);cursor:pointer;white-space:nowrap}
-.zoom-uf-btn:hover{border-color:var(--green);color:var(--green2)}
+.map-hint{position:absolute;top:9px;left:50%;transform:translateX(-50%);background:rgba(13,17,23,.9);border:1px solid var(--border2);border-radius:20px;padding:3px 12px;font-size:.65rem;color:var(--text2);pointer-events:none;z-index:10;white-space:nowrap;max-width:90%}
 
-/* LEGEND PANEL */
-.legend-panel{position:absolute;bottom:10px;left:10px;background:rgba(13,17,23,.94);border:1px solid var(--border2);border-radius:var(--r);padding:10px 12px;z-index:10;min-width:180px;max-width:220px;max-height:60vh;overflow-y:auto}
-.legend-panel::-webkit-scrollbar{width:3px}
-.legend-title{font-size:.62rem;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:var(--text3);margin-bottom:7px}
-.leg-item{display:flex;align-items:center;gap:7px;margin-bottom:4px;font-size:.69rem}
-.leg-dot{width:13px;height:13px;border-radius:3px;flex-shrink:0}
-.leg-sub{font-size:.6rem;color:var(--text3);margin-top:2px;font-style:italic}
-.biv-grid-wrap{margin-bottom:6px}
-.biv-grid{display:grid;grid-template-columns:repeat(3,20px);grid-template-rows:repeat(3,20px);gap:2px}
-.biv-cell{border-radius:2px}
-.biv-axis-x{display:flex;justify-content:space-between;font-size:.56rem;color:var(--text3);margin-top:3px}
-.biv-y-wrap{display:flex;gap:6px}
-.biv-y-labels{display:flex;flex-direction:column;justify-content:space-between;font-size:.55rem;color:var(--text3)}
-.legend-source{font-size:.58rem;color:var(--text3);border-top:1px solid var(--border);margin-top:6px;padding-top:5px;line-height:1.5}
-.legend-source strong{color:var(--text2)}
+/* LEGEND */
+.legend-panel{position:absolute;bottom:10px;left:10px;background:rgba(13,17,23,.95);border:1px solid var(--border2);border-radius:var(--r);padding:10px 12px;z-index:10;min-width:190px;max-width:230px}
+.leg-title{font-size:.62rem;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:var(--text3);margin-bottom:8px}
+.leg-item{display:flex;align-items:flex-start;gap:8px;margin-bottom:5px}
+.leg-swatch{width:14px;height:14px;border-radius:3px;flex-shrink:0;margin-top:1px}
+.leg-text{font-size:.68rem;line-height:1.4}
+.leg-text b{color:var(--text)}
+.leg-text small{color:var(--text3);display:block;font-size:.6rem}
+.leg-source{font-size:.59rem;color:var(--text3);border-top:1px solid var(--border);margin-top:7px;padding-top:6px;line-height:1.6}
+.leg-source strong{color:var(--text2)}
+/* bivariate */
+.biv-wrap{display:flex;gap:6px;margin-bottom:5px}
+.biv-y-axis{display:flex;flex-direction:column;justify-content:space-between;font-size:.55rem;color:var(--text3);padding-bottom:16px}
+.biv-body{}
+.biv-grid{display:grid;grid-template-columns:repeat(3,18px);grid-template-rows:repeat(3,18px);gap:2px}
+.biv-cell{border-radius:2px;cursor:default}
+.biv-x-axis{display:flex;justify-content:space-between;font-size:.55rem;color:var(--text3);margin-top:3px}
 
 /* MAP TOOLTIP */
-.mun-tt{position:absolute;background:rgba(13,17,23,.97);border:1px solid var(--border2);border-radius:var(--r);padding:9px 11px;z-index:20;pointer-events:none;display:none;min-width:200px;max-width:240px}
-.mun-tt h4{font-size:.78rem;font-weight:700;margin-bottom:6px}
-.tt-row{display:flex;justify-content:space-between;gap:10px;font-size:.67rem;margin-bottom:2px}
-.tt-row span:first-child{color:var(--text2)}
-.tt-row span:last-child{font-weight:600}
-.tt-divider{border-top:1px solid var(--border);margin:5px 0}
-.tt-badge{display:inline-block;padding:1px 6px;border-radius:10px;font-size:.58rem;font-weight:700}
-
-/* SECTION MARKERS */
-.section-marker{background:var(--green-dim);border:2px solid var(--green);border-radius:50%;width:10px;height:10px;cursor:pointer}
-.section-marker:hover{background:var(--green);transform:scale(1.4)}
+.mtt{position:absolute;background:rgba(13,17,23,.97);border:1px solid var(--border2);border-radius:var(--r);padding:9px 11px;z-index:20;pointer-events:none;display:none;min-width:210px}
+.mtt h4{font-size:.78rem;font-weight:700;margin-bottom:7px}
+.ttr{display:flex;justify-content:space-between;gap:10px;font-size:.67rem;margin-bottom:3px}
+.ttr span:first-child{color:var(--text2)}
+.ttr span:last-child{font-weight:600}
+.ttd{border-top:1px solid var(--border);margin:5px 0}
+.ttlayer{font-size:.65rem;font-weight:700;margin-bottom:4px;padding-bottom:4px;border-bottom:1px solid var(--border)}
 
 /* RIGHT PANEL */
 .right-panel{width:360px;background:var(--bg2);border-left:1px solid var(--border);display:flex;flex-direction:column;flex-shrink:0}
 .ptabs{display:flex;border-bottom:1px solid var(--border);flex-shrink:0;overflow-x:auto}
 .ptabs::-webkit-scrollbar{height:2px}
-.ptab{padding:7px 8px;font-size:.63rem;font-weight:600;color:var(--text2);cursor:pointer;border-bottom:2px solid transparent;white-space:nowrap;text-transform:uppercase;letter-spacing:.05em;transition:all .15s}
+.ptab{padding:7px 9px;font-size:.63rem;font-weight:600;color:var(--text2);cursor:pointer;border-bottom:2px solid transparent;white-space:nowrap;text-transform:uppercase;letter-spacing:.05em;transition:all .15s}
 .ptab.active{color:var(--green2);border-bottom-color:var(--green)}
 .ptab:hover:not(.active){color:var(--text)}
 .pbody{flex:1;overflow-y:auto;padding:10px}
 .pbody::-webkit-scrollbar{width:4px}
 
-/* CARDS */
 .pc{background:var(--bg3);border:1px solid var(--border);border-radius:var(--r);padding:9px 11px;margin-bottom:8px}
-.pc h4{font-size:.62rem;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:var(--text3);margin-bottom:7px;display:flex;align-items:center;gap:6px}
-.pc h4 .src-tag{font-size:.57rem;padding:1px 5px;border-radius:8px;font-weight:600;text-transform:none;letter-spacing:0}
+.pc h4{font-size:.62rem;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:var(--text3);margin-bottom:7px;display:flex;align-items:center;justify-content:space-between}
 .krow{display:flex;justify-content:space-between;align-items:center;margin-bottom:5px}
-.klbl{font-size:.7rem;color:var(--text2)}
-.kval{font-size:.78rem;font-weight:700}
-.kval.g{color:var(--green2)}
-.kval.r{color:var(--red)}
-.kval.y{color:var(--yellow)}
-.kval.b{color:#60a5fa}
-.kval.p{color:#a78bfa}
-.bar-t{height:5px;background:var(--bg4);border-radius:3px;margin-top:2px;margin-bottom:5px;overflow:hidden}
-.bar-f{height:5px;border-radius:3px}
+.klbl{font-size:.69rem;color:var(--text2)}
+.kv{font-size:.78rem;font-weight:700}
+.kv.g{color:var(--green2)}.kv.r{color:#ef4444}.kv.y{color:#f59e0b}.kv.b{color:#60a5fa}.kv.p{color:#a78bfa}
 .delta{font-size:.6rem;padding:1px 5px;border-radius:8px;font-weight:600}
 .delta.up{background:#003d1933;color:var(--green2)}
-.delta.dn{background:#3f0f0f33;color:var(--red)}
-.delta.eq{background:#21262d;color:var(--text2)}
-
-/* MODEL */
-.model-toggle{display:flex;gap:5px;margin-bottom:9px}
-.mtbtn{flex:1;padding:5px;font-size:.65rem;font-weight:600;border:1px solid var(--border2);border-radius:6px;color:var(--text2);background:transparent;text-align:center;transition:all .15s}
-.mtbtn.active{background:var(--blue-dim);border-color:var(--blue2);color:#60a5fa}
-.cand-row{display:flex;align-items:flex-start;gap:8px;margin-bottom:9px}
-.cav{width:26px;height:26px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:.6rem;font-weight:700;flex-shrink:0}
-.ci{flex:1;min-width:0}
-.cn{font-size:.73rem;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.ic-bar{height:5px;background:var(--bg4);border-radius:3px;position:relative;margin:3px 0}
-.ic-range{height:5px;border-radius:3px;position:absolute}
-.ic-pt{width:7px;height:7px;border-radius:50%;position:absolute;top:-1px;border:1px solid var(--bg2)}
-.ic-lbl{display:flex;justify-content:space-between;font-size:.55rem;color:var(--text3)}
-.cpct{font-size:.82rem;font-weight:700;flex-shrink:0;text-align:right}
-
-/* POLLS */
-.poll-institute-row{display:flex;align-items:center;gap:8px;padding:5px 8px;background:var(--bg4);border-radius:6px;margin-bottom:4px}
-.poll-inst-name{font-size:.68rem;font-weight:600;width:80px;flex-shrink:0}
-.poll-method{font-size:.58rem;color:var(--text3);flex:1}
-.poll-vals{display:flex;gap:8px;flex-shrink:0}
-.poll-val{font-size:.7rem;font-weight:700}
-.poll-date{font-size:.58rem;color:var(--text3)}
-.trend-arrow{font-size:.72rem}
-
-/* SOCIAL */
-.platform-row{display:flex;align-items:center;gap:8px;padding:6px 8px;background:var(--bg4);border-radius:6px;margin-bottom:4px}
-.plat-icon{width:22px;height:22px;border-radius:6px;display:flex;align-items:center;justify-content:center;font-size:.75rem;flex-shrink:0}
-.plat-info{flex:1;min-width:0}
-.plat-name{font-size:.68rem;font-weight:600}
-.plat-meta{font-size:.58rem;color:var(--text3)}
-.sentiment-bar{height:6px;background:var(--bg);border-radius:3px;overflow:hidden;margin-top:3px;display:flex}
-.s-pos{background:#00c853}
-.s-neu{background:#57606a}
-.s-neg{background:#ef4444}
-.plat-volume{font-size:.68rem;font-weight:700;flex-shrink:0;text-align:right}
-.topic-chip{display:inline-block;padding:2px 8px;border-radius:10px;font-size:.63rem;font-weight:600;margin:2px;background:var(--bg4);border:1px solid var(--border2);cursor:pointer}
-.topic-chip:hover{border-color:var(--green);color:var(--green2)}
-.topic-chip.hot{border-color:#ef4444;color:#ef4444}
-.topic-chip.rising{border-color:#f59e0b;color:#f59e0b}
-
-/* SECTIONS */
-.section-row{display:flex;align-items:center;gap:8px;padding:5px 8px;background:var(--bg4);border-radius:6px;margin-bottom:4px}
-.s-num{font-family:'JetBrains Mono',monospace;font-size:.68rem;font-weight:600;width:50px;flex-shrink:0;color:var(--green2)}
-.s-info{flex:1;min-width:0}
-.s-local{font-size:.68rem;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.s-addr{font-size:.58rem;color:var(--text3)}
-.s-eleit{font-size:.67rem;font-weight:700;flex-shrink:0;text-align:right}
-.s-eleit small{display:block;font-size:.55rem;font-weight:400;color:var(--text3)}
-
-/* SHAP */
-.shap-row{display:flex;align-items:center;gap:6px;margin-bottom:4px}
-.shap-nm{width:95px;font-size:.63rem;color:var(--text2);flex-shrink:0}
-.shap-track{flex:1;height:10px;background:var(--bg4);border-radius:2px;position:relative;overflow:hidden}
-.shap-fill{height:10px;position:absolute;border-radius:2px}
-.shap-v{width:38px;font-size:.63rem;font-weight:600;text-align:right}
-
-/* CHAT */
-.chat-wrap{display:flex;flex-direction:column;height:100%;padding:0}
-.chat-msgs{flex:1;overflow-y:auto;padding:8px 10px;display:flex;flex-direction:column;gap:7px}
-.msg{padding:7px 9px;border-radius:var(--r);font-size:.73rem;line-height:1.5;max-width:97%}
-.msg.user{background:var(--blue-dim);border:1px solid #1976d244;align-self:flex-end}
-.msg.agent{background:var(--bg3);border:1px solid var(--border2);align-self:flex-start}
-.msg.system{background:#1a1a2e;border:1px solid #7c3aed44;align-self:stretch;font-size:.66rem;color:#a78bfa;font-style:italic}
-.msg .mm{font-size:.57rem;color:var(--text3);margin-bottom:3px;font-weight:700;text-transform:uppercase;letter-spacing:.06em}
-.msg strong{color:var(--green2)}
-.msg .map-cmd{font-size:.62rem;background:var(--bg4);border:1px solid var(--border2);border-radius:4px;padding:3px 7px;margin-top:5px;display:inline-block;cursor:pointer;color:var(--teal)}
-.msg .map-cmd:hover{border-color:var(--teal)}
-.chat-footer{border-top:1px solid var(--border);padding:8px;flex-shrink:0}
-.chat-ctx{font-size:.6rem;color:var(--text3);margin-bottom:5px;line-height:1.5}
-.chat-ctx strong{color:var(--text2)}
-.chat-irow{display:flex;gap:5px}
-.chat-in{flex:1;background:var(--bg3);border:1px solid var(--border2);border-radius:var(--r);padding:7px 9px;color:var(--text);font-size:.75rem;outline:none;resize:none;font-family:inherit;height:52px}
-.chat-in:focus{border-color:var(--green)}
-.chat-send{background:var(--green-dim);border:1px solid var(--green);border-radius:var(--r);padding:7px 11px;color:var(--green2);font-size:.7rem;font-weight:600}
-.chat-send:hover{background:var(--green);color:#000}
-.typing-dots span{animation:blink 1s infinite}
-.typing-dots span:nth-child(2){animation-delay:.2s}
-.typing-dots span:nth-child(3){animation-delay:.4s}
-@keyframes blink{0%,80%,100%{opacity:.2}40%{opacity:1}}
-
-/* TAGS */
-.tag{display:inline-block;font-size:.58rem;padding:1px 6px;border-radius:8px;font-weight:600;margin:2px}
+.delta.dn{background:#3f0f0f33;color:#ef4444}
+.tag{display:inline-block;font-size:.58rem;padding:1px 5px;border-radius:8px;font-weight:600;margin:1px}
 .tag.tse{background:#1e3a5f;color:#60a5fa}
 .tag.ibge{background:#1a3a1a;color:#4ade80}
 .tag.ds{background:#2d1a1a;color:#f87171}
 .tag.poll{background:#2d2a1a;color:#fbbf24}
 .tag.soc{background:#2a1a3a;color:#c084fc}
-.tag.seg{background:#2a1a2a;color:#e879f9}
 
-/* SECTION LEGEND */
-.sec-legend-item{display:flex;align-items:center;gap:6px;margin-bottom:4px;font-size:.67rem}
+/* model */
+.mtog{display:flex;gap:5px;margin-bottom:9px}
+.mtbtn{flex:1;padding:5px;font-size:.65rem;font-weight:600;border:1px solid var(--border2);border-radius:6px;color:var(--text2);background:transparent;text-align:center;transition:all .15s}
+.mtbtn.active{background:var(--blue-dim);border-color:var(--blue2);color:#60a5fa}
+.cand-row{display:flex;align-items:flex-start;gap:8px;margin-bottom:9px}
+.cav{width:26px;height:26px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:.6rem;font-weight:700;flex-shrink:0}
+.ci{flex:1;min-width:0}
+.cn{font-size:.73rem;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.ic-bar{height:5px;background:var(--bg4);border-radius:3px;position:relative;margin:3px 0}
+.ic-range{height:5px;border-radius:3px;position:absolute}
+.ic-pt{width:7px;height:7px;border-radius:50%;position:absolute;top:-1px;border:1px solid var(--bg2)}
+.ic-lbl{display:flex;justify-content:space-between;font-size:.54rem;color:var(--text3)}
+.cpct{font-size:.82rem;font-weight:700;flex-shrink:0;text-align:right}
+
+/* polls */
+.poll-row{display:flex;align-items:center;gap:7px;padding:5px 8px;background:var(--bg4);border-radius:6px;margin-bottom:4px}
+.pi-name{font-size:.67rem;font-weight:600;width:75px;flex-shrink:0}
+.pi-meta{font-size:.58rem;color:var(--text3);flex:1}
+.pi-vals{display:flex;gap:8px;flex-shrink:0}
+.pi-val{font-size:.69rem;font-weight:700}
+.pi-grade{font-size:.62rem;font-weight:700;color:var(--green2);flex-shrink:0}
+
+/* social */
+.plat-row{display:flex;align-items:center;gap:8px;padding:6px 8px;background:var(--bg4);border-radius:6px;margin-bottom:4px}
+.plat-ico{width:22px;height:22px;border-radius:5px;display:flex;align-items:center;justify-content:center;font-size:.78rem;flex-shrink:0}
+.plat-info{flex:1;min-width:0}
+.plat-nm{font-size:.67rem;font-weight:600}
+.sent-bar{height:6px;background:var(--bg);border-radius:3px;overflow:hidden;margin-top:3px;display:flex}
+.sp{background:#00c853}.sn{background:#57606a}.sr{background:#ef4444}
+.plat-vol{font-size:.67rem;font-weight:700;flex-shrink:0;text-align:right;min-width:40px}
+.topic-chip{display:inline-block;padding:2px 7px;border-radius:10px;font-size:.62rem;font-weight:600;margin:2px;background:var(--bg4);border:1px solid var(--border2);cursor:pointer}
+.topic-chip.hot{border-color:#ef4444;color:#ef4444}
+.topic-chip.rising{border-color:#f59e0b;color:#f59e0b}
+.topic-chip:hover{border-color:var(--green);color:var(--green2)}
+
+/* secoes */
+.sec-row{display:flex;align-items:center;gap:8px;padding:5px 8px;background:var(--bg4);border-radius:6px;margin-bottom:4px;cursor:pointer}
+.sec-row:hover{border:1px solid var(--border2)}
+.sec-id{font-family:'JetBrains Mono',monospace;font-size:.65rem;color:var(--green2);width:55px;flex-shrink:0}
+.sec-info{flex:1;min-width:0}
+.sec-local{font-size:.67rem;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.sec-addr{font-size:.57rem;color:var(--text3)}
+.sec-eleit{font-size:.66rem;font-weight:700;flex-shrink:0;text-align:right}
+.sec-eleit small{display:block;font-size:.54rem;font-weight:400;color:var(--text3)}
 .sec-dot{width:10px;height:10px;border-radius:50%;flex-shrink:0}
+
+/* shap */
+.shap-row{display:flex;align-items:center;gap:5px;margin-bottom:4px}
+.shap-nm{width:95px;font-size:.62rem;color:var(--text2);flex-shrink:0}
+.shap-t{flex:1;height:10px;background:var(--bg4);border-radius:2px;position:relative;overflow:hidden}
+.shap-f{height:10px;position:absolute;border-radius:2px}
+.shap-v{width:40px;font-size:.62rem;font-weight:600;text-align:right;flex-shrink:0}
+
+/* chat */
+.chat-wrap{display:flex;flex-direction:column;height:100%}
+.chat-msgs{flex:1;overflow-y:auto;padding:8px 10px;display:flex;flex-direction:column;gap:7px}
+.msg{padding:7px 9px;border-radius:var(--r);font-size:.72rem;line-height:1.55;max-width:97%}
+.msg.user{background:var(--blue-dim);border:1px solid #1976d244;align-self:flex-end}
+.msg.agent{background:var(--bg3);border:1px solid var(--border2);align-self:flex-start}
+.msg.sys{background:#12112a;border:1px solid #7c3aed33;align-self:stretch;font-size:.64rem;color:#a78bfa;font-style:italic}
+.mm{font-size:.57rem;color:var(--text3);margin-bottom:3px;font-weight:700;text-transform:uppercase;letter-spacing:.06em}
+.msg strong{color:var(--green2)}
+.map-cmd{font-size:.61rem;background:var(--bg4);border:1px solid var(--border2);border-radius:4px;padding:2px 7px;margin-top:4px;display:inline-block;cursor:pointer;color:#00bcd4}
+.map-cmd:hover{border-color:#00bcd4}
+.chat-footer{border-top:1px solid var(--border);padding:8px;flex-shrink:0}
+.chat-ctx{font-size:.59rem;color:var(--text3);margin-bottom:5px;line-height:1.5}
+.chat-ctx strong{color:var(--text2)}
+.chat-irow{display:flex;gap:5px}
+.chat-in{flex:1;background:var(--bg3);border:1px solid var(--border2);border-radius:var(--r);padding:7px 9px;color:var(--text);font-size:.75rem;outline:none;resize:none;font-family:inherit;height:52px}
+.chat-in:focus{border-color:var(--green)}
+.chat-send{background:var(--green-dim);border:1px solid var(--green);border-radius:var(--r);padding:7px 11px;color:var(--green2);font-size:.72rem;font-weight:600}
+.chat-send:hover{background:var(--green);color:#000}
+.typing span{animation:blink 1s infinite}
+.typing span:nth-child(2){animation-delay:.2s}
+.typing span:nth-child(3){animation-delay:.4s}
+@keyframes blink{0%,80%,100%{opacity:.2}40%{opacity:1}}
 </style>
 </head>
 <body>
 
-<!-- TOPNAV -->
 <nav class="topnav">
   <div class="logo">SP<span>E</span>PE</div>
-  <span class="proto-tag">PROTÓTIPO v2</span>
+  <span class="proto-tag">PROTÓTIPO v3</span>
   <div class="nav-filters">
-    <select id="f-cargo" title="Cargo">
+    <select id="f-cargo">
       <option value="1">Presidente</option>
       <option value="3">Governador</option>
       <option value="5">Senador</option>
-      <option value="7">Dep. Federal</option>
     </select>
-    <select id="f-uf" title="UF">
+    <select id="f-uf">
       <option value="BR">🇧🇷 Brasil</option>
-      <option value="SP">SP</option>
-      <option value="MG">MG</option>
-      <option value="RJ">RJ</option>
-      <option value="BA">BA</option>
-      <option value="RS">RS</option>
-      <option value="CE">CE</option>
-      <option value="PE">PE</option>
-      <option value="PR">PR</option>
-      <option value="AM">AM</option>
-      <option value="GO">GO</option>
+      <option value="SP">SP</option><option value="MG">MG</option><option value="RJ">RJ</option>
+      <option value="BA">BA</option><option value="RS">RS</option><option value="CE">CE</option>
+      <option value="PE">PE</option><option value="PR">PR</option><option value="AM">AM</option>
+      <option value="GO">GO</option><option value="PA">PA</option><option value="MA">MA</option>
     </select>
     <select id="f-ano">
       <option value="2026">2026</option>
@@ -247,26 +205,21 @@ button{cursor:pointer;font-family:inherit}
       <option value="2018">2018</option>
     </select>
     <select id="f-candidato">
-      <option value="">— todos candidatos —</option>
       <option value="lula" selected>Lula (PT)</option>
       <option value="bolso">Bolsonaro (PL)</option>
       <option value="ciro">Ciro (PDT)</option>
     </select>
-    <select id="f-turno">
-      <option value="1">1º Turno</option>
-      <option value="2">2º Turno</option>
-    </select>
+    <select id="f-turno"><option value="1">1º Turno</option><option value="2">2º Turno</option></select>
   </div>
   <div class="topnav-right">
-    <div class="model-pill"><div class="model-dot"></div>M1 ativo</div>
-    <div class="model-pill"><div class="model-dot y"></div>M2 aguarda polls</div>
+    <div class="model-pill"><div class="mdot"></div>M1 ativo</div>
+    <div class="model-pill"><div class="mdot y"></div>M2 aguarda polls</div>
     <span class="badge-live">LIVE</span>
   </div>
 </nav>
 
-<!-- LAYER BAR -->
 <div class="layer-bar">
-  <button class="lbtn active" data-layer="bivariate">🗺 Bivariate</button>
+  <button class="lbtn active" data-layer="bivariate">🗺 Resultado × IDH</button>
   <button class="lbtn" data-layer="eleitoral">🏆 Eleitoral</button>
   <button class="lbtn" data-layer="socio">📊 IBGE/IDH</button>
   <button class="lbtn" data-layer="saude">🏥 Saúde</button>
@@ -274,52 +227,42 @@ button{cursor:pointer;font-family:inherit}
   <button class="lbtn" data-layer="pesquisas">📋 Pesquisas</button>
   <button class="lbtn" data-layer="social">📱 Social</button>
   <button class="lbtn" data-layer="secoes">📍 Seções</button>
-  <button class="lbtn" data-layer="predicao">🔮 Predição</button>
+  <button class="lbtn" data-layer="predicao">🔮 Predição 2026</button>
   <div class="lsep"></div>
-  <div class="overlay-wrap">
-    <label>Overlay Y:</label>
-    <select id="overlay-ind">
-      <option value="idhm">IDH Municipal</option>
-      <option value="bf">% Bolsa Família</option>
-      <option value="homicidio">Homicídio /100k</option>
-      <option value="mortalidade">Mort. Infantil</option>
-      <option value="gini">Índice Gini</option>
-      <option value="pobreza">% Extrema Pobreza</option>
-      <option value="analfabetismo">Taxa Analfab.</option>
-      <option value="emprego">% Emprego Formal</option>
-    </select>
-  </div>
+  <select id="overlay-ind" style="background:var(--bg3);border:1px solid var(--border2);border-radius:6px;padding:3px 7px;color:var(--text);font-size:.67rem;outline:none;flex-shrink:0" title="Indicador do eixo Y (modo Bivariate)">
+    <option value="idhm">Y: IDH Municipal</option>
+    <option value="bf">Y: % Bolsa Família</option>
+    <option value="homicidio">Y: Homicídio /100k</option>
+    <option value="mortalidade">Y: Mort. Infantil</option>
+    <option value="gini">Y: Índice Gini</option>
+    <option value="pobreza">Y: % Extrema Pobreza</option>
+  </select>
 </div>
 
-<!-- SHELL -->
 <div class="shell">
-  <!-- MAP PANE -->
   <div class="map-pane">
     <div id="leaflet-map"></div>
-    <div class="map-hint" id="map-hint">Bivariate: Resultado × IDH — Clique para análise contextual</div>
+    <div class="map-hint" id="map-hint">Resultado × IDH — mapa colorido por combinação de resultado eleitoral e IDH municipal</div>
 
-    <!-- Legend -->
     <div class="legend-panel" id="legend-panel">
-      <div class="legend-title" id="leg-title">Resultado × IDH Municipal</div>
-      <div id="leg-body"><!-- filled by JS --></div>
-      <div class="legend-source" id="leg-source"></div>
+      <div class="leg-title" id="leg-title">Resultado × IDH Municipal</div>
+      <div id="leg-body"></div>
+      <div class="leg-source" id="leg-source"></div>
     </div>
 
-    <!-- Municipality tooltip -->
-    <div class="mun-tt" id="mun-tt">
+    <div class="mtt" id="mtt">
+      <div class="ttlayer" id="tt-layer-label">—</div>
       <h4 id="tt-nome">—</h4>
-      <div class="tt-row"><span>Resultado T1</span><span id="tt-res" style="color:var(--green2)">—</span></div>
-      <div class="tt-row"><span>IDH Municipal</span><span id="tt-idh">—</span></div>
-      <div class="tt-row"><span>% Bolsa Família</span><span id="tt-bf">—</span></div>
-      <div class="tt-row"><span>Homicídio/100k</span><span id="tt-hom">—</span></div>
-      <div class="tt-divider"></div>
-      <div class="tt-row"><span>Predição 2026</span><span id="tt-pred" style="color:#60a5fa">—</span></div>
-      <div class="tt-row"><span>Tendência</span><span id="tt-trend">—</span></div>
-      <div style="font-size:.58rem;color:var(--text3);margin-top:5px">▼ Clique para painel completo</div>
+      <div id="tt-layer-metric"></div>
+      <div class="ttd"></div>
+      <div class="ttr"><span>Resultado Eleitoral T1</span><span id="tt-res">—</span></div>
+      <div class="ttr"><span>IDH Municipal</span><span id="tt-idh">—</span></div>
+      <div class="ttr"><span>% Bolsa Família</span><span id="tt-bf">—</span></div>
+      <div class="ttr"><span>Predição 2026</span><span id="tt-pred" style="color:#60a5fa">—</span></div>
+      <div style="font-size:.58rem;color:var(--text3);margin-top:6px">▼ Clique para painel completo</div>
     </div>
   </div>
 
-  <!-- RIGHT PANEL -->
   <div class="right-panel">
     <div class="ptabs">
       <div class="ptab active" data-tab="modelo">Modelo</div>
@@ -331,258 +274,237 @@ button{cursor:pointer;font-family:inherit}
       <div class="ptab" data-tab="chat">Chat</div>
     </div>
 
-    <!-- MODELO TAB -->
+    <!-- MODELO -->
     <div class="pbody" id="tab-modelo">
-      <div class="model-toggle">
+      <div class="mtog">
         <button class="mtbtn active" data-m="1">M1 — Estrutural</button>
         <button class="mtbtn" data-m="2">M2 — Dinâmico</button>
         <button class="mtbtn" data-m="diff">Δ Diferença</button>
       </div>
       <div class="pc">
-        <h4>Predição 2026 — IC 95% <span id="m-region" style="font-weight:400;color:var(--text2);text-transform:none;font-size:.62rem">Brasil · Presidente</span></h4>
+        <h4>Predição 2026 — IC 95% <span id="m-region" style="font-weight:400;color:var(--text2);text-transform:none;font-size:.61rem">Brasil · Presidente</span></h4>
         <div id="m-cands"></div>
-        <div style="font-size:.6rem;color:var(--text3);margin-top:6px;line-height:1.6">
-          Método: PyMC MCMC 4 chains × 2.000 amostras<br>
-          Features M1: 14 estruturais (IDH, BF, hist. 2018/2022, segurança…)<br>
-          Features M2: M1 + pesquisas + social Δ7d + notícias
+        <div style="font-size:.59rem;color:var(--text3);margin-top:5px;line-height:1.6">
+          PyMC MCMC · 4 chains × 2.000 amostras · 14 features estruturais<br>
+          Barra = IC 95% · Ponto = mediana posterior
         </div>
       </div>
       <div class="pc">
-        <h4>Evolução — Pesquisa + Modelo <span class="tag poll">Atlas/Datafolha</span></h4>
+        <h4>Tracking — Pesquisa + Modelo</h4>
         <canvas id="chart-tracking" height="110"></canvas>
       </div>
       <div class="pc">
         <h4>Status M2</h4>
-        <div style="font-size:.7rem;line-height:1.7">
+        <div style="font-size:.69rem;line-height:1.8">
           <div><span style="color:var(--green2)">✓</span> M1 baseline — <strong style="color:var(--green2)">ativo</strong></div>
-          <div><span style="color:var(--yellow)">⏳</span> Polls Silver — <strong style="color:var(--yellow)">processando</strong></div>
-          <div><span style="color:var(--yellow)">⏳</span> Social tokens — <strong style="color:var(--yellow)">aguarda config</strong></div>
+          <div><span style="color:#f59e0b">⏳</span> Polls Silver — <strong style="color:#f59e0b">processando</strong></div>
+          <div><span style="color:#f59e0b">⏳</span> Social tokens — <strong style="color:#f59e0b">aguarda config</strong></div>
           <div><span style="color:var(--text3)">○</span> GDELT notícias — <strong style="color:var(--text3)">pendente</strong></div>
         </div>
-        <div style="font-size:.6rem;color:var(--text3);margin-top:5px">M2 ativo com ≥2 fontes dinâmicas. Delta esperado ±3–7pp.</div>
+        <div style="font-size:.59rem;color:var(--text3);margin-top:5px">Delta esperado M2 sobre M1: ±3–7pp</div>
       </div>
     </div>
 
-    <!-- PESQUISAS TAB -->
+    <!-- PESQUISAS -->
     <div class="pbody" id="tab-pesquisas" style="display:none">
-      <div class="pc">
-        <h4>Tracking de Intenção de Voto <span class="tag poll">Estimulada 1ºT</span></h4>
-        <canvas id="chart-polls-full" height="130"></canvas>
-        <div style="font-size:.6rem;color:var(--text3);margin-top:5px">
-          Linha contínua = média ponderada por qualidade do instituto. Banda = IC 90%.
-        </div>
+      <div class="pc" style="background:#0a1a2e;border-color:#1976d244">
+        <h4>🗺 O mapa agora mostra <span style="color:#60a5fa;text-transform:none;font-size:.68rem">intenção de voto por estado</span></h4>
+        <div style="font-size:.67rem;color:var(--text2);line-height:1.5">Cada estado é colorido pela última pesquisa estadual disponível para o candidato selecionado. Clique num estado para ver as pesquisas daquela UF.</div>
       </div>
-
       <div class="pc">
-        <h4>Últimas Pesquisas Registradas</h4>
+        <h4>Tracking Nacional <span class="tag poll">estimulada · 1ºT</span></h4>
+        <canvas id="chart-polls-full" height="130"></canvas>
+        <div style="font-size:.59rem;color:var(--text3);margin-top:4px">Média ponderada por qualidade do instituto · Banda = IC 90%</div>
+      </div>
+      <div class="pc">
+        <h4>Últimas Pesquisas <span id="polls-uf-label" class="tag poll">Nacional</span></h4>
         <div id="polls-list"></div>
       </div>
-
       <div class="pc">
-        <h4>House Effect por Instituto <span class="tag poll">Δ vs Datafolha</span></h4>
-        <canvas id="chart-house" height="100"></canvas>
-        <div style="font-size:.6rem;color:var(--text3);margin-top:4px">
-          House effect positivo = instituto tende a superestimar o candidato vs. Datafolha.
-        </div>
+        <h4>House Effect por Instituto <span style="font-size:.6rem;font-weight:400;color:var(--text3)">Δ vs Datafolha</span></h4>
+        <canvas id="chart-house" height="90"></canvas>
+        <div style="font-size:.59rem;color:var(--text3);margin-top:4px">Positivo = instituto superestima o candidato em relação à Datafolha</div>
       </div>
-
       <div class="pc">
-        <h4>Cobertura Geográfica das Pesquisas</h4>
+        <h4>Cobertura por UF</h4>
         <div id="poll-geo"></div>
-        <div style="font-size:.6rem;color:var(--text3);margin-top:4px">
-          UFs com pesquisa estadual nos últimos 30 dias.
-        </div>
       </div>
-
       <div class="pc">
-        <h4>Metadados de Qualidade</h4>
-        <div class="krow"><span class="klbl">Total pesquisas (2022)</span><span class="kval b">1.847</span></div>
-        <div class="krow"><span class="klbl">Institutos únicos</span><span class="kval">23</span></div>
-        <div class="krow"><span class="klbl">Cobertura nacional</span><span class="kval g">27/27 UFs</span></div>
-        <div class="krow"><span class="klbl">Período mais recente</span><span class="kval">Out/2022</span></div>
-        <div class="krow"><span class="klbl">N médio por pesquisa</span><span class="kval">2.148</span></div>
-        <div class="krow"><span class="klbl">% presencial</span><span class="kval">61%</span></div>
-        <div class="krow"><span class="klbl">Erro médio (ex-post)</span><span class="kval r">3.2pp</span></div>
-        <div style="margin-top:6px"><span class="tag tse">TSE Pesquisas</span><span class="tag poll">Atlas Intel</span><span class="tag poll">Datafolha</span><span class="tag poll">Quaest</span></div>
+        <h4>Metadados</h4>
+        <div class="krow"><span class="klbl">Total pesquisas (2022)</span><span class="kv b">1.847</span></div>
+        <div class="krow"><span class="klbl">Institutos únicos</span><span class="kv">23</span></div>
+        <div class="krow"><span class="klbl">UFs cobertas</span><span class="kv g">27/27</span></div>
+        <div class="krow"><span class="klbl">N médio</span><span class="kv">2.148</span></div>
+        <div class="krow"><span class="klbl">% presencial</span><span class="kv">61%</span></div>
+        <div class="krow"><span class="klbl">Erro médio ex-post</span><span class="kv r">3.2pp</span></div>
       </div>
     </div>
 
-    <!-- SOCIAL TAB -->
+    <!-- SOCIAL -->
     <div class="pbody" id="tab-social" style="display:none">
+      <div class="pc" style="background:#0a1a2e;border-color:#1976d244">
+        <h4>🗺 O mapa agora mostra <span style="color:#a78bfa;text-transform:none;font-size:.68rem">sentimento nas redes por estado</span></h4>
+        <div style="font-size:.67rem;color:var(--text2);line-height:1.5">Cada estado é colorido pelo índice de sentimento agregado (últimas 24h) para o candidato selecionado. Clique para ver plataformas e tópicos daquela UF.</div>
+      </div>
       <div class="pc">
         <h4>Sentimento por Plataforma <span class="tag soc">Δ24h</span></h4>
         <div id="social-platforms"></div>
-        <div style="font-size:.6rem;color:var(--text3);margin-top:5px;line-height:1.5">
-          Sentimento: verde=positivo / cinza=neutro / vermelho=negativo<br>
-          Método: modelo de sentimento fine-tuned BERTimbau
-        </div>
+        <div style="font-size:.59rem;color:var(--text3);margin-top:4px">Método: BERTimbau fine-tuned · positivo / neutro / negativo</div>
       </div>
-
       <div class="pc">
-        <h4>Sentimento Temporal — 30 dias</h4>
+        <h4>Evolução de Sentimento — 30 dias</h4>
         <canvas id="chart-sentiment" height="110"></canvas>
       </div>
-
       <div class="pc">
-        <h4>Tópicos em Alta <span class="tag soc">Últimas 6h</span></h4>
+        <h4>Tópicos em Alta <span class="tag soc">últimas 6h</span></h4>
         <div id="trending-topics"></div>
-        <div style="font-size:.6rem;color:var(--text3);margin-top:5px">
-          🔴 viral (>50k menções) · 🟡 em alta (>10k) · cinza normal
-        </div>
+        <div style="font-size:.59rem;color:var(--text3);margin-top:4px">🔴 viral (&gt;50k) · 🟡 em alta (&gt;10k)</div>
       </div>
-
       <div class="pc">
         <h4>Polarização por UF</h4>
-        <canvas id="chart-polar" height="100"></canvas>
-        <div style="font-size:.6rem;color:var(--text3);margin-top:4px">
-          Índice de polarização = |pos% − neg%| / total. Acima de 0.6 = altamente polarizado.
-        </div>
+        <canvas id="chart-polar" height="90"></canvas>
+        <div style="font-size:.59rem;color:var(--text3);margin-top:4px">Índice &gt;0.6 = altamente polarizado</div>
       </div>
-
       <div class="pc">
-        <h4>Engajamento Orgânico vs. Impulsionado</h4>
-        <div class="krow"><span class="klbl">Menções totais (hoje)</span><span class="kval b">847k</span></div>
-        <div class="krow"><span class="klbl">% orgânico estimado</span><span class="kval g">68%</span></div>
-        <div class="krow"><span class="klbl">% potencialmente pago</span><span class="kval y">32%</span></div>
-        <div class="krow"><span class="klbl">Contas suspeitas (bots)</span><span class="kval r">4.2%</span></div>
-        <div class="krow"><span class="klbl">Alcance estimado</span><span class="kval">12.4M</span></div>
-        <div style="margin-top:6px"><span class="tag soc">Twitter/X</span><span class="tag soc">BlueSky</span><span class="tag soc">YouTube</span><span class="tag soc">Facebook</span></div>
+        <h4>Volume e Qualidade</h4>
+        <div class="krow"><span class="klbl">Menções hoje</span><span class="kv b">847k</span></div>
+        <div class="krow"><span class="klbl">% orgânico estimado</span><span class="kv g">68%</span></div>
+        <div class="krow"><span class="klbl">% potenc. pago</span><span class="kv y">32%</span></div>
+        <div class="krow"><span class="klbl">Contas suspeitas (bots)</span><span class="kv r">4.2%</span></div>
+        <div class="krow"><span class="klbl">Alcance estimado</span><span class="kv">12.4M</span></div>
       </div>
     </div>
 
-    <!-- SEÇÕES TAB -->
+    <!-- SEÇÕES -->
     <div class="pbody" id="tab-secoes" style="display:none">
-      <div class="pc">
-        <h4>Legenda — Seções Eleitorais</h4>
-        <div class="sec-legend-item"><div class="sec-dot" style="background:#00c853"></div>Seção com >60% voto candidato</div>
-        <div class="sec-legend-item"><div class="sec-dot" style="background:#f59e0b"></div>Seção disputada (45–60%)</div>
-        <div class="sec-legend-item"><div class="sec-dot" style="background:#ef4444"></div>Seção <45% candidato</div>
-        <div class="sec-legend-item"><div class="sec-dot" style="background:#60a5fa"></div>Zona eleitoral (sede)</div>
-        <div class="sec-legend-item"><div class="sec-dot" style="background:#a78bfa"></div>Seção especial (DZ/exterior)</div>
-        <div style="font-size:.6rem;color:var(--text3);margin-top:5px">Disponível a partir do zoom 12+ (nível município).<br>Fonte: TSE Locais de Votação.</div>
+      <div class="pc" style="background:#0a1a2e;border-color:#1976d244">
+        <h4>🗺 O mapa agora mostra <span style="color:var(--green2);text-transform:none;font-size:.68rem">seções eleitorais como marcadores</span></h4>
+        <div style="font-size:.67rem;color:var(--text2);line-height:1.5">Marcadores coloridos por resultado no município. Zoom ≥12 ativa marcadores individuais por seção. Clique num marcador para detalhes da seção.</div>
       </div>
-
-      <div class="pc" id="secoes-summary">
-        <h4>Resumo — <span id="sec-uf-label">SP</span></h4>
-        <div class="krow"><span class="klbl">Total de seções</span><span class="kval b" id="sec-total">78.431</span></div>
-        <div class="krow"><span class="klbl">Zonas eleitorais</span><span class="kval" id="sec-zonas">749</span></div>
-        <div class="krow"><span class="klbl">Locais de votação</span><span class="kval" id="sec-locais">26.314</span></div>
-        <div class="krow"><span class="klbl">Eleitores habilitados</span><span class="kval" id="sec-eleit">34.4M</span></div>
-        <div class="krow"><span class="klbl">Seções com coord. GPS</span><span class="kval g">92%</span></div>
-      </div>
-
       <div class="pc">
-        <h4>Seções Próximas <span style="font-size:.6rem;font-weight:400;color:var(--text3)">(zoom no mapa)</span></h4>
+        <h4>Legenda — Seções</h4>
+        <div style="display:flex;flex-direction:column;gap:5px">
+          <div style="display:flex;align-items:center;gap:7px;font-size:.67rem"><div class="sec-dot" style="background:#00c853"></div>&gt;60% votos — domínio do candidato</div>
+          <div style="display:flex;align-items:center;gap:7px;font-size:.67rem"><div class="sec-dot" style="background:#f59e0b"></div>45–60% — seção disputada</div>
+          <div style="display:flex;align-items:center;gap:7px;font-size:.67nm"><div class="sec-dot" style="background:#ef4444"></div>&lt;45% — oposição predomina</div>
+          <div style="display:flex;align-items:center;gap:7px;font-size:.67rem"><div class="sec-dot" style="background:#60a5fa"></div>Sede de zona eleitoral</div>
+        </div>
+        <div style="font-size:.59rem;color:var(--text3);margin-top:6px">Tamanho proporcional ao número de eleitores</div>
+      </div>
+      <div class="pc">
+        <h4>Resumo — <span id="sec-uf">SP</span></h4>
+        <div class="krow"><span class="klbl">Total seções</span><span class="kv b">78.431</span></div>
+        <div class="krow"><span class="klbl">Zonas eleitorais</span><span class="kv">749</span></div>
+        <div class="krow"><span class="klbl">Locais de votação</span><span class="kv">26.314</span></div>
+        <div class="krow"><span class="klbl">Eleitores habilitados</span><span class="kv">34,4M</span></div>
+        <div class="krow"><span class="klbl">Com coordenadas GPS</span><span class="kv g">92%</span></div>
+      </div>
+      <div class="pc">
+        <h4>Seções — Zoom atual <span style="font-size:.6rem;font-weight:400;color:var(--text3)">(faça zoom no mapa)</span></h4>
         <div id="secoes-list"></div>
       </div>
-
       <div class="pc">
         <h4>Distribuição de Resultado por Seção</h4>
-        <canvas id="chart-secoes-dist" height="100"></canvas>
-        <div style="font-size:.6rem;color:var(--text3);margin-top:4px">
-          Histograma de % votos Lula por seção eleitoral. Cada barra = faixa de 5pp.
-        </div>
+        <canvas id="chart-sec-dist" height="90"></canvas>
+        <div style="font-size:.59rem;color:var(--text3);margin-top:4px">Histograma: % votos do candidato por seção · faixas de 5pp</div>
       </div>
     </div>
 
-    <!-- CONTEXTO TAB -->
+    <!-- CONTEXTO -->
     <div class="pbody" id="tab-contexto" style="display:none">
       <div style="padding-bottom:8px;border-bottom:1px solid var(--border);margin-bottom:8px">
-        <div style="font-size:.65rem;color:var(--text3)">Município selecionado</div>
-        <div style="font-size:.95rem;font-weight:700" id="ctx-nome">Clique no mapa →</div>
-        <div style="font-size:.66rem;color:var(--text2)" id="ctx-uf-ano">selecione um município para ver contexto</div>
+        <div style="font-size:.63rem;color:var(--text3)">Município / Estado selecionado</div>
+        <div style="font-size:.95rem;font-weight:700" id="ctx-nome">← Clique no mapa</div>
+        <div style="font-size:.65rem;color:var(--text2)" id="ctx-sub">Selecione uma região para ver o contexto completo</div>
       </div>
       <div class="pc">
         <h4>Resultado Eleitoral <span class="tag tse">TSE</span></h4>
-        <div class="krow"><span class="klbl">Vencedor T1</span><span class="kval g" id="c-winner">—</span></div>
-        <div class="krow"><span class="klbl">% votos T1</span><span class="kval" id="c-pct1">—</span></div>
-        <div class="krow"><span class="klbl">% votos T2</span><span class="kval" id="c-pct2">—</span></div>
-        <div class="krow"><span class="klbl">Comparecimento</span><span class="kval" id="c-comp">—</span></div>
-        <div class="krow"><span class="klbl">Votos brancos/nulos</span><span class="kval" id="c-branco">—</span></div>
+        <div class="krow"><span class="klbl">Vencedor T1</span><span class="kv g" id="c-w">—</span></div>
+        <div class="krow"><span class="klbl">% votos T1</span><span class="kv" id="c-p1">—</span></div>
+        <div class="krow"><span class="klbl">% votos T2</span><span class="kv" id="c-p2">—</span></div>
+        <div class="krow"><span class="klbl">Comparecimento</span><span class="kv" id="c-cp">—</span></div>
+        <div class="krow"><span class="klbl">Brancos/Nulos</span><span class="kv" id="c-bn">—</span></div>
       </div>
       <div class="pc">
         <h4>Socioeconômico <span class="tag ibge">IBGE</span></h4>
-        <div class="krow"><span class="klbl">IDH Municipal</span><span class="kval b" id="c-idhm">—</span></div>
-        <div class="krow"><span class="klbl">Renda per capita</span><span class="kval" id="c-renda">—</span></div>
-        <div class="krow"><span class="klbl">Índice Gini</span><span class="kval" id="c-gini">—</span></div>
-        <div class="krow"><span class="klbl">Analfabetismo</span><span class="kval r" id="c-analf">—</span></div>
-        <div class="krow"><span class="klbl">% Urbano</span><span class="kval" id="c-urb">—</span></div>
-        <div class="krow"><span class="klbl">Populacão</span><span class="kval" id="c-pop">—</span></div>
+        <div class="krow"><span class="klbl">IDH Municipal</span><span class="kv b" id="c-idh">—</span></div>
+        <div class="krow"><span class="klbl">Renda per capita</span><span class="kv" id="c-renda">—</span></div>
+        <div class="krow"><span class="klbl">Índice Gini</span><span class="kv" id="c-gini">—</span></div>
+        <div class="krow"><span class="klbl">Analfabetismo</span><span class="kv r" id="c-analf">—</span></div>
+        <div class="krow"><span class="klbl">% Urbano</span><span class="kv" id="c-urb">—</span></div>
+        <div class="krow"><span class="klbl">População</span><span class="kv" id="c-pop">—</span></div>
       </div>
       <div class="pc">
         <h4>Transferências Sociais <span class="tag ibge">CadÚnico</span></h4>
-        <div class="krow"><span class="klbl">% famílias BF</span><span class="kval y" id="c-bf">—</span></div>
-        <div class="krow"><span class="klbl">Famílias beneficiadas</span><span class="kval" id="c-fambf">—</span></div>
-        <div class="krow"><span class="klbl">Valor médio BF (R$)</span><span class="kval" id="c-valbf">—</span></div>
-        <div class="krow"><span class="klbl">% CadÚnico cadastrado</span><span class="kval" id="c-cad">—</span></div>
+        <div class="krow"><span class="klbl">% famílias BF</span><span class="kv y" id="c-bf">—</span></div>
+        <div class="krow"><span class="klbl">Famílias beneficiadas</span><span class="kv" id="c-fbf">—</span></div>
+        <div class="krow"><span class="klbl">Valor médio BF</span><span class="kv" id="c-vbf">—</span></div>
       </div>
       <div class="pc">
         <h4>Saúde <span class="tag ds">DataSUS</span></h4>
-        <div class="krow"><span class="klbl">Mort. Infantil /1k NV</span><span class="kval r" id="c-mi">—</span></div>
-        <div class="krow"><span class="klbl">Cobertura APS</span><span class="kval g" id="c-aps">—</span></div>
-        <div class="krow"><span class="klbl">Cobertura plano</span><span class="kval" id="c-plano">—</span></div>
-        <div class="krow"><span class="klbl">IDSUS</span><span class="kval" id="c-idsus">—</span></div>
+        <div class="krow"><span class="klbl">Mort. Infantil /1k NV</span><span class="kv r" id="c-mi">—</span></div>
+        <div class="krow"><span class="klbl">Cobertura APS</span><span class="kv g" id="c-aps">—</span></div>
+        <div class="krow"><span class="klbl">Cobertura plano</span><span class="kv" id="c-plano">—</span></div>
       </div>
       <div class="pc">
-        <h4>Segurança <span class="tag seg">Atlas Violência</span></h4>
-        <div class="krow"><span class="klbl">Homicídio /100k</span><span class="kval r" id="c-hom">—</span></div>
-        <div class="krow"><span class="klbl">IVS — Vulnerab. Social</span><span class="kval" id="c-ivs">—</span></div>
-        <div class="krow"><span class="klbl">Feminicídio /100k mulheres</span><span class="kval" id="c-fem">—</span></div>
+        <h4>Segurança</h4>
+        <div class="krow"><span class="klbl">Homicídio /100k</span><span class="kv r" id="c-hom">—</span></div>
+        <div class="krow"><span class="klbl">IVS — Vulnerab. Social</span><span class="kv" id="c-ivs">—</span></div>
+      </div>
+      <div class="pc">
+        <h4>Pesquisas — <span id="c-uf-poll">—</span> <span class="tag poll">última pesquisa</span></h4>
+        <div class="krow"><span class="klbl">Lula (PT)</span><span class="kv g" id="c-poll-lula">—</span></div>
+        <div class="krow"><span class="klbl">Bolsonaro (PL)</span><span class="kv b" id="c-poll-bolso">—</span></div>
+        <div class="krow"><span class="klbl">Instituto / Data</span><span class="kv" id="c-poll-inst" style="font-size:.63rem">—</span></div>
+      </div>
+      <div class="pc">
+        <h4>Sentimento Social <span class="tag soc">últimas 24h</span></h4>
+        <div class="krow"><span class="klbl">Sentimento Lula</span><span class="kv g" id="c-sent-lula">—</span></div>
+        <div class="krow"><span class="klbl">Sentimento Bolsonaro</span><span class="kv b" id="c-sent-bolso">—</span></div>
+        <div class="krow"><span class="klbl">Polarização</span><span class="kv y" id="c-polar">—</span></div>
       </div>
       <div class="pc" style="background:#0a2540;border-color:#1976d2">
-        <h4 style="color:#60a5fa">Predição 2026 — Município</h4>
-        <div class="krow"><span class="klbl">Candidato projetado</span><span class="kval g" id="c-pcand">—</span></div>
-        <div class="krow"><span class="klbl">Probabilidade M1</span><span class="kval b" id="c-pprob">—</span></div>
-        <div class="krow"><span class="klbl">IC 95% [lo — hi]</span><span class="kval" id="c-pic" style="font-size:.68rem">—</span></div>
-        <div class="krow"><span class="klbl">Δ vs 2022</span><span class="kval" id="c-pdelta">—</span></div>
-        <div class="krow"><span class="klbl">Cluster eleitoral</span><span class="kval p" id="c-cluster">—</span></div>
+        <h4 style="color:#60a5fa">Predição 2026 — M1</h4>
+        <div class="krow"><span class="klbl">Candidato projetado</span><span class="kv g" id="c-pcand">—</span></div>
+        <div class="krow"><span class="klbl">Probabilidade</span><span class="kv b" id="c-pprob">—</span></div>
+        <div class="krow"><span class="klbl">IC 95%</span><span class="kv" id="c-pic" style="font-size:.66rem">—</span></div>
+        <div class="krow"><span class="klbl">Δ vs 2022</span><span class="kv" id="c-pdelta">—</span></div>
+        <div class="krow"><span class="klbl">Cluster eleitoral</span><span class="kv p" id="c-cluster">—</span></div>
       </div>
     </div>
 
-    <!-- SHAP TAB -->
+    <!-- SHAP -->
     <div class="pbody" id="tab-shap" style="display:none">
-      <div style="font-size:.7rem;color:var(--text2);margin-bottom:8px;line-height:1.5">
-        SHAP values mostram a contribuição de cada feature para a predição. Positivo = aumenta prob. do candidato selecionado.
-      </div>
+      <div style="font-size:.69rem;color:var(--text2);margin-bottom:8px;line-height:1.5">SHAP values: contribuição de cada feature para a predição. Positivo = aumenta probabilidade do candidato selecionado.</div>
       <div class="pc">
-        <h4>SHAP Global — <span id="shap-cand-label">Lula (PT)</span></h4>
+        <h4>SHAP Global — <span id="shap-cand">Lula (PT)</span></h4>
         <div id="shap-global"></div>
-        <div style="margin-top:6px"><span class="tag tse">TSE</span><span class="tag ibge">IBGE</span><span class="tag ibge">CadÚnico</span><span class="tag ds">DataSUS</span></div>
+        <div style="margin-top:5px"><span class="tag tse">TSE</span><span class="tag ibge">IBGE</span><span class="tag ibge">CadÚnico</span><span class="tag ds">DataSUS</span></div>
       </div>
-      <div class="pc" id="shap-mun-card" style="display:none">
-        <h4>SHAP Local — <span id="shap-mun-label">—</span></h4>
+      <div class="pc" id="shap-local-card" style="display:none">
+        <h4>SHAP Local — <span id="shap-local-nm">—</span></h4>
         <div id="shap-local"></div>
-        <div style="font-size:.6rem;color:var(--text3);margin-top:5px">Desvio do SHAP global para este município específico.</div>
+        <div style="font-size:.58rem;color:var(--text3);margin-top:4px">Desvio SHAP local em relação ao global para este município</div>
       </div>
-      <div style="font-size:.62rem;color:var(--text3);line-height:1.5;margin-top:4px">
-        Método: TreeSHAP sobre PyMC posterior médio (10k amostras).<br>
-        Intervalo de confiança nos SHAP values: bootstrap 1.000 iterações.
-      </div>
+      <div style="font-size:.61rem;color:var(--text3);line-height:1.5;margin-top:4px">Método: TreeSHAP sobre PyMC posterior médio · bootstrap 1.000 iterações</div>
     </div>
 
-    <!-- CHAT TAB -->
+    <!-- CHAT -->
     <div class="pbody" id="tab-chat" style="display:none;padding:0;height:100%">
       <div class="chat-wrap">
         <div class="chat-msgs" id="chat-msgs">
-          <div class="msg system"><div class="mm">Sistema</div>Sessão iniciada · Brasil · 2022 · Presidente · T1 · Candidato: Lula</div>
+          <div class="msg sys"><div class="mm">Sistema</div>Sessão iniciada · Brasil · 2022 · Presidente · T1 · Lula (PT)</div>
           <div class="msg agent">
             <div class="mm">SPEPE · Analista</div>
-            Olá! Contexto atual: <strong>Brasil, Eleição 2022, Presidente, 1º Turno, Lula (PT)</strong>.<br><br>
-            Os filtros do mapa estão sincronizados. Quando você mudar um filtro acima, atualizarei automaticamente a análise.<br><br>
-            Posso analisar:<br>
-            • Padrões geográficos de votação<br>
-            • Correlações com indicadores socioeconômicos<br>
-            • Predições 2026 por município<br>
-            • Municípios que viraram entre 2018 e 2022<br><br>
-            <span class="map-cmd" onclick="mapZoomCmd('nordeste')">📍 Zoom no Nordeste</span>
-            <span class="map-cmd" onclick="mapZoomCmd('sudeste')">📍 Zoom no Sudeste</span>
+            Olá! Contexto: <strong>Brasil, 2022, Presidente, 1ºT, Lula (PT)</strong>.<br><br>
+            Os filtros e o mapa estão sincronizados. Ao mudar qualquer filtro ou clicar em uma região, o mapa atualiza e eu recebo o contexto automaticamente.<br><br>
+            <span class="map-cmd" onclick="zoomRegion('nordeste')">📍 Zoom Nordeste</span>
+            <span class="map-cmd" onclick="zoomRegion('sudeste')">📍 Zoom Sudeste</span>
+            <span class="map-cmd" onclick="activateLayer('pesquisas')">📋 Ver pesquisas no mapa</span>
           </div>
         </div>
         <div class="chat-footer">
-          <div class="chat-ctx">
-            Contexto: <strong id="ctx-text">Brasil · 2022 · Presidente · T1 · Lula</strong>
-            <span id="ctx-mun-text" style="color:var(--green2)"></span>
-          </div>
+          <div class="chat-ctx">Contexto: <strong id="ctx-txt">Brasil · 2022 · Presidente · T1 · Lula</strong><span id="ctx-mun" style="color:var(--green2)"></span></div>
           <div class="chat-irow">
             <textarea class="chat-in" id="chat-in" placeholder="Pergunte sobre eleitorado, indicadores, predições..."></textarea>
             <button class="chat-send" id="chat-send">↑</button>
@@ -590,746 +512,878 @@ button{cursor:pointer;font-family:inherit}
         </div>
       </div>
     </div>
-
-  </div><!-- /right-panel -->
-</div><!-- /shell -->
+  </div>
+</div>
 
 <script>
-// ─── UF BOUNDS & CENTERS ────────────────────────────────────────────────────
-const UF_VIEW = {
-  BR:  { center:[-15.78,-47.93], zoom:4 },
-  SP:  { center:[-22.25,-48.35], zoom:7 },
-  MG:  { center:[-18.50,-44.50], zoom:7 },
-  RJ:  { center:[-22.10,-42.80], zoom:8 },
-  BA:  { center:[-12.50,-41.70], zoom:7 },
-  RS:  { center:[-30.50,-53.40], zoom:7 },
-  CE:  { center:[ -5.50,-39.30], zoom:7 },
-  PE:  { center:[ -8.50,-37.50], zoom:8 },
-  PR:  { center:[-25.00,-51.50], zoom:7 },
-  AM:  { center:[ -4.50,-64.00], zoom:6 },
-  GO:  { center:[-15.50,-49.50], zoom:7 },
-};
-const REGION_VIEW = {
-  nordeste: { center:[-9.0,-38.5], zoom:6 },
-  sudeste:  { center:[-20.0,-44.0], zoom:6 },
-  sul:      { center:[-28.0,-51.0], zoom:6 },
-  norte:    { center:[-5.0,-60.0], zoom:5 },
-  centroeste:{ center:[-14.0,-52.0], zoom:6 },
-};
-
-// ─── MOCK DATA ───────────────────────────────────────────────────────────────
-const CANDIDATES = [
-  { id:"lula",  name:"Luiz Inácio Lula da Silva", partido:"PT",  color:"#d32f2f", pct:53.1, lo:50.2, hi:55.9, delta:"+1.8pp", up:true  },
-  { id:"bolso", name:"Jair Messias Bolsonaro",    partido:"PL",  color:"#1565c0", pct:42.4, lo:39.7, hi:45.1, delta:"-1.8pp", up:false },
-  { id:"ciro",  name:"Ciro Ferreira Gomes",       partido:"PDT", color:"#7c3aed", pct:3.0,  lo:2.1,  hi:3.9,  delta:"-0.3pp", up:false },
-];
-
-const POLLS_DATA = {
-  labels:["Jan","Fev","Mar","Abr","Mai","Jun","Jul","Ago","Set","Out"],
-  lula:  [45,46,48,47,49,50,51,52,53,52],
-  bolso: [38,37,36,37,36,35,35,36,37,43],
-  ciro:  [10,10,9,8,8,7,7,6,5,4],
-  banda_lo:[43,44,46,45,47,48,49,50,51,50],
-  banda_hi:[47,48,50,49,51,52,53,54,55,54],
+// ──────────────────────────────────────────────────────────────────────────────
+// DADOS MOCK POR UF — cada camada tem um valor real por estado
+// ──────────────────────────────────────────────────────────────────────────────
+const UF_DATA = {
+  AC:{sigla:"AC",name:"Acre",          res:63.4, idhm:0.663, bf:49.2, hom:35.8, mi:16.2, sent:0.55, poll:61, pred:65},
+  AL:{sigla:"AL",name:"Alagoas",       res:72.1, idhm:0.631, bf:58.4, hom:52.3, mi:21.8, sent:0.62, poll:70, pred:73},
+  AM:{sigla:"AM",name:"Amazonas",      res:67.4, idhm:0.674, bf:44.8, hom:27.1, mi:18.4, sent:0.51, poll:65, pred:68},
+  AP:{sigla:"AP",name:"Amapá",         res:68.9, idhm:0.708, bf:41.3, hom:41.2, mi:19.1, sent:0.48, poll:66, pred:70},
+  BA:{sigla:"BA",name:"Bahia",         res:71.3, idhm:0.660, bf:55.1, hom:48.7, mi:17.9, sent:0.66, poll:69, pred:72},
+  CE:{sigla:"CE",name:"Ceará",         res:69.8, idhm:0.682, bf:53.2, hom:39.4, mi:16.8, sent:0.58, poll:68, pred:71},
+  DF:{sigla:"DF",name:"Distrito Federal", res:50.1, idhm:0.824, bf:14.2, hom:14.8, mi:8.9, sent:0.22, poll:48, pred:51},
+  ES:{sigla:"ES",name:"Espírito Santo", res:48.2, idhm:0.740, bf:22.1, hom:29.8, mi:11.4, sent:0.18, poll:46, pred:49},
+  GO:{sigla:"GO",name:"Goiás",         res:44.8, idhm:0.735, bf:24.6, hom:22.4, mi:12.1, sent:0.12, poll:43, pred:46},
+  MA:{sigla:"MA",name:"Maranhão",      res:73.2, idhm:0.639, bf:62.1, hom:44.8, mi:22.4, sent:0.68, poll:71, pred:74},
+  MG:{sigla:"MG",name:"Minas Gerais",  res:52.4, idhm:0.731, bf:28.4, hom:16.2, mi:11.8, sent:0.31, poll:51, pred:54},
+  MS:{sigla:"MS",name:"Mato Grosso do Sul", res:41.3, idhm:0.729, bf:22.8, hom:24.1, mi:12.8, sent:0.08, poll:40, pred:43},
+  MT:{sigla:"MT",name:"Mato Grosso",   res:38.4, idhm:0.725, bf:23.1, hom:26.4, mi:13.1, sent:0.04, poll:37, pred:40},
+  PA:{sigla:"PA",name:"Pará",          res:70.2, idhm:0.646, bf:51.8, hom:41.3, mi:20.1, sent:0.61, poll:68, pred:71},
+  PB:{sigla:"PB",name:"Paraíba",       res:70.8, idhm:0.658, bf:57.4, hom:38.2, mi:18.8, sent:0.63, poll:69, pred:72},
+  PE:{sigla:"PE",name:"Pernambuco",    res:68.4, idhm:0.673, bf:52.8, hom:47.6, mi:19.2, sent:0.57, poll:67, pred:70},
+  PI:{sigla:"PI",name:"Piauí",         res:74.1, idhm:0.646, bf:60.2, hom:36.8, mi:19.8, sent:0.67, poll:72, pred:75},
+  PR:{sigla:"PR",name:"Paraná",        res:44.2, idhm:0.749, bf:21.4, hom:14.8, mi:9.8, sent:0.14, poll:43, pred:46},
+  RJ:{sigla:"RJ",name:"Rio de Janeiro",res:52.8, idhm:0.761, bf:31.2, hom:39.8, mi:13.4, sent:0.28, poll:51, pred:54},
+  RN:{sigla:"RN",name:"Rio Grande do Norte", res:68.2, idhm:0.684, bf:51.4, hom:41.8, mi:17.4, sent:0.59, poll:67, pred:70},
+  RO:{sigla:"RO",name:"Rondônia",      res:41.8, idhm:0.690, bf:28.4, hom:28.4, mi:14.2, sent:0.09, poll:40, pred:43},
+  RR:{sigla:"RR",name:"Roraima",       res:44.1, idhm:0.707, bf:32.1, hom:30.8, mi:15.8, sent:0.13, poll:43, pred:46},
+  RS:{sigla:"RS",name:"Rio Grande do Sul", res:47.1, idhm:0.746, bf:19.8, hom:12.4, mi:9.1, sent:0.16, poll:46, pred:49},
+  SC:{sigla:"SC",name:"Santa Catarina",res:37.2, idhm:0.774, bf:16.4, hom:10.8, mi:8.4, sent:0.02, poll:36, pred:39},
+  SE:{sigla:"SE",name:"Sergipe",       res:69.4, idhm:0.665, bf:53.8, hom:43.2, mi:18.6, sent:0.60, poll:68, pred:71},
+  SP:{sigla:"SP",name:"São Paulo",     res:49.8, idhm:0.783, bf:21.8, hom:10.2, mi:9.8, sent:0.24, poll:48, pred:52},
+  TO:{sigla:"TO",name:"Tocantins",     res:58.4, idhm:0.699, bf:38.4, hom:22.8, mi:15.4, sent:0.42, poll:57, pred:60},
 };
 
-const POLLS_LIST = [
-  { inst:"Datafolha",  data:"01/10/2022", n:2556, metodo:"Presencial",  lula:50, bolso:36, margem:2, nota:"A+" },
-  { inst:"Quaest",     data:"29/09/2022", n:2000, metodo:"Telefone",    lula:49, bolso:37, margem:2, nota:"A" },
-  { inst:"AtlasIntel", data:"28/09/2022", n:5000, metodo:"Online",      lula:52, bolso:36, margem:1, nota:"A" },
-  { inst:"PoderData",  data:"27/09/2022", n:3500, metodo:"Online",      lula:48, bolso:38, margem:2, nota:"B+" },
-  { inst:"IBOPE/Ipec", data:"25/09/2022", n:2000, metodo:"Presencial",  lula:51, bolso:37, margem:2, nota:"A+" },
-];
+// Lookup por propriedade do GeoJSON (sigla ou name)
+function getUfData(feature) {
+  const p = feature.properties || {};
+  const sigla = p.sigla || p.SIGLA || "";
+  const name  = p.name  || p.NAME  || p.ESTADO || "";
+  if (sigla && UF_DATA[sigla]) return UF_DATA[sigla];
+  // Tenta por nome parcial
+  const key = Object.keys(UF_DATA).find(k =>
+    UF_DATA[k].name.toLowerCase() === name.toLowerCase() ||
+    UF_DATA[k].name.toLowerCase().includes(name.toLowerCase()) ||
+    name.toLowerCase().includes(UF_DATA[k].name.toLowerCase())
+  );
+  return key ? UF_DATA[key] : null;
+}
 
-const HOUSE_EFFECT = {
-  labels:["Datafolha","Quaest","AtlasIntel","PoderData","IBOPE"],
-  lula:  [0, -1, +2, -2, +1],
-  bolso: [0, +1, -1, +2, -1],
-};
-
-const SOCIAL_PLATFORMS = [
-  { name:"Twitter/X",  icon:"𝕏", color:"#1da1f2", vol:"342k", pos:45, neu:28, neg:27, delta:"+3%",  deltaUp:true  },
-  { name:"BlueSky",    icon:"☁", color:"#0085ff", vol:"89k",  pos:58, neu:22, neg:20, delta:"+8%",  deltaUp:true  },
-  { name:"Facebook",   icon:"f", color:"#1877f2", vol:"215k", pos:38, neu:31, neg:31, delta:"-2%",  deltaUp:false },
-  { name:"YouTube",    icon:"▶", color:"#ff0000", vol:"124k", pos:41, neu:35, neg:24, delta:"+1%",  deltaUp:true  },
-  { name:"TikTok",     icon:"♪", color:"#69c9d0", vol:"78k",  pos:62, neu:24, neg:14, delta:"+12%", deltaUp:true  },
-];
-
-const TRENDING = [
-  { text:"#DebatePresidencial", hot:true,    rising:false },
-  { text:"#LulaPresidente",    hot:true,    rising:false },
-  { text:"#BolsonaroJaneiro",  hot:false,   rising:true  },
-  { text:"economia",           hot:false,   rising:true  },
-  { text:"bolsafamilia",       hot:false,   rising:false },
-  { text:"seguranca pública",  hot:false,   rising:true  },
-  { text:"urnas eletrônicas",  hot:false,   rising:false },
-  { text:"TSE",                hot:false,   rising:false },
-  { text:"previdencia",        hot:false,   rising:true  },
-  { text:"Nordeste vota",      hot:true,    rising:false },
-];
-
-const SECOES_MOCK = [
-  { zona:"001", secao:"0001", local:"E.E. PROF. JOÃO DA SILVA", addr:"R. das Flores, 123 — Centro", eleit:422, result:68 },
-  { zona:"001", secao:"0002", local:"E.E. PROF. JOÃO DA SILVA", addr:"R. das Flores, 123 — Centro", eleit:399, result:71 },
-  { zona:"001", secao:"0045", local:"CMEI JARDIM ESPERANÇA",    addr:"R. Boa Vista, 890 — Jardim", eleit:448, result:44 },
-  { zona:"002", secao:"0112", local:"ESCOLA MUN. SÃO PEDRO",    addr:"Av. Brasil, 2200 — Zona Norte", eleit:501, result:55 },
-  { zona:"002", secao:"0113", local:"ESCOLA MUN. SÃO PEDRO",    addr:"Av. Brasil, 2200 — Zona Norte", eleit:389, result:52 },
-  { zona:"003", secao:"0201", local:"AABB — ASSOC. ATLÉTICA",   addr:"R. do Esporte, 45 — Centro", eleit:467, result:38 },
-];
-
-const MUNICIPALITIES = [
-  { nome:"São Paulo", uf:"SP", winner:"Bolsonaro T1 / Lula T2", pct1:42.1, pct2:52.4, comp:73.2, branco:4.1, idhm:0.805, renda:1650, gini:0.58, analf:3.2, urb:99.1, pop:"12,3M", bf:18.4, fambf:"1.2M", valbf:"R$ 498", cad:29, mi:8.1, aps:82, plano:68, idsus:6.8, hom:10.2, ivs:"0.21 (Baixo)", fem:2.1, pred:"Lula 54%", pprob:"54%", pic:"51–57%", pdelta:"+2.1pp", cluster:"Metrópole Polarizada" },
-  { nome:"Salvador",  uf:"BA", winner:"Lula T1",                pct1:71.2, pct2:null, comp:68.4, branco:3.2, idhm:0.759, renda:890,  gini:0.62, analf:6.1, urb:98.7, pop:"2,9M", bf:41.2, fambf:"280k",  valbf:"R$ 611", cad:51, mi:13.4, aps:68, plano:35, idsus:5.9, hom:47.8, ivs:"0.39 (Médio)", fem:4.8, pred:"Lula 73%", pprob:"73%", pic:"70–76%", pdelta:"+2.3pp", cluster:"Nordeste BF-Dependente" },
-  { nome:"Belo Horizonte", uf:"MG", winner:"Lula T1",           pct1:51.4, pct2:57.1, comp:75.1, branco:3.9, idhm:0.810, renda:1580, gini:0.55, analf:2.8, urb:99.2, pop:"2,7M", bf:22.1, fambf:"195k",  valbf:"R$ 521", cad:33, mi:9.2, aps:79, plano:52, idsus:7.1, hom:21.3, ivs:"0.25 (Baixo)", fem:2.9, pred:"Lula 54%", pprob:"54%", pic:"51–57%", pdelta:"+3.1pp", cluster:"Metrópole Progressiva" },
-];
-let _selMun = null;
-
-// ─── SHAP DATA ───────────────────────────────────────────────────────────────
-const SHAP_DATA = [
-  { name:"% BF 2022",       v:+0.183, c:"#00c853" },
-  { name:"Hist. Lula 2018", v:+0.156, c:"#00c853" },
-  { name:"Hist. Lula 2014", v:+0.091, c:"#00c853" },
-  { name:"% Extrem. Pob.",  v:+0.118, c:"#00c853" },
-  { name:"Gini",            v:+0.072, c:"#00c853" },
-  { name:"Analfabetismo",   v:+0.064, c:"#00c853" },
-  { name:"Mort. Infantil",  v:+0.052, c:"#00c853" },
-  { name:"Renda per cap.",  v:-0.112, c:"#ef4444" },
-  { name:"% Urbano",        v:-0.083, c:"#ef4444" },
-  { name:"IDH rank",        v:-0.061, c:"#ef4444" },
-  { name:"Emendas/hab",     v:+0.035, c:"#00c853" },
-  { name:"IVS Segurança",   v:+0.029, c:"#00c853" },
-  { name:"APS cobertura",   v:+0.021, c:"#00c853" },
-  { name:"Comparecimento",  v:+0.018, c:"#00c853" },
-];
-
-// ─── CHAT RESPONSES ──────────────────────────────────────────────────────────
-const AGENT_RESPONSES = [
-  (ctx) => `Com o filtro atual <strong>${ctx}</strong>, identifico que a correlação entre % Bolsa Família e voto Lula é <strong>+0.73</strong> (p&lt;0.001). Os 1.847 municípios com BF&gt;40% votaram Lula com média de <strong>68% T1</strong>.<br><br><span class="map-cmd" onclick="mapZoomCmd('nordeste')">📍 Zoom no Nordeste</span>`,
-  (ctx) => `Analisando <strong>${ctx}</strong>: os municípios que <strong>viraram</strong> de Bolsonaro (2018) para Lula (2022) somam <strong>892</strong>. Concentração no interior de SP, MG e PR — vinculados ao aumento do BF em 2022.<br><br><span class="map-cmd" onclick="selectTabAndLayer('socio')">📊 Ver camada IBGE</span>`,
-  (ctx) => `Para <strong>${ctx}</strong>, o modelo M1 projeta <strong>53–58%</strong> de probabilidade de vitória em 2026. O principal driver é a manutenção do BF + IDH estagnado. Modelo M2 ainda aguarda dados de pesquisas e social.<br><br><span class="map-cmd" onclick="selectTabAndLayer('predicao')">🔮 Ver predição no mapa</span>`,
-  (ctx) => `Em <strong>${ctx}</strong>: municípios com alto IDH (>0.75) e que votaram Lula somam <strong>248</strong>. São majoritariamente capitais e regiões metropolitanas. SHAP mostra que nesses casos o peso do BF cai e "história 2014/2018" sobe.<br><br><span class="map-cmd" onclick="switchPanelTab('shap')">📊 Ver SHAP</span>`,
-];
-let _chatIdx = 0;
-
-// ─── BIVARIATE COLORS ────────────────────────────────────────────────────────
+// ──────────────────────────────────────────────────────────────────────────────
+// ESCALAS DE COR — cada métrica tem uma função de cor
+// ──────────────────────────────────────────────────────────────────────────────
+function colorEleitoral(pct) {
+  if (pct >= 60) return "#1a9641";
+  if (pct >= 50) return "#74c476";
+  if (pct >= 45) return "#ffffbf";
+  if (pct >= 40) return "#fdae61";
+  return "#d7191c";
+}
+function colorIDHM(v) {
+  if (v >= 0.78) return "#08519c";
+  if (v >= 0.72) return "#3182bd";
+  if (v >= 0.65) return "#6baed6";
+  if (v >= 0.58) return "#bdd7e7";
+  return "#ffffd4";
+}
+function colorBF(v) {
+  // Alto BF → vermelho/laranja; Baixo BF → azul
+  if (v >= 55) return "#d62728";
+  if (v >= 45) return "#e07028";
+  if (v >= 35) return "#fdae61";
+  if (v >= 25) return "#ffffbf";
+  return "#a6d96a";
+}
+function colorHomicidio(v) {
+  if (v >= 50) return "#d7191c";
+  if (v >= 35) return "#fdae61";
+  if (v >= 20) return "#ffffbf";
+  if (v >= 10) return "#6baed6";
+  return "#08519c";
+}
+function colorMortalidade(v) {
+  if (v >= 22) return "#d7191c";
+  if (v >= 16) return "#fdae61";
+  if (v >= 12) return "#ffffbf";
+  if (v >= 8)  return "#6baed6";
+  return "#08519c";
+}
+function colorSentimento(v) {
+  if (v >= 0.5)  return "#1a9641";
+  if (v >= 0.15) return "#74c476";
+  if (v >= -0.15)return "#aaaaaa";
+  if (v >= -0.5) return "#fdae61";
+  return "#d7191c";
+}
+function colorPesquisas(v) {
+  if (v >= 60) return "#1a9641";
+  if (v >= 50) return "#74c476";
+  if (v >= 45) return "#ffffbf";
+  if (v >= 40) return "#fdae61";
+  return "#d7191c";
+}
+function colorPredicao(v) {
+  if (v >= 60) return "#1a9641";
+  if (v >= 55) return "#74c476";
+  if (v >= 48) return "#ffffbf";
+  if (v >= 42) return "#fdae61";
+  return "#d7191c";
+}
 const BIV = [
-  ["#2d6a4f","#52b788","#8ecae6"],  // IDH alto
-  ["#e76f51","#f4a261","#90e0ef"],  // IDH médio
-  ["#d62828","#c77dff","#023e8a"],  // IDH baixo
+  // IDH alto (row0=top)
+  ["#2d6a4f","#52b788","#8ecae6"],
+  ["#e76f51","#f4a261","#90e0ef"],
+  ["#d62828","#c77dff","#023e8a"],
 ];
+function colorBivariate(res, ind, overlay) {
+  const y_val = overlay === "bf" ? ind : overlay === "homicidio" ? ind : overlay === "mortalidade" ? ind : ind;
+  // normalize to 0-2
+  let xi = res >= 55 ? 2 : res >= 45 ? 1 : 0;
+  let yi;
+  if (overlay === "idhm")       { yi = y_val >= 0.73 ? 0 : y_val >= 0.65 ? 1 : 2; }
+  else if (overlay === "bf")    { yi = y_val >= 50 ? 2 : y_val >= 30 ? 1 : 0; }
+  else if (overlay === "homicidio") { yi = y_val >= 35 ? 2 : y_val >= 18 ? 1 : 0; }
+  else if (overlay === "mortalidade"){ yi = y_val >= 18 ? 2 : y_val >= 12 ? 1 : 0; }
+  else if (overlay === "gini")  { yi = y_val >= 0.58 ? 2 : y_val >= 0.50 ? 1 : 0; }
+  else if (overlay === "pobreza"){ yi = y_val >= 15 ? 2 : y_val >= 7 ? 1 : 0; }
+  else { yi = y_val >= 0.73 ? 0 : y_val >= 0.65 ? 1 : 2; }
+  return BIV[yi][xi];
+}
 
-// ─── MAP INIT ─────────────────────────────────────────────────────────────────
-let gMap = null, _geoLayer = null, _sectionMarkers = [];
+// ──────────────────────────────────────────────────────────────────────────────
+// MAPA
+// ──────────────────────────────────────────────────────────────────────────────
+let gMap = null, _geoLayer = null, _secMarkers = [];
 let _activeLayer = "bivariate";
 
+const UF_VIEW = {
+  BR:  { c:[-15.78,-47.93], z:4 },
+  SP:  { c:[-22.25,-48.35], z:7 },
+  MG:  { c:[-18.50,-44.50], z:7 },
+  RJ:  { c:[-22.10,-42.80], z:8 },
+  BA:  { c:[-12.50,-41.70], z:7 },
+  RS:  { c:[-30.50,-53.40], z:7 },
+  CE:  { c:[ -5.50,-39.30], z:7 },
+  PE:  { c:[ -8.50,-37.50], z:8 },
+  PR:  { c:[-25.00,-51.50], z:7 },
+  AM:  { c:[ -4.50,-64.00], z:6 },
+  GO:  { c:[-15.50,-49.50], z:7 },
+  PA:  { c:[ -4.00,-52.00], z:6 },
+  MA:  { c:[ -4.80,-45.00], z:7 },
+};
+const REGION_VIEW = {
+  nordeste: { c:[-8.0,-38.5],  z:6 },
+  sudeste:  { c:[-20.5,-44.0], z:6 },
+  sul:      { c:[-28.0,-51.0], z:6 },
+  norte:    { c:[-5.0,-60.0],  z:5 },
+};
+
 function initMap() {
-  if(gMap) return;
-  gMap = L.map("leaflet-map",{zoomControl:true,attributionControl:false}).setView([-15.78,-47.93],4);
-  L.tileLayer("https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png",{
-    subdomains:"abcd",maxZoom:19
-  }).addTo(gMap);
+  if (gMap) return;
+  gMap = L.map("leaflet-map", { zoomControl:true, attributionControl:false })
+           .setView([-15.78,-47.93], 4);
+  L.tileLayer("https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png",
+    { subdomains:"abcd", maxZoom:19 }).addTo(gMap);
 
   fetch("https://raw.githubusercontent.com/codeforamerica/click_that_hood/master/public/data/brazil-states.geojson")
-    .then(r=>r.json()).then(data=>{
-      _geoLayer = L.geoJSON(data,{
-        style:f=>layerStyle(f),
-        onEachFeature:(f,layer)=>{
+    .then(r => r.json())
+    .then(data => {
+      _geoLayer = L.geoJSON(data, {
+        style:   f => featureStyle(f),
+        onEachFeature: (f, layer) => {
           layer.on({
-            mouseover:e=>showTooltip(e,f),
-            mouseout: ()=>hideTT(),
-            click:    e=>handleMapClick(e,f),
+            mouseover: e => showTT(e, f),
+            mouseout:  ()  => hideTT(),
+            click:     e  => handleClick(e, f),
           });
         }
       }).addTo(gMap);
-    }).catch(()=>{
-      document.getElementById("leaflet-map").innerHTML=`
-        <div style="display:flex;flex-direction:column;align-items:center;justify-content:center;height:100%;gap:12px;color:var(--text3)">
+    })
+    .catch(() => {
+      document.getElementById("leaflet-map").innerHTML =
+        `<div style="display:flex;flex-direction:column;align-items:center;justify-content:center;height:100%;gap:12px;color:var(--text3)">
           <div style="font-size:2rem">🗺️</div>
           <div style="font-size:.82rem">GeoJSON indisponível (modo offline)</div>
-          <div style="display:flex;flex-wrap:wrap;gap:8px;justify-content:center;max-width:400px">
-            ${MUNICIPALITIES.map(m=>`<button onclick="clickMockMun('${m.nome}')" style="background:var(--bg3);border:1px solid var(--border2);border-radius:8px;padding:8px 12px;color:var(--text);font-size:.73rem;cursor:pointer;font-family:inherit">${m.nome} – ${m.uf}</button>`).join("")}
+          <div style="display:flex;flex-wrap:wrap;gap:8px;justify-content:center;max-width:420px">
+            ${Object.values(UF_DATA).slice(0,8).map(u =>
+              `<button onclick="clickUF('${u.sigla}')" style="background:var(--bg3);border:1px solid var(--border2);border-radius:8px;padding:8px 12px;color:var(--text);font-size:.72rem;cursor:pointer;font-family:inherit">${u.sigla} — ${u.name}</button>`
+            ).join("")}
           </div>
-          <div style="font-size:.62rem;color:var(--text3)">Clique para painel contextual</div>
         </div>`;
     });
 
-  gMap.on("zoomend",()=>{ if(gMap.getZoom()>=12) renderSectionMarkers(); else clearSectionMarkers(); });
-}
-
-function mapZoom(uf) {
-  if(!gMap) return;
-  const v = UF_VIEW[uf] || UF_VIEW.BR;
-  gMap.flyTo(v.center, v.zoom, {duration:1.2});
-}
-function mapZoomCmd(region) {
-  if(!gMap) return;
-  const v = REGION_VIEW[region];
-  if(v) gMap.flyTo(v.center, v.zoom, {duration:1.2});
-}
-window.mapZoomCmd = mapZoomCmd;
-window.clickMockMun = (nome)=>{ const m=MUNICIPALITIES.find(x=>x.nome===nome); if(m) selectMun(m); };
-
-function layerStyle(f) {
-  const name=(f.properties?.sigla||f.properties?.name||"");
-  const h=name.split("").reduce((a,c)=>a+c.charCodeAt(0),0);
-  const flat=BIV.flat();
-  return { fillColor:flat[h%flat.length], fillOpacity:0.65, color:"#4b6878", weight:1 };
-}
-
-function recolor() { if(_geoLayer) _geoLayer.setStyle(f=>layerStyle(f)); }
-
-function showTooltip(e, f) {
-  const tt=document.getElementById("mun-tt");
-  const p=f.properties||{};
-  const name=p.name||p.sigla||"Estado";
-  const m=MUNICIPALITIES[0];
-  document.getElementById("tt-nome").textContent=name;
-  document.getElementById("tt-res").textContent=m.winner.split(" T1")[0]+" "+m.pct1+"%";
-  document.getElementById("tt-idh").textContent=m.idhm;
-  document.getElementById("tt-bf").textContent=m.bf+"%";
-  document.getElementById("tt-hom").textContent=m.hom;
-  document.getElementById("tt-pred").textContent=m.pred;
-  document.getElementById("tt-trend").textContent="▲ +2.1pp vs 2018";
-  const mp=gMap.latLngToContainerPoint(e.latlng);
-  tt.style.left=(mp.x+14)+"px"; tt.style.top=(mp.y+10)+"px";
-  tt.style.display="block";
-}
-function hideTT(){ document.getElementById("mun-tt").style.display="none"; }
-
-function handleMapClick(e, f) {
-  hideTT();
-  const m=MUNICIPALITIES[Math.floor(Math.random()*MUNICIPALITIES.length)];
-  selectMun(m);
-}
-
-function renderSectionMarkers() {
-  clearSectionMarkers();
-  if(_activeLayer!=="secoes") return;
-  const center=gMap.getCenter();
-  SECOES_MOCK.forEach((s,i)=>{
-    const lat=center.lat+(Math.random()-.5)*0.05;
-    const lng=center.lng+(Math.random()-.5)*0.05;
-    const col=s.result>60?"#00c853":s.result>45?"#f59e0b":"#ef4444";
-    const mk=L.circleMarker([lat,lng],{radius:6,fillColor:col,color:"#0d1117",weight:1.5,fillOpacity:.9})
-      .addTo(gMap)
-      .bindTooltip(`<b>Zona ${s.zona} Seção ${s.secao}</b><br>${s.local}<br>Eleitores: ${s.eleit}<br>Resultado: ${s.result}% Lula`,{className:"leaflet-dark-tip"});
-    _sectionMarkers.push(mk);
+  gMap.on("zoomend", () => {
+    if (gMap.getZoom() >= 11 && _activeLayer === "secoes") renderSecMarkers();
+    else clearSecMarkers();
   });
 }
-function clearSectionMarkers() { _sectionMarkers.forEach(m=>m.remove()); _sectionMarkers=[]; }
 
-// ─── LEGEND ──────────────────────────────────────────────────────────────────
+// Calcula a cor de cada feature com base na camada ativa
+function featureStyle(f) {
+  const d = getUfData(f);
+  if (!d) return { fillColor:"#21262d", fillOpacity:.5, color:"#4b6878", weight:1 };
+  const overlay = document.getElementById("overlay-ind").value;
+
+  let fill;
+  switch (_activeLayer) {
+    case "eleitoral":  fill = colorEleitoral(d.res);      break;
+    case "socio":      fill = colorIDHM(d.idhm);          break;
+    case "saude":      fill = colorMortalidade(d.mi);     break;
+    case "seguranca":  fill = colorHomicidio(d.hom);      break;
+    case "pesquisas":  fill = colorPesquisas(d.poll);     break;
+    case "social":     fill = colorSentimento(d.sent);    break;
+    case "predicao":   fill = colorPredicao(d.pred);      break;
+    case "secoes":     fill = colorEleitoral(d.res);      break;
+    case "bivariate": {
+      const yv = overlay==="bf" ? d.bf : overlay==="homicidio" ? d.hom : overlay==="mortalidade" ? d.mi : overlay==="gini" ? (d.gini||0.55) : overlay==="pobreza" ? (d.res>60?20:10) : d.idhm;
+      fill = colorBivariate(d.res, yv, overlay);
+      break;
+    }
+    default: fill = "#21262d";
+  }
+  return { fillColor:fill, fillOpacity:0.72, color:"#0d1117", weight:1 };
+}
+
+function recolorMap() {
+  if (_geoLayer) _geoLayer.setStyle(f => featureStyle(f));
+}
+
+// Tooltip — mostra a métrica relevante para a camada ativa + dados base
+function showTT(e, f) {
+  const tt = document.getElementById("mtt");
+  const d  = getUfData(f);
+  const p  = f.properties || {};
+  const nome = d ? d.name : (p.name || p.sigla || "—");
+  document.getElementById("tt-nome").textContent = nome;
+
+  // Métrica em destaque da camada ativa
+  let layerLabel = "", layerMetric = "";
+  if (d) {
+    const mapa = {
+      bivariate:  { l:"Resultado × IDH",  m:`${d.res}% votos · IDH ${d.idhm}` },
+      eleitoral:  { l:"Resultado T1",      m:`${d.res}% (${d.res>=50?"Lula lidera":"Bolsonaro lidera"})` },
+      socio:      { l:"IDH Municipal",     m:`${d.idhm} — ${d.idhm>=0.74?"Alto":d.idhm>=0.66?"Médio":"Baixo"}` },
+      saude:      { l:"Mort. Infantil",    m:`${d.mi}/1k NV — ${d.mi<=10?"Bom":d.mi<=16?"Moderado":"Crítico"}` },
+      seguranca:  { l:"Homicídio /100k",   m:`${d.hom} — ${d.hom<=12?"Baixo":d.hom<=30?"Médio":"Alto"}` },
+      pesquisas:  { l:"Intenção de voto",  m:`Lula ${d.poll}% · Bolsonaro ${100-d.poll-8}% (última pesquisa)` },
+      social:     { l:"Sentimento social", m:`${d.sent>=0.3?"Positivo":d.sent>=-0.1?"Neutro":"Negativo"} (score ${d.sent.toFixed(2)})` },
+      secoes:     { l:"Resultado por seção", m:`${d.res}% média nas seções` },
+      predicao:   { l:"Predição 2026 M1",  m:`Lula ${d.pred}% (IC 95%: ${d.pred-4}–${d.pred+4}%)` },
+    };
+    const info = mapa[_activeLayer] || mapa.bivariate;
+    layerLabel  = info.l;
+    layerMetric = info.m;
+    document.getElementById("tt-res").textContent  = d.res + "%";
+    document.getElementById("tt-idh").textContent  = d.idhm;
+    document.getElementById("tt-bf").textContent   = d.bf + "%";
+    document.getElementById("tt-pred").textContent = "Lula " + d.pred + "%";
+  }
+  document.getElementById("tt-layer-label").textContent  = layerLabel;
+  document.getElementById("tt-layer-metric").innerHTML   =
+    `<div style="font-size:.73rem;font-weight:700;margin-bottom:5px;color:var(--green2)">${layerMetric}</div>`;
+
+  const mp = gMap.latLngToContainerPoint(e.latlng);
+  tt.style.left = (mp.x + 14) + "px";
+  tt.style.top  = (mp.y + 8)  + "px";
+  tt.style.display = "block";
+}
+function hideTT() { document.getElementById("mtt").style.display = "none"; }
+
+function handleClick(e, f) {
+  hideTT();
+  const d = getUfData(f);
+  if (!d) return;
+  selectUF(d);
+  if (_activeLayer === "secoes" && gMap.getZoom() < 11) {
+    gMap.flyTo(UF_VIEW[d.sigla]?.c || [-15,-47], 11, { duration:1.4 });
+  }
+}
+
+// Seções mock
+const SEC_MOCK = [
+  { z:"001",s:"0001",l:"E.E. PROF. JOÃO DA SILVA",   a:"R. das Flores, 123 — Centro",     el:422, res:68 },
+  { z:"001",s:"0002",l:"E.E. PROF. JOÃO DA SILVA",   a:"R. das Flores, 123 — Centro",     el:399, res:71 },
+  { z:"001",s:"0045",l:"CMEI JARDIM ESPERANÇA",      a:"R. Boa Vista, 890 — Jardim",      el:448, res:44 },
+  { z:"002",s:"0112",l:"ESCOLA MUN. SÃO PEDRO",      a:"Av. Brasil, 2200 — Zona Norte",   el:501, res:55 },
+  { z:"002",s:"0113",l:"ESCOLA MUN. SÃO PEDRO",      a:"Av. Brasil, 2200 — Zona Norte",   el:389, res:52 },
+  { z:"003",s:"0201",l:"AABB — ASSOC. ATLÉTICA",     a:"R. do Esporte, 45 — Centro",      el:467, res:38 },
+];
+function renderSecMarkers() {
+  clearSecMarkers();
+  if (_activeLayer !== "secoes") return;
+  const center = gMap.getCenter();
+  SEC_MOCK.forEach((s) => {
+    const lat = center.lat + (Math.random() - .5) * .04;
+    const lng = center.lng + (Math.random() - .5) * .04;
+    const col = s.res > 60 ? "#00c853" : s.res > 45 ? "#f59e0b" : "#ef4444";
+    const r   = 4 + Math.round(s.el / 120);
+    const mk  = L.circleMarker([lat, lng], { radius:r, fillColor:col, color:"#0d1117", weight:1.5, fillOpacity:.9 })
+      .addTo(gMap)
+      .bindTooltip(`<b>Z${s.z}-S${s.s}</b><br>${s.l}<br>Eleitores: ${s.el}<br><b>Lula: ${s.res}%</b>`, { className:"" });
+    _secMarkers.push(mk);
+  });
+}
+function clearSecMarkers() { _secMarkers.forEach(m => m.remove()); _secMarkers = []; }
+
+// ──────────────────────────────────────────────────────────────────────────────
+// LEGENDS
+// ──────────────────────────────────────────────────────────────────────────────
 const LEGENDS = {
   bivariate: {
-    title:"Resultado × IDH Municipal",
-    source:"<strong>TSE 2022</strong> resultado T1 × <strong>IBGE</strong> IDH 2010/est.2022<br>Escala bivariate 3×3 (resultado baixo/médio/alto × IDH baixo/médio/alto)",
-    render:()=>{
-      let h=`<div class="biv-grid-wrap"><div class="biv-y-wrap">
-        <div class="biv-y-labels"><span>IDH alto</span><span>IDH méd</span><span>IDH baixo</span></div>
+    title: "Resultado × IDH Municipal",
+    source: "<strong>TSE 2022</strong> % votos T1 × <strong>IBGE</strong> IDH estimado 2022<br>Escala bivariate 3×3: resultado (X) × indicador (Y)",
+    render: () => {
+      const overlay = document.getElementById("overlay-ind").options[document.getElementById("overlay-ind").selectedIndex].text.replace("Y: ","");
+      return `<div style="display:flex;gap:6px;margin-bottom:5px">
+        <div style="display:flex;flex-direction:column;justify-content:space-between;font-size:.54rem;color:var(--text3);padding-bottom:15px">
+          <span>${overlay} alto</span><span>${overlay} méd</span><span>${overlay} baixo</span>
+        </div>
         <div>
-          <div class="biv-grid" id="biv-grid-inner"></div>
-          <div class="biv-axis-x"><span>Res.baixo</span><span>Res.méd</span><span>Res.alto</span></div>
+          <div class="biv-grid" id="biv-grid-cells"></div>
+          <div class="biv-x-axis"><span>Res. baixo</span><span>Res. méd</span><span>Res. alto</span></div>
         </div></div>
-      </div>
-      <div style="margin-top:8px;font-size:.6rem;color:var(--text3);line-height:1.6">
-        <span style="display:inline-block;width:9px;height:9px;background:#2d6a4f;border-radius:2px;margin-right:4px"></span>Alto resultado + Alto IDH<br>
-        <span style="display:inline-block;width:9px;height:9px;background:#d62828;border-radius:2px;margin-right:4px"></span>Alto resultado + Baixo IDH<br>
-        <span style="display:inline-block;width:9px;height:9px;background:#8ecae6;border-radius:2px;margin-right:4px"></span>Baixo resultado + Alto IDH
+      <div style="font-size:.6rem;color:var(--text3);line-height:1.6">
+        <span style="display:inline-block;width:9px;height:9px;background:#2d6a4f;border-radius:2px;margin-right:4px"></span>Alto resultado + ${overlay} baixo (risco)<br>
+        <span style="display:inline-block;width:9px;height:9px;background:#8ecae6;border-radius:2px;margin-right:4px"></span>Baixo resultado + ${overlay} alto<br>
+        <span style="display:inline-block;width:9px;height:9px;background:#023e8a;border-radius:2px;margin-right:4px"></span>Alto resultado + ${overlay} alto (sólido)
       </div>`;
-      return h;
     },
-    afterRender:()=>{
-      const g=document.getElementById("biv-grid-inner"); if(!g) return;
-      g.innerHTML="";
-      for(let y=0;y<3;y++) for(let x=0;x<3;x++) {
-        const d=document.createElement("div");
-        d.className="biv-cell"; d.style.background=BIV[y][x];
-        d.title=`IDH:${["Alto","Médio","Baixo"][y]} × Resultado:${["Baixo","Médio","Alto"][x]}`;
+    afterRender: () => {
+      const g = document.getElementById("biv-grid-cells"); if (!g) return;
+      g.innerHTML = "";
+      for (let y = 0; y < 3; y++) for (let x = 0; x < 3; x++) {
+        const d = document.createElement("div");
+        d.className = "biv-cell"; d.style.background = BIV[y][x];
         g.appendChild(d);
       }
     }
   },
-  eleitoral:{
-    title:"Resultado Eleitoral — T1",
-    source:"<strong>TSE 2022</strong> · Resultado por município no 1º turno<br>Escala: % votos do candidato selecionado",
-    render:()=>[
-      {c:"#1a9641",l:">60%",d:"Domínio claro"},
-      {c:"#74c476",l:"50–60%",d:"Vantagem confortável"},
-      {c:"#ffffbf",l:"45–50%",d:"Disputa equilibrada"},
-      {c:"#fdae61",l:"40–45%",d:"Desvantagem leve"},
-      {c:"#d7191c",l:"<40%",d:"Oposição clara"},
-    ].map(i=>`<div class="leg-item"><div class="leg-dot" style="background:${i.c}"></div><span><b>${i.l}</b> <span style="color:var(--text3)">${i.d}</span></span></div>`).join(""),
+  eleitoral: {
+    title: "Resultado Eleitoral — T1",
+    source: "<strong>TSE 2022</strong> · % votos do candidato selecionado no 1º turno por estado",
+    render: () => [
+      {c:"#1a9641",b:">60%",    d:"Domínio claro"},
+      {c:"#74c476",b:"50–60%",  d:"Vantagem confortável"},
+      {c:"#ffffbf",b:"45–50%",  d:"Setor competitivo"},
+      {c:"#fdae61",b:"40–45%",  d:"Desvantagem leve"},
+      {c:"#d7191c",b:"<40%",    d:"Oposição predomina"},
+    ].map(i=>`<div class="leg-item"><div class="leg-swatch" style="background:${i.c}"></div><div class="leg-text"><b>${i.b}</b><small>${i.d}</small></div></div>`).join(""),
   },
-  socio:{
-    title:"IDH Municipal",
-    source:"<strong>IBGE</strong> Censo 2010 + estimativas 2022<br>IDH composto: longevidade, educação e renda",
-    render:()=>[
-      {c:"#08519c",l:">0.80",d:"Muito alto"},
-      {c:"#3182bd",l:"0.75–0.80",d:"Alto"},
-      {c:"#6baed6",l:"0.65–0.75",d:"Médio-alto"},
-      {c:"#bdd7e7",l:"0.55–0.65",d:"Médio"},
-      {c:"#ffffd4",l:"<0.55",d:"Baixo"},
-    ].map(i=>`<div class="leg-item"><div class="leg-dot" style="background:${i.c}"></div><span><b>${i.l}</b> <span style="color:var(--text3)">${i.d}</span></span></div>`).join(""),
+  socio: {
+    title: "IDH Municipal",
+    source: "<strong>IBGE</strong> Censo 2010 + estimativas 2022<br>Índice composto: longevidade + educação + renda",
+    render: () => [
+      {c:"#08519c",b:">0.78",   d:"Muito alto"},
+      {c:"#3182bd",b:"0.72–0.78",d:"Alto"},
+      {c:"#6baed6",b:"0.65–0.72",d:"Médio-alto"},
+      {c:"#bdd7e7",b:"0.58–0.65",d:"Médio"},
+      {c:"#ffffd4",b:"<0.58",   d:"Baixo"},
+    ].map(i=>`<div class="leg-item"><div class="leg-swatch" style="background:${i.c}"></div><div class="leg-text"><b>${i.b}</b><small>${i.d}</small></div></div>`).join(""),
   },
-  saude:{
-    title:"Mortalidade Infantil (/1k NV)",
-    source:"<strong>DataSUS</strong> SIM/SINASC 2021<br>Óbitos por 1.000 nascidos vivos",
-    render:()=>[
-      {c:"#08519c",l:"<8",d:"Excelente"},
-      {c:"#6baed6",l:"8–12",d:"Bom"},
-      {c:"#ffffbf",l:"12–18",d:"Moderado"},
-      {c:"#fdae61",l:"18–28",d:"Preocupante"},
-      {c:"#d7191c",l:">28",d:"Crítico"},
-    ].map(i=>`<div class="leg-item"><div class="leg-dot" style="background:${i.c}"></div><span><b>${i.l}</b> <span style="color:var(--text3)">${i.d}</span></span></div>`).join(""),
+  saude: {
+    title: "Mortalidade Infantil (/1.000 NV)",
+    source: "<strong>DataSUS</strong> SIM/SINASC 2021<br>Óbitos infantis por 1.000 nascidos vivos",
+    render: () => [
+      {c:"#08519c",b:"<8",    d:"Excelente"},
+      {c:"#6baed6",b:"8–12",  d:"Bom"},
+      {c:"#ffffbf",b:"12–16", d:"Moderado"},
+      {c:"#fdae61",b:"16–22", d:"Preocupante"},
+      {c:"#d7191c",b:">22",   d:"Crítico"},
+    ].map(i=>`<div class="leg-item"><div class="leg-swatch" style="background:${i.c}"></div><div class="leg-text"><b>${i.b}</b><small>${i.d}</small></div></div>`).join(""),
   },
-  seguranca:{
-    title:"Taxa de Homicídio (/100k hab)",
-    source:"<strong>Atlas da Violência</strong> IPEA/FBSP 2021<br>Homicídios dolosos por 100.000 habitantes",
-    render:()=>[
-      {c:"#08519c",l:"<10",d:"Baixo"},
-      {c:"#6baed6",l:"10–20",d:"Moderado"},
-      {c:"#ffffbf",l:"20–40",d:"Alto"},
-      {c:"#fdae61",l:"40–60",d:"Muito alto"},
-      {c:"#d7191c",l:">60",d:"Crítico"},
-    ].map(i=>`<div class="leg-item"><div class="leg-dot" style="background:${i.c}"></div><span><b>${i.l}</b> <span style="color:var(--text3)">${i.d}</span></span></div>`).join(""),
+  seguranca: {
+    title: "Taxa de Homicídio (/100k hab)",
+    source: "<strong>Atlas da Violência</strong> IPEA/FBSP 2021<br>Homicídios dolosos por 100.000 habitantes",
+    render: () => [
+      {c:"#08519c",b:"<10",   d:"Baixo"},
+      {c:"#6baed6",b:"10–20", d:"Moderado"},
+      {c:"#ffffbf",b:"20–35", d:"Alto"},
+      {c:"#fdae61",b:"35–50", d:"Muito alto"},
+      {c:"#d7191c",b:">50",   d:"Crítico"},
+    ].map(i=>`<div class="leg-item"><div class="leg-swatch" style="background:${i.c}"></div><div class="leg-text"><b>${i.b}</b><small>${i.d}</small></div></div>`).join(""),
   },
-  pesquisas:{
-    title:"Intenção de Voto — Última Pesquisa",
-    source:"<strong>TSE Pesquisas</strong> + <strong>Atlas Intel</strong> + institutos<br>% estimulada 1º turno, pesquisa mais recente",
-    render:()=>[
-      {c:"#1a9641",l:">50%",d:"Maioria absoluta"},
-      {c:"#74c476",l:"45–50%",d:"Vantagem"},
-      {c:"#ffffbf",l:"40–45%",d:"Competitivo"},
-      {c:"#fdae61",l:"35–40%",d:"Segundo colocado"},
-      {c:"#d7191c",l:"<35%",d:"Distante"},
-    ].map(i=>`<div class="leg-item"><div class="leg-dot" style="background:${i.c}"></div><span><b>${i.l}</b> <span style="color:var(--text3)">${i.d}</span></span></div>`).join(""),
+  pesquisas: {
+    title: "Intenção de Voto — Última Pesquisa",
+    source: "<strong>TSE + Atlas Intel + Datafolha</strong><br>% estimulada 1ºT · pesquisa mais recente por UF",
+    render: () => [
+      {c:"#1a9641",b:">60%",   d:"Maioria absoluta clara"},
+      {c:"#74c476",b:"50–60%", d:"Vantagem"},
+      {c:"#ffffbf",b:"45–50%", d:"Competitivo"},
+      {c:"#fdae61",b:"40–45%", d:"Segundo lugar"},
+      {c:"#d7191c",b:"<40%",   d:"Distante"},
+    ].map(i=>`<div class="leg-item"><div class="leg-swatch" style="background:${i.c}"></div><div class="leg-text"><b>${i.b}</b><small>${i.d}</small></div></div>`).join(""),
   },
-  social:{
-    title:"Sentimento nas Redes Sociais",
-    source:"<strong>Twitter/X, BlueSky, Facebook, YouTube</strong><br>Índice de sentimento agregado (BERTimbau) — últimas 24h",
-    render:()=>[
-      {c:"#1a9641",l:">0.6",d:"Positivo forte"},
-      {c:"#74c476",l:"0.2–0.6",d:"Positivo"},
-      {c:"#cccccc",l:"-0.2–0.2",d:"Neutro"},
-      {c:"#fdae61",l:"-0.6–-0.2",d:"Negativo"},
-      {c:"#d7191c",l:"<-0.6",d:"Negativo forte"},
-    ].map(i=>`<div class="leg-item"><div class="leg-dot" style="background:${i.c}"></div><span><b>${i.l}</b> <span style="color:var(--text3)">${i.d}</span></span></div>`).join(""),
+  social: {
+    title: "Sentimento nas Redes Sociais",
+    source: "<strong>Twitter/X + BlueSky + Facebook + YouTube</strong><br>BERTimbau fine-tuned · índice agregado · últimas 24h",
+    render: () => [
+      {c:"#1a9641",b:">+0.5",      d:"Positivo forte"},
+      {c:"#74c476",b:"+0.15–+0.5", d:"Positivo"},
+      {c:"#aaaaaa",b:"-0.15–+0.15",d:"Neutro / polarizado"},
+      {c:"#fdae61",b:"-0.5–-0.15", d:"Negativo"},
+      {c:"#d7191c",b:"<-0.5",      d:"Negativo forte"},
+    ].map(i=>`<div class="leg-item"><div class="leg-swatch" style="background:${i.c}"></div><div class="leg-text"><b>${i.b}</b><small>${i.d}</small></div></div>`).join(""),
   },
-  secoes:{
-    title:"Seções Eleitorais",
-    source:"<strong>TSE</strong> Locais de Votação 2022<br>Disponível zoom ≥12 (nível município)",
-    render:()=>`
-      <div class="sec-legend-item"><div class="sec-dot" style="background:#00c853;border:1px solid #00c853"></div>>60% votos candidato</div>
-      <div class="sec-legend-item"><div class="sec-dot" style="background:#f59e0b"></div>45–60% (disputada)</div>
-      <div class="sec-legend-item"><div class="sec-dot" style="background:#ef4444"></div><45% candidato</div>
-      <div class="sec-legend-item"><div class="sec-dot" style="background:#60a5fa"></div>Sede de zona eleitoral</div>
-      <div style="margin-top:6px;font-size:.62rem;color:var(--text3)">Tamanho do círculo proporcional ao número de eleitores</div>`,
+  secoes: {
+    title: "Seções Eleitorais — Resultado",
+    source: "<strong>TSE</strong> Locais de Votação 2022<br>Marcadores ativados no zoom ≥11",
+    render: () => [
+      {c:"#00c853",b:">60%",   d:"Domínio do candidato"},
+      {c:"#f59e0b",b:"45–60%", d:"Seção disputada"},
+      {c:"#ef4444",b:"<45%",   d:"Oposição predomina"},
+      {c:"#60a5fa",b:"●",      d:"Sede de zona eleitoral"},
+    ].map(i=>`<div class="leg-item"><div class="leg-swatch" style="background:${i.c};border-radius:50%"></div><div class="leg-text"><b>${i.b}</b><small>${i.d}</small></div></div>`).join("")
+     + `<div style="font-size:.6rem;color:var(--text3);margin-top:4px">Tamanho = nº de eleitores</div>`,
   },
-  predicao:{
-    title:"Predição 2026 — Modelo M1",
-    source:"<strong>PyMC MCMC</strong> 4 chains × 2.000 amostras<br>14 features estruturais · IC 95% por município",
-    render:()=>[
-      {c:"#1a9641",l:">60%",d:"Alta confiança"},
-      {c:"#74c476",l:"55–60%",d:"Favorável"},
-      {c:"#ffffbf",l:"48–55%",d:"Competitivo"},
-      {c:"#fdae61",l:"42–48%",d:"Desfavorável"},
-      {c:"#d7191c",l:"<42%",d:"Improvável"},
-    ].map(i=>`<div class="leg-item"><div class="leg-dot" style="background:${i.c}"></div><span><b>${i.l}</b> <span style="color:var(--text3)">${i.d}</span></span></div>`).join(""),
+  predicao: {
+    title: "Predição 2026 — Modelo M1",
+    source: "<strong>PyMC MCMC</strong> · 14 features estruturais<br>IC 95% · mediana posterior por UF",
+    render: () => [
+      {c:"#1a9641",b:">60%",   d:"Alta confiança"},
+      {c:"#74c476",b:"55–60%", d:"Favorável"},
+      {c:"#ffffbf",b:"48–55%", d:"Competitivo"},
+      {c:"#fdae61",b:"42–48%", d:"Desfavorável"},
+      {c:"#d7191c",b:"<42%",   d:"Improvável"},
+    ].map(i=>`<div class="leg-item"><div class="leg-swatch" style="background:${i.c}"></div><div class="leg-text"><b>${i.b}</b><small>${i.d}</small></div></div>`).join(""),
   },
 };
 
 function renderLegend(layer) {
-  const lg=LEGENDS[layer]||LEGENDS.bivariate;
-  document.getElementById("leg-title").textContent=lg.title;
-  const body=document.getElementById("leg-body");
-  const src=document.getElementById("leg-source");
-  const raw=lg.render();
-  body.innerHTML=typeof raw==="string"?raw:"";
-  src.innerHTML=lg.source||"";
-  if(lg.afterRender) lg.afterRender();
+  const lg = LEGENDS[layer] || LEGENDS.bivariate;
+  document.getElementById("leg-title").textContent = lg.title;
+  document.getElementById("leg-body").innerHTML = typeof lg.render === "function" ? lg.render() : "";
+  document.getElementById("leg-source").innerHTML = lg.source || "";
+  if (lg.afterRender) lg.afterRender();
 }
 
-// ─── LAYER BUTTONS ────────────────────────────────────────────────────────────
-document.querySelectorAll(".lbtn").forEach(btn=>{
-  btn.addEventListener("click",()=>{
-    document.querySelectorAll(".lbtn").forEach(b=>b.classList.remove("active"));
-    btn.classList.add("active");
-    _activeLayer=btn.dataset.layer;
-    renderLegend(_activeLayer);
-    updateHint(_activeLayer);
-    recolor();
-    if(_activeLayer==="secoes") { renderSectionMarkers(); switchPanelTab("secoes"); }
-    else { clearSectionMarkers(); }
-    if(_activeLayer==="pesquisas") switchPanelTab("pesquisas");
-    if(_activeLayer==="social") switchPanelTab("social");
-    if(_activeLayer==="predicao") switchPanelTab("modelo");
-  });
-});
-
-const HINTS = {
-  bivariate:"Bivariate: Resultado × IDH — clique para análise contextual completa",
-  eleitoral:"Resultado eleitoral por município — clique para detalhes",
-  socio:"IDH Municipal — IBGE 2022 — clique para comparar com resultado",
-  saude:"Mortalidade Infantil / DataSUS — clique para painel de saúde",
-  seguranca:"Taxa de homicídio /100k hab — Atlas da Violência",
-  pesquisas:"Intenção de voto (última pesquisa por município)",
-  social:"Sentimento nas redes sociais — últimas 24h",
-  secoes:"Seções eleitorais — zoom ≥12 para ver marcadores individuais",
-  predicao:"Predição M1 2026 — IC 95% PyMC — clique para SHAP local",
+// ──────────────────────────────────────────────────────────────────────────────
+// LAYER SWITCHING
+// ──────────────────────────────────────────────────────────────────────────────
+const LAYER_HINTS = {
+  bivariate: "Resultado eleitoral × indicador socioeconômico (bivariate choropleth) — clique num estado",
+  eleitoral: "Resultado por estado — % votos do candidato selecionado no T1",
+  socio:     "IDH Municipal por estado — IBGE 2022",
+  saude:     "Mortalidade Infantil por estado — DataSUS 2021",
+  seguranca: "Taxa de homicídio por 100k hab — Atlas da Violência 2021",
+  pesquisas: "Intenção de voto por estado — última pesquisa estadual disponível",
+  social:    "Sentimento nas redes sociais por estado — últimas 24h (BERTimbau)",
+  secoes:    "Seções eleitorais — cores por resultado · zoom ≥11 mostra marcadores",
+  predicao:  "Predição Modelo M1 2026 — mediana posterior PyMC por estado",
 };
-function updateHint(l){ document.getElementById("map-hint").textContent=HINTS[l]||""; }
+const LAYER_PANEL_MAP = {
+  pesquisas:"pesquisas", social:"social", secoes:"secoes", predicao:"modelo",
+  eleitoral:"contexto",  socio:"contexto", saude:"contexto", seguranca:"contexto",
+  bivariate:"modelo",
+};
 
-// ─── PANEL TABS ───────────────────────────────────────────────────────────────
-function switchPanelTab(name) {
-  document.querySelectorAll(".ptab").forEach(t=>t.classList.remove("active"));
-  document.querySelectorAll(".pbody").forEach(b=>b.style.display="none");
-  const tab=document.querySelector(`[data-tab="${name}"]`);
-  const body=document.getElementById(`tab-${name}`);
-  if(tab) tab.classList.add("active");
-  if(body) body.style.display="block";
-}
-window.switchPanelTab=switchPanelTab;
-document.querySelectorAll(".ptab").forEach(t=>{
-  t.addEventListener("click",()=>switchPanelTab(t.dataset.tab));
-});
-window.selectTabAndLayer=(layer)=>{ switchPanelTab(layer); document.querySelector(`[data-layer="${layer}"]`)?.click(); };
-
-// ─── FILTER CHANGE → ZOOM + CHAT ─────────────────────────────────────────────
-function getCtxText() {
-  const uf=document.getElementById("f-uf").value;
-  const ano=document.getElementById("f-ano").value;
-  const cand=document.getElementById("f-candidato").options[document.getElementById("f-candidato").selectedIndex].text;
-  const cargo=document.getElementById("f-cargo").options[document.getElementById("f-cargo").selectedIndex].text;
-  const turno=document.getElementById("f-turno").value;
-  return `${uf==="BR"?"Brasil":uf} · ${ano} · ${cargo} · T${turno} · ${cand}`;
-}
-
-function onFilterChange() {
-  const uf=document.getElementById("f-uf").value;
-  mapZoom(uf);
-  const ctx=getCtxText();
-  document.getElementById("ctx-text").textContent=ctx;
-  document.getElementById("m-region").textContent=ctx.split("·").slice(0,2).join("·");
-  updateShapCandLabel();
-  // Inject system message in chat
-  injectSystemMsg(`Filtro atualizado: ${ctx}`);
-}
-
-["f-uf","f-cargo","f-ano","f-candidato","f-turno"].forEach(id=>{
-  document.getElementById(id)?.addEventListener("change",onFilterChange);
-});
-
-// ─── MODEL TOGGLE ────────────────────────────────────────────────────────────
-document.querySelectorAll(".mtbtn").forEach(btn=>{
-  btn.addEventListener("click",()=>{
-    document.querySelectorAll(".mtbtn").forEach(b=>b.classList.remove("active"));
+document.querySelectorAll(".lbtn").forEach(btn => {
+  btn.addEventListener("click", () => {
+    document.querySelectorAll(".lbtn").forEach(b => b.classList.remove("active"));
     btn.classList.add("active");
-    const m=btn.dataset.m;
-    if(m==="2"){
-      document.getElementById("m-cands").innerHTML=`<div style="text-align:center;padding:14px 0;color:var(--text2);font-size:.73rem"><div style="font-size:1.4rem;margin-bottom:6px">⏳</div>Modelo 2 aguarda dados de Polls e Social.<br><span style="color:var(--text3);font-size:.63rem">ETA: ~3 dias</span></div>`;
-    } else if(m==="diff") {
-      document.getElementById("m-cands").innerHTML=`<div style="padding:8px 0;font-size:.72rem;color:var(--text2)">Δ M2 − M1 (não disponível ainda).<br><span style="color:var(--text3)">Requer Modelo 2 ativo.</span></div>`;
-    } else {
-      renderCandidates();
-    }
+    _activeLayer = btn.dataset.layer;
+    recolorMap();
+    renderLegend(_activeLayer);
+    document.getElementById("map-hint").textContent = LAYER_HINTS[_activeLayer] || "";
+    if (_activeLayer === "secoes" && gMap && gMap.getZoom() >= 11) renderSecMarkers();
+    else clearSecMarkers();
+    const panelTarget = LAYER_PANEL_MAP[_activeLayer];
+    if (panelTarget) switchTab(panelTarget);
+    // Injetar no chat
+    chatInject("sys", `Vista alterada para: ${btn.textContent.trim()}`);
   });
 });
 
-// ─── RENDER FUNCTIONS ─────────────────────────────────────────────────────────
+document.getElementById("overlay-ind").addEventListener("change", () => {
+  if (_activeLayer === "bivariate") { recolorMap(); renderLegend("bivariate"); }
+});
+
+// ──────────────────────────────────────────────────────────────────────────────
+// FILTROS → ZOOM + RECOLORIR + CHAT
+// ──────────────────────────────────────────────────────────────────────────────
+function getCtx() {
+  const uf   = document.getElementById("f-uf").value;
+  const ano  = document.getElementById("f-ano").value;
+  const cand = document.getElementById("f-candidato").options[document.getElementById("f-candidato").selectedIndex].text;
+  const cargo= document.getElementById("f-cargo").options[document.getElementById("f-cargo").selectedIndex].text;
+  const t    = document.getElementById("f-turno").value;
+  return `${uf==="BR"?"Brasil":uf} · ${ano} · ${cargo} · T${t} · ${cand}`;
+}
+
+function onFilter() {
+  const uf = document.getElementById("f-uf").value;
+  if (gMap) {
+    const v = UF_VIEW[uf] || UF_VIEW.BR;
+    gMap.flyTo(v.c, v.z, { duration:1.3 });
+  }
+  recolorMap();
+  const ctx = getCtx();
+  document.getElementById("ctx-txt").textContent   = ctx;
+  document.getElementById("m-region").textContent  = ctx.split("·").slice(0,2).join("·").trim();
+  chatInject("sys", `Filtro: ${ctx}`);
+  updateShapCandLabel();
+}
+
+["f-uf","f-cargo","f-ano","f-candidato","f-turno"].forEach(id => {
+  document.getElementById(id)?.addEventListener("change", onFilter);
+});
+
+// ──────────────────────────────────────────────────────────────────────────────
+// SELEÇÃO DE UF / MUNICÍPIO
+// ──────────────────────────────────────────────────────────────────────────────
+function selectUF(d) {
+  if (!d) return;
+  switchTab("contexto");
+  document.getElementById("ctx-nome").textContent = d.name;
+  document.getElementById("ctx-sub").textContent  = `${d.sigla} · Eleição 2022 · Presidente`;
+  document.getElementById("c-w").textContent  = d.res >= 50 ? "Lula (PT)" : "Bolsonaro (PL)";
+  document.getElementById("c-p1").textContent = d.res + "%";
+  document.getElementById("c-p2").textContent = d.res >= 50 ? (d.res + 2).toFixed(1) + "%" : "—";
+  document.getElementById("c-cp").textContent = "72.4%";
+  document.getElementById("c-bn").textContent = "3.8%";
+  document.getElementById("c-idh").textContent   = d.idhm;
+  document.getElementById("c-renda").textContent = "R$ " + Math.round(600 + d.idhm * 1200);
+  document.getElementById("c-gini").textContent  = d.gini || "0.55";
+  document.getElementById("c-analf").textContent = (30 - d.idhm * 30).toFixed(1) + "%";
+  document.getElementById("c-urb").textContent   = (50 + d.idhm * 50).toFixed(1) + "%";
+  document.getElementById("c-pop").textContent   = "—";
+  document.getElementById("c-bf").textContent    = d.bf + "%";
+  document.getElementById("c-fbf").textContent   = "—";
+  document.getElementById("c-vbf").textContent   = "—";
+  document.getElementById("c-mi").textContent    = d.mi;
+  document.getElementById("c-aps").textContent   = (100 - d.mi * 2) + "%";
+  document.getElementById("c-plano").textContent = (d.idhm * 60).toFixed(0) + "%";
+  document.getElementById("c-hom").textContent   = d.hom;
+  document.getElementById("c-ivs").textContent   = d.hom > 40 ? "Alto" : d.hom > 20 ? "Médio" : "Baixo";
+  document.getElementById("c-uf-poll").textContent  = d.sigla;
+  document.getElementById("c-poll-lula").textContent  = d.poll + "%";
+  document.getElementById("c-poll-bolso").textContent = (100 - d.poll - 8) + "%";
+  document.getElementById("c-poll-inst").textContent  = "Datafolha — Set/2022";
+  document.getElementById("c-sent-lula").textContent  = d.sent >= 0 ? "+" + d.sent.toFixed(2) : d.sent.toFixed(2);
+  document.getElementById("c-sent-bolso").textContent = (-d.sent + 0.1).toFixed(2);
+  document.getElementById("c-polar").textContent = Math.min(0.99, Math.abs(d.sent) * 1.5).toFixed(2);
+  document.getElementById("c-pcand").textContent  = "Lula";
+  document.getElementById("c-pprob").textContent  = d.pred + "%";
+  document.getElementById("c-pic").textContent    = `${d.pred-4}% — ${d.pred+4}%`;
+  const dEl = document.getElementById("c-pdelta");
+  const delta = (d.pred - d.res).toFixed(1);
+  dEl.textContent = (delta >= 0 ? "+" : "") + delta + "pp";
+  dEl.className = "kv " + (delta >= 0 ? "g" : "r");
+  document.getElementById("c-cluster").textContent =
+    d.bf > 45 ? "Nordeste BF-Dependente" :
+    d.idhm > 0.76 ? "Metrópole Polarizada" : "Interior Médio";
+
+  // SHAP local
+  document.getElementById("shap-local-nm").textContent = d.name;
+  document.getElementById("shap-local-card").style.display = "block";
+  renderShap("shap-local", SHAP_DATA.map(s => ({ ...s, v: s.v * (0.6 + Math.random() * 0.8) })));
+
+  // Chat
+  document.getElementById("ctx-mun").textContent = ` · ${d.name}`;
+  chatInject("agent",
+    `Estado selecionado: <strong>${d.name} (${d.sigla})</strong><br>
+    Resultado 2022: <strong>${d.res}% Lula</strong> · IDH: ${d.idhm} · % BF: ${d.bf}%<br>
+    Sentimento social: ${d.sent>=0.3?"positivo":d.sent>=-0.1?"neutro":"negativo"} (${d.sent.toFixed(2)})<br>
+    Última pesquisa: Lula ${d.poll}% · Predição 2026: <strong>${d.pred}%</strong><br><br>
+    <span class="map-cmd" onclick="switchTab('shap')">📊 Ver SHAP</span>
+    <span class="map-cmd" onclick="activateLayer('pesquisas')">📋 Ver pesquisas no mapa</span>`
+  );
+
+  // Atualizar label de seções
+  document.getElementById("sec-uf").textContent = d.sigla;
+}
+
+window.clickUF = (sigla) => selectUF(UF_DATA[sigla]);
+window.activateLayer = (l) => document.querySelector(`[data-layer="${l}"]`)?.click();
+window.zoomRegion = (r) => { const v=REGION_VIEW[r]; if(v&&gMap) gMap.flyTo(v.c,v.z,{duration:1.3}); };
+window.switchTab = switchTab;
+
+// ──────────────────────────────────────────────────────────────────────────────
+// TABS
+// ──────────────────────────────────────────────────────────────────────────────
+function switchTab(name) {
+  document.querySelectorAll(".ptab").forEach(t => t.classList.remove("active"));
+  document.querySelectorAll(".pbody").forEach(b => b.style.display = "none");
+  const t = document.querySelector(`[data-tab="${name}"]`);
+  const b = document.getElementById(`tab-${name}`);
+  if (t) t.classList.add("active");
+  if (b) b.style.display = "block";
+}
+document.querySelectorAll(".ptab").forEach(t => {
+  t.addEventListener("click", () => switchTab(t.dataset.tab));
+});
+
+// ──────────────────────────────────────────────────────────────────────────────
+// CHARTS
+// ──────────────────────────────────────────────────────────────────────────────
+const PD = {
+  labels:["Jan","Fev","Mar","Abr","Mai","Jun","Jul","Ago","Set","Out"],
+  lula:  [45,46,48,47,49,50,51,52,53,52],
+  bolso: [38,37,36,37,36,35,35,36,37,43],
+  ciro:  [10,10,9,8,8,7,7,6,5,4],
+};
+let _charts = {};
+function mkChart(id, cfg) {
+  const ctx = document.getElementById(id); if (!ctx) return;
+  if (_charts[id]) _charts[id].destroy();
+  _charts[id] = new Chart(ctx, cfg);
+}
+const cOpts = (min,max) => ({
+  plugins:{ legend:{ labels:{ color:"#8d96a0", font:{size:9} } } },
+  scales:{
+    x:{ ticks:{color:"#57606a",font:{size:8}}, grid:{color:"#21262d"} },
+    y:{ ticks:{color:"#57606a",font:{size:8},callback:v=>v+(min<-1?"":"%")}, grid:{color:"#21262d"}, min, max }
+  },
+  responsive:true, maintainAspectRatio:true,
+});
+
+function initCharts() {
+  // Tracking
+  mkChart("chart-tracking",{ type:"line", data:{ labels:PD.labels,
+    datasets:[
+      {label:"Lula",data:PD.lula,borderColor:"#ef5350",tension:.4,pointRadius:2,borderWidth:2,backgroundColor:"#ef535011"},
+      {label:"Bolsonaro",data:PD.bolso,borderColor:"#42a5f5",tension:.4,pointRadius:2,borderWidth:2,backgroundColor:"#42a5f511"},
+    ]}, options:cOpts(25,60)});
+
+  // Polls full
+  mkChart("chart-polls-full",{ type:"line", data:{ labels:PD.labels,
+    datasets:[
+      {label:"Lula (PT)",data:PD.lula,borderColor:"#ef5350",tension:.4,pointRadius:3,borderWidth:2,backgroundColor:"#ef535011"},
+      {label:"Bolsonaro (PL)",data:PD.bolso,borderColor:"#42a5f5",tension:.4,pointRadius:3,borderWidth:2,backgroundColor:"#42a5f511"},
+      {label:"Ciro (PDT)",data:PD.ciro,borderColor:"#a78bfa",tension:.4,pointRadius:2,borderWidth:1},
+    ]}, options:cOpts(0,65)});
+
+  // House effect
+  mkChart("chart-house",{ type:"bar",
+    data:{ labels:["Datafolha","Quaest","AtlasIntel","PoderData","IBOPE"],
+      datasets:[
+        {label:"Δ Lula",   data:[0,-1,+2,-2,+1], backgroundColor:"#ef535088",borderRadius:3},
+        {label:"Δ Bolso",  data:[0,+1,-1,+2,-1], backgroundColor:"#42a5f588",borderRadius:3},
+      ]},
+    options:{ plugins:{legend:{labels:{color:"#8d96a0",font:{size:9}}}},
+      scales:{x:{ticks:{color:"#57606a",font:{size:8}},grid:{display:false}},
+              y:{ticks:{color:"#57606a",font:{size:8},callback:v=>(v>0?"+":"")+v+"pp"},grid:{color:"#21262d"}}},
+      responsive:true,maintainAspectRatio:true}});
+
+  // Sentiment
+  const sl = [...Array(30)].map((_,i)=>`${i+1}`);
+  mkChart("chart-sentiment",{ type:"line",
+    data:{ labels:sl, datasets:[
+      {label:"Lula",  data:sl.map((_,i)=>+(0.35+Math.sin(i*.4)*.18+Math.random()*.04).toFixed(2)), borderColor:"#ef5350",tension:.5,pointRadius:0,backgroundColor:"#ef535011"},
+      {label:"Bolso", data:sl.map((_,i)=>+(0.05+Math.sin(i*.3+1)*.12+Math.random()*.04).toFixed(2)), borderColor:"#42a5f5",tension:.5,pointRadius:0,backgroundColor:"#42a5f511"},
+    ]},
+    options:{ plugins:{legend:{labels:{color:"#8d96a0",font:{size:9}}}},
+      scales:{x:{ticks:{color:"#57606a",font:{size:7},maxRotation:0},grid:{display:false}},
+              y:{ticks:{color:"#57606a",font:{size:8}},grid:{color:"#21262d"},min:-1,max:1}},
+      responsive:true,maintainAspectRatio:true}});
+
+  // Polar
+  const ufs=["SP","RJ","MG","BA","RS","CE","PE","PR","GO","AM"];
+  const pv=ufs.map(u=>+(Math.abs(UF_DATA[u]?.sent||0)*1.4+Math.random()*.1).toFixed(2));
+  mkChart("chart-polar",{ type:"bar",
+    data:{ labels:ufs, datasets:[{ label:"Polarização", data:pv, backgroundColor:pv.map(v=>v>.6?"#ef444488":v>.4?"#f59e0b88":"#6baed688"), borderRadius:3 }]},
+    options:{ plugins:{legend:{display:false}},
+      scales:{x:{ticks:{color:"#57606a",font:{size:8}},grid:{display:false}},
+              y:{ticks:{color:"#57606a",font:{size:8}},grid:{color:"#21262d"},min:0,max:1}},
+      responsive:true,maintainAspectRatio:true}});
+
+  // Seções dist
+  const bins=[12,28,52,78,95,110,88,62,40,18];
+  mkChart("chart-sec-dist",{ type:"bar",
+    data:{ labels:["<30","30-35","35-40","40-45","45-50","50-55","55-60","60-65","65-70",">70"],
+      datasets:[{ label:"Seções", data:bins,
+        backgroundColor:bins.map((_,i)=>i<4?"#ef444866":i<6?"#f59e0b66":"#00c85366"), borderRadius:2 }]},
+    options:{ plugins:{legend:{display:false}},
+      scales:{x:{ticks:{color:"#57606a",font:{size:7},maxRotation:45},grid:{display:false}},
+              y:{ticks:{color:"#57606a",font:{size:8}},grid:{color:"#21262d"}}},
+      responsive:true,maintainAspectRatio:true}});
+}
+
+// ──────────────────────────────────────────────────────────────────────────────
+// POLLS LIST / SOCIAL / TOPICS
+// ──────────────────────────────────────────────────────────────────────────────
+const POLLS_LIST = [
+  {inst:"Datafolha",  dt:"01/10",n:2556,met:"Presencial",l:50,b:36,mg:2,g:"A+"},
+  {inst:"Quaest",     dt:"29/09",n:2000,met:"Telefone",  l:49,b:37,mg:2,g:"A"},
+  {inst:"AtlasIntel", dt:"28/09",n:5000,met:"Online",    l:52,b:36,mg:1,g:"A"},
+  {inst:"PoderData",  dt:"27/09",n:3500,met:"Online",    l:48,b:38,mg:2,g:"B+"},
+  {inst:"IBOPE/Ipec", dt:"25/09",n:2000,met:"Presencial",l:51,b:37,mg:2,g:"A+"},
+];
+function renderPollsList() {
+  document.getElementById("polls-list").innerHTML = POLLS_LIST.map(p => `
+    <div class="poll-row">
+      <div><div class="pi-name">${p.inst}</div><div class="pi-meta">${p.dt}/2022 · N=${p.n}<br>${p.met} · ±${p.mg}pp</div></div>
+      <div class="pi-vals">
+        <div class="pi-val" style="color:#ef5350">${p.l}%</div>
+        <div class="pi-val" style="color:#42a5f5">${p.b}%</div>
+      </div>
+      <div class="pi-grade">${p.g}</div>
+    </div>`).join("");
+}
+function renderPollGeo() {
+  const ufs=["SP","MG","RJ","BA","RS","CE","PE","PR","GO","AM","SC","PB","PI","MA","PA"];
+  document.getElementById("poll-geo").innerHTML =
+    `<div style="display:flex;flex-wrap:wrap;gap:4px">` +
+    ufs.map(u=>`<span style="background:var(--green-dim);color:var(--green2);border:1px solid var(--green);border-radius:4px;padding:2px 6px;font-size:.61rem;font-weight:600">${u}</span>`).join("") +
+    `</div>`;
+}
+
+const PLATFORMS = [
+  {nm:"Twitter/X",ic:"𝕏",col:"#1da1f2",vol:"342k",pos:45,neu:28,neg:27,d:"+3%",du:true},
+  {nm:"BlueSky",  ic:"☁",col:"#0085ff",vol:"89k", pos:58,neu:22,neg:20,d:"+8%",du:true},
+  {nm:"Facebook", ic:"f",col:"#1877f2",vol:"215k",pos:38,neu:31,neg:31,d:"-2%",du:false},
+  {nm:"YouTube",  ic:"▶",col:"#ff0000",vol:"124k",pos:41,neu:35,neg:24,d:"+1%",du:true},
+  {nm:"TikTok",   ic:"♪",col:"#69c9d0",vol:"78k", pos:62,neu:24,neg:14,d:"+12%",du:true},
+];
+function renderPlatforms() {
+  document.getElementById("social-platforms").innerHTML = PLATFORMS.map(p => `
+    <div class="plat-row">
+      <div class="plat-ico" style="background:${p.col}22;border:1px solid ${p.col}44;color:${p.col}">${p.ic}</div>
+      <div class="plat-info">
+        <div class="plat-nm">${p.nm}</div>
+        <div class="sent-bar">
+          <div class="sp" style="width:${p.pos}%"></div>
+          <div class="sn" style="width:${p.neu}%"></div>
+          <div class="sr" style="width:${p.neg}%"></div>
+        </div>
+        <div style="font-size:.57rem;color:var(--text3)">${p.pos}% pos · ${p.neu}% neu · ${p.neg}% neg</div>
+      </div>
+      <div style="text-align:right;flex-shrink:0">
+        <div class="plat-vol">${p.vol}</div>
+        <div style="font-size:.59rem;color:${p.du?"var(--green2)":"#ef4444"}">${p.d}</div>
+      </div>
+    </div>`).join("");
+}
+const TOPICS = [
+  {t:"#DebatePresidencial",hot:true,rising:false},{t:"#LulaPresidente",hot:true,rising:false},
+  {t:"#BolsonaroJaneiro",hot:false,rising:true},{t:"economia",hot:false,rising:true},
+  {t:"bolsafamilia",hot:false,rising:false},{t:"segurança pública",hot:false,rising:true},
+  {t:"urnas eletrônicas",hot:false,rising:false},{t:"TSE julgamento",hot:false,rising:false},
+  {t:"Nordeste vota",hot:true,rising:false},{t:"previdência",hot:false,rising:true},
+];
+function renderTopics() {
+  document.getElementById("trending-topics").innerHTML =
+    `<div style="display:flex;flex-wrap:wrap;gap:0">` +
+    TOPICS.map(t=>`<span class="topic-chip${t.hot?" hot":t.rising?" rising":""}">${t.hot?"🔴 ":t.rising?"🟡 ":""}${t.t}</span>`).join("") +
+    `</div>`;
+}
+
+// SEÇÕES
+function renderSecoesList() {
+  document.getElementById("secoes-list").innerHTML = SEC_MOCK.map(s => {
+    const col = s.res>60?"#00c853":s.res>45?"#f59e0b":"#ef4444";
+    return `<div class="sec-row">
+      <div class="sec-id">Z${s.z}-S${s.s}</div>
+      <div class="sec-info"><div class="sec-local">${s.l}</div><div class="sec-addr">${s.a}</div></div>
+      <div class="sec-eleit">${s.el}<small>eleitores</small></div>
+      <div class="sec-dot" style="background:${col}"></div>
+    </div>`;
+  }).join("");
+}
+
+// ──────────────────────────────────────────────────────────────────────────────
+// MODEL
+// ──────────────────────────────────────────────────────────────────────────────
+const CANDIDATES = [
+  {id:"lula", nm:"Luiz Inácio Lula da Silva",pt:"PT",col:"#d32f2f",pct:53.1,lo:50.2,hi:55.9,delta:"+1.8pp",up:true},
+  {id:"bolso",nm:"Jair Messias Bolsonaro",   pt:"PL",col:"#1565c0",pct:42.4,lo:39.7,hi:45.1,delta:"-1.8pp",up:false},
+  {id:"ciro", nm:"Ciro Ferreira Gomes",      pt:"PDT",col:"#7c3aed",pct:3.0,lo:2.1,hi:3.9,delta:"-0.3pp",up:false},
+];
 function renderCandidates() {
-  const el=document.getElementById("m-cands");
-  if(!el) return;
-  el.innerHTML=CANDIDATES.map(d=>{
-    return `<div class="cand-row">
-      <div class="cav" style="background:${d.color}22;border:1px solid ${d.color}">${d.name.split(" ").map(w=>w[0]).slice(0,2).join("")}</div>
+  document.getElementById("m-cands").innerHTML = CANDIDATES.map(d => `
+    <div class="cand-row">
+      <div class="cav" style="background:${d.col}22;border:1px solid ${d.col}">${d.nm.split(" ").map(w=>w[0]).slice(0,2).join("")}</div>
       <div class="ci">
-        <div class="cn">${d.name} <span style="font-size:.6rem;color:var(--text3)">(${d.partido})</span></div>
+        <div class="cn">${d.nm} <span style="font-size:.59rem;color:var(--text3)">(${d.pt})</span></div>
         <div class="ic-bar" title="IC95%: ${d.lo}%–${d.hi}%">
-          <div class="ic-range" style="left:${d.lo}%;width:${d.hi-d.lo}%;background:${d.color}44"></div>
-          <div class="ic-pt" style="left:calc(${d.pct}% - 3.5px);background:${d.color}"></div>
+          <div class="ic-range" style="left:${d.lo}%;width:${d.hi-d.lo}%;background:${d.col}44"></div>
+          <div class="ic-pt" style="left:calc(${d.pct}% - 3.5px);background:${d.col}"></div>
         </div>
         <div class="ic-lbl"><span>${d.lo}%</span><span>IC 95%</span><span>${d.hi}%</span></div>
       </div>
       <div style="text-align:right;flex-shrink:0">
-        <div class="cpct" style="color:${d.color}">${d.pct}%</div>
+        <div class="cpct" style="color:${d.col}">${d.pct}%</div>
         <span class="delta ${d.up?"up":"dn"}">${d.delta}</span>
       </div>
-    </div>`;
-  }).join("");
-}
-
-let _trackChart=null, _pollsChart=null, _houseChart=null, _sentChart=null, _polarChart=null, _secoesChart=null;
-
-function renderTrackingChart() {
-  const ctx=document.getElementById("chart-tracking"); if(!ctx) return;
-  if(_trackChart) _trackChart.destroy();
-  _trackChart=new Chart(ctx,{type:"line",data:{
-    labels:POLLS_DATA.labels,
-    datasets:[
-      {label:"Lula",data:POLLS_DATA.lula,borderColor:"#ef5350",backgroundColor:"#ef535011",tension:.4,pointRadius:2,borderWidth:2},
-      {label:"Bolsonaro",data:POLLS_DATA.bolso,borderColor:"#42a5f5",backgroundColor:"#42a5f511",tension:.4,pointRadius:2,borderWidth:2},
-      {label:"IC 90%",data:POLLS_DATA.banda_hi,borderColor:"transparent",backgroundColor:"#ef535018",fill:"+1",tension:.4,pointRadius:0},
-      {label:"_lo",data:POLLS_DATA.banda_lo,borderColor:"transparent",backgroundColor:"transparent",fill:false,tension:.4,pointRadius:0},
-    ]
-  },options:{plugins:{legend:{labels:{color:"#8d96a0",font:{size:9},filter:i=>!i.text.startsWith("_")&&i.text!=="IC 90%"}}},
-    scales:{x:{ticks:{color:"#57606a",font:{size:8}},grid:{color:"#21262d"}},y:{ticks:{color:"#57606a",font:{size:8},callback:v=>v+"%"},grid:{color:"#21262d"},min:25,max:60}},
-    responsive:true,maintainAspectRatio:true}});
-}
-
-function renderPollsFull() {
-  const ctx=document.getElementById("chart-polls-full"); if(!ctx) return;
-  if(_pollsChart) _pollsChart.destroy();
-  _pollsChart=new Chart(ctx,{type:"line",data:{
-    labels:POLLS_DATA.labels,
-    datasets:[
-      {label:"Lula (PT)",data:POLLS_DATA.lula,borderColor:"#ef5350",tension:.4,pointRadius:3,borderWidth:2,backgroundColor:"#ef535011"},
-      {label:"Bolsonaro (PL)",data:POLLS_DATA.bolso,borderColor:"#42a5f5",tension:.4,pointRadius:3,borderWidth:2,backgroundColor:"#42a5f511"},
-      {label:"Ciro (PDT)",data:POLLS_DATA.ciro,borderColor:"#a78bfa",tension:.4,pointRadius:3,borderWidth:1,backgroundColor:"#a78bfa11"},
-    ]
-  },options:{plugins:{legend:{labels:{color:"#8d96a0",font:{size:9}}}},
-    scales:{x:{ticks:{color:"#57606a",font:{size:8}},grid:{color:"#21262d"}},y:{ticks:{color:"#57606a",font:{size:8},callback:v=>v+"%"},grid:{color:"#21262d"},min:0,max:60}},
-    responsive:true,maintainAspectRatio:true}});
-}
-
-function renderPollsList() {
-  document.getElementById("polls-list").innerHTML=POLLS_LIST.map(p=>`
-    <div class="poll-institute-row">
-      <div>
-        <div class="poll-inst-name">${p.inst}</div>
-        <div class="poll-date">${p.data}</div>
-      </div>
-      <div class="poll-method">N=${p.n}<br>${p.metodo}</div>
-      <div class="poll-vals">
-        <div class="poll-val" style="color:#ef5350">${p.lula}%</div>
-        <div class="poll-val" style="color:#42a5f5">${p.bolso}%</div>
-      </div>
-      <div style="text-align:right;flex-shrink:0">
-        <div style="font-size:.62rem;font-weight:700;color:var(--green2)">${p.nota}</div>
-        <div style="font-size:.57rem;color:var(--text3)">±${p.margem}pp</div>
-      </div>
     </div>`).join("");
 }
+document.querySelectorAll(".mtbtn").forEach(btn => {
+  btn.addEventListener("click", () => {
+    document.querySelectorAll(".mtbtn").forEach(b=>b.classList.remove("active"));
+    btn.classList.add("active");
+    if (btn.dataset.m === "1") renderCandidates();
+    else document.getElementById("m-cands").innerHTML =
+      `<div style="text-align:center;padding:14px;color:var(--text2);font-size:.72rem"><div style="font-size:1.4rem;margin-bottom:6px">${btn.dataset.m==="2"?"⏳":"Δ"}</div>${btn.dataset.m==="2"?"M2 aguarda Polls + Social (~3 dias)":"Δ M2−M1 indisponível: M2 pendente"}</div>`;
+  });
+});
 
-function renderHouseChart() {
-  const ctx=document.getElementById("chart-house"); if(!ctx) return;
-  if(_houseChart) _houseChart.destroy();
-  _houseChart=new Chart(ctx,{type:"bar",data:{
-    labels:HOUSE_EFFECT.labels,
-    datasets:[
-      {label:"Δ Lula",data:HOUSE_EFFECT.lula,backgroundColor:"#ef535088",borderRadius:3},
-      {label:"Δ Bolsonaro",data:HOUSE_EFFECT.bolso,backgroundColor:"#42a5f588",borderRadius:3},
-    ]
-  },options:{plugins:{legend:{labels:{color:"#8d96a0",font:{size:9}}}},
-    scales:{x:{ticks:{color:"#57606a",font:{size:8}},grid:{display:false}},y:{ticks:{color:"#57606a",font:{size:8},callback:v=>(v>0?"+":"")+v+"pp"},grid:{color:"#21262d"}}},
-    responsive:true,maintainAspectRatio:true}});
-}
-
-function renderPollGeo() {
-  const ufs=["SP","MG","RJ","BA","RS","CE","PE","PR","GO","AM","SC","PB","PI","MA","PA"];
-  document.getElementById("poll-geo").innerHTML=`<div style="display:flex;flex-wrap:wrap;gap:4px">`+
-    ufs.map(u=>`<span style="background:var(--green-dim);color:var(--green2);border:1px solid var(--green);border-radius:4px;padding:2px 6px;font-size:.62rem;font-weight:600">${u}</span>`).join("")+
-    `</div>`;
-}
-
-function renderSocialPlatforms() {
-  document.getElementById("social-platforms").innerHTML=SOCIAL_PLATFORMS.map(p=>`
-    <div class="platform-row">
-      <div class="plat-icon" style="background:${p.color}22;border:1px solid ${p.color}44;color:${p.color}">${p.icon}</div>
-      <div class="plat-info">
-        <div class="plat-name">${p.name}</div>
-        <div class="sentiment-bar">
-          <div class="s-pos" style="width:${p.pos}%"></div>
-          <div class="s-neu" style="width:${p.neu}%"></div>
-          <div class="s-neg" style="width:${p.neg}%"></div>
-        </div>
-        <div class="plat-meta">${p.pos}% pos · ${p.neu}% neu · ${p.neg}% neg</div>
-      </div>
-      <div style="text-align:right;flex-shrink:0">
-        <div class="plat-volume">${p.vol}</div>
-        <div style="font-size:.6rem;color:${p.deltaUp?"var(--green2)":"var(--red)"}">${p.delta}</div>
-      </div>
-    </div>`).join("");
-}
-
-function renderSentimentChart() {
-  const ctx=document.getElementById("chart-sentiment"); if(!ctx) return;
-  if(_sentChart) _sentChart.destroy();
-  const labs=[...Array(30)].map((_,i)=>`${i+1}/10`);
-  const lula= labs.map((_,i)=>0.3+Math.sin(i*.4)*.2+Math.random()*.05);
-  const bolso=labs.map((_,i)=>0.1+Math.sin(i*.3+1)*.15+Math.random()*.05);
-  _sentChart=new Chart(ctx,{type:"line",data:{
-    labels:labs,
-    datasets:[
-      {label:"Lula",data:lula,borderColor:"#ef5350",backgroundColor:"#ef535011",tension:.5,pointRadius:0},
-      {label:"Bolsonaro",data:bolso,borderColor:"#42a5f5",backgroundColor:"#42a5f511",tension:.5,pointRadius:0},
-    ]
-  },options:{plugins:{legend:{labels:{color:"#8d96a0",font:{size:9}}}},
-    scales:{x:{ticks:{color:"#57606a",font:{size:7},maxRotation:0},grid:{display:false}},
-            y:{ticks:{color:"#57606a",font:{size:8}},grid:{color:"#21262d"},min:-1,max:1}},
-    responsive:true,maintainAspectRatio:true}});
-}
-
-function renderTrending() {
-  document.getElementById("trending-topics").innerHTML=`<div style="display:flex;flex-wrap:wrap;gap:0">`+
-    TRENDING.map(t=>`<span class="topic-chip${t.hot?" hot":t.rising?" rising":""}">${t.hot?"🔴 ":t.rising?"🟡 ":""}${t.text}</span>`).join("")+
-    `</div>`;
-}
-
-function renderPolarChart() {
-  const ctx=document.getElementById("chart-polar"); if(!ctx) return;
-  if(_polarChart) _polarChart.destroy();
-  const ufs=["SP","RJ","MG","BA","RS","CE","PE","PR","GO","AM"];
-  const vals=ufs.map(()=>Math.random()*.7+.2);
-  _polarChart=new Chart(ctx,{type:"bar",data:{
-    labels:ufs,
-    datasets:[{label:"Polarização",data:vals,backgroundColor:vals.map(v=>v>.6?"#ef444488":v>.4?"#f59e0b88":"#6baed688"),borderRadius:3}]
-  },options:{plugins:{legend:{display:false}},
-    scales:{x:{ticks:{color:"#57606a",font:{size:8}},grid:{display:false}},y:{ticks:{color:"#57606a",font:{size:8}},grid:{color:"#21262d"},min:0,max:1}},
-    responsive:true,maintainAspectRatio:true}});
-}
-
-function renderSecoesList() {
-  document.getElementById("secoes-list").innerHTML=SECOES_MOCK.map(s=>`
-    <div class="section-row">
-      <div class="s-num">Z${s.zona}-S${s.secao}</div>
-      <div class="s-info">
-        <div class="s-local">${s.local}</div>
-        <div class="s-addr">${s.addr}</div>
-      </div>
-      <div class="s-eleit">${s.eleit}<small>eleitores</small></div>
-    </div>`).join("");
-}
-
-function renderSecoesDistChart() {
-  const ctx=document.getElementById("chart-secoes-dist"); if(!ctx) return;
-  if(_secoesChart) _secoesChart.destroy();
-  const bins=Array(10).fill(0).map((_,i)=>Math.round(50+30*Math.sin(i*.6)+Math.random()*20));
-  _secoesChart=new Chart(ctx,{type:"bar",data:{
-    labels:["<30%","30–35","35–40","40–45","45–50","50–55","55–60","60–65","65–70",">70%"],
-    datasets:[{label:"Nº seções",data:bins,backgroundColor:bins.map((_,i)=>i<4?"#ef444488":i<6?"#f59e0b88":"#00c85388"),borderRadius:2}]
-  },options:{plugins:{legend:{display:false}},
-    scales:{x:{ticks:{color:"#57606a",font:{size:7},maxRotation:45},grid:{display:false}},y:{ticks:{color:"#57606a",font:{size:8}},grid:{color:"#21262d"}}},
-    responsive:true,maintainAspectRatio:true}});
-}
-
-// ─── SHAP ────────────────────────────────────────────────────────────────────
-function renderShap(containerId, data) {
-  const el=document.getElementById(containerId); if(!el) return;
-  const maxA=Math.max(...data.map(d=>Math.abs(d.v)));
-  el.innerHTML=data.map(d=>{
-    const pct=Math.abs(d.v)/maxA*100;
-    return `<div class="shap-row">
+// ──────────────────────────────────────────────────────────────────────────────
+// SHAP
+// ──────────────────────────────────────────────────────────────────────────────
+const SHAP_DATA = [
+  {name:"% BF 2022",       v:+0.183,c:"#00c853"},{name:"Hist. Lula 2018",v:+0.156,c:"#00c853"},
+  {name:"Hist. Lula 2014", v:+0.091,c:"#00c853"},{name:"% Extrem. Pob.", v:+0.118,c:"#00c853"},
+  {name:"Gini",            v:+0.072,c:"#00c853"},{name:"Analfabetismo",  v:+0.064,c:"#00c853"},
+  {name:"Mort. Infantil",  v:+0.052,c:"#00c853"},{name:"Renda per cap.", v:-0.112,c:"#ef4444"},
+  {name:"% Urbano",        v:-0.083,c:"#ef4444"},{name:"IDH rank",       v:-0.061,c:"#ef4444"},
+  {name:"Emendas/hab",     v:+0.035,c:"#00c853"},{name:"IVS Segurança",  v:+0.029,c:"#00c853"},
+  {name:"APS cobertura",   v:+0.021,c:"#00c853"},{name:"Comparecimento", v:+0.018,c:"#00c853"},
+];
+function renderShap(id, data) {
+  const el = document.getElementById(id); if (!el) return;
+  const mx = Math.max(...data.map(d=>Math.abs(d.v)));
+  el.innerHTML = data.sort((a,b)=>Math.abs(b.v)-Math.abs(a.v)).map(d => `
+    <div class="shap-row">
       <span class="shap-nm">${d.name}</span>
-      <div class="shap-track"><div class="shap-fill" style="width:${pct}%;background:${d.c};${d.v>=0?"left:0":"right:0"}"></div></div>
+      <div class="shap-t"><div class="shap-f" style="width:${Math.abs(d.v)/mx*100}%;background:${d.c};${d.v>=0?"left:0":"right:0"}"></div></div>
       <span class="shap-v" style="color:${d.c}">${d.v>=0?"+":""}${d.v.toFixed(3)}</span>
-    </div>`;
-  }).join("");
+    </div>`).join("");
 }
-
 function updateShapCandLabel() {
-  const sel=document.getElementById("f-candidato");
-  const lbl=sel.options[sel.selectedIndex].text;
-  const el=document.getElementById("shap-cand-label"); if(el) el.textContent=lbl;
+  const sel = document.getElementById("f-candidato");
+  const el  = document.getElementById("shap-cand"); if (el) el.textContent = sel.options[sel.selectedIndex].text;
 }
 
-// ─── MUNICIPALITY SELECTION ──────────────────────────────────────────────────
-function selectMun(m) {
-  _selMun=m;
-  switchPanelTab("contexto");
-  document.getElementById("ctx-nome").textContent=m.nome;
-  document.getElementById("ctx-uf-ano").textContent=`${m.uf} · Eleição 2022 · Presidente`;
-  document.getElementById("c-winner").textContent=m.winner;
-  document.getElementById("c-pct1").textContent=m.pct1+"%";
-  document.getElementById("c-pct2").textContent=m.pct2?m.pct2+"%":"—";
-  document.getElementById("c-comp").textContent=m.comp+"%";
-  document.getElementById("c-branco").textContent=m.branco+"%";
-  document.getElementById("c-idhm").textContent=m.idhm;
-  document.getElementById("c-renda").textContent="R$ "+m.renda;
-  document.getElementById("c-gini").textContent=m.gini;
-  document.getElementById("c-analf").textContent=m.analf+"%";
-  document.getElementById("c-urb").textContent=m.urb+"%";
-  document.getElementById("c-pop").textContent=m.pop;
-  document.getElementById("c-bf").textContent=m.bf+"%";
-  document.getElementById("c-fambf").textContent=m.fambf;
-  document.getElementById("c-valbf").textContent=m.valbf;
-  document.getElementById("c-cad").textContent=m.cad+"%";
-  document.getElementById("c-mi").textContent=m.mi;
-  document.getElementById("c-aps").textContent=m.aps+"%";
-  document.getElementById("c-plano").textContent=m.plano+"%";
-  document.getElementById("c-idsus").textContent=m.idsus;
-  document.getElementById("c-hom").textContent=m.hom;
-  document.getElementById("c-ivs").textContent=m.ivs;
-  document.getElementById("c-fem").textContent=m.fem;
-  document.getElementById("c-pcand").textContent="Lula";
-  document.getElementById("c-pprob").textContent=m.pprob;
-  document.getElementById("c-pic").textContent=m.pic;
-  const dEl=document.getElementById("c-pdelta");
-  dEl.textContent=m.pdelta; dEl.className="kval "+(m.pdelta.startsWith("+")?"g":"r");
-  document.getElementById("c-cluster").textContent=m.cluster;
-  // Update SHAP local
-  document.getElementById("shap-mun-label").textContent=m.nome;
-  document.getElementById("shap-mun-card").style.display="block";
-  renderShap("shap-local", SHAP_DATA.map(s=>({...s, v:s.v*(0.7+Math.random()*.6)})));
-  // Update chat context
-  document.getElementById("ctx-mun-text").textContent=` · ${m.nome}`;
-  // Inject into chat
-  injectAgentMsg(`Município selecionado: <strong>${m.nome} – ${m.uf}</strong>. IDH: ${m.idhm}, % BF: ${m.bf}%, Homicídio: ${m.hom}/100k.<br>Predição 2026: <strong>${m.pred}</strong> (IC 95%: ${m.pic}). Cluster: ${m.cluster}.<br><br><span class="map-cmd" onclick="switchPanelTab('shap')">📊 Ver SHAP local</span>`);
+// ──────────────────────────────────────────────────────────────────────────────
+// CHAT
+// ──────────────────────────────────────────────────────────────────────────────
+const CHAT_RESPS = [
+  c => `Com o contexto <strong>${c}</strong>: a correlação % BF × voto é <strong>+0.73</strong>. Os 1.847 municípios com BF&gt;40% votaram Lula com média de <strong>68% T1</strong>.<br><br><span class="map-cmd" onclick="zoomRegion('nordeste')">📍 Zoom Nordeste</span>`,
+  c => `Para <strong>${c}</strong>: 892 municípios viraram de Bolsonaro (2018) para Lula (2022). Concentração no interior de SP, MG e PR — correlacionados com aumento do BF.<br><br><span class="map-cmd" onclick="activateLayer('eleitoral')">🗺 Ver resultado no mapa</span>`,
+  c => `M1 projeta para <strong>${c}</strong>: 53–58% de probabilidade de vitória em 2026. Principal driver: BF + IDH estagnado. M2 refinará quando polls + social estiverem disponíveis.<br><br><span class="map-cmd" onclick="activateLayer('predicao')">🔮 Ver predição no mapa</span>`,
+  c => `Em <strong>${c}</strong>: municípios com IDH&gt;0.75 que votaram Lula somam 248. SHAP mostra que nesses casos o peso do BF cai e "histórico 2014/2018" sobe.<br><br><span class="map-cmd" onclick="switchTab('shap')">📊 Ver SHAP global</span>`,
+];
+let _ci = 0;
+function chatInject(type, text) {
+  const msgs = document.getElementById("chat-msgs");
+  const d = document.createElement("div"); d.className = "msg " + (type === "sys" ? "sys" : type === "agent" ? "agent" : "user");
+  d.innerHTML = `<div class="mm">${type==="sys"?"Sistema":type==="agent"?"SPEPE · Analista":"Você"}</div>${text}`;
+  msgs.appendChild(d); msgs.scrollTop = msgs.scrollHeight;
 }
-
-// ─── CHAT ─────────────────────────────────────────────────────────────────────
-function injectSystemMsg(text) {
-  const msgs=document.getElementById("chat-msgs");
-  const d=document.createElement("div"); d.className="msg system";
-  d.innerHTML=`<div class="mm">Sistema</div>${text}`;
-  msgs.appendChild(d); msgs.scrollTop=msgs.scrollHeight;
-}
-function injectAgentMsg(text) {
-  const msgs=document.getElementById("chat-msgs");
-  const d=document.createElement("div"); d.className="msg agent";
-  d.innerHTML=`<div class="mm">SPEPE · Analista</div>${text}`;
-  msgs.appendChild(d); msgs.scrollTop=msgs.scrollHeight;
-}
-
-document.getElementById("chat-send").addEventListener("click",sendChat);
-document.getElementById("chat-in").addEventListener("keydown",e=>{ if(e.key==="Enter"&&!e.shiftKey){e.preventDefault();sendChat();} });
-
+document.getElementById("chat-send").addEventListener("click", sendChat);
+document.getElementById("chat-in").addEventListener("keydown", e => { if(e.key==="Enter"&&!e.shiftKey){e.preventDefault();sendChat();} });
 function sendChat() {
-  const el=document.getElementById("chat-in");
-  const msg=el.value.trim(); if(!msg) return;
-  el.value="";
-  const msgs=document.getElementById("chat-msgs");
-  const ud=document.createElement("div"); ud.className="msg user";
-  ud.innerHTML=`<div class="mm">Você</div>${msg}`; msgs.appendChild(ud);
-  // Typing
-  const td=document.createElement("div"); td.className="msg agent"; td.id="typing";
-  td.innerHTML=`<div class="mm">SPEPE · Analista</div><span class="typing-dots"><span>●</span><span>●</span><span>●</span></span>`;
-  msgs.appendChild(td); msgs.scrollTop=msgs.scrollHeight;
-  setTimeout(()=>{
+  const el = document.getElementById("chat-in");
+  const msg = el.value.trim(); if (!msg) return; el.value = "";
+  chatInject("user", msg);
+  const td = document.createElement("div"); td.className = "msg agent"; td.id = "typing-ind";
+  td.innerHTML = `<div class="mm">SPEPE · Analista</div><span class="typing"><span>●</span><span>●</span><span>●</span></span>`;
+  document.getElementById("chat-msgs").appendChild(td);
+  document.getElementById("chat-msgs").scrollTop = 9999;
+  setTimeout(() => {
     td.remove();
-    const ctx=getCtxText();
-    const resp=AGENT_RESPONSES[_chatIdx%AGENT_RESPONSES.length](ctx); _chatIdx++;
-    const ad=document.createElement("div"); ad.className="msg agent";
-    ad.innerHTML=`<div class="mm">SPEPE · Analista</div>${resp}`;
-    msgs.appendChild(ad); msgs.scrollTop=msgs.scrollHeight;
-  },1000+Math.random()*800);
+    chatInject("agent", CHAT_RESPS[_ci % CHAT_RESPS.length](getCtx()));
+    _ci++;
+  }, 900 + Math.random() * 700);
 }
 
-// ─── INIT ─────────────────────────────────────────────────────────────────────
-window.addEventListener("load",()=>{
+// ──────────────────────────────────────────────────────────────────────────────
+// INIT
+// ──────────────────────────────────────────────────────────────────────────────
+window.addEventListener("load", () => {
   initMap();
   renderLegend("bivariate");
   renderCandidates();
-  renderTrackingChart();
-  renderPollsFull();
+  initCharts();
   renderPollsList();
-  renderHouseChart();
   renderPollGeo();
-  renderSocialPlatforms();
-  renderSentimentChart();
-  renderTrending();
-  renderPolarChart();
+  renderPlatforms();
+  renderTopics();
   renderSecoesList();
-  renderSecoesDistChart();
   renderShap("shap-global", SHAP_DATA);
 });
 </script>
