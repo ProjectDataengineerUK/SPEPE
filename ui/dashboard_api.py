@@ -139,6 +139,7 @@ _PUBLIC_API_PATHS = {
     "/api/indicadores",
     "/api/perfis",
     "/api/mapa",
+    "/api/mapa/choropleth",
     "/api/ufs",
     "/api/mesorregioes",
     "/api/social/sentimento",
@@ -2111,6 +2112,141 @@ async def get_mapa(
             logger.warning("BigQuery mapa %s falhou: %s", nivel_str, exc)
 
     return JSONResponse({"nivel": nivel_str, "features": [], "fonte": "indisponivel"})
+
+
+# ── Choropleth temático — endpoint unificado por camada ──────────────────────
+
+_CHOROPLETH_LAYERS = frozenset(
+    {"eleitoral", "ibge", "socio", "saude", "seguranca", "pesquisas", "sentimento", "predicao"}
+)
+
+
+@app.get("/api/mapa/choropleth")
+async def get_mapa_choropleth(
+    layer: str = Query(
+        "ibge", description="eleitoral|ibge|socio|saude|seguranca|pesquisas|sentimento|predicao"
+    ),
+    cargo: str = Query("Governador"),
+    candidato: str = Query(""),
+    ano: int = Query(2022),
+) -> JSONResponse:
+    """Retorna {sg_uf → value} para colorir choropleth no nível UF.
+
+    Cada camada agrega sua métrica-chave por estado:
+      eleitoral  → pct_votos máximo do líder por UF
+      ibge/socio → IDHM médio por UF
+      saude      → taxa mortalidade infantil média por UF
+      seguranca  → taxa homicídio média por UF
+      pesquisas  → intenção de voto média do candidato por UF
+      sentimento → score sentimento médio por UF
+      predicao   → p_mean do modelo M1 por UF
+    """
+    if layer not in _CHOROPLETH_LAYERS:
+        raise HTTPException(
+            400, detail=f"layer deve ser um de: {', '.join(sorted(_CHOROPLETH_LAYERS))}"
+        )
+
+    if not (settings.gcp_project_id and os.environ.get("USE_BIGQUERY", "").lower() == "true"):
+        return JSONResponse({"layer": layer, "data": [], "status": "no_bq"})
+
+    try:
+        rows = await _bq_choropleth(layer, cargo, candidato, ano)
+        return JSONResponse({"layer": layer, "data": rows})
+    except Exception as exc:
+        logger.warning("choropleth/%s falhou: %s", layer, exc)
+        return JSONResponse({"layer": layer, "data": [], "status": "error"})
+
+
+async def _bq_choropleth(layer: str, cargo: str, candidato: str, ano: int) -> list[dict]:
+    import asyncio
+    from google.cloud import bigquery
+
+    client = bigquery.Client(project=settings.gcp_project_id)
+    gold = f"{settings.gcp_project_id}.{settings.bigquery_dataset_gold}"
+    mlops = f"{settings.gcp_project_id}.spepe_mlops"
+    cd_cargo = _CARGO_CD.get(cargo, 3)
+
+    if layer == "eleitoral":
+        query = f"""
+            SELECT sg_uf, ROUND(MAX(pct_votos_municipio), 4) AS value
+            FROM `{gold}.fact_municipio_candidato_eleicao`
+            WHERE cd_cargo = @cd_cargo AND ano_eleicao = @ano AND nr_turno = 1
+              AND (@candidato = '' OR LOWER(nm_candidato) LIKE CONCAT('%', LOWER(@candidato), '%'))
+            GROUP BY sg_uf
+        """
+        params = [
+            bigquery.ScalarQueryParameter("cd_cargo", "INT64", cd_cargo),
+            bigquery.ScalarQueryParameter("ano", "INT64", ano),
+            bigquery.ScalarQueryParameter("candidato", "STRING", candidato),
+        ]
+
+    elif layer in ("ibge", "socio"):
+        query = f"""
+            SELECT sg_uf, ROUND(AVG(idhm), 4) AS value
+            FROM `{gold}.fact_ibge_municipio`
+            GROUP BY sg_uf
+        """
+        params = []
+
+    elif layer == "saude":
+        query = f"""
+            SELECT sg_uf, ROUND(AVG(tx_mortalidade_infantil_1000), 4) AS value
+            FROM `{gold}.fact_saude_municipio`
+            WHERE ano = @ano
+            GROUP BY sg_uf
+        """
+        params = [bigquery.ScalarQueryParameter("ano", "INT64", ano)]
+
+    elif layer == "seguranca":
+        query = f"""
+            SELECT sg_uf, ROUND(AVG(taxa_homicidio_100k), 4) AS value
+            FROM `{gold}.fact_seguranca_municipio`
+            WHERE ano = @ano
+            GROUP BY sg_uf
+        """
+        params = [bigquery.ScalarQueryParameter("ano", "INT64", ano)]
+
+    elif layer == "pesquisas":
+        query = f"""
+            SELECT uf AS sg_uf, ROUND(AVG(intencao_ponderada), 4) AS value
+            FROM `{gold}.fact_intencao_voto`
+            WHERE cd_cargo = @cd_cargo AND ano_eleitoral = @ano
+              AND (@candidato = '' OR LOWER(candidato_normalizado) LIKE CONCAT('%', LOWER(@candidato), '%'))
+            GROUP BY uf
+        """
+        params = [
+            bigquery.ScalarQueryParameter("cd_cargo", "INT64", cd_cargo),
+            bigquery.ScalarQueryParameter("ano", "INT64", ano),
+            bigquery.ScalarQueryParameter("candidato", "STRING", candidato),
+        ]
+
+    elif layer == "sentimento":
+        query = f"""
+            SELECT sg_uf, ROUND(AVG(score_sentimento), 4) AS value
+            FROM `{gold}.fact_sentiment_municipio`
+            WHERE data_referencia >= DATE_SUB(CURRENT_DATE(), INTERVAL 30 DAY)
+              AND (@candidato = '' OR LOWER(candidato) LIKE CONCAT('%', LOWER(@candidato), '%'))
+            GROUP BY sg_uf
+        """
+        params = [bigquery.ScalarQueryParameter("candidato", "STRING", candidato)]
+
+    else:  # predicao
+        query = f"""
+            SELECT sg_uf, ROUND(AVG(p_mean), 4) AS value
+            FROM `{mlops}.fact_predictions`
+            WHERE DATE(prediction_date) >= DATE_SUB(CURRENT_DATE(), INTERVAL 30 DAY)
+              AND (@candidato = '' OR LOWER(candidato) LIKE CONCAT('%', LOWER(@candidato), '%'))
+            GROUP BY sg_uf
+        """
+        params = [bigquery.ScalarQueryParameter("candidato", "STRING", candidato)]
+
+    job_config = (
+        bigquery.QueryJobConfig(query_parameters=params) if params else bigquery.QueryJobConfig()
+    )
+    rows = await asyncio.to_thread(
+        lambda: list(client.query(query, job_config=job_config).result())
+    )
+    return [{"sg_uf": r["sg_uf"], "value": float(r["value"] or 0)} for r in rows]
 
 
 @app.get("/api/mapa/locais")

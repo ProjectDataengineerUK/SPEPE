@@ -46,12 +46,13 @@
     if (!action || !action.type) return;
     try {
       switch (action.type) {
-        case 'set_layer':   return setLayer(action.layer);
-        case 'set_filter':  return setFilter(action.uf, action.cargo, action.candidato);
-        case 'zoom_to':     return zoomTo(action.uf, action.municipio);
-        case 'highlight':   return highlightMunicipios(action.municipios || []);
-        case 'set_metric':  return setMetric(action.metric);
-        case 'set_period':  return setPeriod(action.from, action.to);
+        case 'set_layer':     return setLayer(action.layer);
+        case 'map_highlight': return mapHighlight(action.layer, action.uf_values);
+        case 'set_filter':    return setFilter(action.uf, action.cargo, action.candidato);
+        case 'zoom_to':       return zoomTo(action.uf, action.municipio);
+        case 'highlight':     return highlightMunicipios(action.municipios || []);
+        case 'set_metric':    return setMetric(action.metric);
+        case 'set_period':    return setPeriod(action.from, action.to);
       }
     } catch (e) {
       console.warn('[dashboard_actions] action failed', action.type, e);
@@ -160,6 +161,20 @@
         ano.value = year;
         if (typeof global.applyFilters === 'function') setTimeout(global.applyFilters, 60);
       }
+    }
+  }
+
+  function mapHighlight(layer, ufValues) {
+    if (!layer || !ufValues || typeof ufValues !== 'object') return;
+    _ensureMapTab();
+    // applyUfValues aplica os valores diretamente no choropleth sem nova requisição API
+    if (typeof global.applyUfValues === 'function') {
+      global.applyUfValues(layer, ufValues);
+      document.querySelectorAll('.layer-btn').forEach(b => {
+        b.classList.toggle('active', b.dataset.layer === layer);
+      });
+    } else if (typeof global.swapLayer === 'function') {
+      global.swapLayer(layer);
     }
   }
 

@@ -1,26 +1,116 @@
 /**
- * SPEPE — map_layers.js
- * Gerencia os 4 LayerGroups temáticos do mapa Leaflet.
- * Depende de: Leaflet.js (carregado antes), gMap/dataLayer globais do spepe-app.html.
+ * SPEPE — map_layers.js v2
+ * Gerencia 7 camadas temáticas no mapa Leaflet via /api/mapa/choropleth.
+ * Cores extraídas do spepe-prototype.html v3.
+ * Depende de: Leaflet.js, _geoLayer e reloadMap() globais do spepe-app.html.
  */
+
+// ── Configuração das camadas ───────────────────────────────────────────────
 
 const LAYER_CONFIG = {
-  eleitoral:  { label: "Resultado Eleitoral", defaultMetric: "pct_votos",      endpoint: null },
-  ibge:       { label: "Indicadores IBGE",    defaultMetric: "idhm",           endpoint: "/api/indicadores/ibge" },
-  sentimento: { label: "Sentimento",          defaultMetric: "sentiment_score", endpoint: "/api/indicadores/sentimento" },
-  previsao:   { label: "Previsão 2026",       defaultMetric: "pct_previsto",    endpoint: "/api/indicadores/previsao" },
+  eleitoral:  { label: "🏆 Eleitoral",       campo: "pct_votos" },
+  ibge:       { label: "📊 IBGE/IDH",        campo: "idhm" },
+  saude:      { label: "🏥 Saúde",           campo: "mortalidade_infantil" },
+  seguranca:  { label: "🛡 Segurança",       campo: "homicidios" },
+  pesquisas:  { label: "📋 Pesquisas",       campo: "intencao_voto" },
+  sentimento: { label: "📱 Sentimento",      campo: "score_sentimento" },
+  predicao:   { label: "🔮 Predição 2026",   campo: "p_mean" },
 };
 
-// Estado interno do módulo
+// ── Escalas de cor (do protótipo v3) ──────────────────────────────────────
+
+const _COLOR = {
+  eleitoral:  v => v >= 60 ? "#1a9641" : v >= 50 ? "#74c476" : v >= 45 ? "#ffffbf" : v >= 40 ? "#fdae61" : "#d7191c",
+  ibge:       v => v >= 0.78 ? "#08519c" : v >= 0.72 ? "#3182bd" : v >= 0.65 ? "#6baed6" : v >= 0.58 ? "#bdd7e7" : "#ffffd4",
+  saude:      v => v >= 22 ? "#d7191c" : v >= 16 ? "#fdae61" : v >= 12 ? "#ffffbf" : v >= 8 ? "#6baed6" : "#08519c",
+  seguranca:  v => v >= 50 ? "#d7191c" : v >= 35 ? "#fdae61" : v >= 20 ? "#ffffbf" : v >= 10 ? "#6baed6" : "#08519c",
+  pesquisas:  v => v >= 60 ? "#1a9641" : v >= 50 ? "#74c476" : v >= 45 ? "#ffffbf" : v >= 40 ? "#fdae61" : "#d7191c",
+  sentimento: v => v >= 0.5 ? "#1a9641" : v >= 0.15 ? "#74c476" : v >= -0.15 ? "#aaaaaa" : v >= -0.5 ? "#fdae61" : "#d7191c",
+  predicao:   v => v >= 0.60 ? "#1a9641" : v >= 0.55 ? "#74c476" : v >= 0.48 ? "#ffffbf" : v >= 0.42 ? "#fdae61" : "#d7191c",
+};
+
+const _LEGEND = {
+  eleitoral:  [["#1a9641","> 60%"],["#74c476","50–60%"],["#ffffbf","45–50%"],["#fdae61","40–45%"],["#d7191c","< 40%"]],
+  ibge:       [["#08519c","≥ 0,78"],["#3182bd","0,72–0,78"],["#6baed6","0,65–0,72"],["#bdd7e7","0,58–0,65"],["#ffffd4","< 0,58"]],
+  saude:      [["#08519c","< 8"],["#6baed6","8–12"],["#ffffbf","12–16"],["#fdae61","16–22"],["#d7191c","≥ 22 /mil"]],
+  seguranca:  [["#08519c","< 10"],["#6baed6","10–20"],["#ffffbf","20–35"],["#fdae61","35–50"],["#d7191c","≥ 50 /100k"]],
+  pesquisas:  [["#1a9641","> 60%"],["#74c476","50–60%"],["#ffffbf","45–50%"],["#fdae61","40–45%"],["#d7191c","< 40%"]],
+  sentimento: [["#1a9641","Muito positivo"],["#74c476","Positivo"],["#aaaaaa","Neutro"],["#fdae61","Negativo"],["#d7191c","Muito negativo"]],
+  predicao:   [["#1a9641","≥ 60%"],["#74c476","55–60%"],["#ffffbf","48–55%"],["#fdae61","42–48%"],["#d7191c","< 42%"]],
+};
+
+// ── Mapeamento sg_uf → CD_UF (IBGE 2 dígitos) ────────────────────────────
+
+const _UF_TO_CDUF = {
+  AC:"12",AL:"27",AP:"16",AM:"13",BA:"29",CE:"23",DF:"53",ES:"32",GO:"52",
+  MA:"21",MT:"51",MS:"50",MG:"31",PA:"15",PB:"25",PR:"41",PE:"26",PI:"22",
+  RJ:"33",RN:"24",RS:"43",RO:"11",RR:"14",SC:"42",SP:"35",SE:"28",TO:"17",
+};
+
+// ── Estado interno ────────────────────────────────────────────────────────
+
 let _activeLayer = "eleitoral";
-let _layerData   = {};   // { cd_municipio_ibge: valor }
-let _activeMetric = "pct_votos";
+let _layerData = {};   // { sg_uf: value }
+
+// ── API pública ────────────────────────────────────────────────────────────
 
 /**
- * Registra listeners nos botões de toggle de camada.
- * Chamado após o mapa estar pronto (window.onload ou initMap).
+ * Ativa uma camada: busca dados, redesenha mapa, atualiza legenda.
+ */
+async function swapLayer(layerName) {
+  if (!(layerName in LAYER_CONFIG)) {
+    if (layerName === "socio") layerName = "ibge";
+    else return;
+  }
+  _activeLayer = layerName;
+
+  // Eleitoral usa o sistema legado (reloadMap com GeoJSON colorido por pct)
+  if (layerName === "eleitoral") {
+    _layerData = {};
+    _applyStyle();
+    _updateLegend(layerName);
+    if (typeof reloadMap === "function") reloadMap();
+    return;
+  }
+
+  const data = await _fetchChoropleth(layerName);
+  _layerData = {};
+  (data || []).forEach(row => {
+    if (row.sg_uf) _layerData[row.sg_uf] = row.value;
+  });
+
+  _applyStyle();
+  _updateLegend(layerName);
+}
+
+/**
+ * Aplica uf_values recebidos diretamente (ex: do Supervisor via WS).
+ */
+function applyUfValues(layerName, ufValues) {
+  if (!(layerName in LAYER_CONFIG) && layerName !== "socio") return;
+  if (layerName === "socio") layerName = "ibge";
+  _activeLayer = layerName;
+  _layerData = {};
+  Object.entries(ufValues || {}).forEach(([uf, val]) => {
+    _layerData[uf.toUpperCase()] = parseFloat(val) || 0;
+  });
+  _applyStyle();
+  _updateLegend(layerName);
+}
+
+/**
+ * Retorna cor para (layer, value) — exposto para uso externo.
+ */
+function getLayerColor(layerName, value) {
+  const fn = _COLOR[layerName] || _COLOR.ibge;
+  return (value != null && !isNaN(value)) ? fn(value) : "#21262d";
+}
+
+/**
+ * Inicializa: expande layer bar para 7 botões e registra cliques.
  */
 function initMapLayers() {
+  _expandLayerBar();
   document.querySelectorAll(".layer-btn").forEach(btn => {
     btn.addEventListener("click", () => {
       document.querySelectorAll(".layer-btn").forEach(b => b.classList.remove("active"));
@@ -30,193 +120,84 @@ function initMapLayers() {
   });
 }
 
-/**
- * Troca a camada ativa. Busca dados do endpoint se necessário e redesenha.
- * @param {string} layerName  — chave de LAYER_CONFIG
- */
-async function swapLayer(layerName) {
-  if (!(layerName in LAYER_CONFIG)) return;
-  _activeLayer = layerName;
-  const cfg = LAYER_CONFIG[layerName];
-  _activeMetric = cfg.defaultMetric;
+// ── Helpers privados ───────────────────────────────────────────────────────
 
-  if (layerName === "eleitoral") {
-    _layerData = {};
-    _redrawCurrentLayer();
-    _updateLayerLegend(layerName);
-    return;
-  }
-
-  const params = _buildParams(layerName);
-  const data = await _fetchLayerData(cfg.endpoint, params);
-  if (!data) return;
-
-  _layerData = {};
-  (data.data || []).forEach(row => {
-    const key = String(row.cd_municipio_ibge || "");
-    if (key) _layerData[key] = _extractValue(row, cfg.defaultMetric);
-  });
-
-  _redrawCurrentLayer();
-  _updateLayerLegend(layerName);
-}
-
-/**
- * Recarrega os dados da camada atual com novos params (candidato, uf, etc.).
- * @param {string} layerName
- * @param {Object} params
- */
-async function updateLayerData(layerName, params) {
-  const cfg = LAYER_CONFIG[layerName];
-  if (!cfg || !cfg.endpoint) return;
-  const data = await _fetchLayerData(cfg.endpoint, params);
-  if (!data) return;
-
-  _layerData = {};
-  (data.data || []).forEach(row => {
-    const key = String(row.cd_municipio_ibge || "");
-    if (key) _layerData[key] = _extractValue(row, cfg.defaultMetric);
-  });
-  _redrawCurrentLayer();
-}
-
-/**
- * Retorna cor hex para uma métrica e valor dados.
- * @param {string} metric
- * @param {number} value
- * @returns {string}  hex color
- */
-function getColorScale(metric, value) {
-  if (value === null || value === undefined || isNaN(value)) return "#21262d";
-
-  if (metric === "pct_votos" || metric === "pct_previsto") {
-    if (value >= 50) return "#1a9641";
-    if (value >= 45) return "#a6d96a";
-    if (value >= 35) return "#ffffbf";
-    if (value >= 30) return "#fdae61";
-    return "#d7191c";
-  }
-
-  if (metric === "idhm" || metric === "renda_per_capita") {
-    // idhm 0–1, renda normalizada
-    const norm = metric === "idhm" ? value : Math.min(value / 3000, 1);
-    if (norm >= 0.8) return "#08519c";
-    if (norm >= 0.65) return "#3182bd";
-    if (norm >= 0.5) return "#6baed6";
-    if (norm >= 0.35) return "#bdd7e7";
-    return "#ffffd4";
-  }
-
-  if (metric === "taxa_analfabetismo") {
-    // maior analfabetismo → pior (vermelho)
-    if (value <= 5) return "#08519c";
-    if (value <= 10) return "#6baed6";
-    if (value <= 20) return "#ffffbf";
-    if (value <= 30) return "#fdae61";
-    return "#d7191c";
-  }
-
-  if (metric === "sentiment_score") {
-    // -1 a +1
-    if (value >= 0.6) return "#1a9641";
-    if (value >= 0.2) return "#a6d96a";
-    if (value >= -0.2) return "#f0f0f0";
-    if (value >= -0.6) return "#fdae61";
-    return "#d7191c";
-  }
-
-  // fallback neutro
-  return "#3d444d";
-}
-
-
-// ── helpers privados ──────────────────────────────────────────────────────
-
-function _buildParams(layerName) {
-  const uf = document.getElementById("f-uf")?.value || "SP";
-  const candidato = document.getElementById("map-candidato")?.value?.trim() || "";
-  const params = new URLSearchParams();
-  const cfg = LAYER_CONFIG[layerName];
-  params.set("metrica", cfg.defaultMetric);
-  if (uf && uf !== "BR") params.set("uf", uf);
-  if (candidato) params.set("candidato", candidato);
-  if (layerName === "sentimento") {
-    params.set("data_ref", new Date().toISOString().slice(0, 10));
-  }
-  return params;
-}
-
-async function _fetchLayerData(endpoint, params) {
+async function _fetchChoropleth(layer) {
   try {
-    const url = `${endpoint}?${params.toString()}`;
+    const cargo = document.getElementById("map-cargo-sel")?.value || "Governador";
+    const cand = document.getElementById("map-candidato")?.value?.trim() || "";
+    const ano = document.getElementById("f-ano")?.value || "2022";
+    const params = new URLSearchParams({ layer, cargo, ano });
+    if (cand) params.set("candidato", cand);
+    const url = `/api/mapa/choropleth?${params}`;
     const res = await (typeof apiFetch === "function" ? apiFetch(url) : fetch(url));
-    if (!res || !res.ok) return null;
-    return await res.json();
+    if (!res || !res.ok) return [];
+    const json = await res.json();
+    return json.data || [];
   } catch {
-    return null;
+    return [];
   }
 }
 
-function _extractValue(row, metric) {
-  if (row.valor !== undefined) return row.valor;
-  if (row[metric] !== undefined) return row[metric];
-  return null;
+function _applyStyle() {
+  if (typeof _geoLayer === "undefined" || !_geoLayer) return;
+  if (_activeLayer === "eleitoral") return;  // legado usa renderGeoJSON
+
+  const colorFn = _COLOR[_activeLayer] || _COLOR.ibge;
+  _geoLayer.setStyle(feature => {
+    const props = feature.properties || {};
+    // Tenta sg_uf direto, depois converte CD_UF → sg_uf
+    const sgUf = props.SIGLA_UF || props.sg_uf || _cdufToSgUf(
+      String(props.CD_UF || props.codarea || props.CD_MUN?.slice(0, 2) || "")
+    );
+    const val = _layerData[sgUf];
+    const fill = (val != null && !isNaN(val)) ? colorFn(val) : "#21262d";
+    return { fillColor: fill, fillOpacity: 0.72, color: "#4b6878", weight: 1 };
+  });
 }
 
-function _redrawCurrentLayer() {
-  if (_activeLayer === "eleitoral") {
-    if (typeof reloadMap === "function") reloadMap();
-    return;
-  }
-
-  if (typeof _geoLayer !== "undefined" && _geoLayer) {
-    _geoLayer.setStyle(function(feature) {
-      const props = feature.properties || {};
-      const cod = String(props.codarea || props.CD_MUN || props.CD_UF || "");
-      const valor = _layerData[cod] ?? _layerData[cod.slice(0, 6)];
-      const color = (valor !== undefined) ? getColorScale(_activeMetric, valor) : "#21262d";
-      return { fillColor: color, fillOpacity: 0.65, color: "#4b6878", weight: 1 };
-    });
-  }
+function _cdufToSgUf(cduf) {
+  const inv = Object.fromEntries(Object.entries(_UF_TO_CDUF).map(([k, v]) => [v, k]));
+  return inv[cduf] || cduf;
 }
 
-function _updateLayerLegend(layerName) {
+function _updateLegend(layer) {
   const el = document.getElementById("map-legend-items");
   if (!el) return;
-
-  const legends = {
-    eleitoral: [
-      { color: "#1a9641", label: "> 50%" },
-      { color: "#a6d96a", label: "45–50%" },
-      { color: "#ffffbf", label: "35–45%" },
-      { color: "#fdae61", label: "30–35%" },
-      { color: "#d7191c", label: "< 30%" },
-    ],
-    ibge: [
-      { color: "#08519c", label: "Muito alto" },
-      { color: "#3182bd", label: "Alto" },
-      { color: "#6baed6", label: "Médio" },
-      { color: "#bdd7e7", label: "Baixo" },
-      { color: "#ffffd4", label: "Muito baixo" },
-    ],
-    sentimento: [
-      { color: "#1a9641", label: "Positivo forte" },
-      { color: "#a6d96a", label: "Positivo" },
-      { color: "#f0f0f0", label: "Neutro" },
-      { color: "#fdae61", label: "Negativo" },
-      { color: "#d7191c", label: "Negativo forte" },
-    ],
-    previsao: [
-      { color: "#1a9641", label: "> 50% projetado" },
-      { color: "#a6d96a", label: "45–50%" },
-      { color: "#ffffbf", label: "35–45%" },
-      { color: "#fdae61", label: "30–35%" },
-      { color: "#d7191c", label: "< 30%" },
-    ],
-  };
-
-  const items = legends[layerName] || [];
-  el.innerHTML = items
-    .map(i => `<div class="leg-item"><div class="leg-dot" style="background:${i.color}"></div><span class="leg-label">${i.label}</span></div>`)
-    .join("");
+  const items = _LEGEND[layer] || [];
+  el.innerHTML = items.map(
+    ([color, label]) =>
+      `<div class="leg-item"><div class="leg-dot" style="background:${color}"></div><span class="leg-label">${label}</span></div>`
+  ).join("");
+  const title = document.getElementById("map-legend-title");
+  if (title) title.textContent = (LAYER_CONFIG[layer] || {}).label || layer;
 }
+
+function _expandLayerBar() {
+  const bar = document.getElementById("layer-controls");
+  if (!bar) return;
+
+  // Só expande se ainda tiver apenas os 4 botões originais
+  const existing = [...bar.querySelectorAll(".layer-btn")].map(b => b.dataset.layer);
+  const toAdd = [
+    { layer: "saude",     label: "🏥 Saúde" },
+    { layer: "seguranca", label: "🛡 Segurança" },
+    { layer: "pesquisas", label: "📋 Pesquisas" },
+  ];
+  toAdd.forEach(({ layer, label }) => {
+    if (!existing.includes(layer)) {
+      const btn = document.createElement("button");
+      btn.className = "layer-btn";
+      btn.dataset.layer = layer;
+      btn.textContent = label;
+      bar.appendChild(btn);
+    }
+  });
+}
+
+// ── Exports globais ────────────────────────────────────────────────────────
+
+window.swapLayer      = swapLayer;
+window.applyUfValues  = applyUfValues;
+window.getLayerColor  = getLayerColor;
+window.LAYER_CONFIG   = LAYER_CONFIG;

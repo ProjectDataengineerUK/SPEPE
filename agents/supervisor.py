@@ -55,18 +55,21 @@ texto produzido por um agente de análise. Retorne EXCLUSIVAMENTE um JSON com es
 }
 
 Tipos de ações permitidos (use apenas os necessários, omita campos desconhecidos):
-  {"type": "set_layer",  "layer": "sentimento|eleitoral|ibge|previsao"}
-  {"type": "set_filter", "uf": "SP", "cargo": "presidente|governador|senador|deputado federal|deputado estadual", "candidato": "NOME"}
-  {"type": "zoom_to",    "uf": "SP", "municipio": 3550308}
-  {"type": "highlight",  "municipios": [3550308, 3304557]}
-  {"type": "set_metric", "metric": "idhm|renda|gini|pct_votos|sentiment_score|prediction_pct"}
-  {"type": "set_period", "from": "2026-01-01", "to": "2026-05-10"}
+  {"type": "set_layer",     "layer": "eleitoral|ibge|saude|seguranca|pesquisas|sentimento|predicao"}
+  {"type": "map_highlight", "layer": "ibge|saude|seguranca|pesquisas|sentimento|predicao", "uf_values": {"SP": 0.72, "RJ": 0.65}}
+  {"type": "set_filter",    "uf": "SP", "cargo": "presidente|governador|senador|deputado federal|deputado estadual", "candidato": "NOME"}
+  {"type": "zoom_to",       "uf": "SP", "municipio": 3550308}
+  {"type": "highlight",     "municipios": [3550308, 3304557]}
+  {"type": "set_metric",    "metric": "idhm|renda|gini|pct_votos|sentiment_score|prediction_pct"}
+  {"type": "set_period",    "from": "2026-01-01", "to": "2026-05-10"}
 
 Regras:
 - Se nenhuma ação for inferível, retorne {"intent_schema":"v1","actions":[],"narration":""}.
 - narration deve resumir em 1-2 frases o que o agente disse, sem markdown.
 - Cargo/UF/candidato só se MENCIONADOS explicitamente.
-- Códigos IBGE de município só se aparecerem literalmente no texto.
+- Codes IBGE de município só se aparecerem literalmente no texto.
+- Use map_highlight com uf_values APENAS quando o agente mencionar valores específicos por estado.
+- Use set_layer quando o agente mudar de tema (ex: "veja a distribuição de IDHM").
 - Não invente dados.
 
 Pergunta original do usuário:
