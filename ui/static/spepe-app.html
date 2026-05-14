@@ -5,11 +5,27 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>SPEPE — Análise Eleitoral</title>
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
-<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
-<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script defer src="/static/js/dashboard_actions.js"></script>
 <script defer src="/static/js/map_layers.js"></script>
 <script src="https://accounts.google.com/gsi/client" async defer></script>
+<script>
+async function initGoogleMaps() {
+  try {
+    const res = await apiFetch('/api/config/maps-key');
+    const { key } = await res.json();
+    if (!key) { initMapFallback(); return; }
+    const s = document.createElement('script');
+    s.src = `https://maps.googleapis.com/maps/api/js?key=${key}&callback=initMap&v=weekly`;
+    s.async = true;
+    s.onerror = initMapFallback;
+    document.head.appendChild(s);
+  } catch(e) { initMapFallback(); }
+}
+function initMapFallback() {
+  const el = document.getElementById('leaflet-map');
+  if (el) el.innerHTML = '<div class="flex items-center justify-center h-full text-gray-500 text-sm" style="display:flex;align-items:center;justify-content:center;height:100%;color:#57606a;font-size:.85rem">Mapa indisponível — configure GOOGLE_MAPS_API_KEY</div>';
+}
+</script>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
 <style>
 *{margin:0;padding:0;box-sizing:border-box}
@@ -257,8 +273,12 @@ tr.rhl td{background:rgba(0,200,83,.07)!important}
 .map-breadcrumb span:hover{text-decoration:underline}
 .map-cargo-sel{background:var(--bg3);border:1px solid var(--border);border-radius:6px;padding:5px 9px;color:var(--text);font-size:.75rem;outline:none;margin-left:auto}
 .map-cargo-sel:focus{border-color:var(--green)}
-.map-body{flex:1;display:flex;overflow:hidden;min-height:0;position:relative}
-#leaflet-map{flex:1;min-height:400px;background:#0d1117}
+.chart-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,320px),1fr));gap:12px}
+.chart-grid .card canvas{max-height:260px}
+.chart-grid-21{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,280px),1fr));gap:12px}
+.chart-grid-21 .card canvas{max-height:240px}
+.map-body{flex:1;display:flex;overflow:hidden;min-height:0}
+#leaflet-map{flex:1;min-height:0;background:#0d1117}
 #zona-panel{width:320px;background:var(--bg2);border-left:1px solid var(--border);overflow-y:auto;flex-shrink:0;display:none}
 .map-legend{width:210px;background:var(--bg2);border-left:1px solid var(--border);padding:14px;overflow-y:auto;flex-shrink:0;display:flex;flex-direction:column;gap:10px}
 .leg-title{font-size:.68rem;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:var(--text2)}
@@ -300,11 +320,6 @@ tr.rhl td{background:rgba(0,200,83,.07)!important}
 .zona-card-btn:hover{border-color:var(--green);color:var(--green2)}
 .leg-gradient{display:flex;align-items:stretch;border-radius:4px;overflow:hidden;height:12px;margin:4px 0}
 .leg-grad-labels{display:flex;justify-content:space-between;font-size:.6rem;color:var(--text3);font-family:'JetBrains Mono',monospace}
-/* Responsive chart grid */
-.chart-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,320px),1fr));gap:12px}
-.chart-grid .card canvas{max-height:260px}
-.chart-grid-21{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,280px),1fr));gap:12px}
-.chart-grid-21 .card canvas{max-height:240px}
 </style>
 </head>
 <body>
@@ -1030,7 +1045,7 @@ function switchTab(el,nm){
     const mapa=document.getElementById('tab-mapa');
     if(mapa){ mapa.style.display='flex'; mapa.classList.add('active'); }
     loadCandidatoList();
-    setTimeout(()=>{ if(!_leafletMap) initMap(); else { window.dispatchEvent(new Event('resize')); reloadMap(); } },150);
+    setTimeout(()=>{ if(!gMap) initGoogleMaps(); else reloadMap(); },50);
   } else if(_TAB_PANEL_MAP[nm]){
     if(dash) dash.style.display='none';
     const panelId='tab-'+_TAB_PANEL_MAP[nm];
@@ -1329,7 +1344,7 @@ function applyFilters(){
   refreshSentimentChart(uf, ano);
   refreshResultadosChart(cargo, uf, ano, turnoNum);
   loadCandidatoList();
-  if(_leafletMap && document.getElementById('tab-mapa')?.classList.contains('active')) reloadMap();
+  if(gMap && document.getElementById('tab-mapa')?.classList.contains('active')) reloadMap();
 }
 function onCargoSelect(val){
   const tab=[...document.querySelectorAll('.cargo-tab')].find(t=>t.textContent.includes(val.split('.')[0].trim()));
@@ -1347,7 +1362,7 @@ function switchCargo(el,cargo){
   const mapSel=document.getElementById('map-cargo-sel');
   if(mapSel && [...mapSel.options].some(o=>o.value===cargo||o.text===cargo)){
     mapSel.value=cargo;
-    if(_leafletMap && document.getElementById('tab-mapa')?.classList.contains('active')) reloadMap();
+    if(gMap && document.getElementById('tab-mapa')?.classList.contains('active')) reloadMap();
   }
   if(cargo==='Comparativo'){
     showCompare(); return;
@@ -1837,13 +1852,14 @@ function toast(msg){
 // MAPA ELEITORAL — Google Maps + IBGE GeoJSON + Drill-down
 // ═══════════════════════════════════════════════════════════
 
-let _leafletMap = null;
-let gMap = null; // alias de compatibilidade
-let _geoLayer = null;
+let _map = null;
+let gMap = null;
+let dataLayer = null;
 let _mapLevel = 'uf';
-let _mapCtx = {};
+let _mapCtx = {}; // {uf:'SP', cd_municipio:'71072', nr_zona:'1'}
+let _geoLayer = null;
 let _mapData = {};
-let _mapMode = 'historico';
+let _mapMode = 'historico'; // 'historico' | '2026'
 
 function setMapMode(mode) {
   _mapMode = mode;
@@ -1906,71 +1922,67 @@ const IBGE_GEO = {
 };
 
 function initMap(){
-  if(_leafletMap) return;
+  if(gMap) return;
   const mapEl = document.getElementById('leaflet-map');
   if(!mapEl) return;
-  _leafletMap = L.map('leaflet-map', {
-    center:[-14.235,-51.925], zoom:4, zoomControl:true
+  if(typeof google === 'undefined' || !google.maps) {
+    initMapFallback();
+    return;
+  }
+  gMap = new google.maps.Map(mapEl, {
+    center:{lat:-14.235,lng:-51.925}, zoom:4,
+    mapTypeId:'roadmap', styles:MAP_DARK_STYLE,
+    disableDefaultUI:false, zoomControl:true
   });
-  L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png',{
-    attribution:'&copy; <a href="https://www.openstreetmap.org/copyright">OSM</a> &copy; <a href="https://carto.com/attributions">CARTO</a>',
-    subdomains:'abcd', maxZoom:19
-  }).addTo(_leafletMap);
-  gMap = _leafletMap; // alias
-  if(typeof initMapLayers==='function') initMapLayers();
-  requestAnimationFrame(()=> requestAnimationFrame(()=>{
-    window.dispatchEvent(new Event('resize'));
-    reloadMap();
-  }));
+  dataLayer = new google.maps.Data({map:gMap});
+  dataLayer.addListener('click', ev => {
+    const cod = ev.feature.getProperty('codarea') || ev.feature.getProperty('CD_MUN') || ev.feature.getProperty('CD_UF') || '';
+    const nome = ev.feature.getProperty('nome') || cod;
+    handleMapClick(cod, nome);
+    const d = _mapData[String(cod)];
+    if(d) _drillDown(null, d);
+  });
+  _map = gMap; // alias for legacy references
+  if (typeof initMapLayers === "function") initMapLayers();
+  reloadMap();
 }
 
-function renderGeoJSON(geojsonData, colorBy, layer){
+function renderGeoJSON(geojsonData, colorBy, layer) {
   _clearBubbles();
-  const _zonaPanel=document.getElementById('zona-panel');
-  if(_zonaPanel) _zonaPanel.style.display='none';
-  if(!_leafletMap) return;
-  if(_geoLayer){ _leafletMap.removeLayer(_geoLayer); _geoLayer=null; }
+  const _zonaPanel = document.getElementById('zona-panel');
+  if(_zonaPanel) _zonaPanel.style.display = 'none';
+  if(!dataLayer) return;
+  dataLayer.forEach(f => dataLayer.remove(f));
   if(!geojsonData) return;
-  _geoLayer=L.geoJSON(geojsonData,{
-    style: feature=>{
-      const props=feature.properties||{};
-      const cod=String(props.codarea||props.CD_MUN||props.CD_UF||props.CD_REGIAO||'');
-      const d=_mapData[cod]||_mapData[cod.slice(0,2)];
-      if(!d) return{fillColor:'#21262d',fillOpacity:0.25,color:'#4b6878',weight:1};
-      let color='#21262d';
-      if(layer && layer!=='electoral'){
-        const val=(d.pct||50)/100;
-        if(layer==='archetype'){
-          const r=Math.round(124-val*90),g=Math.round(58+val*130),b=Math.round(237-val*50);
-          color=`rgb(${r},${g},${b})`;
-        } else if(layer==='security'){
-          const i=Math.round(val*200+55);
-          color=`rgb(${i},${Math.round(68-val*40)},${Math.round(68-val*40)})`;
-        } else if(layer==='health'){
-          color=val>0.7?'#00c853':val>0.5?'#66bb6a':val>0.35?'#ffd54f':'#ef9a9a';
-        } else if(layer==='economic'){
-          color=val>0.7?'#00c853':val>0.5?'#c6e400':val>0.35?'#ffd54f':'#ff8f00';
-        }
-      } else {
-        if(colorBy==='partido'||colorBy==='lider'){
-          color=d.partido?(PARTIDO_COR[d.partido]||_candidateColor(d.lider)):_candidateColor(d.lider);
-        } else if(colorBy==='margem'){
-          const margem=Math.abs((d.pct||0)-(d.pct2||0));
-          color=margem>20?'#ef4444':margem>10?'#f59e0b':'#22c55e';
-        }
+  dataLayer.addGeoJson(geojsonData);
+  dataLayer.setStyle(feature => {
+    const cod = String(feature.getProperty('codarea') || feature.getProperty('CD_MUN') || feature.getProperty('CD_UF') || feature.getProperty('CD_REGIAO') || '');
+    const d = _mapData[cod] || _mapData[cod.slice(0,2)];
+    if(!d) return {fillColor:'#21262d', fillOpacity:0.25, strokeColor:'#4b6878', strokeWeight:1};
+    let color = '#21262d';
+    if(layer && layer !== 'electoral'){
+      const val = (d.pct||50) / 100;
+      if(layer === 'archetype'){
+        const r=Math.round(124-val*90), g=Math.round(58+val*130), b=Math.round(237-val*50);
+        color = `rgb(${r},${g},${b})`;
+      } else if(layer === 'security'){
+        const i=Math.round(val*200+55);
+        color = `rgb(${i},${Math.round(68-val*40)},${Math.round(68-val*40)})`;
+      } else if(layer === 'health'){
+        color = val>0.7?'#00c853':val>0.5?'#66bb6a':val>0.35?'#ffd54f':'#ef9a9a';
+      } else if(layer === 'economic'){
+        color = val>0.7?'#00c853':val>0.5?'#c6e400':val>0.35?'#ffd54f':'#ff8f00';
       }
-      return{fillColor:color,fillOpacity:0.60,color:'#4b6878',weight:1};
-    },
-    onEachFeature:(feature,lyr)=>{
-      const props=feature.properties||{};
-      const cod=String(props.codarea||props.CD_MUN||props.CD_UF||props.CD_REGIAO||'');
-      const d=_mapData[cod]||_mapData[cod.slice(0,2)];
-      if(d){
-        lyr.bindTooltip(_buildTooltip(d,layer),{sticky:true,className:'map-tooltip',maxWidth:220});
-        lyr.on('click',()=>{ handleMapClick(cod,props.nome||cod); _drillDown(feature,d); });
+    } else {
+      if(colorBy === 'partido' || colorBy === 'lider'){
+        color = d.partido ? (PARTIDO_COR[d.partido] || _candidateColor(d.lider)) : _candidateColor(d.lider);
+      } else if(colorBy === 'margem'){
+        const margem = Math.abs((d.pct||0) - (d.pct2||0));
+        color = margem > 20 ? '#ef4444' : margem > 10 ? '#f59e0b' : '#22c55e';
       }
     }
-  }).addTo(_leafletMap);
+    return {fillColor:color, fillOpacity:0.60, strokeColor:'#4b6878', strokeWeight:1};
+  });
 }
 
 async function setMapLevel(level){
@@ -1986,7 +1998,7 @@ async function setMapLevel(level){
 }
 
 async function reloadMap(){
-  if(!_leafletMap) return;
+  if(!gMap) return;
   const cargo = document.getElementById('map-cargo-sel')?.value || 'Governador';
   const colorBy = document.getElementById('map-color-by')?.value || 'lider';
   const layer = document.getElementById('map-layer-sel')?.value || 'electoral';
@@ -2094,29 +2106,43 @@ function _polygonCentroid(coords){
 
 let _bubbleOverlays = [];
 function _clearBubbles(){
-  _bubbleOverlays.forEach(o=>{ if(_leafletMap) _leafletMap.removeLayer(o); });
+  _bubbleOverlays.forEach(o=>o.setMap(null));
   _bubbleOverlays = [];
 }
 
 function _renderBubbleMap(geoJSON, colorBy){
   _clearBubbles();
-  if(!_leafletMap || !geoJSON) return;
+  if(!gMap || !geoJSON) return;
   const features = geoJSON.features||[];
-  const maxVotos = Math.max(1,...Object.values(_mapData).map(d=>d.total_votos||0));
+  const maxVotos = Math.max(1, ...Object.values(_mapData).map(d=>d.total_votos||0));
   features.forEach(feat=>{
     const props = feat.properties||{};
     const cod = String(props.codarea||'');
     const d = _mapData[cod];
     if(!d) return;
     const center = _polygonCentroid(feat.geometry.coordinates);
-    const r = 8000 + Math.sqrt((d.total_votos||0)/maxVotos)*60000;
-    const color = d.partido?(PARTIDO_COR[d.partido]||_candidateColor(d.lider)):_candidateColor(d.lider);
-    const circle = L.circle([center.lat,center.lng],{
-      radius:r, fillColor:color, fillOpacity:0.72,
-      color:'#fff', opacity:0.4, weight:1
-    }).addTo(_leafletMap);
-    circle.bindPopup(_buildTooltip(d,'electoral'));
+    const r = 800 + Math.sqrt((d.total_votos||0)/maxVotos) * 25000;
+    const color = d.partido ? (PARTIDO_COR[d.partido]||_candidateColor(d.lider)) : _candidateColor(d.lider);
+    const circle = new google.maps.Circle({
+      map: gMap,
+      center,
+      radius: r,
+      fillColor: color,
+      fillOpacity: 0.72,
+      strokeColor: '#fff',
+      strokeOpacity: 0.4,
+      strokeWeight: 1,
+      clickable: true,
+    });
+    const info = new google.maps.InfoWindow({
+      content: _buildTooltip(d, 'electoral'),
+    });
+    circle.addListener('click', ()=>{
+      info.setPosition(center);
+      info.open(gMap);
+    });
     _bubbleOverlays.push(circle);
+    _bubbleOverlays.push(info);
   });
 }
 
@@ -2173,7 +2199,8 @@ function _updateBreadcrumb(){
 function resetMap(){
   _mapCtx = {};
   _mapLevel = 'uf';
-  if(_leafletMap) _leafletMap.setView([-14.235,-51.925],4);
+  if(gMap) gMap.setCenter({lat:-14.235,lng:-51.925});
+  if(gMap) gMap.setZoom(4);
   reloadMap();
 }
 

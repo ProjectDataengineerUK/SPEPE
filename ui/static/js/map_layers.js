@@ -136,14 +136,17 @@ function getColorScale(metric, value) {
  * @returns {google.maps.Data.StyleOptions}
  */
 function applyStyleToFeature(feature) {
-  if (_activeLayer === "eleitoral") return null;
+  if (_activeLayer === "eleitoral") return null; // deixa o renderGeoJSON padrão agir
 
-  const props = (feature && feature.properties) || {};
-  const cod = String(props.codarea || props.CD_MUN || props.CD_UF || "");
+  const cod = String(
+    feature.getProperty("codarea") ||
+    feature.getProperty("CD_MUN") ||
+    feature.getProperty("CD_UF") || ""
+  );
   const valor = _layerData[cod] ?? _layerData[cod.slice(0, 6)];
   const color = (valor !== undefined) ? getColorScale(_activeMetric, valor) : "#21262d";
 
-  return { fillColor: color, fillOpacity: 0.65, color: "#4b6878", weight: 1 };
+  return { fillColor: color, fillOpacity: 0.65, strokeColor: "#4b6878", strokeWeight: 1 };
 }
 
 // ── helpers privados ──────────────────────────────────────────────────────
@@ -181,11 +184,14 @@ function _extractValue(row, metric) {
 
 function _redrawCurrentLayer() {
   if (_activeLayer === "eleitoral") {
+    // Deixa reloadMap() do host cuidar do estilo eleitoral
     if (typeof reloadMap === "function") reloadMap();
     return;
   }
-  if (typeof _geoLayer !== "undefined" && _geoLayer && typeof _geoLayer.setStyle === "function") {
-    _geoLayer.setStyle(applyStyleToFeature);
+
+  // Injetar estilo via Google Maps Data Layer se disponível
+  if (typeof dataLayer !== "undefined" && dataLayer) {
+    dataLayer.setStyle(applyStyleToFeature);
   }
 }
 
