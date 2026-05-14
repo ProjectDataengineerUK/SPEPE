@@ -936,6 +936,48 @@ async def get_socioeconomico(
             if result:
                 return JSONResponse({"municipios": result})
             logger.warning("BigQuery socioeconomico: Gold vazio para UF=%s ano=%s", uf, ano)
+            # Silver TSE fallback — IBGE cols are wide in Silver TSE tables
+            try:
+                from google.cloud import bigquery as _bq
+                silver = f"{settings.gcp_project_id}.{settings.bigquery_dataset_silver}"
+                query_s = f"""
+                    SELECT
+                        SAFE_CAST(cd_municipio_ibge AS INT64) AS cd_municipio_ibge,
+                        sg_uf,
+                        ANY_VALUE(nm_municipio) AS nm_municipio,
+                        MAX(SAFE_CAST(populacao_total AS FLOAT64)) AS populacao_total,
+                        MAX(SAFE_CAST(renda_per_capita AS FLOAT64)) AS renda_per_capita,
+                        MAX(SAFE_CAST(taxa_alfabetizacao AS FLOAT64)) AS taxa_alfabetizacao,
+                        MAX(SAFE_CAST(taxa_analfabetismo AS FLOAT64)) AS taxa_analfabetismo
+                    FROM `{silver}.tse_*`
+                    WHERE REGEXP_CONTAINS(_TABLE_SUFFIX, r'^[a-z]{{2}}_2022$')
+                      AND sg_uf = @uf AND cd_municipio_ibge IS NOT NULL
+                    GROUP BY cd_municipio_ibge, sg_uf
+                    ORDER BY populacao_total DESC NULLS LAST
+                    LIMIT @lim
+                """
+                _client = _bq.Client(project=settings.gcp_project_id)
+                _jc = _bq.QueryJobConfig(query_parameters=[
+                    _bq.ScalarQueryParameter("uf", "STRING", uf.upper()),
+                    _bq.ScalarQueryParameter("lim", "INT64", limit),
+                ])
+                _rows = list(_client.query(query_s, job_config=_jc).result())
+                if _rows:
+                    _result = [{
+                        "nm": r.get("nm_municipio") or str(r.get("cd_municipio_ibge", "")),
+                        "populacao": int(r.get("populacao_total") or 0),
+                        "taxa_alfabetizacao": round(float(r.get("taxa_alfabetizacao") or 0), 1),
+                        "taxa_analfabetismo": round(float(r.get("taxa_analfabetismo") or 0), 1),
+                        "pct_urbano": 0.0,
+                        "pct_0_14": 0.0,
+                        "pct_60_mais": 0.0,
+                        "idhm": 0.0,
+                        "renda_per_capita": round(float(r.get("renda_per_capita") or 0), 0),
+                        "gini": 0.0,
+                    } for r in _rows]
+                    return JSONResponse({"municipios": _result, "fonte": "silver_tse"})
+            except Exception as _exc_s:
+                logger.warning("Silver TSE socioeconomico falhou: %s", _exc_s)
             return JSONResponse(
                 {
                     "municipios": [],
@@ -1057,6 +1099,51 @@ async def get_seguranca(
             )
         except Exception as exc:
             logger.warning("BigQuery seguranca falhou: %s", exc)
+            # Silver fallback for seguranca
+            try:
+                from google.cloud import bigquery as _bq
+                silver = f"{settings.gcp_project_id}.{settings.bigquery_dataset_silver}"
+                query_seg = f"""
+                    SELECT
+                        CAST(cd_municipio_ibge AS INT64) AS cd_municipio_ibge,
+                        sg_uf,
+                        CAST(NULL AS STRING) AS nm_municipio,
+                        COALESCE(SAFE_CAST(ano AS INT64), @ano) AS ano,
+                        SAFE_CAST(ivs_total AS FLOAT64) AS ivs_total,
+                        SAFE_CAST(ivs_infraestrutura AS FLOAT64) AS ivs_infraestrutura,
+                        SAFE_CAST(ivs_capital_humano AS FLOAT64) AS ivs_capital_humano,
+                        SAFE_CAST(ivs_renda_trabalho AS FLOAT64) AS ivs_renda_trabalho,
+                        SAFE_CAST(taxa_homicidio AS FLOAT64) AS taxa_homicidio_100k,
+                        CAST(NULL AS FLOAT64) AS taxa_roubo_100k,
+                        CAST(NULL AS INT64) AS qt_feminicidio
+                    FROM `{silver}.seguranca_municipal`
+                    WHERE sg_uf = @uf AND COALESCE(SAFE_CAST(ano AS INT64), 2022) = @ano
+                    ORDER BY ivs_total DESC NULLS LAST
+                    LIMIT @lim
+                """
+                _client = _bq.Client(project=settings.gcp_project_id)
+                _jc = _bq.QueryJobConfig(query_parameters=[
+                    _bq.ScalarQueryParameter("uf", "STRING", uf.upper()),
+                    _bq.ScalarQueryParameter("ano", "INT64", ano),
+                    _bq.ScalarQueryParameter("lim", "INT64", limit),
+                ])
+                _rows_seg = list(_client.query(query_seg, job_config=_jc).result())
+                if _rows_seg:
+                    return JSONResponse({"municipios": [
+                        {
+                            "nm": r.get("nm_municipio") or str(r.get("cd_municipio_ibge", "")),
+                            "taxa_homicidio": round(float(r.get("taxa_homicidio_100k") or 0), 1),
+                            "ivs_total": round(float(r.get("ivs_total") or 0), 3),
+                            "ivs_infra": round(float(r.get("ivs_infraestrutura") or 0), 3),
+                            "ivs_capital_humano": round(float(r.get("ivs_capital_humano") or 0), 3),
+                            "ivs_renda": round(float(r.get("ivs_renda_trabalho") or 0), 3),
+                            "taxa_roubo": 0.0,
+                            "qt_feminicidio": 0,
+                        }
+                        for r in _rows_seg
+                    ], "fonte": "silver_seguranca"})
+            except Exception as _exc_seg:
+                logger.warning("Silver seguranca falhou: %s", _exc_seg)
             return JSONResponse({"municipios": [], "fonte": "bq_error", "error": str(exc)})
     data = _local_seguranca(uf, ano, limit)
     return JSONResponse({"municipios": data, "fonte": "local" if data else "indisponivel"})
@@ -1171,6 +1258,45 @@ async def get_saude(
             )
         except Exception as exc:
             logger.warning("BigQuery saude falhou: %s", exc)
+            # Silver fallback for saude
+            try:
+                from google.cloud import bigquery as _bq
+                silver = f"{settings.gcp_project_id}.{settings.bigquery_dataset_silver}"
+                query_sau = f"""
+                    SELECT
+                        CAST(cd_municipio_ibge AS INT64) AS cd_municipio_ibge,
+                        sg_uf,
+                        CAST(NULL AS STRING) AS nm_municipio,
+                        COALESCE(SAFE_CAST(ano AS INT64), @ano) AS ano,
+                        SAFE_CAST(taxa_mortalidade_infantil_1000 AS FLOAT64) AS taxa_mortalidade_infantil_1000,
+                        CAST(NULL AS FLOAT64) AS taxa_mortalidade_materna_100k,
+                        SAFE_CAST(pct_cobertura_plano_saude AS FLOAT64) AS pct_cobertura_plano_saude,
+                        CAST(NULL AS FLOAT64) AS idsus_score
+                    FROM `{silver}.saude_municipal`
+                    WHERE sg_uf = @uf AND COALESCE(SAFE_CAST(ano AS INT64), 2022) = @ano
+                    ORDER BY taxa_mortalidade_infantil_1000 ASC NULLS LAST
+                    LIMIT @lim
+                """
+                _client = _bq.Client(project=settings.gcp_project_id)
+                _jc = _bq.QueryJobConfig(query_parameters=[
+                    _bq.ScalarQueryParameter("uf", "STRING", uf.upper()),
+                    _bq.ScalarQueryParameter("ano", "INT64", ano),
+                    _bq.ScalarQueryParameter("lim", "INT64", limit),
+                ])
+                _rows_sau = list(_client.query(query_sau, job_config=_jc).result())
+                if _rows_sau:
+                    return JSONResponse({"municipios": [
+                        {
+                            "nm": r.get("nm_municipio") or str(r.get("cd_municipio_ibge", "")),
+                            "tx_mortalidade_infantil": round(float(r.get("taxa_mortalidade_infantil_1000") or 0), 1),
+                            "tx_mortalidade_materna": 0.0,
+                            "pct_cobertura_plano": round(float(r.get("pct_cobertura_plano_saude") or 0) * 100, 1),
+                            "idsus": 0.0,
+                        }
+                        for r in _rows_sau
+                    ], "fonte": "silver_saude"})
+            except Exception as _exc_sau:
+                logger.warning("Silver saude falhou: %s", _exc_sau)
             return JSONResponse({"municipios": [], "fonte": "bq_error", "error": str(exc)})
     data = _local_saude(uf, ano, limit)
     return JSONResponse({"municipios": data, "fonte": "local" if data else "indisponivel"})
@@ -2732,7 +2858,7 @@ async def get_social_sentimento(
             return JSONResponse({"data": [dict(r) for r in rows]})
         except Exception as exc:
             logger.warning("BigQuery social sentimento falhou: %s", exc)
-    return JSONResponse({"data": []})
+    return JSONResponse({"data": [], "status": "sem_tokens", "hint": "Configure TWITTER_BEARER_TOKEN e YOUTUBE_API_KEY para ativar monitoramento social."})
 
 
 # ── Social: Google Trends por UF ─────────────────────────────────────────────
@@ -2762,7 +2888,7 @@ async def get_social_trends(uf: str = "SP", ano: int = 2026) -> JSONResponse:
             return JSONResponse({"data": [dict(r) for r in rows]})
         except Exception as exc:
             logger.warning("BigQuery social trends falhou: %s", exc)
-    return JSONResponse({"data": []})
+    return JSONResponse({"data": [], "status": "sem_tokens", "hint": "Configure TWITTER_BEARER_TOKEN e YOUTUBE_API_KEY para ativar monitoramento social."})
 
 
 # ── Social: Plataformas ───────────────────────────────────────────────────────
@@ -2812,7 +2938,7 @@ async def get_social_plataformas(uf: str = "SP", ano: int = 2026) -> JSONRespons
             return JSONResponse({"data": [dict(r) for r in rows]})
         except Exception as exc:
             logger.warning("BigQuery social plataformas falhou: %s", exc)
-    return JSONResponse({"data": []})
+    return JSONResponse({"data": [], "status": "sem_tokens", "hint": "Configure TWITTER_BEARER_TOKEN e YOUTUBE_API_KEY para ativar monitoramento social."})
 
 
 # ── Social: Detector de crise ─────────────────────────────────────────────────
@@ -2842,7 +2968,7 @@ async def get_social_crise(uf: str = "SP") -> JSONResponse:
             return JSONResponse({"data": [dict(r) for r in rows]})
         except Exception as exc:
             logger.warning("BigQuery social crise falhou: %s", exc)
-    return JSONResponse({"data": []})
+    return JSONResponse({"data": [], "status": "sem_tokens", "hint": "Configure TWITTER_BEARER_TOKEN e YOUTUBE_API_KEY para ativar monitoramento social."})
 
 
 # ── Social: Temas por UF ──────────────────────────────────────────────────────
@@ -2879,7 +3005,7 @@ async def get_social_temas(uf: str = "SP", ano: int = 2026) -> JSONResponse:
             return JSONResponse({"data": [dict(r) for r in rows]})
         except Exception as exc:
             logger.warning("BigQuery social temas falhou: %s", exc)
-    return JSONResponse({"data": []})
+    return JSONResponse({"data": [], "status": "sem_tokens", "hint": "Configure TWITTER_BEARER_TOKEN e YOUTUBE_API_KEY para ativar monitoramento social."})
 
 
 # ── Digital: Meta Ads por UF ──────────────────────────────────────────────────
@@ -3111,6 +3237,48 @@ async def get_endividamento(
                     return JSONResponse({"data": [dict(r) for r in rows3], "fonte": "silver"})
             except Exception as exc3:
                 logger.warning("BigQuery endividamento Silver falhou: %s", exc3)
+    # Last resort: call BACEN SGS API directly (public, no auth)
+    try:
+        import httpx
+        _series = {
+            "endividamento_familias_pct": 29037,
+            "comprometimento_renda_pct": 29038,
+            "inadimplencia_pf_pct": 21084,
+        }
+        _d_ini = f"01/01/{ano_start}"
+        _d_fim = f"31/12/{ano_end}"
+        _frames: dict = {}
+        async with httpx.AsyncClient(timeout=20) as _hc:
+            for _col, _codigo in _series.items():
+                try:
+                    _r = await _hc.get(
+                        f"https://api.bcb.gov.br/dados/serie/bcdata.sgs.{_codigo}/dados",
+                        params={"formato": "json", "dataInicial": _d_ini, "dataFinal": _d_fim},
+                    )
+                    _r.raise_for_status()
+                    _frames[_col] = {
+                        item["data"]: float(item["valor"].replace(",", "."))
+                        for item in _r.json()
+                        if item.get("valor") not in (None, "", "-")
+                    }
+                except Exception:
+                    pass
+        _all_dates = sorted(set().union(*[set(f.keys()) for f in _frames.values()]))
+        if _all_dates:
+            _rows_live = [
+                {
+                    "data_referencia": _d,
+                    "endividamento_familias_pct": _frames.get("endividamento_familias_pct", {}).get(_d),
+                    "comprometimento_renda_pct": _frames.get("comprometimento_renda_pct", {}).get(_d),
+                    "inadimplencia_pf_pct": _frames.get("inadimplencia_pf_pct", {}).get(_d),
+                    "inadimplencia_pf_credito": None,
+                    "fontes": "BACEN-SGS-live",
+                }
+                for _d in _all_dates
+            ]
+            return JSONResponse({"data": _rows_live, "fonte": "bacen_live"})
+    except Exception as _exc:
+        logger.warning("BACEN SGS live falhou: %s", _exc)
     return JSONResponse({"data": []})
 
 

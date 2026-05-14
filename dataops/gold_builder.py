@@ -183,31 +183,25 @@ def _build_gold_via_bigquery_sql() -> dict:
         "fact_ibge_municipio": f"""
             CREATE OR REPLACE TABLE `{gold}.fact_ibge_municipio` AS
             SELECT
-                SAFE_CAST(cd_municipio_ibge AS INT64)                       AS cd_municipio_ibge,
+                SAFE_CAST(cd_municipio_ibge AS INT64)           AS cd_municipio_ibge,
                 sg_uf,
-                ANY_VALUE(nm_municipio)                                   AS nm_municipio,
-                2022                                                        AS ano,
-                MAX(IF(indicador='populacao',
-                    SAFE_CAST(valor AS FLOAT64), NULL))                     AS populacao_total,
-                MAX(IF(indicador='taxa_alfabetizacao',
-                    SAFE_CAST(valor AS FLOAT64), NULL))                     AS taxa_alfabetizacao,
-                MAX(IF(indicador='pct_analfabetos',
-                    SAFE_CAST(valor AS FLOAT64), NULL))                     AS taxa_analfabetismo,
-                MAX(IF(indicador='pct_urbano',
-                    SAFE_CAST(valor AS FLOAT64), NULL))                     AS pct_urbano,
-                MAX(IF(indicador='pct_0_14',
-                    SAFE_CAST(valor AS FLOAT64), NULL))                     AS pct_0_14,
-                MAX(IF(indicador='pct_60_mais',
-                    SAFE_CAST(valor AS FLOAT64), NULL))                     AS pct_60_mais,
-                MAX(IF(indicador='pct_catolico',
-                    SAFE_CAST(valor AS FLOAT64), NULL))                     AS pct_catolico,
-                CAST(NULL AS FLOAT64)                                       AS idhm,
-                CAST(NULL AS FLOAT64)                                       AS renda_per_capita,
-                CAST(NULL AS FLOAT64)                                       AS gini,
-                CAST(NULL AS FLOAT64)                                       AS pct_extrema_pobreza,
-                CURRENT_TIMESTAMP() AS ingested_at
+                ANY_VALUE(nm_municipio)                          AS nm_municipio,
+                2022                                             AS ano,
+                MAX(SAFE_CAST(populacao_total AS FLOAT64))       AS populacao_total,
+                MAX(SAFE_CAST(taxa_alfabetizacao AS FLOAT64))    AS taxa_alfabetizacao,
+                MAX(SAFE_CAST(taxa_analfabetismo AS FLOAT64))    AS taxa_analfabetismo,
+                MAX(SAFE_CAST(renda_per_capita AS FLOAT64))      AS renda_per_capita,
+                CAST(NULL AS FLOAT64)                            AS pct_urbano,
+                CAST(NULL AS FLOAT64)                            AS pct_0_14,
+                CAST(NULL AS FLOAT64)                            AS pct_60_mais,
+                CAST(NULL AS FLOAT64)                            AS pct_catolico,
+                CAST(NULL AS FLOAT64)                            AS idhm,
+                CAST(NULL AS FLOAT64)                            AS gini,
+                CAST(NULL AS FLOAT64)                            AS pct_extrema_pobreza,
+                CURRENT_TIMESTAMP()                              AS ingested_at
             FROM {silver_wc}
-            WHERE cd_municipio_ibge IS NOT NULL
+            WHERE REGEXP_CONTAINS(_TABLE_SUFFIX, r'^[a-z]{{2}}_2022$')
+              AND cd_municipio_ibge IS NOT NULL
             GROUP BY cd_municipio_ibge, sg_uf
         """,
         "dim_territorio": f"""
