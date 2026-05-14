@@ -1,10 +1,14 @@
 """PyMC Electoral Model — non-centered hierarchical with historical + polls + candidate effects.
 
 Architecture (3-level partial pooling):
-  Level 1: UF intercept       a_uf[uf]      — partial pooling across 27 UFs
-  Level 2: Candidate intercept gamma[cand]   — partial pooling (top-N + OTHER bucket)
-  Level 3: Anchoring signals  w_hist, w_poll — pre-scaled [0,1] features with informative priors
-  Level 4: Demo features       beta[uf,feat] — UF-varying slopes on IBGE z-scored features
+  Level 1: UF intercept       a_uf[uf]      — partial pooling across 27 UFs; absorbs global
+                                               intercept (mu_uf); mu_cand removed (anchored at 0)
+  Level 2: Candidate intercept gamma[cand]   — partial pooling (top-N + OTHER bucket);
+                                               non-centered via g_raw with mu_cand=0 implicit
+  Level 3: Anchoring signals  w_hist, w_poll — TruncatedNormal(lower=0) with conservative priors
+                                               scaled for multi-candidate races (pct_votos ~5-30%)
+  Level 4: Demo features       beta[uf,feat] — hierarchical partial pooling across UFs via
+                                               mu_beta + sd_beta * beta_raw (non-centered)
 
 Linear predictor (logit scale):
   eta = a_uf[uf]
@@ -14,6 +18,16 @@ Linear predictor (logit scale):
       + sum(beta_demo[uf] * X_demo, axis=1)
 
 Likelihood: Beta(alpha=mu*kappa, beta=(1-mu)*kappa), mu = sigmoid(eta)
+
+Prior calibration (multi-candidate race, pct_votos in (0,1)):
+  w_hist ~ TruncatedNormal(mu=1.5, sigma=0.5, lower=0): for hist=0.6 → logit contrib 0.9
+    → sigmoid(0.9) ≈ 0.71, well inside plausible range for leading candidate
+  w_poll ~ TruncatedNormal(mu=1.0, sigma=0.5, lower=0): polls noisier at municipal level
+  Positive truncation ensures historical/poll signals always push in correct direction.
+
+Identification:
+  mu_cand removed — non-identifiable with mu_uf. mu_uf acts as global intercept.
+  gamma[cand] = sd_cand * g_raw (mu_cand=0 implicit anchor).
 """
 
 from __future__ import annotations
@@ -114,10 +128,14 @@ def build_electoral_model(features: dict):
 
     Model structure:
       - UF random intercept (non-centered, partial pooling across 27 UFs)
+          mu_uf serves as global intercept; mu_cand removed (non-identifiable, anchored at 0)
       - Candidate random intercept (non-centered, partial pooling top-N + OTHER)
-      - w_hist: coefficient for historical vote share (strong informative prior, positive)
-      - w_poll: coefficient for poll signal (informative prior, positive)
-      - beta_demo: UF-varying slopes on 4 IBGE features (weakly informative)
+          gamma = sd_cand * g_raw  (mu_cand=0 implicit)
+      - w_hist: TruncatedNormal(mu=1.5, sigma=0.5, lower=0) — conservative prior scaled for
+          multi-candidate races; old N(4,1) caused logit blow-up for pct_votos ~5-30%
+      - w_poll: TruncatedNormal(mu=1.0, sigma=0.5, lower=0) — polls noisier at municipal level
+      - beta_demo: hierarchical partial pooling across UFs via mu_beta + sd_beta * beta_raw
+          (non-centered); stabilises small-sample UFs like AC, RR, AP (~20 municipalities)
       - kappa: Beta concentration (precision)
     """
     try:
@@ -155,19 +173,28 @@ def build_electoral_model(features: dict):
         a_uf = pm.Deterministic("a_uf", mu_uf + sd_uf * a_raw)
 
         # ── Level 2: Candidate intercept (non-centered) ──────────────────────
-        mu_cand = pm.Normal("mu_cand", 0.0, 1.0)
+        # mu_cand removed: non-identifiable with mu_uf (translational mode).
+        # mu_uf absorbs the global intercept; gamma is anchored at 0 mean.
         sd_cand = pm.HalfNormal("sd_cand", 0.5)
         g_raw = pm.Normal("g_raw", 0.0, 1.0, shape=n_cand)
-        gamma = pm.Deterministic("gamma", mu_cand + sd_cand * g_raw)
+        gamma = pm.Deterministic("gamma", sd_cand * g_raw)
 
-        # ── Level 3: Anchoring signals (informative priors, positive) ────────
-        # w_hist ~ N(4, 1): on logit scale, Δ0.2 historical → Δ0.8 logit
-        # w_poll ~ N(3, 1): polls are noisier at municipal level
-        w_hist = pm.Normal("w_hist", mu=4.0, sigma=1.0)
-        w_poll = pm.Normal("w_poll", mu=3.0, sigma=1.0)
+        # ── Level 3: Anchoring signals (conservative, positive-only priors) ──
+        # TruncatedNormal(lower=0) ensures hist/poll always push in correct direction.
+        # Calibration for multi-candidate race (pct_votos ~5-30%):
+        #   w_hist=1.5, hist=0.6 → logit contrib 0.9 → sigmoid≈0.71 (plausible for leader)
+        #   Old N(4,1) gave contrib 2.4 → sigmoid≈0.92 (impossible in multi-candidate races)
+        # w_poll lower (1.0) because polls are noisier at municipal granularity.
+        w_hist = pm.TruncatedNormal("w_hist", mu=1.5, sigma=0.5, lower=0.0)
+        w_poll = pm.TruncatedNormal("w_poll", mu=1.0, sigma=0.5, lower=0.0)
 
-        # ── Level 4: UF-varying demo slopes (weakly informative) ────────────
-        beta_demo = pm.Normal("beta_demo", 0.0, 0.5, shape=(n_uf, n_demo))
+        # ── Level 4: UF-varying demo slopes (hierarchical partial pooling) ────
+        # Hyperpriors share information across UFs → stabilises small-sample UFs
+        # (AC, RR, AP with ~20 municipalities). Non-centered for sampling efficiency.
+        mu_beta = pm.Normal("mu_beta", 0.0, 0.3, shape=n_demo)
+        sd_beta = pm.HalfNormal("sd_beta", 0.3, shape=n_demo)
+        beta_raw = pm.Normal("beta_raw", 0.0, 1.0, shape=(n_uf, n_demo))
+        beta_demo = pm.Deterministic("beta_demo", mu_beta + sd_beta * beta_raw)
 
         # ── Linear predictor ─────────────────────────────────────────────────
         eta = (

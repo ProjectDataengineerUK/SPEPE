@@ -258,7 +258,7 @@ tr.rhl td{background:rgba(0,200,83,.07)!important}
 .map-cargo-sel{background:var(--bg3);border:1px solid var(--border);border-radius:6px;padding:5px 9px;color:var(--text);font-size:.75rem;outline:none;margin-left:auto}
 .map-cargo-sel:focus{border-color:var(--green)}
 .map-body{flex:1;display:flex;overflow:hidden;min-height:0}
-#leaflet-map{flex:1;min-height:0;background:#0d1117}
+#leaflet-map{flex:1;min-height:0;height:100%;background:#0d1117}
 #zona-panel{width:320px;background:var(--bg2);border-left:1px solid var(--border);overflow-y:auto;flex-shrink:0;display:none}
 .map-legend{width:210px;background:var(--bg2);border-left:1px solid var(--border);padding:14px;overflow-y:auto;flex-shrink:0;display:flex;flex-direction:column;gap:10px}
 .leg-title{font-size:.68rem;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:var(--text2)}
@@ -1030,7 +1030,7 @@ function switchTab(el,nm){
     const mapa=document.getElementById('tab-mapa');
     if(mapa){ mapa.style.display='flex'; mapa.classList.add('active'); }
     loadCandidatoList();
-    setTimeout(()=>{ if(!_leafletMap) initMap(); else reloadMap(); },50);
+    setTimeout(()=>{ if(!_leafletMap) initMap(); else { _leafletMap.invalidateSize(); reloadMap(); } },150);
   } else if(_TAB_PANEL_MAP[nm]){
     if(dash) dash.style.display='none';
     const panelId='tab-'+_TAB_PANEL_MAP[nm];
@@ -1918,6 +1918,7 @@ function initMap(){
   }).addTo(_leafletMap);
   gMap = _leafletMap; // alias
   if(typeof initMapLayers==='function') initMapLayers();
+  _leafletMap.invalidateSize();
   reloadMap();
 }
 

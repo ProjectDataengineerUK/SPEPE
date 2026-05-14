@@ -54,11 +54,11 @@ def build_electoral_dataset(
       split_mode='validate' → 2022 only
 
     Returns DataFrame with columns:
-      cd_municipio_ibge, sg_uf, ano_eleicao, candidato, split_type,
+      cd_municipio_ibge, sg_uf, ano_eleicao, candidato, cd_cargo, ds_cargo, split_type,
       y (target pct_votos), qt_votos, total_municipio,
       pct_votos_historico, is_new_candidate,
       media_intencao_voto_uf, n_pesquisas, poll_missing,
-      sg_partido, ds_cargo,
+      sg_partido,
       populacao_total, renda_per_capita, taxa_alfabetizacao, taxa_analfabetismo
     """
     split_filters = {
@@ -88,8 +88,7 @@ def build_electoral_dataset(
         f"""
     LEFT JOIN (
         SELECT nm_candidato AS candidato, ano_eleicao,
-               ANY_VALUE(sg_partido) AS sg_partido,
-               ANY_VALUE(ds_cargo)   AS ds_cargo
+               ANY_VALUE(sg_partido) AS sg_partido
         FROM `{project_id}.spepe_silver.dim_candidato`
         GROUP BY nm_candidato, ano_eleicao
     ) c ON c.candidato = v.candidato AND c.ano_eleicao = v.ano_eleicao
@@ -131,17 +130,20 @@ def build_electoral_dataset(
             CAST(cd_municipio_ibge AS STRING)                       AS cd_municipio_ibge,
             COALESCE(sg_uf_y, sg_uf_x)                             AS sg_uf,
             CAST(ano_eleicao AS INT64)                              AS ano_eleicao,
+            cd_cargo,
+            ds_cargo,
             UPPER(TRIM(REGEXP_REPLACE(nm_candidato, r'\\s+', ' '))) AS candidato,
             SUM(CAST(qt_votos AS FLOAT64))                          AS qt_votos,
             SUM(SUM(CAST(qt_votos AS FLOAT64)))
                 OVER (PARTITION BY CAST(cd_municipio_ibge AS STRING),
-                                   CAST(ano_eleicao AS INT64))      AS total_municipio,
+                                   CAST(ano_eleicao AS INT64),
+                                   cd_cargo)                        AS total_municipio,
         FROM `{project_id}.spepe_silver.tse_*`
         WHERE REGEXP_CONTAINS(_TABLE_SUFFIX, r'^[a-z]{{2}}_(2018|2022)$')
           AND nm_candidato IS NOT NULL
           AND qt_votos IS NOT NULL
           AND CAST(qt_votos AS FLOAT64) > 0
-        GROUP BY cd_municipio_ibge, sg_uf_y, sg_uf_x, ano_eleicao, nm_candidato
+        GROUP BY cd_municipio_ibge, sg_uf_y, sg_uf_x, ano_eleicao, cd_cargo, ds_cargo, nm_candidato
     ),
 
     votos_pct AS (
@@ -157,6 +159,7 @@ def build_electoral_dataset(
         SELECT
             cd_municipio_ibge,
             candidato,
+            cd_cargo,
             ano_eleicao + 4     AS target_ano,
             pct_votos           AS pct_votos_historico
         FROM votos_pct
@@ -180,6 +183,8 @@ def build_electoral_dataset(
         v.sg_uf,
         v.ano_eleicao,
         v.candidato,
+        v.cd_cargo,
+        v.ds_cargo,
         CASE
             WHEN v.ano_eleicao = 2018 THEN 'train'
             WHEN v.ano_eleicao = 2022 THEN 'validate'
@@ -200,9 +205,8 @@ def build_electoral_dataset(
         COALESCE(p.n_pesquisas, 0)                                   AS n_pesquisas,
         CAST(p.media_intencao_voto_uf IS NULL AS INT64)              AS poll_missing,
 
-        -- Party / cargo identity
+        -- Party / cargo identity (ds_cargo from dim_candidato as fallback)
         COALESCE(c.sg_partido, 'DESCONHECIDO')                      AS sg_partido,
-        COALESCE(c.ds_cargo,   'DESCONHECIDO')                      AS ds_cargo,
 
         -- IBGE demographics (25% weight — log1p applied in Python)
         COALESCE(i.populacao_total,    0)     AS populacao_total,
@@ -214,6 +218,7 @@ def build_electoral_dataset(
     LEFT JOIN historical_lag h
            ON h.cd_municipio_ibge = v.cd_municipio_ibge
           AND h.candidato         = v.candidato
+          AND h.cd_cargo          = v.cd_cargo
           AND h.target_ano        = v.ano_eleicao
     {pesquisas_join}
     {dim_cand_join}
@@ -329,6 +334,16 @@ def _assert_data_quality(df: pd.DataFrame) -> None:
             f"IBGE join coverage {ibge_coverage:.1%} < {_IBGE_JOIN_MIN:.0%}. "
             "IBGE table may be incomplete."
         )
+
+    # Verify pct_votos sums ~1.0 per (municipio, cargo, ano) — catches wrong cargo partition
+    if "cd_cargo" in df.columns:
+        pct_sum = df.groupby(["cd_municipio_ibge", "cd_cargo", "ano_eleicao"])["y"].sum()
+        bad_groups = ((pct_sum < 0.7) | (pct_sum > 1.3)).mean()
+        if bad_groups > 0.05:
+            raise ValueError(
+                f"{bad_groups:.1%} of (municipio, cargo, ano) groups have pct_votos sum "
+                "outside [0.7, 1.3]. Check cargo partition in SQL."
+            )
 
 
 def _table_exists(client: bigquery.Client, project: str, dataset: str, table: str) -> bool:

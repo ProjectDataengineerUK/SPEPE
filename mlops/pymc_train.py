@@ -59,12 +59,20 @@ def train_pymc_model(
 
     project_id = project_id or os.environ.get("GCP_PROJECT_ID", "spepe-prod")
 
+    from mlops.shared_schema import IBGE_COL_ALIASES, IBGE_DEMOGRAPHIC_COLS
+
     # ── Step 1: Load full dataset (train + val) ─────────────────────────────
     logger.info("Loading training dataset (split_mode='all')...")
     df = build_training_dataset(project_id=project_id, write_to_bq=False, split_mode="all")
 
     if df.empty:
         raise ValueError("Training dataset is empty")
+
+    # Remap legacy column names if present (backward compat with old Gold schema)
+    for old_name, new_name in IBGE_COL_ALIASES.items():
+        if old_name in df.columns and new_name not in df.columns:
+            df = df.rename(columns={old_name: new_name})
+            logger.info("Remapped legacy column: %s → %s", old_name, new_name)
 
     # ── Step 2: Encode UF categories on full dataset (consistent train+val) ─
     uf_cat = pd.Categorical(df["sg_uf"])
@@ -89,12 +97,7 @@ def train_pymc_model(
     )
 
     # ── Step 4: Feature selection — only columns with real signal ────────────
-    feature_cols = [
-        "populacao",
-        "renda_media",
-        "pct_ensino_superior",
-        "pct_analfabetos",
-    ]
+    feature_cols = IBGE_DEMOGRAPHIC_COLS  # ["populacao_total", "renda_per_capita", "taxa_alfabetizacao", "taxa_analfabetismo"]
     # Hard QC: abort if any feature is degenerate (all-constant after z-score)
     train_raw = df_train[feature_cols].fillna(0)
     degenerate = train_raw.columns[train_raw.std() < 1e-3].tolist()
