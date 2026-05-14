@@ -30,10 +30,29 @@ def _build_gold_via_bigquery_sql() -> dict:
     try:
         client.get_table(f"{_GCP_PROJECT}.{_BQ_SILVER_DATASET}.dim_candidato")
         _has_dim_cand = True
-        logger.info("Silver dim_candidato encontrado — sg_partido via JOIN")
+        logger.info("Silver dim_candidato encontrado — verificando sq_candidato em tse_*")
     except Exception:
         _has_dim_cand = False
         logger.info("Silver dim_candidato ausente — sg_partido=NULL (rode silver_transform)")
+
+    # Validate that tse_* tables have sq_candidato — column absent → skip partido JOIN
+    if _has_dim_cand:
+        try:
+            _sq_check = (
+                client.query(
+                    f"SELECT 1 FROM `{_GCP_PROJECT}.{_BQ_SILVER_DATASET}.INFORMATION_SCHEMA.COLUMNS`"
+                    f" WHERE table_name LIKE 'tse_%' AND column_name = 'sq_candidato' LIMIT 1"
+                )
+                .to_dataframe(create_bqstorage_client=False)
+            )
+            if _sq_check.empty:
+                logger.info("Silver tse_* sem sq_candidato — partido JOIN desativado")
+                _has_dim_cand = False
+            else:
+                logger.info("sq_candidato confirmado — sg_partido via JOIN ativo")
+        except Exception as _e:
+            logger.warning("Falha ao verificar sq_candidato: %s — partido JOIN desativado", _e)
+            _has_dim_cand = False
 
     if _has_dim_cand:
         _partido_cols = """c.sg_partido              AS sg_partido,
@@ -173,9 +192,10 @@ def _build_gold_via_bigquery_sql() -> dict:
                     ), 0) * 100, 1
                 )                                       AS pct_votos_uf,
                 CURRENT_TIMESTAMP()                     AS ingested_at
-            FROM `{silver}.tse_presidente_*`
+            FROM {silver_wc}
             WHERE nm_candidato IS NOT NULL
               AND qt_votos IS NOT NULL
+              AND SAFE_CAST(cd_cargo AS INT64) = 1
             GROUP BY
                 sg_uf, cd_municipio, nm_municipio, cd_municipio_ibge,
                 nm_candidato, nr_candidato, cd_cargo, ds_cargo, nr_turno, ano_eleicao

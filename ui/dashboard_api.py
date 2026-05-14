@@ -447,17 +447,18 @@ async def _bq_candidatos(cargo: str, uf: str, ano: int) -> list[dict]:
             ]
         )
     elif cd_cargo == 1:
-        # Presidente: usa fact_presidente_resultado (nacional, sem filtro de UF)
+        # Presidente: nacional, sem filtro de UF — agrega fact_municipio_candidato_eleicao
         query = f"""
             SELECT
                 nm_candidato                                    AS nm,
-                CAST(NULL AS STRING)                            AS partido,
+                sg_partido                                      AS partido,
                 ROUND(SUM(total_votos) / SUM(SUM(total_votos)) OVER () * 100, 1) AS pct_t1,
                 CAST(SUM(total_votos) AS STRING)                AS votos
-            FROM `{gold}.fact_presidente_resultado`
+            FROM `{gold}.fact_municipio_candidato_eleicao`
             WHERE ano_eleicao = @ano
+              AND cd_cargo = 1
               AND nr_turno = 1
-            GROUP BY nm_candidato
+            GROUP BY nm_candidato, sg_partido
             ORDER BY pct_t1 DESC
             LIMIT 50
         """
@@ -591,38 +592,69 @@ async def _bq_kpi(cargo: str, uf: str, ano: int) -> dict:
             "fonte": "bigquery_pesquisas_2026",
         }
 
-    query = f"""
-        WITH ranked AS (
+    # Presidente: resultado nacional sem filtro de UF
+    if cd_cargo == 1:
+        query = f"""
+            WITH ranked AS (
+                SELECT
+                    nm_candidato,
+                    sg_partido,
+                    SUM(total_votos) AS total_cand,
+                    SUM(SUM(total_votos)) OVER () AS total_geral,
+                    COUNT(DISTINCT cd_municipio) AS municipios,
+                    ROW_NUMBER() OVER (ORDER BY SUM(total_votos) DESC) AS rn
+                FROM `{gold}.fact_municipio_candidato_eleicao`
+                WHERE ano_eleicao = @ano
+                  AND cd_cargo = 1 AND nr_turno = 1
+                GROUP BY nm_candidato, sg_partido
+            )
             SELECT
-                nm_candidato,
-                sg_partido,
-                SUM(total_votos) AS total_cand,
-                SUM(SUM(total_votos)) OVER () AS total_geral,
-                COUNT(DISTINCT cd_municipio) AS municipios,
-                ROW_NUMBER() OVER (ORDER BY SUM(total_votos) DESC) AS rn
-            FROM `{gold}.fact_municipio_candidato_eleicao`
-            WHERE sg_uf = @uf AND ano_eleicao = @ano
-              AND cd_cargo = @cd_cargo AND nr_turno = 1
-            GROUP BY nm_candidato, sg_partido
+                MAX(IF(rn=1, nm_candidato, NULL))                        AS vencedor,
+                MAX(IF(rn=1, sg_partido, NULL))                          AS vencedor_partido,
+                ROUND(MAX(IF(rn=1, total_cand/total_geral*100, NULL)),1) AS vencedor_pct,
+                MAX(IF(rn=2, nm_candidato, NULL))                        AS segundo,
+                ROUND(MAX(IF(rn=2, total_cand/total_geral*100, NULL)),1) AS segundo_pct,
+                MAX(municipios)                                           AS municipios,
+                MAX(total_geral)                                          AS total_votos
+            FROM ranked WHERE rn <= 2
+        """
+        job_config = bigquery.QueryJobConfig(
+            query_parameters=[
+                bigquery.ScalarQueryParameter("ano", "INT64", ano),
+            ]
         )
-        SELECT
-            MAX(IF(rn=1, nm_candidato, NULL))                        AS vencedor,
-            MAX(IF(rn=1, sg_partido, NULL))                          AS vencedor_partido,
-            ROUND(MAX(IF(rn=1, total_cand/total_geral*100, NULL)),1) AS vencedor_pct,
-            MAX(IF(rn=2, nm_candidato, NULL))                        AS segundo,
-            ROUND(MAX(IF(rn=2, total_cand/total_geral*100, NULL)),1) AS segundo_pct,
-            MAX(municipios)                                           AS municipios,
-            MAX(total_geral)                                          AS total_votos
-        FROM ranked
-        WHERE rn <= 2
-    """
-    job_config = bigquery.QueryJobConfig(
-        query_parameters=[
-            bigquery.ScalarQueryParameter("uf", "STRING", uf.upper()),
-            bigquery.ScalarQueryParameter("ano", "INT64", ano),
-            bigquery.ScalarQueryParameter("cd_cargo", "INT64", cd_cargo),
-        ]
-    )
+    else:
+        query = f"""
+            WITH ranked AS (
+                SELECT
+                    nm_candidato,
+                    sg_partido,
+                    SUM(total_votos) AS total_cand,
+                    SUM(SUM(total_votos)) OVER () AS total_geral,
+                    COUNT(DISTINCT cd_municipio) AS municipios,
+                    ROW_NUMBER() OVER (ORDER BY SUM(total_votos) DESC) AS rn
+                FROM `{gold}.fact_municipio_candidato_eleicao`
+                WHERE sg_uf = @uf AND ano_eleicao = @ano
+                  AND cd_cargo = @cd_cargo AND nr_turno = 1
+                GROUP BY nm_candidato, sg_partido
+            )
+            SELECT
+                MAX(IF(rn=1, nm_candidato, NULL))                        AS vencedor,
+                MAX(IF(rn=1, sg_partido, NULL))                          AS vencedor_partido,
+                ROUND(MAX(IF(rn=1, total_cand/total_geral*100, NULL)),1) AS vencedor_pct,
+                MAX(IF(rn=2, nm_candidato, NULL))                        AS segundo,
+                ROUND(MAX(IF(rn=2, total_cand/total_geral*100, NULL)),1) AS segundo_pct,
+                MAX(municipios)                                           AS municipios,
+                MAX(total_geral)                                          AS total_votos
+            FROM ranked WHERE rn <= 2
+        """
+        job_config = bigquery.QueryJobConfig(
+            query_parameters=[
+                bigquery.ScalarQueryParameter("uf", "STRING", uf.upper()),
+                bigquery.ScalarQueryParameter("ano", "INT64", ano),
+                bigquery.ScalarQueryParameter("cd_cargo", "INT64", cd_cargo),
+            ]
+        )
     rows = await asyncio.to_thread(
         lambda: list(client.query(query, job_config=job_config).result())
     )
