@@ -2255,6 +2255,13 @@ def transform_presidente_to_silver(year: int, use_bigquery: bool = False) -> dic
                 if col not in df_batch.columns:
                     df_batch[col] = default
             df_batch = df_batch[[c for c in _REQUIRED_COLS if c in df_batch.columns]]
+            # Align schema with per-UF Silver tables (which have nm_municipio_x/y from TSE+IBGE join)
+            if "nm_municipio" in df_batch.columns and "nm_municipio_x" not in df_batch.columns:
+                df_batch.rename(columns={"nm_municipio": "nm_municipio_x"}, inplace=True)
+                df_batch["nm_municipio_y"] = None
+            if "sg_uf" in df_batch.columns and "sg_uf_x" not in df_batch.columns:
+                df_batch["sg_uf_x"] = df_batch["sg_uf"]
+                df_batch["sg_uf_y"] = None
             batches_out.append(df_batch)
             total_rows += len(df_batch)
             logger.debug("Presidente batch %d rows (total %d)", len(df_batch), total_rows)

@@ -38,13 +38,10 @@ def _build_gold_via_bigquery_sql() -> dict:
     # Validate that tse_* tables have sq_candidato — column absent → skip partido JOIN
     if _has_dim_cand:
         try:
-            _sq_check = (
-                client.query(
-                    f"SELECT 1 FROM `{_GCP_PROJECT}.{_BQ_SILVER_DATASET}.INFORMATION_SCHEMA.COLUMNS`"
-                    f" WHERE table_name LIKE 'tse_%' AND column_name = 'sq_candidato' LIMIT 1"
-                )
-                .to_dataframe(create_bqstorage_client=False)
-            )
+            _sq_check = client.query(
+                f"SELECT 1 FROM `{_GCP_PROJECT}.{_BQ_SILVER_DATASET}.INFORMATION_SCHEMA.COLUMNS`"
+                f" WHERE table_name LIKE 'tse_%' AND column_name = 'sq_candidato' LIMIT 1"
+            ).to_dataframe(create_bqstorage_client=False)
             if _sq_check.empty:
                 logger.info("Silver tse_* sem sq_candidato — partido JOIN desativado")
                 _has_dim_cand = False
@@ -71,13 +68,18 @@ def _build_gold_via_bigquery_sql() -> dict:
         _from_tse_s = silver_wc
         _partido_grp = ""
 
+    # Silver per-UF tables have nm_municipio_x/y (from TSE+IBGE join); tse_presidente has same
+    # after schema alignment in transform_presidente_to_silver.
+    _nm_mun_sel = f"COALESCE({_s}nm_municipio_x, {_s}nm_municipio_y) AS nm_municipio"
+    _nm_mun_grp = f"{_s}nm_municipio_x, {_s}nm_municipio_y"
+
     sqls = {
         "fact_municipio_eleicao": f"""
             CREATE OR REPLACE TABLE `{gold}.fact_municipio_eleicao` AS
             SELECT
                 {_s}sg_uf,
                 SAFE_CAST({_s}cd_municipio AS INT64)        AS cd_municipio,
-                {_s}nm_municipio                           AS nm_municipio,
+                {_nm_mun_sel},
                 SAFE_CAST({_s}cd_municipio_ibge AS INT64)   AS cd_municipio_ibge,
                 {_s}nm_candidato,
                 {_partido_cols}
@@ -93,7 +95,7 @@ def _build_gold_via_bigquery_sql() -> dict:
                 CURRENT_TIMESTAMP()                          AS ingested_at
             FROM {_from_tse_s}
             {_partido_join}
-            GROUP BY {_s}sg_uf, {_s}cd_municipio, {_s}nm_municipio, {_s}cd_municipio_ibge,
+            GROUP BY {_s}sg_uf, {_s}cd_municipio, {_nm_mun_grp}, {_s}cd_municipio_ibge,
                      {_s}nm_candidato, {_partido_grp}
                      {_s}cd_cargo, {_s}ds_cargo, {_s}ano_eleicao
         """,
@@ -102,7 +104,7 @@ def _build_gold_via_bigquery_sql() -> dict:
             SELECT
                 {_s}sg_uf,
                 SAFE_CAST({_s}cd_municipio AS INT64)    AS cd_municipio,
-                {_s}nm_municipio                       AS nm_municipio,
+                {_nm_mun_sel},
                 SAFE_CAST({_s}nr_zona AS INT64)          AS nr_zona,
                 SAFE_CAST({_s}nr_secao AS INT64)         AS nr_secao,
                 {_s}nm_candidato,
@@ -115,7 +117,7 @@ def _build_gold_via_bigquery_sql() -> dict:
                 CURRENT_TIMESTAMP()                      AS ingested_at
             FROM {_from_tse_s}
             {_partido_join}
-            GROUP BY {_s}sg_uf, {_s}cd_municipio, {_s}nm_municipio, {_s}nr_zona, {_s}nr_secao,
+            GROUP BY {_s}sg_uf, {_s}cd_municipio, {_nm_mun_grp}, {_s}nr_zona, {_s}nr_secao,
                      {_s}nm_candidato, {_partido_grp}
                      {_s}cd_cargo, {_s}ds_cargo, {_s}nr_turno, {_s}ano_eleicao
         """,
@@ -155,7 +157,7 @@ def _build_gold_via_bigquery_sql() -> dict:
                 SELECT
                     {_s}sg_uf,
                     SAFE_CAST({_s}cd_municipio AS INT64)        AS cd_municipio,
-                    {_s}nm_municipio                           AS nm_municipio,
+                    {_nm_mun_sel},
                     SAFE_CAST({_s}cd_municipio_ibge AS INT64)   AS cd_municipio_ibge,
                     {_s}nm_candidato,
                     {_partido_cols}
@@ -167,7 +169,7 @@ def _build_gold_via_bigquery_sql() -> dict:
                     CURRENT_TIMESTAMP()                          AS ingested_at
                 FROM {_from_tse_s}
                 {_partido_join}
-                GROUP BY {_s}sg_uf, {_s}cd_municipio, {_s}nm_municipio, {_s}cd_municipio_ibge,
+                GROUP BY {_s}sg_uf, {_s}cd_municipio, {_nm_mun_grp}, {_s}cd_municipio_ibge,
                          {_s}nm_candidato, {_partido_grp}
                          {_s}cd_cargo, {_s}ds_cargo, {_s}nr_turno, {_s}ano_eleicao
             )
@@ -176,28 +178,27 @@ def _build_gold_via_bigquery_sql() -> dict:
             CREATE OR REPLACE TABLE `{gold}.fact_presidente_resultado` AS
             SELECT
                 sg_uf,
-                SAFE_CAST(cd_municipio AS INT64)        AS cd_municipio,
-                nm_municipio,
-                SAFE_CAST(cd_municipio_ibge AS INT64)   AS cd_municipio_ibge,
+                SAFE_CAST(cd_municipio AS INT64)                        AS cd_municipio,
+                COALESCE(nm_municipio_x, nm_municipio_y)                AS nm_municipio,
+                SAFE_CAST(cd_municipio_ibge AS INT64)                   AS cd_municipio_ibge,
                 nm_candidato,
-                SAFE_CAST(nr_candidato AS INT64)        AS nr_candidato,
-                SAFE_CAST(cd_cargo AS INT64)            AS cd_cargo,
+                SAFE_CAST(nr_candidato AS INT64)                        AS nr_candidato,
+                SAFE_CAST(cd_cargo AS INT64)                            AS cd_cargo,
                 ds_cargo,
-                SAFE_CAST(nr_turno AS INT64)            AS nr_turno,
-                SAFE_CAST(ano_eleicao AS INT64)         AS ano_eleicao,
-                SAFE_CAST(SUM(qt_votos) AS INT64)       AS total_votos,
+                SAFE_CAST(nr_turno AS INT64)                            AS nr_turno,
+                SAFE_CAST(ano_eleicao AS INT64)                         AS ano_eleicao,
+                SAFE_CAST(SUM(qt_votos) AS INT64)                       AS total_votos,
                 ROUND(
                     SUM(qt_votos) / NULLIF(SUM(SUM(qt_votos)) OVER (
                         PARTITION BY sg_uf, nr_turno, ano_eleicao
                     ), 0) * 100, 1
-                )                                       AS pct_votos_uf,
-                CURRENT_TIMESTAMP()                     AS ingested_at
-            FROM {silver_wc}
+                )                                                        AS pct_votos_uf,
+                CURRENT_TIMESTAMP()                                      AS ingested_at
+            FROM `{silver}.tse_presidente_*`
             WHERE nm_candidato IS NOT NULL
               AND qt_votos IS NOT NULL
-              AND SAFE_CAST(cd_cargo AS INT64) = 1
             GROUP BY
-                sg_uf, cd_municipio, nm_municipio, cd_municipio_ibge,
+                sg_uf, cd_municipio, nm_municipio_x, nm_municipio_y, cd_municipio_ibge,
                 nm_candidato, nr_candidato, cd_cargo, ds_cargo, nr_turno, ano_eleicao
         """,
         "fact_ibge_municipio": f"""
