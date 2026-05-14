@@ -22,6 +22,7 @@ def main(uf: str, years: list[int] | None = None, include_social: bool = True) -
         transform_economia_to_silver,
         transform_emendas_to_silver,
         transform_endividamento_to_silver,
+        transform_locais_votacao_to_silver,
         transform_pesquisas_to_silver,
         transform_presidente_to_silver,
         transform_saude_to_silver,
@@ -216,6 +217,22 @@ def main(uf: str, years: list[int] | None = None, include_social: bool = True) -
                 perfil_year,
                 r.get("message"),
             )
+
+    # ── Locais de Votação TSE (cadastro ATUAL, por UF) ───────────────────────
+    import datetime as _dt
+
+    _locais_year = int(os.environ.get("LOCAIS_YEAR", str(_dt.date.today().year)))
+    logger.info("Silver locais votação: %s/%d", uf, _locais_year)
+    r = transform_locais_votacao_to_silver(uf, _locais_year, use_bigquery=use_bq)
+    if r.get("status") == "ok":
+        logger.info("Locais Silver OK %s/%d: %d rows", uf, _locais_year, r.get("rows", 0))
+    else:
+        logger.warning(
+            "Locais Silver %s/%d: %s (CDN TSE pode estar em manutenção)",
+            uf,
+            _locais_year,
+            r.get("message"),
+        )
 
     # ── Candidaturas TSE (dim_candidato — partido lookup para Gold JOIN) ────
     _cand_years_env = os.environ.get("CANDIDATURAS_YEARS", "2018,2022")

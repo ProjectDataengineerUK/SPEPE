@@ -17,7 +17,25 @@ logger = logging.getLogger("spepe.clients.tse")
 
 _CDN = "https://cdn.tse.jus.br/estatistica/sead/odsele/votacao_secao/votacao_secao_{year}_{uf}.zip"
 _CDN_BR = "https://cdn.tse.jus.br/estatistica/sead/odsele/votacao_secao/votacao_secao_{year}_BR.zip"
-_CDN_BR = "https://cdn.tse.jus.br/estatistica/sead/odsele/votacao_secao/votacao_secao_{year}_BR.zip"
+_CDN_LOCAIS = (
+    "https://cdn.tse.jus.br/estatistica/sead/odsele/eleitorado_locais_votacao/"
+    "eleitorado_locais_votacao_{uf}_ATUAL.zip"
+)
+
+_COL_MAP_LOCAIS: dict[str, str] = {
+    "SG_UF": "sg_uf",
+    "CD_MUNICIPIO": "cd_municipio",
+    "NM_MUNICIPIO": "nm_municipio",
+    "NR_ZONA": "nr_zona",
+    "NR_SECAO": "nr_secao",
+    "NR_LOCAL_VOTACAO": "nr_local_votacao",
+    "NM_LOCAL_VOTACAO": "nm_local_votacao",
+    "DS_ENDERECO": "ds_endereco",
+    "NM_BAIRRO": "nm_bairro",
+    "NR_CEP": "nr_cep",
+    "NR_LATITUDE": "nr_latitude",
+    "NR_LONGITUDE": "nr_longitude",
+}
 
 # Raw TSE column → canonical lowercase name
 _COL_MAP: dict[str, str] = {
@@ -221,6 +239,77 @@ def download_br_presidente(year: int) -> str:
             raise ValueError(f"Nenhuma linha lida do ZIP TSE BR {year}")
 
         logger.info("TSE BR streaming: %d linhas → %s", total_rows, tmp_parquet)
+        return tmp_parquet
+
+    finally:
+        if os.path.exists(tmp_zip):
+            os.unlink(tmp_zip)
+
+
+@retry(stop=stop_after_attempt(3), wait=wait_exponential(min=2, max=30))
+def download_eleitorado_locais(uf: str) -> str:
+    """Download locais de votação TSE (cadastro ATUAL) para uma UF.
+
+    O arquivo CDN não é versionado por ano — é o cadastro vigente ("ATUAL").
+    Retorna caminho de parquet temporário; caller responsável por apagar após uso.
+    """
+    url = _CDN_LOCAIS.format(uf=uf.upper())
+    logger.info("Baixando locais votação: %s", url)
+
+    tmp_fd, tmp_zip = tempfile.mkstemp(suffix=".zip")
+    tmp_parquet = tmp_zip.replace(".zip", ".parquet")
+    try:
+        with requests.get(url, timeout=300, stream=True) as resp:
+            resp.raise_for_status()
+            with os.fdopen(tmp_fd, "wb") as fout:
+                for http_chunk in resp.iter_content(chunk_size=8 * 1024 * 1024):
+                    fout.write(http_chunk)
+        logger.info("ZIP locais baixado: %.1f MB", os.path.getsize(tmp_zip) / 1e6)
+
+        writer: pq.ParquetWriter | None = None
+        total_rows = 0
+        keep_cols = set(_COL_MAP_LOCAIS.keys())
+
+        with zipfile.ZipFile(tmp_zip) as zf:
+            csv_files = [n for n in zf.namelist() if n.lower().endswith(".csv")]
+            if not csv_files:
+                raise ValueError(f"ZIP locais vazio para {uf}: {zf.namelist()}")
+
+            for name in csv_files:
+                with zf.open(name) as f:
+                    for chunk in pd.read_csv(
+                        f, sep=";", encoding="latin-1", dtype=str, chunksize=200_000
+                    ):
+                        present = [c for c in chunk.columns if c in keep_cols]
+                        chunk = chunk[present].rename(
+                            columns={c: _COL_MAP_LOCAIS[c] for c in present}
+                        )
+                        for col in ("nr_latitude", "nr_longitude"):
+                            if col in chunk.columns:
+                                chunk[col] = pd.to_numeric(
+                                    chunk[col].str.replace(",", ".", regex=False),
+                                    errors="coerce",
+                                )
+                        for col in ("cd_municipio", "nr_zona", "nr_secao", "nr_local_votacao"):
+                            if col in chunk.columns:
+                                chunk[col] = pd.to_numeric(chunk[col], errors="coerce")
+                        if "sg_uf" in chunk.columns:
+                            chunk["sg_uf"] = chunk["sg_uf"].str.strip().str.upper()
+                        if "nm_municipio" in chunk.columns:
+                            chunk["nm_municipio"] = chunk["nm_municipio"].str.strip().str.title()
+                        table = pa.Table.from_pandas(chunk, preserve_index=False)
+                        if writer is None:
+                            writer = pq.ParquetWriter(tmp_parquet, table.schema, compression="zstd")
+                        writer.write_table(table)
+                        total_rows += len(chunk)
+                        del chunk, table
+
+        if writer:
+            writer.close()
+        if total_rows == 0:
+            raise ValueError(f"Nenhuma linha lida de locais de votação {uf}")
+
+        logger.info("Locais votação %s: %d linhas → %s", uf, total_rows, tmp_parquet)
         return tmp_parquet
 
     finally:

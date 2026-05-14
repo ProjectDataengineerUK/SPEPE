@@ -2170,6 +2170,94 @@ def transform_tse_perfil_to_silver(
     return {"status": "ok", "path": path, "rows": len(df)}
 
 
+def transform_locais_votacao_to_silver(
+    uf: str,
+    snapshot_year: int | None = None,
+    use_bigquery: bool = False,
+) -> dict:
+    """Transform Bronze TSE Locais de Votação → Silver locais_votacao.
+
+    Reads:  raw/tse_locais/{snapshot_year}/{UF}/locais_{UF}_ATUAL.parquet
+    Writes: Silver table `locais_votacao` (WRITE_APPEND pre-delete by sg_uf+snapshot_year)
+
+    Granularidade: seção (linha original). JOIN com votos via nr_zona+nr_secao.
+    Agrupamento de mapa: sg_uf + cd_municipio + nr_zona + nr_local_votacao.
+    """
+    import datetime
+
+    LOCAL_SILVER_DIR.mkdir(parents=True, exist_ok=True)
+
+    year = snapshot_year or datetime.date.today().year
+    uf_upper = uf.upper()
+
+    df = pd.DataFrame()
+    if GCS_BUCKET:
+        prefix = f"raw/tse_locais/{year}/{uf_upper}/"
+        try:
+            df = _read_gcs_parquet_glob(GCS_BUCKET, prefix)
+        except Exception as exc:
+            logger.warning("GCS tse_locais read %s/%d: %s", uf_upper, year, exc)
+
+    if df.empty:
+        bronze_path = LOCAL_BRONZE_DIR / "tse_locais" / str(year) / uf_upper
+        files = list(bronze_path.glob("*.parquet")) if bronze_path.exists() else []
+        if files:
+            df = pd.concat([pd.read_parquet(f) for f in files], ignore_index=True)
+
+    if df.empty:
+        return {
+            "status": "error",
+            "message": f"Bronze tse_locais vazio para {uf_upper}/{year}",
+        }
+
+    df = df.copy()
+    if "sg_uf" not in df.columns:
+        df["sg_uf"] = uf_upper
+    df["sg_uf"] = df["sg_uf"].fillna(uf_upper).str.strip().str.upper()
+
+    if "nm_municipio" in df.columns:
+        df["nm_municipio"] = df["nm_municipio"].str.strip().str.title()
+
+    for col in ("cd_municipio", "nr_zona", "nr_secao", "nr_local_votacao"):
+        if col in df.columns:
+            df[col] = pd.to_numeric(df[col], errors="coerce").astype("Int64")
+
+    for col in ("nr_latitude", "nr_longitude"):
+        if col in df.columns:
+            df[col] = pd.to_numeric(
+                df[col].astype(str).str.replace(",", ".", regex=False),
+                errors="coerce",
+            ).astype("Float64")
+
+    for col in ("nm_local_votacao", "ds_endereco", "nm_bairro", "nr_cep"):
+        if col in df.columns:
+            df[col] = df[col].fillna("").astype(str).str.strip()
+
+    df["snapshot_year"] = year
+    df["ingested_at"] = pd.Timestamp.utcnow()
+
+    key_cols = ["sg_uf", "cd_municipio", "nr_zona", "nr_secao"]
+    present_keys = [c for c in key_cols if c in df.columns]
+    if present_keys:
+        before = len(df)
+        df = df.drop_duplicates(subset=present_keys)
+        removed = before - len(df)
+        if removed:
+            logger.warning("Locais %s: %d duplicatas removidas", uf_upper, removed)
+
+    logger.info("Locais Silver %s/%d: %d rows", uf_upper, year, len(df))
+
+    if use_bigquery:
+        path = _write_bigquery_uf_year(df, "locais_votacao", uf_upper, year)
+    else:
+        path_local = LOCAL_SILVER_DIR / f"locais_votacao_{uf_upper.lower()}_{year}.parquet"
+        df.to_parquet(path_local, index=False, compression="zstd")
+        path = str(path_local)
+        logger.info("Locais Silver local: %s (%d rows)", path, len(df))
+
+    return {"status": "ok", "path": path, "rows": len(df)}
+
+
 def transform_presidente_to_silver(year: int, use_bigquery: bool = False) -> dict:
     """Transform Bronze TSE Presidente (nacional) → Silver.
 

@@ -685,6 +685,36 @@ def _build_gold_via_bigquery_sql() -> dict:
             FULL OUTER JOIN trends USING (candidato, sg_uf, ano)
             FULL OUTER JOIN social USING (candidato, sg_uf, ano)
         """,
+        "fact_locais_votacao": f"""
+            CREATE OR REPLACE TABLE `{gold}.fact_locais_votacao`
+            CLUSTER BY sg_uf, cd_municipio
+            AS
+            SELECT
+                sg_uf,
+                SAFE_CAST(cd_municipio AS INT64)             AS cd_municipio,
+                ANY_VALUE(nm_municipio)                       AS nm_municipio,
+                SAFE_CAST(nr_zona AS INT64)                   AS nr_zona,
+                SAFE_CAST(nr_local_votacao AS INT64)          AS nr_local_votacao,
+                ANY_VALUE(nm_local_votacao)                   AS nm_local_votacao,
+                ANY_VALUE(ds_endereco)                        AS ds_endereco,
+                ANY_VALUE(nm_bairro)                          AS nm_bairro,
+                ANY_VALUE(nr_cep)                             AS nr_cep,
+                AVG(SAFE_CAST(nr_latitude AS FLOAT64))        AS nr_latitude,
+                AVG(SAFE_CAST(nr_longitude AS FLOAT64))       AS nr_longitude,
+                COUNT(DISTINCT SAFE_CAST(nr_secao AS INT64))  AS qt_secoes,
+                (AVG(SAFE_CAST(nr_latitude AS FLOAT64)) IS NOT NULL) AS has_coordinates,
+                MAX(SAFE_CAST(snapshot_year AS INT64))        AS snapshot_year,
+                CURRENT_TIMESTAMP()                           AS ingested_at
+            FROM `{silver}.locais_votacao`
+            WHERE sg_uf IS NOT NULL
+              AND cd_municipio IS NOT NULL
+              AND nr_local_votacao IS NOT NULL
+            GROUP BY
+                sg_uf,
+                SAFE_CAST(cd_municipio AS INT64),
+                SAFE_CAST(nr_zona AS INT64),
+                SAFE_CAST(nr_local_votacao AS INT64)
+        """,
     }
 
     # Tables that may have no Silver source yet — skip without failing the job
@@ -706,6 +736,7 @@ def _build_gold_via_bigquery_sql() -> dict:
         "fact_endividamento_nacional",
         "fact_votacoes_parlamentar",
         "fact_perfil_eleitorado",
+        "fact_locais_votacao",
     }
 
     results = {}

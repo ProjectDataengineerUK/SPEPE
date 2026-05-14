@@ -148,6 +148,7 @@ _PUBLIC_API_PATHS = {
     "/api/candidatos",
     "/api/municipios",
     "/api/kpi",
+    "/api/mapa/locais",
 }
 
 
@@ -2096,6 +2097,91 @@ async def get_mapa(
             logger.warning("BigQuery mapa %s falhou: %s", nivel_str, exc)
 
     return JSONResponse({"nivel": nivel_str, "features": [], "fonte": "indisponivel"})
+
+
+@app.get("/api/mapa/locais")
+async def get_mapa_locais(
+    uf: str = Query(..., description="Sigla da UF, ex: SP"),
+    cd_municipio: str | None = Query(None),
+    nr_zona: str | None = Query(None),
+    only_with_coords: bool = Query(True),
+) -> Response:
+    """GeoJSON FeatureCollection com pontos de locais de votação da UF."""
+    if not (settings.gcp_project_id and os.environ.get("USE_BIGQUERY", "").lower() == "true"):
+        return _json_safe_response(
+            {"type": "FeatureCollection", "features": [], "fonte": "bigquery_indisponivel"}
+        )
+    try:
+        features = await _bq_locais_votacao(uf.upper(), cd_municipio, nr_zona, only_with_coords)
+        return _json_safe_response({"type": "FeatureCollection", "features": features})
+    except Exception as exc:
+        logger.warning("BQ locais_votacao falhou: %s", exc)
+        return _json_safe_response({"type": "FeatureCollection", "features": [], "erro": str(exc)})
+
+
+async def _bq_locais_votacao(
+    uf: str,
+    cd_municipio: str | None,
+    nr_zona: str | None,
+    only_with_coords: bool,
+) -> list[dict]:
+    from google.cloud import bigquery
+
+    client = bigquery.Client(project=settings.gcp_project_id)
+    gold = f"{settings.gcp_project_id}.{settings.bigquery_dataset_gold}"
+
+    filters = ["sg_uf = @uf"]
+    params: list = [bigquery.ScalarQueryParameter("uf", "STRING", uf)]
+
+    if cd_municipio:
+        filters.append("cd_municipio = @cd_municipio")
+        params.append(bigquery.ScalarQueryParameter("cd_municipio", "INT64", int(cd_municipio)))
+    if nr_zona:
+        filters.append("nr_zona = @nr_zona")
+        params.append(bigquery.ScalarQueryParameter("nr_zona", "INT64", int(nr_zona)))
+    if only_with_coords:
+        filters.append("has_coordinates = TRUE")
+
+    query = f"""
+        SELECT sg_uf, cd_municipio, nm_municipio, nr_zona, nr_local_votacao,
+               nm_local_votacao, ds_endereco, nm_bairro, nr_cep,
+               nr_latitude, nr_longitude, qt_secoes
+        FROM `{gold}.fact_locais_votacao`
+        WHERE {" AND ".join(filters)}
+        ORDER BY nr_zona, nr_local_votacao
+        LIMIT 10000
+    """
+    rows = await asyncio.to_thread(
+        lambda: list(
+            client.query(
+                query,
+                job_config=bigquery.QueryJobConfig(query_parameters=params),
+            ).result()
+        )
+    )
+    return [
+        {
+            "type": "Feature",
+            "geometry": {
+                "type": "Point",
+                "coordinates": [float(r["nr_longitude"]), float(r["nr_latitude"])],
+            },
+            "properties": {
+                "sg_uf": r["sg_uf"],
+                "cd_municipio": r["cd_municipio"],
+                "nm_municipio": r["nm_municipio"],
+                "nr_zona": r["nr_zona"],
+                "nr_local_votacao": r["nr_local_votacao"],
+                "nm_local_votacao": r["nm_local_votacao"],
+                "ds_endereco": r["ds_endereco"],
+                "nm_bairro": r["nm_bairro"],
+                "nr_cep": r["nr_cep"],
+                "qt_secoes": r["qt_secoes"],
+            },
+        }
+        for r in rows
+        if r["nr_latitude"] is not None and r["nr_longitude"] is not None
+    ]
 
 
 async def _bq_mapa_nacional(cargo: str, ano: int, turno: int, candidato: str = "") -> list[dict]:

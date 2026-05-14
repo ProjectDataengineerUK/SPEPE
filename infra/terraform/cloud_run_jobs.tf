@@ -17,6 +17,7 @@ locals {
     pesquisas_ingest      = { timeout = "1800s", memory = "1Gi",   cpu = "1", args = [] }
     tse_perfil_ingest     = { timeout = local.prod_mode ? "3600s" : "1800s", memory = "2Gi", cpu = "1", args = ["--uf", local.uf_arg] }
     tse_candidaturas_ingest = { timeout = local.prod_mode ? "3600s" : "1800s", memory = "1Gi", cpu = "1", args = ["--uf", local.uf_arg] }
+    tse_locais_ingest       = { timeout = local.prod_mode ? "7200s" : "3600s", memory = "4Gi", cpu = "2", args = ["--uf", local.uf_arg] }
     reddit_ingest         = { timeout = "1800s", memory = "512Mi", cpu = "1", args = [] }
     camara_senado_ingest  = { timeout = "3600s", memory = "1Gi",   cpu = "1", args = [] }
     endividamento_ingest  = { timeout = local.prod_mode ? "1800s" : "900s", memory = "512Mi", cpu = "1", args = ["--uf", local.uf_arg] }
@@ -66,6 +67,7 @@ locals {
     }
     tse_perfil_ingest     = {}
     tse_candidaturas_ingest = {}
+    tse_locais_ingest       = {}
     reddit_ingest = {
       REDDIT_SUBREDDITS = jsonencode(["brasil", "politica", "brasilivre"])
       REDDIT_DIAS       = "30"
@@ -124,6 +126,7 @@ locals {
     pesquisas_ingest        = ["python", "-m", "dataops.jobs.pesquisas_ingest_job"]
     tse_perfil_ingest       = ["python", "-m", "dataops.jobs.tse_perfil_ingest_job"]
     tse_candidaturas_ingest = ["python", "-m", "dataops.jobs.tse_candidaturas_ingest_job"]
+    tse_locais_ingest       = ["python", "-m", "dataops.jobs.tse_locais_ingest_job"]
     reddit_ingest           = ["python", "-m", "dataops.jobs.reddit_ingest_job"]
     camara_senado_ingest    = ["python", "-m", "dataops.jobs.camara_senado_ingest_job"]
     endividamento_ingest    = ["python", "-m", "dataops.jobs.endividamento_ingest_job"]

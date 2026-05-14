@@ -6,8 +6,11 @@ import logging
 import os
 import sys
 from dataops.bronze_writer import write_bronze_from_file
-from dataops.clients.tse_client import download_tse_resultados
-from dataops.clients.tse_client import download_br_presidente
+from dataops.clients.tse_client import (
+    download_br_presidente,
+    download_eleitorado_locais,
+    download_tse_resultados,
+)
 
 # Lista completa de UFs – usada tanto no modo script quanto nos jobs Cloud Run
 _ALL_UFS = [
@@ -41,6 +44,29 @@ _ALL_UFS = [
 ]
 
 logbook = logging.getLogger("spepe.jobs.tse_ingest")
+
+
+def ingest_locais(uf: str) -> None:
+    """Baixa locais de votação TSE (ATUAL) para uma UF e persiste na camada Bronze."""
+    import datetime
+
+    snapshot_year = datetime.date.today().year
+    logbook.info("Locais votação ingest: UF=%s (snapshot %d)", uf, snapshot_year)
+    try:
+        parquet_path = download_eleitorado_locais(uf)
+    except Exception as exc:
+        logbook.error("Download locais %s falhou: %s", uf, exc)
+        return
+
+    write_bronze_from_file(
+        src_path=parquet_path,
+        source="tse_locais",
+        year=snapshot_year,
+        uf=uf,
+        filename=f"locais_{uf.upper()}_ATUAL.parquet",
+        use_gcs=bool(os.environ.get("GCS_BUCKET")),
+    )
+    logbook.info("Locais Bronze OK: %s/%d", uf, snapshot_year)
 
 
 def main(uf: str, year: int) -> None:
@@ -83,6 +109,9 @@ def main(uf: str, year: int) -> None:
     )
 
     logbook.info("TSE ingest concluído: %s", out_path)
+
+    # ---- Locais de votação (cadastro ATUAL) ----
+    ingest_locais(uf)
 
 
 if __name__ == "__main__":
