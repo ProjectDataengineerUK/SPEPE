@@ -216,7 +216,9 @@ def fetch_meta_ads(
 
             ads = data.get("data", [])
             if not ads:
-                logger.info("Meta Ads: 0 anúncios para '%s' (resposta: %s)", candidato, str(data)[:200])
+                logger.info(
+                    "Meta Ads: 0 anúncios para '%s' (resposta: %s)", candidato, str(data)[:200]
+                )
                 break
 
             for ad in ads:
