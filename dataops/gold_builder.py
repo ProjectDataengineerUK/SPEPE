@@ -204,26 +204,28 @@ def _build_gold_via_bigquery_sql() -> dict:
         "fact_ibge_municipio": f"""
             CREATE OR REPLACE TABLE `{gold}.fact_ibge_municipio` AS
             SELECT
-                SAFE_CAST(cd_municipio_ibge AS INT64)           AS cd_municipio_ibge,
-                sg_uf,
-                ANY_VALUE(nm_municipio)                          AS nm_municipio,
-                2022                                             AS ano,
-                MAX(SAFE_CAST(populacao_total AS FLOAT64))       AS populacao_total,
-                MAX(SAFE_CAST(taxa_alfabetizacao AS FLOAT64))    AS taxa_alfabetizacao,
-                MAX(SAFE_CAST(taxa_analfabetismo AS FLOAT64))    AS taxa_analfabetismo,
-                MAX(SAFE_CAST(renda_per_capita AS FLOAT64))      AS renda_per_capita,
-                CAST(NULL AS FLOAT64)                            AS pct_urbano,
-                CAST(NULL AS FLOAT64)                            AS pct_0_14,
-                CAST(NULL AS FLOAT64)                            AS pct_60_mais,
-                CAST(NULL AS FLOAT64)                            AS pct_catolico,
-                CAST(NULL AS FLOAT64)                            AS idhm,
-                CAST(NULL AS FLOAT64)                            AS gini,
-                CAST(NULL AS FLOAT64)                            AS pct_extrema_pobreza,
-                CURRENT_TIMESTAMP()                              AS ingested_at
+                SAFE_CAST(cd_municipio_ibge AS INT64)            AS cd_municipio_ibge,
+                ANY_VALUE(sg_uf)                                  AS sg_uf,
+                ANY_VALUE(
+                    COALESCE(nm_municipio_x, nm_municipio_y)
+                )                                                 AS nm_municipio,
+                SAFE_CAST(ANY_VALUE(ano_eleicao) AS INT64)        AS ano,
+                CAST(NULL AS FLOAT64)                             AS populacao_total,
+                CAST(NULL AS FLOAT64)                             AS taxa_alfabetizacao,
+                CAST(NULL AS FLOAT64)                             AS taxa_analfabetismo,
+                CAST(NULL AS FLOAT64)                             AS renda_per_capita,
+                CAST(NULL AS FLOAT64)                             AS pct_urbano,
+                CAST(NULL AS FLOAT64)                             AS pct_0_14,
+                CAST(NULL AS FLOAT64)                             AS pct_60_mais,
+                CAST(NULL AS FLOAT64)                             AS pct_catolico,
+                CAST(NULL AS FLOAT64)                             AS idhm,
+                CAST(NULL AS FLOAT64)                             AS gini,
+                CAST(NULL AS FLOAT64)                             AS pct_extrema_pobreza,
+                CURRENT_TIMESTAMP()                               AS ingested_at
             FROM {silver_wc}
-            WHERE REGEXP_CONTAINS(_TABLE_SUFFIX, r'^[a-z]{{2}}_2022$')
+            WHERE REGEXP_CONTAINS(LOWER(_TABLE_SUFFIX), r'^[a-z]{{2}}_20\d\d$')
               AND cd_municipio_ibge IS NOT NULL
-            GROUP BY cd_municipio_ibge, sg_uf
+            GROUP BY cd_municipio_ibge
         """,
         "dim_territorio": f"""
             CREATE OR REPLACE TABLE `{gold}.dim_territorio` AS
@@ -720,6 +722,8 @@ def _build_gold_via_bigquery_sql() -> dict:
     # Tables that may have no Silver source yet — skip without failing the job
     _OPTIONAL = {
         "fact_presidente_resultado",
+        "fact_saude_municipio",
+        "fact_seguranca_municipio",
         "fact_pesquisa",
         "fact_intencao_voto",
         "vw_pesquisa_intencao_detalhada",
