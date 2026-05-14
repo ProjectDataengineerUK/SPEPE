@@ -197,7 +197,8 @@ def fetch_meta_ads(
             params: dict[str, Any] = {
                 "access_token": token,
                 "ad_type": "POLITICAL_AND_ISSUE_ADS",
-                "ad_reached_countries": country,
+                # Must be JSON-encoded array — plain string "BR" returns 0 results silently
+                "ad_reached_countries": json.dumps([country]),
                 "search_terms": candidato,
                 "ad_delivery_date_min": start_date,
                 "ad_delivery_date_max": end_date,
@@ -215,6 +216,7 @@ def fetch_meta_ads(
 
             ads = data.get("data", [])
             if not ads:
+                logger.info("Meta Ads: 0 anúncios para '%s' (resposta: %s)", candidato, str(data)[:200])
                 break
 
             for ad in ads:
