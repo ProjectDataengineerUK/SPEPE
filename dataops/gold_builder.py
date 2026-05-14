@@ -593,20 +593,21 @@ def _build_gold_via_bigquery_sql() -> dict:
         "fact_votacoes_parlamentar": f"""
             CREATE OR REPLACE TABLE `{gold}.fact_votacoes_parlamentar` AS
             SELECT
-                SAFE_CAST(ano AS INT64)              AS ano,
-                SAFE_CAST(mes AS INT64)              AS mes,
-                COALESCE(sg_uf, 'BR')                AS sg_uf,
-                COALESCE(sg_partido, 'N/A')          AS sg_partido,
-                COALESCE(casa, 'Câmara')             AS casa,
-                COALESCE(tema, 'Geral')              AS tema,
-                COUNT(*)                             AS qt_votacoes,
-                COUNTIF(voto = 'Sim')               AS qt_sim,
-                COUNTIF(LOWER(voto) LIKE '%não%' OR LOWER(voto) LIKE '%nao%') AS qt_nao,
-                COUNTIF(LOWER(voto) LIKE '%absten%') AS qt_abstencao,
-                CURRENT_TIMESTAMP()                  AS ingested_at
-            FROM `{silver}.votacoes_parlamentares`
-            WHERE ano IS NOT NULL
-            GROUP BY ano, mes, sg_uf, sg_partido, casa, tema
+                SAFE_CAST(COALESCE(ano_ref, 2024) AS INT64)  AS ano,
+                CAST(NULL AS INT64)                           AS mes,
+                COALESCE(sg_uf, 'BR')                        AS sg_uf,
+                COALESCE(sg_partido, 'N/A')                  AS sg_partido,
+                COALESCE(casa, 'Câmara')                     AS casa,
+                'Geral'                                      AS tema,
+                COUNT(*)                                     AS qt_parlamentares,
+                CAST(NULL AS INT64)                          AS qt_votacoes,
+                CAST(NULL AS INT64)                          AS qt_sim,
+                CAST(NULL AS INT64)                          AS qt_nao,
+                CAST(NULL AS INT64)                          AS qt_abstencao,
+                CURRENT_TIMESTAMP()                          AS ingested_at
+            FROM `{silver}.parlamentares_federais`
+            WHERE sg_uf IS NOT NULL
+            GROUP BY ano_ref, sg_uf, sg_partido, casa
         """,
         # ── Perfil do Eleitorado TSE ──────────────────────────────────────────
         "fact_perfil_eleitorado": f"""
@@ -619,12 +620,6 @@ def _build_gold_via_bigquery_sql() -> dict:
                 COALESCE(ds_grau_escolaridade, 'Não informado')      AS ds_grau_escolaridade,
                 COALESCE(ds_estado_civil, 'Não informado')           AS ds_estado_civil,
                 SUM(SAFE_CAST(qt_eleitores AS INT64))                AS qt_eleitores,
-                SUM(SAFE_CAST(qt_eleitores_deficiencia AS INT64))    AS qt_eleitores_deficiencia,
-                SUM(SAFE_CAST(qt_eleitores_biometria AS INT64))      AS qt_eleitores_biometria,
-                ROUND(
-                    SUM(SAFE_CAST(qt_eleitores_biometria AS INT64)) /
-                    NULLIF(SUM(SAFE_CAST(qt_eleitores AS INT64)), 0) * 100, 1
-                )                                                    AS pct_biometria,
                 CURRENT_TIMESTAMP()                                  AS ingested_at
             FROM `{silver}.perfil_eleitorado`
             WHERE sg_uf IS NOT NULL

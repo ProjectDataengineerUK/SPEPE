@@ -3139,15 +3139,16 @@ async def get_parlamentares(
                 params.append(bigquery.ScalarQueryParameter("casa", "STRING", casa))
             query = f"""
                 SELECT sg_uf, sg_partido, casa, tema,
-                       SUM(qt_votacoes) AS qt_votacoes,
-                       SUM(qt_sim)      AS qt_sim,
-                       SUM(qt_nao)      AS qt_nao,
-                       SUM(qt_abstencao) AS qt_abstencao,
+                       SUM(qt_parlamentares)                              AS qt_parlamentares,
+                       SUM(qt_votacoes)                                   AS qt_votacoes,
+                       SUM(qt_sim)                                        AS qt_sim,
+                       SUM(qt_nao)                                        AS qt_nao,
+                       SUM(qt_abstencao)                                  AS qt_abstencao,
                        ROUND(SUM(qt_sim) / NULLIF(SUM(qt_votacoes), 0) * 100, 1) AS pct_favoravel
                 FROM `{gold}.fact_votacoes_parlamentar`
                 WHERE ano = @year {uf_filter} {casa_filter}
                 GROUP BY sg_uf, sg_partido, casa, tema
-                ORDER BY qt_votacoes DESC
+                ORDER BY qt_parlamentares DESC NULLS LAST
                 LIMIT 200
             """
             job_config = bigquery.QueryJobConfig(query_parameters=params)
@@ -3155,7 +3156,7 @@ async def get_parlamentares(
             return JSONResponse({"data": [dict(r) for r in rows]})
         except Exception as exc:
             logger.warning("BigQuery parlamentares falhou (Gold): %s", exc)
-            # Fallback: try Silver votacoes_parlamentares directly
+            # Fallback: Silver parlamentares_federais (directory, no voting data)
             try:
                 silver = f"{settings.gcp_project_id}.{settings.bigquery_dataset_silver}"
                 params2: list = [bigquery.ScalarQueryParameter("year", "INT64", year)]
@@ -3166,16 +3167,17 @@ async def get_parlamentares(
                     SELECT COALESCE(sg_uf, 'BR') AS sg_uf,
                            COALESCE(sg_partido, 'N/A') AS sg_partido,
                            COALESCE(casa, 'Câmara') AS casa,
-                           COALESCE(tema, 'Geral') AS tema,
-                           COUNT(*) AS qt_votacoes,
-                           COUNTIF(voto = 'Sim') AS qt_sim,
-                           COUNTIF(LOWER(voto) LIKE '%não%' OR LOWER(voto) LIKE '%nao%') AS qt_nao,
-                           COUNTIF(LOWER(voto) LIKE '%absten%') AS qt_abstencao,
-                           ROUND(COUNTIF(voto='Sim') / NULLIF(COUNT(*), 0) * 100, 1) AS pct_favoravel
-                    FROM `{silver}.votacoes_parlamentares`
-                    WHERE SAFE_CAST(ano AS INT64) = @year {uf_filter2}
-                    GROUP BY sg_uf, sg_partido, casa, tema
-                    ORDER BY qt_votacoes DESC
+                           'Geral' AS tema,
+                           COUNT(*) AS qt_parlamentares,
+                           CAST(NULL AS INT64) AS qt_votacoes,
+                           CAST(NULL AS INT64) AS qt_sim,
+                           CAST(NULL AS INT64) AS qt_nao,
+                           CAST(NULL AS INT64) AS qt_abstencao,
+                           CAST(NULL AS FLOAT64) AS pct_favoravel
+                    FROM `{silver}.parlamentares_federais`
+                    WHERE SAFE_CAST(ano_ref AS INT64) = @year {uf_filter2}
+                    GROUP BY sg_uf, sg_partido, casa
+                    ORDER BY qt_parlamentares DESC
                     LIMIT 200
                 """
                 rows2 = list(
