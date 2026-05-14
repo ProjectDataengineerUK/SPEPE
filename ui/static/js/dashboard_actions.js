@@ -60,11 +60,20 @@
 
   function setLayer(layer) {
     if (!layer) return;
+    _ensureMapTab();
+    // Prefer swapLayer from map_layers.js (themed choropleth system)
+    if (typeof global.swapLayer === 'function') {
+      global.swapLayer(layer);
+      document.querySelectorAll('.layer-btn').forEach(b => {
+        b.classList.toggle('active', b.dataset.layer === layer);
+      });
+      return;
+    }
+    // Fallback: old hidden-select system
     const sel = document.getElementById('map-layer-sel');
     const domLayer = LAYER_TO_DOM[layer] || layer;
     if (sel) {
       sel.value = domLayer;
-      _ensureMapTab();
       if (typeof global.reloadMap === 'function') setTimeout(global.reloadMap, 80);
     }
   }

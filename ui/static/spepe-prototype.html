@@ -50,23 +50,21 @@ button{cursor:pointer;font-family:inherit}
 #leaflet-map{width:100%;height:100%}
 .map-hint{position:absolute;top:9px;left:50%;transform:translateX(-50%);background:rgba(13,17,23,.9);border:1px solid var(--border2);border-radius:20px;padding:3px 12px;font-size:.65rem;color:var(--text2);pointer-events:none;z-index:10;white-space:nowrap;max-width:90%}
 
-/* LEGEND */
-.legend-panel{position:absolute;bottom:10px;left:10px;background:rgba(13,17,23,.95);border:1px solid var(--border2);border-radius:var(--r);padding:10px 12px;z-index:10;min-width:190px;max-width:230px}
-.leg-title{font-size:.62rem;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:var(--text3);margin-bottom:8px}
-.leg-item{display:flex;align-items:flex-start;gap:8px;margin-bottom:5px}
-.leg-swatch{width:14px;height:14px;border-radius:3px;flex-shrink:0;margin-top:1px}
-.leg-text{font-size:.68rem;line-height:1.4}
+/* LEGEND — integrada nos painéis */
+.leg-mini{background:var(--bg4);border:1px solid var(--border2);border-radius:var(--r);padding:8px 10px;margin-bottom:8px}
+.leg-mini-title{font-size:.58rem;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:var(--text3);margin-bottom:6px;display:flex;align-items:center;justify-content:space-between}
+.leg-mini-title span{color:var(--text2);font-weight:400;text-transform:none;letter-spacing:0}
+.leg-items{display:flex;flex-direction:column;gap:3px}
+.leg-item{display:flex;align-items:flex-start;gap:8px}
+.leg-swatch{width:12px;height:12px;border-radius:2px;flex-shrink:0;margin-top:1px}
+.leg-text{font-size:.65rem;line-height:1.4}
 .leg-text b{color:var(--text)}
-.leg-text small{color:var(--text3);display:block;font-size:.6rem}
-.leg-source{font-size:.59rem;color:var(--text3);border-top:1px solid var(--border);margin-top:7px;padding-top:6px;line-height:1.6}
+.leg-text small{color:var(--text3);display:block;font-size:.58rem}
+.leg-source{font-size:.57rem;color:var(--text3);margin-top:5px;padding-top:5px;border-top:1px solid var(--border);line-height:1.5}
 .leg-source strong{color:var(--text2)}
-/* bivariate */
-.biv-wrap{display:flex;gap:6px;margin-bottom:5px}
-.biv-y-axis{display:flex;flex-direction:column;justify-content:space-between;font-size:.55rem;color:var(--text3);padding-bottom:16px}
-.biv-body{}
-.biv-grid{display:grid;grid-template-columns:repeat(3,18px);grid-template-rows:repeat(3,18px);gap:2px}
-.biv-cell{border-radius:2px;cursor:default}
-.biv-x-axis{display:flex;justify-content:space-between;font-size:.55rem;color:var(--text3);margin-top:3px}
+.biv-grid{display:grid;grid-template-columns:repeat(3,16px);grid-template-rows:repeat(3,16px);gap:2px}
+.biv-cell{border-radius:2px}
+.biv-x-axis{display:flex;justify-content:space-between;font-size:.53rem;color:var(--text3);margin-top:2px}
 
 /* MAP TOOLTIP */
 .mtt{position:absolute;background:rgba(13,17,23,.97);border:1px solid var(--border2);border-radius:var(--r);padding:9px 11px;z-index:20;pointer-events:none;display:none;min-width:210px}
@@ -158,6 +156,12 @@ button{cursor:pointer;font-family:inherit}
 
 /* chat */
 .chat-wrap{display:flex;flex-direction:column;height:100%}
+.chat-header{padding:8px 10px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;flex-shrink:0;background:var(--bg3)}
+.chat-agent-info{display:flex;align-items:center;gap:8px}
+.agent-avatar{width:28px;height:28px;border-radius:50%;background:linear-gradient(135deg,#1565c0,#00c853);display:flex;align-items:center;justify-content:center;font-size:.6rem;font-weight:700;color:#fff;flex-shrink:0}
+.agent-name{font-size:.72rem;font-weight:700}
+.agent-sub{font-size:.6rem;color:var(--text3)}
+.agent-status{display:flex;align-items:center;gap:4px;font-size:.62rem;color:var(--green2)}
 .chat-msgs{flex:1;overflow-y:auto;padding:8px 10px;display:flex;flex-direction:column;gap:7px}
 .msg{padding:7px 9px;border-radius:var(--r);font-size:.72rem;line-height:1.55;max-width:97%}
 .msg.user{background:var(--blue-dim);border:1px solid #1976d244;align-self:flex-end}
@@ -244,12 +248,6 @@ button{cursor:pointer;font-family:inherit}
     <div id="leaflet-map"></div>
     <div class="map-hint" id="map-hint">Resultado × IDH — mapa colorido por combinação de resultado eleitoral e IDH municipal</div>
 
-    <div class="legend-panel" id="legend-panel">
-      <div class="leg-title" id="leg-title">Resultado × IDH Municipal</div>
-      <div id="leg-body"></div>
-      <div class="leg-source" id="leg-source"></div>
-    </div>
-
     <div class="mtt" id="mtt">
       <div class="ttlayer" id="tt-layer-label">—</div>
       <h4 id="tt-nome">—</h4>
@@ -268,14 +266,18 @@ button{cursor:pointer;font-family:inherit}
       <div class="ptab active" data-tab="modelo">Modelo</div>
       <div class="ptab" data-tab="pesquisas">Pesquisas</div>
       <div class="ptab" data-tab="social">Social</div>
-      <div class="ptab" data-tab="secoes">Seções</div>
       <div class="ptab" data-tab="contexto">Contexto</div>
       <div class="ptab" data-tab="shap">SHAP</div>
-      <div class="ptab" data-tab="chat">Chat</div>
+      <div class="ptab" data-tab="chat">Chat IA</div>
     </div>
 
     <!-- MODELO -->
     <div class="pbody" id="tab-modelo">
+      <div class="leg-mini" id="leg-modelo">
+        <div class="leg-mini-title">Legenda do mapa <span id="leg-modelo-layer">Resultado × IDH</span></div>
+        <div class="leg-items" id="leg-modelo-body"></div>
+        <div class="leg-source" id="leg-modelo-source"></div>
+      </div>
       <div class="mtog">
         <button class="mtbtn active" data-m="1">M1 — Estrutural</button>
         <button class="mtbtn" data-m="2">M2 — Dinâmico</button>
@@ -307,9 +309,16 @@ button{cursor:pointer;font-family:inherit}
 
     <!-- PESQUISAS -->
     <div class="pbody" id="tab-pesquisas" style="display:none">
-      <div class="pc" style="background:#0a1a2e;border-color:#1976d244">
-        <h4>🗺 O mapa agora mostra <span style="color:#60a5fa;text-transform:none;font-size:.68rem">intenção de voto por estado</span></h4>
-        <div style="font-size:.67rem;color:var(--text2);line-height:1.5">Cada estado é colorido pela última pesquisa estadual disponível para o candidato selecionado. Clique num estado para ver as pesquisas daquela UF.</div>
+      <div class="leg-mini">
+        <div class="leg-mini-title">Mapa — Intenção de Voto <span>última pesquisa estadual</span></div>
+        <div class="leg-items">
+          <div class="leg-item"><div class="leg-swatch" style="background:#1a9641"></div><div class="leg-text"><b>&gt;60%</b><small>Maioria absoluta clara</small></div></div>
+          <div class="leg-item"><div class="leg-swatch" style="background:#74c476"></div><div class="leg-text"><b>50–60%</b><small>Vantagem</small></div></div>
+          <div class="leg-item"><div class="leg-swatch" style="background:#ffffbf"></div><div class="leg-text"><b>45–50%</b><small>Competitivo</small></div></div>
+          <div class="leg-item"><div class="leg-swatch" style="background:#fdae61"></div><div class="leg-text"><b>40–45%</b><small>Segundo lugar</small></div></div>
+          <div class="leg-item"><div class="leg-swatch" style="background:#d7191c"></div><div class="leg-text"><b>&lt;40%</b><small>Distante</small></div></div>
+        </div>
+        <div class="leg-source"><strong>TSE + Atlas Intel + Datafolha</strong> · % estimulada 1ºT · pesquisa mais recente por UF</div>
       </div>
       <div class="pc">
         <h4>Tracking Nacional <span class="tag poll">estimulada · 1ºT</span></h4>
@@ -342,9 +351,16 @@ button{cursor:pointer;font-family:inherit}
 
     <!-- SOCIAL -->
     <div class="pbody" id="tab-social" style="display:none">
-      <div class="pc" style="background:#0a1a2e;border-color:#1976d244">
-        <h4>🗺 O mapa agora mostra <span style="color:#a78bfa;text-transform:none;font-size:.68rem">sentimento nas redes por estado</span></h4>
-        <div style="font-size:.67rem;color:var(--text2);line-height:1.5">Cada estado é colorido pelo índice de sentimento agregado (últimas 24h) para o candidato selecionado. Clique para ver plataformas e tópicos daquela UF.</div>
+      <div class="leg-mini">
+        <div class="leg-mini-title">Mapa — Sentimento nas Redes <span>índice agregado 24h</span></div>
+        <div class="leg-items">
+          <div class="leg-item"><div class="leg-swatch" style="background:#1a9641"></div><div class="leg-text"><b>&gt;+0.5</b><small>Positivo forte</small></div></div>
+          <div class="leg-item"><div class="leg-swatch" style="background:#74c476"></div><div class="leg-text"><b>+0.15 a +0.5</b><small>Positivo</small></div></div>
+          <div class="leg-item"><div class="leg-swatch" style="background:#aaaaaa"></div><div class="leg-text"><b>-0.15 a +0.15</b><small>Neutro / polarizado</small></div></div>
+          <div class="leg-item"><div class="leg-swatch" style="background:#fdae61"></div><div class="leg-text"><b>-0.5 a -0.15</b><small>Negativo</small></div></div>
+          <div class="leg-item"><div class="leg-swatch" style="background:#d7191c"></div><div class="leg-text"><b>&lt;-0.5</b><small>Negativo forte</small></div></div>
+        </div>
+        <div class="leg-source"><strong>Twitter/X + BlueSky + Facebook + YouTube</strong> · BERTimbau fine-tuned · últimas 24h</div>
       </div>
       <div class="pc">
         <h4>Sentimento por Plataforma <span class="tag soc">Δ24h</span></h4>
@@ -375,40 +391,6 @@ button{cursor:pointer;font-family:inherit}
       </div>
     </div>
 
-    <!-- SEÇÕES -->
-    <div class="pbody" id="tab-secoes" style="display:none">
-      <div class="pc" style="background:#0a1a2e;border-color:#1976d244">
-        <h4>🗺 O mapa agora mostra <span style="color:var(--green2);text-transform:none;font-size:.68rem">seções eleitorais como marcadores</span></h4>
-        <div style="font-size:.67rem;color:var(--text2);line-height:1.5">Marcadores coloridos por resultado no município. Zoom ≥12 ativa marcadores individuais por seção. Clique num marcador para detalhes da seção.</div>
-      </div>
-      <div class="pc">
-        <h4>Legenda — Seções</h4>
-        <div style="display:flex;flex-direction:column;gap:5px">
-          <div style="display:flex;align-items:center;gap:7px;font-size:.67rem"><div class="sec-dot" style="background:#00c853"></div>&gt;60% votos — domínio do candidato</div>
-          <div style="display:flex;align-items:center;gap:7px;font-size:.67rem"><div class="sec-dot" style="background:#f59e0b"></div>45–60% — seção disputada</div>
-          <div style="display:flex;align-items:center;gap:7px;font-size:.67nm"><div class="sec-dot" style="background:#ef4444"></div>&lt;45% — oposição predomina</div>
-          <div style="display:flex;align-items:center;gap:7px;font-size:.67rem"><div class="sec-dot" style="background:#60a5fa"></div>Sede de zona eleitoral</div>
-        </div>
-        <div style="font-size:.59rem;color:var(--text3);margin-top:6px">Tamanho proporcional ao número de eleitores</div>
-      </div>
-      <div class="pc">
-        <h4>Resumo — <span id="sec-uf">SP</span></h4>
-        <div class="krow"><span class="klbl">Total seções</span><span class="kv b">78.431</span></div>
-        <div class="krow"><span class="klbl">Zonas eleitorais</span><span class="kv">749</span></div>
-        <div class="krow"><span class="klbl">Locais de votação</span><span class="kv">26.314</span></div>
-        <div class="krow"><span class="klbl">Eleitores habilitados</span><span class="kv">34,4M</span></div>
-        <div class="krow"><span class="klbl">Com coordenadas GPS</span><span class="kv g">92%</span></div>
-      </div>
-      <div class="pc">
-        <h4>Seções — Zoom atual <span style="font-size:.6rem;font-weight:400;color:var(--text3)">(faça zoom no mapa)</span></h4>
-        <div id="secoes-list"></div>
-      </div>
-      <div class="pc">
-        <h4>Distribuição de Resultado por Seção</h4>
-        <canvas id="chart-sec-dist" height="90"></canvas>
-        <div style="font-size:.59rem;color:var(--text3);margin-top:4px">Histograma: % votos do candidato por seção · faixas de 5pp</div>
-      </div>
-    </div>
 
     <!-- CONTEXTO -->
     <div class="pbody" id="tab-contexto" style="display:none">
@@ -492,19 +474,29 @@ button{cursor:pointer;font-family:inherit}
     <!-- CHAT -->
     <div class="pbody" id="tab-chat" style="display:none;padding:0;height:100%">
       <div class="chat-wrap">
+        <div class="chat-header">
+          <div class="chat-agent-info">
+            <div class="agent-avatar">AI</div>
+            <div>
+              <div class="agent-name">SPEPE · Analista</div>
+              <div class="agent-sub">Gemini 2.5 Pro · Camada Semântica</div>
+            </div>
+          </div>
+          <div class="agent-status"><div class="mdot"></div>online</div>
+        </div>
         <div class="chat-msgs" id="chat-msgs">
           <div class="msg sys"><div class="mm">Sistema</div>Sessão iniciada · Brasil · 2022 · Presidente · T1 · Lula (PT)</div>
           <div class="msg agent">
-            <div class="mm">SPEPE · Analista</div>
-            Olá! Contexto: <strong>Brasil, 2022, Presidente, 1ºT, Lula (PT)</strong>.<br><br>
-            Os filtros e o mapa estão sincronizados. Ao mudar qualquer filtro ou clicar em uma região, o mapa atualiza e eu recebo o contexto automaticamente.<br><br>
+            <div class="mm">Analista</div>
+            Olá! Estou conectado à camada semântica com contexto <strong>Brasil · 2022 · Presidente · T1 · Lula (PT)</strong>.<br><br>
+            Quando você mudar um filtro ou clicar num estado, recebo o contexto automaticamente e posso cruzar dados eleitorais, pesquisas, social, IBGE e predições do modelo.<br><br>
             <span class="map-cmd" onclick="zoomRegion('nordeste')">📍 Zoom Nordeste</span>
             <span class="map-cmd" onclick="zoomRegion('sudeste')">📍 Zoom Sudeste</span>
             <span class="map-cmd" onclick="activateLayer('pesquisas')">📋 Ver pesquisas no mapa</span>
           </div>
         </div>
         <div class="chat-footer">
-          <div class="chat-ctx">Contexto: <strong id="ctx-txt">Brasil · 2022 · Presidente · T1 · Lula</strong><span id="ctx-mun" style="color:var(--green2)"></span></div>
+          <div class="chat-ctx">Contexto ativo: <strong id="ctx-txt">Brasil · 2022 · Presidente · T1 · Lula</strong><span id="ctx-mun" style="color:var(--green2)"></span></div>
           <div class="chat-irow">
             <textarea class="chat-in" id="chat-in" placeholder="Pergunte sobre eleitorado, indicadores, predições..."></textarea>
             <button class="chat-send" id="chat-send">↑</button>
@@ -945,9 +937,13 @@ const LEGENDS = {
 
 function renderLegend(layer) {
   const lg = LEGENDS[layer] || LEGENDS.bivariate;
-  document.getElementById("leg-title").textContent = lg.title;
-  document.getElementById("leg-body").innerHTML = typeof lg.render === "function" ? lg.render() : "";
-  document.getElementById("leg-source").innerHTML = lg.source || "";
+  // Atualiza legenda mini do tab Modelo
+  const elLayer = document.getElementById("leg-modelo-layer");
+  const elBody  = document.getElementById("leg-modelo-body");
+  const elSrc   = document.getElementById("leg-modelo-source");
+  if (elLayer) elLayer.textContent = lg.title;
+  if (elBody)  elBody.innerHTML = typeof lg.render === "function" ? lg.render() : "";
+  if (elSrc)   elSrc.innerHTML = lg.source || "";
   if (lg.afterRender) lg.afterRender();
 }
 
@@ -966,7 +962,8 @@ const LAYER_HINTS = {
   predicao:  "Predição Modelo M1 2026 — mediana posterior PyMC por estado",
 };
 const LAYER_PANEL_MAP = {
-  pesquisas:"pesquisas", social:"social", secoes:"secoes", predicao:"modelo",
+  pesquisas:"pesquisas", social:"social", predicao:"modelo",
+  secoes:null,
   eleitoral:"contexto",  socio:"contexto", saude:"contexto", seguranca:"contexto",
   bivariate:"modelo",
 };
@@ -982,7 +979,7 @@ document.querySelectorAll(".lbtn").forEach(btn => {
     if (_activeLayer === "secoes" && gMap && gMap.getZoom() >= 11) renderSecMarkers();
     else clearSecMarkers();
     const panelTarget = LAYER_PANEL_MAP[_activeLayer];
-    if (panelTarget) switchTab(panelTarget);
+    if (panelTarget && panelTarget !== null) switchTab(panelTarget);
     // Injetar no chat
     chatInject("sys", `Vista alterada para: ${btn.textContent.trim()}`);
   });

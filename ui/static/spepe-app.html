@@ -1750,8 +1750,13 @@ function applyIntent(actions){
         break;
       }
       case 'set_map_layer':{
-        const sel=document.getElementById('map-layer-sel');
-        if(sel && action.layer){ sel.value=action.layer; setTimeout(reloadMap,100); }
+        if(action.layer && typeof swapLayer==='function'){
+          swapLayer(action.layer);
+          document.querySelectorAll('.layer-btn').forEach(b=>b.classList.toggle('active',b.dataset.layer===action.layer));
+        } else {
+          const sel=document.getElementById('map-layer-sel');
+          if(sel && action.layer){ sel.value=action.layer; setTimeout(reloadMap,100); }
+        }
         const t=[...document.querySelectorAll('.main-tab')].find(t=>t.textContent.includes('Mapa'));
         if(t) switchTab(t,'Mapa');
         break;
