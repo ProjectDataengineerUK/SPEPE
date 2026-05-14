@@ -394,6 +394,7 @@ def _write_bigquery_uf_year(df: pd.DataFrame, table_name: str, uf: str, year: in
             create_disposition="CREATE_IF_NEEDED",
             autodetect=False,
             schema=_dataframe_to_bq_schema(df),
+            schema_update_options=[bigquery.SchemaUpdateOption.ALLOW_FIELD_ADDITION],
         )
         job = client.load_table_from_dataframe(df, table_id, job_config=job_config)
         job.result()
