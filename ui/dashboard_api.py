@@ -456,8 +456,8 @@ async def _bq_candidatos(cargo: str, uf: str, ano: int) -> list[dict]:
                 ROUND(SUM(total_votos) / SUM(SUM(total_votos)) OVER () * 100, 1) AS pct_t1,
                 CAST(SUM(total_votos) AS STRING)                AS votos
             FROM `{gold}.fact_municipio_candidato_eleicao`
-            WHERE ano_eleicao = @ano
-              AND cd_cargo = 1
+            WHERE cd_cargo = 1
+              AND (ano_eleicao = @ano OR ano_eleicao IS NULL)
               AND nr_turno = 1
             GROUP BY nm_candidato, sg_partido
             ORDER BY pct_t1 DESC
@@ -605,8 +605,9 @@ async def _bq_kpi(cargo: str, uf: str, ano: int) -> dict:
                     COUNT(DISTINCT cd_municipio) AS municipios,
                     ROW_NUMBER() OVER (ORDER BY SUM(total_votos) DESC) AS rn
                 FROM `{gold}.fact_municipio_candidato_eleicao`
-                WHERE ano_eleicao = @ano
-                  AND cd_cargo = 1 AND nr_turno = 1
+                WHERE cd_cargo = 1
+                  AND (ano_eleicao = @ano OR ano_eleicao IS NULL)
+                  AND nr_turno = 1
                 GROUP BY nm_candidato, sg_partido
             )
             SELECT

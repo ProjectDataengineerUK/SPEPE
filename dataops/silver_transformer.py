@@ -2339,6 +2339,7 @@ def transform_presidente_to_silver(year: int, use_bigquery: bool = False) -> dic
         for batch in pq_file.iter_batches(batch_size=50_000):
             df_batch = batch.to_pandas()
             df_batch = _normalize_tse(df_batch, year)
+            df_batch["ano_eleicao"] = year  # TSE presidente Bronze pode ter NULL/vazio
             for col, default in _COL_DEFAULTS.items():
                 if col not in df_batch.columns:
                     df_batch[col] = default
