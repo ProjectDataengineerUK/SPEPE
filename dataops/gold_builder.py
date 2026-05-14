@@ -517,7 +517,7 @@ def _build_gold_via_bigquery_sql() -> dict:
                 MAX(COALESCE(SAFE_CAST(interesse_busca AS FLOAT64), 0.0))   AS interesse_busca_max,
                 COUNT(*)                                                    AS qt_semanas,
                 CURRENT_TIMESTAMP()                                         AS ingested_at
-            FROM `{silver}.google_trends_uf_BR`
+            FROM `{silver}.google_trends_uf_*`
             WHERE sg_uf IS NOT NULL
             GROUP BY candidato, sg_uf, ano
         """,

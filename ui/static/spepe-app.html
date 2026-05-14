@@ -274,7 +274,7 @@ tr.rhl td{background:rgba(0,200,83,.07)!important}
 .chart-grid-21{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,280px),1fr));gap:12px}
 .chart-grid-21 .card canvas{max-height:240px}
 .map-body{flex:1;display:flex;overflow:hidden;min-height:0}
-#leaflet-map{flex:1;min-height:0;background:#0d1117}
+#leaflet-map{flex:1;min-height:0;height:100%;background:#0d1117}
 #zona-panel{width:320px;background:var(--bg2);border-left:1px solid var(--border);overflow-y:auto;flex-shrink:0;display:none}
 .map-legend{width:210px;background:var(--bg2);border-left:1px solid var(--border);padding:14px;overflow-y:auto;flex-shrink:0;display:flex;flex-direction:column;gap:10px}
 .leg-title{font-size:.68rem;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:var(--text2)}
@@ -1041,7 +1041,10 @@ function switchTab(el,nm){
     const mapa=document.getElementById('tab-mapa');
     if(mapa){ mapa.style.display='flex'; mapa.classList.add('active'); }
     loadCandidatoList();
-    setTimeout(()=>{ if(!gMap) initLeafletMap(); else reloadMap(); },50);
+    setTimeout(()=>{
+      if(!gMap) initLeafletMap();
+      else { gMap.invalidateSize(); reloadMap(); }
+    },100);
   } else if(_TAB_PANEL_MAP[nm]){
     if(dash) dash.style.display='none';
     const panelId='tab-'+_TAB_PANEL_MAP[nm];
@@ -1920,7 +1923,7 @@ function initMap(){
 
   dataLayer = null;
   if (typeof initMapLayers === 'function') initMapLayers();
-  reloadMap();
+  setTimeout(()=>{ gMap.invalidateSize(); reloadMap(); }, 150);
 }
 
 function renderGeoJSON(geojsonData, colorBy, layer) {
