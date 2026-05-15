@@ -687,6 +687,7 @@ html,body{font-size:13px}
     <div class="right-panel">
       <div class="ptabs">
         <div class="ptab active" data-tab="modelo" onclick="ptSwitch('modelo')">Modelo</div>
+        <div class="ptab" data-tab="chat" onclick="ptSwitch('chat')">💬 Chat IA</div>
         <div class="ptab" data-tab="pesquisas" onclick="ptSwitch('pesquisas')">Pesquisas</div>
         <div class="ptab" data-tab="social" onclick="ptSwitch('social')">Social</div>
         <div class="ptab" data-tab="contexto" onclick="ptSwitch('contexto')">Contexto</div>
@@ -701,7 +702,6 @@ html,body{font-size:13px}
         <div class="ptab" data-tab="gdelt" onclick="ptSwitch('gdelt')">GDELT</div>
         <div class="ptab" data-tab="secoes" onclick="ptSwitch('secoes')">Seções</div>
         <div class="ptab" data-tab="fontes" onclick="ptSwitch('fontes')">Fontes</div>
-        <div class="ptab" data-tab="chat" onclick="ptSwitch('chat')">Chat IA</div>
       </div>
 
       <!-- MODELO -->
@@ -1812,35 +1812,59 @@ async function renderCargoView(cargo){
     const cands = resCands?.candidatos || [];
     const muns = resMun?.municipios || [];
     _lastMuns = muns;
+    const _el = id => document.getElementById(id);
+    const candsNorm = cands.map(c=>({
+      nm: c.nm||c.nm_candidato||'?',
+      partido: c.partido||c.sg_partido||'—',
+      pct: parseFloat(c.pct_t1||0),
+      votos: c.votos||'—',
+      avatar: (c.nm||c.nm_candidato||'??').split(' ').map(w=>w[0]).join('').slice(0,2).toUpperCase(),
+    }));
+    _lastCands = candsNorm;
+
     if (cands.length) {
       if (resKpi?.vencedor) {
         setKpi(0, resKpi.vencedor, `${resKpi.vencedor_partido||'—'} · ${turno}`, (resKpi.vencedor_pct||0).toFixed(1)+'%');
         setKpi(1, resKpi.segundo||'—', `${resKpi.segundo_partido||'—'} · ${turno}`, (resKpi.segundo_pct||0).toFixed(1)+'%');
-        document.getElementById('kv2').textContent = (resKpi.margem||0).toFixed(1)+'pp';
+        if(_el('kv2')) _el('kv2').textContent = (resKpi.margem_pp||resKpi.margem||0).toFixed(1)+'pp';
+        // Populate visible pt-modelo KPI panel
+        if(_el('ms-lider'))   _el('ms-lider').textContent   = resKpi.vencedor;
+        if(_el('ms-pct'))     _el('ms-pct').textContent     = (resKpi.vencedor_pct||0).toFixed(1)+'%';
+        if(_el('ms-segundo')) _el('ms-segundo').textContent = resKpi.segundo||'—';
+        if(_el('ms-total'))   _el('ms-total').textContent   = resKpi.total_votos||'—';
+        if(_el('ms-context')) _el('ms-context').textContent = `${cargo} · ${uf} ${ano}`;
       }
-      const candsNorm = cands.map(c=>({
-        nm: c.nm||c.nm_candidato||'?',
-        partido: c.partido||c.sg_partido||'—',
-        pct: parseFloat(c.pct_t1||0),
-        votos: c.votos||'—',
-        avatar: (c.nm||c.nm_candidato||'??').split(' ').map(w=>w[0]).join('').slice(0,2).toUpperCase(),
-      }));
-      _lastCands = candsNorm;
+      // Populate m-cands with live candidate rows
+      const mCands = _el('m-cands');
+      if(mCands && candsNorm.length) {
+        const maxPct = Math.max(...candsNorm.map(c=>c.pct));
+        mCands.innerHTML = candsNorm.slice(0,5).map(c=>`
+          <div class="krow">
+            <span class="klbl" title="${c.nm}">${c.nm.split(' ').slice(0,2).join(' ')}</span>
+            <span class="kv" style="font-size:.72rem">${c.partido}</span>
+            <span class="kv g" style="min-width:42px;text-align:right">${c.pct.toFixed(1)}%</span>
+          </div>`).join('');
+      }
       renderCandCards(candsNorm, cargo);
       renderTableBQ(muns, candsNorm);
-      document.getElementById('kv3').textContent = muns.length+'+';
-      document.getElementById('ks3').textContent = 'municípios carregados';
-      document.getElementById('res-title').textContent = `Resultado — ${cargo} · ${turno}`;
-      document.getElementById('res-sub').textContent = `% votos válidos · ${uf} ${ano}`;
-      document.getElementById('cands-title').textContent = `Candidatos — ${cargo} · ${uf} ${ano}`;
-      document.getElementById('tbl-title').textContent = `Municípios · ${cargo} · ${uf} ${ano}`;
+      if(_el('kv3')) _el('kv3').textContent = muns.length+'+';
+      if(_el('ks3')) _el('ks3').textContent = 'municípios carregados';
+      if(_el('res-title'))    _el('res-title').textContent    = `Resultado — ${cargo} · ${turno}`;
+      if(_el('res-sub'))      _el('res-sub').textContent      = `% votos válidos · ${uf} ${ano}`;
+      if(_el('cands-title'))  _el('cands-title').textContent  = `Candidatos — ${cargo} · ${uf} ${ano}`;
+      if(_el('tbl-title'))    _el('tbl-title').textContent    = `Municípios · ${cargo} · ${uf} ${ano}`;
     } else {
-      _lastCands = [];
-      document.getElementById('cand-grid').innerHTML = `<div style="color:#8d96a0;padding:1.5rem;text-align:center;grid-column:1/-1">Sem dados para <strong>${uf}</strong> ${ano}.<br><small>Execute o pipeline Silver→Gold para ver dados reais.</small></div>`;
+      if(_el('cand-grid'))  _el('cand-grid').innerHTML = `<div style="color:#8d96a0;padding:1.5rem;text-align:center;grid-column:1/-1">Sem dados para <strong>${uf}</strong> ${ano}.<br><small>Execute o pipeline Silver→Gold para ver dados reais.</small></div>`;
+      if(_el('m-cands'))    _el('m-cands').innerHTML   = '<div class="mrp-empty">Sem dados BQ para esta seleção</div>';
+      if(_el('ms-lider'))   _el('ms-lider').textContent   = '—';
+      if(_el('ms-pct'))     _el('ms-pct').textContent     = '—';
+      if(_el('ms-segundo')) _el('ms-segundo').textContent = '—';
+      if(_el('ms-total'))   _el('ms-total').textContent   = '—';
+      if(_el('ms-context')) _el('ms-context').textContent = `${cargo} · ${uf} ${ano}`;
       renderTableBQ([], []);
-      document.getElementById('res-sub').textContent = `% votos válidos · ${uf} ${ano}`;
-      document.getElementById('cands-title').textContent = `Candidatos — ${cargo} · ${uf} ${ano}`;
-      document.getElementById('tbl-title').textContent = `Municípios · ${cargo} · ${uf} ${ano}`;
+      if(_el('res-sub'))     _el('res-sub').textContent     = `% votos válidos · ${uf} ${ano}`;
+      if(_el('cands-title')) _el('cands-title').textContent = `Candidatos — ${cargo} · ${uf} ${ano}`;
+      if(_el('tbl-title'))   _el('tbl-title').textContent   = `Municípios · ${cargo} · ${uf} ${ano}`;
     }
     if (CH.polls) { CH.polls.data.labels=[]; CH.polls.data.datasets=[]; CH.polls.update(); }
   } catch(e) {
@@ -3746,17 +3770,22 @@ function ptSwitch(tab) {
 
 function _loadPesquisasRightPanel() {
   const uf = document.getElementById('f-uf')?.value || 'BR';
-  const cargo = document.getElementById('map-cargo-sel')?.value || 'Governador';
-  const cdCargo = {Presidente:1,Governador:3,Senador:5,'Dep. Federal':6,'Dep. Estadual':7}[cargo]||3;
+  const cargo = document.getElementById('map-cargo-sel')?.value || document.getElementById('f-cargo')?.value || 'Presidente';
   const el = document.getElementById('pesq-list');
   if(!el) return;
   el.innerHTML = '<div class="mrp-empty">Carregando...</div>';
-  document.getElementById('pesq-uf-label').textContent = uf;
-  apiFetch(`/api/pesquisas/intencao?uf=${uf}&cd_cargo=${cdCargo}&ano=2026`)
+  const ufLabel = document.getElementById('pesq-uf-label');
+  if(ufLabel) ufLabel.textContent = uf;
+  apiFetch(`/api/pesquisas?cargo=${encodeURIComponent(cargo)}&sg_uf=${uf}&ano=2026`)
     .then(r => r?.json()).then(data => {
-      const rows = (data?.data || []).slice(0, 8);
-      if (!rows.length) { el.innerHTML = '<div class="mrp-empty">Sem pesquisas disponíveis</div>'; return; }
-      el.innerHTML = rows.map(r => `<div class="mrp-row"><span>${r.candidato||'?'}</span><span>${(+(r.intencao_ponderada||0)).toFixed(1)}%</span></div>`).join('');
+      const series = data?.series || [];
+      if (!series.length) { el.innerHTML = '<div class="mrp-empty">Sem pesquisas disponíveis</div>'; return; }
+      const rows = series.map(s => {
+        const pts = s.pontos || [];
+        const last = pts[pts.length - 1] || {};
+        return {candidato: s.candidato, intencao: last.ajustada || last.intencao || 0};
+      }).sort((a,b) => b.intencao - a.intencao).slice(0, 8);
+      el.innerHTML = rows.map(r => `<div class="mrp-row"><span>${r.candidato||'?'}</span><span>${(+r.intencao).toFixed(1)}%</span></div>`).join('');
     }).catch(() => { el.innerHTML = '<div class="mrp-empty">Pesquisas indisponíveis</div>'; });
 }
 
@@ -3769,8 +3798,10 @@ async function _loadSocialPanel() {
     if(!el) return;
     if(!data.length){ el.innerHTML = '<div class="mrp-empty">Sem dados de sentimento</div>'; return; }
     el.innerHTML = data.slice(0,5).map(d => {
-      const pct = ((d.score_sentimento||0)+1)/2*100;
-      return `<div class="krow"><span class="klbl">${d.plataforma||d.sg_uf||'?'}</span><span class="kv ${pct>55?'g':pct<45?'r':'y'}">${(+(d.score_sentimento||0)).toFixed(2)}</span></div>`;
+      const score = +(d.sentimento_score_medio ?? d.score_sentimento ?? 0);
+      const pct = (score + 1) / 2 * 100;
+      const label = d.candidato || d.plataforma || d.sg_uf || '?';
+      return `<div class="krow"><span class="klbl">${label}</span><span class="kv ${pct>55?'g':pct<45?'r':'y'}">${score.toFixed(2)}</span></div>`;
     }).join('');
   } catch { /* no-op */ }
 }
