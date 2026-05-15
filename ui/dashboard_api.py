@@ -151,6 +151,7 @@ _PUBLIC_API_PATHS = {
     "/api/kpi",
     "/api/mapa/locais",
     "/api/model/status",
+    "/api/resultados/partido",
 }
 
 
@@ -3116,6 +3117,47 @@ async def get_mesorregioes(uf: str = "SP") -> JSONResponse:
         logger.warning("IBGE mesorregioes falhou: %s", exc)
         data = []
     return JSONResponse({"mesorregioes": [{"id": m["id"], "nome": m["nome"]} for m in data]})
+
+
+@app.get("/api/resultados/partido")
+async def get_historico_partido(
+    partido: str = Query("PT"),
+    cargo: str = Query("Presidente"),
+    uf: str = Query("BR"),
+) -> JSONResponse:
+    if settings.gcp_project_id and os.environ.get("USE_BIGQUERY", "").lower() == "true":
+        try:
+            from google.cloud import bigquery
+
+            client = bigquery.Client(project=settings.gcp_project_id)
+            gold = f"{settings.gcp_project_id}.{settings.bigquery_dataset_gold}"
+            params: list = [
+                bigquery.ScalarQueryParameter("partido", "STRING", partido.upper()),
+                bigquery.ScalarQueryParameter("cargo", "STRING", cargo),
+            ]
+            where = "sg_partido = @partido AND ds_cargo_normalizado = @cargo"
+            if uf.upper() != "BR":
+                where += " AND sg_uf = @uf"
+                params.append(bigquery.ScalarQueryParameter("uf", "STRING", uf.upper()))
+            query = f"""
+                SELECT
+                    ano_eleicao                                       AS ano,
+                    COUNT(DISTINCT nm_candidato)                      AS candidaturas,
+                    COUNTIF(ds_sit_tot_turno IN
+                        ('ELEITO','ELEITO POR QP','ELEITO POR MÉDIA')) AS eleitos,
+                    SUM(qt_votos_nominais)                            AS votos
+                FROM `{gold}.fact_municipio_candidato_eleicao`
+                WHERE {where}
+                GROUP BY ano_eleicao
+                ORDER BY ano_eleicao
+                LIMIT 10
+            """
+            job_config = bigquery.QueryJobConfig(query_parameters=params)
+            rows = list(client.query(query, job_config=job_config).result())
+            return JSONResponse({"data": [dict(r) for r in rows], "partido": partido, "cargo": cargo})
+        except Exception as exc:
+            logger.warning("BigQuery historico_partido falhou: %s", exc)
+    return JSONResponse({"data": [], "partido": partido, "cargo": cargo, "status": "no_bq"})
 
 
 # ── Social: Sentimento ────────────────────────────────────────────────────────

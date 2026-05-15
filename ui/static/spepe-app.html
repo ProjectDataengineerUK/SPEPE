@@ -9,6 +9,7 @@
 <script defer src="/static/js/map_layers.js"></script>
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="https://unpkg.com/leaflet.heat@0.2.0/dist/leaflet-heat.js"></script>
 <script src="https://accounts.google.com/gsi/client" async defer></script>
 <script>
 function initLeafletMap() {
@@ -78,6 +79,25 @@ select,input,textarea{font-family:inherit}
 .user-name{font-size:.78rem;font-weight:500}
 .btn-logout{background:transparent;border:1px solid var(--border);border-radius:6px;padding:4px 10px;font-size:.7rem;color:var(--text2)}
 .btn-logout:hover{border-color:var(--red);color:var(--red)}
+.countdown-badge{font-size:.64rem;font-weight:700;background:var(--orange-dim);color:var(--orange);border:1px solid rgba(249,115,22,.4);border-radius:12px;padding:2px 10px;white-space:nowrap;letter-spacing:.02em}
+.pbody-scroll{flex:1;overflow-y:auto;padding:10px}
+.bar-h{height:14px;background:var(--bg4);border-radius:4px;overflow:hidden;flex:1}
+.bar-fill{height:100%;border-radius:4px;transition:width .4s}
+.hist-row{display:flex;gap:6px;align-items:center;margin-bottom:6px;font-size:.68rem}
+.hist-ano{width:36px;flex-shrink:0;color:var(--text2);font-weight:600}
+.hist-val{width:38px;text-align:right;flex-shrink:0;font-weight:700}
+.cal-item{display:flex;gap:9px;align-items:flex-start;margin-bottom:10px;padding-bottom:10px;border-bottom:1px solid var(--border)}
+.cal-date{font-size:.62rem;font-weight:700;color:var(--green2);white-space:nowrap;width:52px;flex-shrink:0}
+.cal-title{font-size:.72rem;font-weight:600;line-height:1.3}
+.cal-desc{font-size:.62rem;color:var(--text2);margin-top:2px;line-height:1.4}
+.cal-tag{display:inline-block;font-size:.55rem;padding:1px 6px;border-radius:8px;font-weight:700;margin-top:3px}
+.cal-tag.tse{background:#1e3a5f;color:#60a5fa}
+.cal-tag.reg{background:#1a3a1a;color:#4ade80}
+.cal-tag.camp{background:#3f2800;color:#fbbf24}
+.cal-tag.vote{background:#2e1065;color:#c084fc}
+.dem-row{display:flex;align-items:center;gap:7px;margin-bottom:5px}
+.dem-lbl{font-size:.67rem;color:var(--text2);width:82px;flex-shrink:0}
+.dem-pct{font-size:.69rem;font-weight:700;width:36px;text-align:right;flex-shrink:0}
 
 /* MAIN TABS */
 .main-tabs{display:flex;padding:0 14px;border-bottom:1px solid var(--border);background:var(--bg2);flex-shrink:0}
@@ -551,6 +571,9 @@ html,body{font-size:13px}
       <select id="f-turno" onchange="applyFilters()">
         <option>1º Turno</option><option>2º Turno</option>
       </select>
+      <select id="f-mesorregiao" onchange="applyFilters()" title="Mesorregião" style="max-width:130px">
+        <option value="">Toda a UF</option>
+      </select>
       <input id="map-candidato" type="text" placeholder="Candidato…" list="map-candidato-list"
              autocomplete="off" oninput="reloadMap()" style="width:120px">
       <datalist id="map-candidato-list"></datalist>
@@ -567,6 +590,7 @@ html,body{font-size:13px}
           <span id="m2-label">M2 …</span>
         </div>
       </div>
+      <span id="countdown-badge" class="countdown-badge" title="1º Turno — 04/out/2026">⏱ … dias · 1ºT</span>
       <span class="badge-live">● Live</span>
       <div class="user-pill">
         <div class="user-avatar" id="uav">JL</div>
@@ -587,6 +611,7 @@ html,body{font-size:13px}
     <button class="lbtn layer-btn" data-layer="pesquisas">&#128203; Pesquisas</button>
     <button class="lbtn layer-btn" data-layer="sentimento">&#128241; Sentimento</button>
     <button class="lbtn layer-btn" data-layer="predicao">&#128302; Predi&#231;&#227;o 2026</button>
+    <button class="lbtn" id="btn-calor" data-layer="calor" onclick="toggleHeatmap(this)">&#128293; Calor</button>
     <div class="lsep"></div>
     <select id="overlay-ind" style="background:var(--bg3);border:1px solid var(--border2);border-radius:6px;padding:3px 7px;color:var(--text);font-size:.67rem;outline:none;flex-shrink:0" title="Indicador do eixo Y (modo Bivariate)">
       <option value="idhm">Y: IDH Municipal</option>
@@ -645,6 +670,9 @@ html,body{font-size:13px}
         <div class="ptab" data-tab="social" onclick="ptSwitch('social')">Social</div>
         <div class="ptab" data-tab="contexto" onclick="ptSwitch('contexto')">Contexto</div>
         <div class="ptab" data-tab="shap" onclick="ptSwitch('shap')">SHAP</div>
+        <div class="ptab" data-tab="perfil" onclick="ptSwitch('perfil')">Perfil</div>
+        <div class="ptab" data-tab="partidos" onclick="ptSwitch('partidos')">Partidos</div>
+        <div class="ptab" data-tab="calendario" onclick="ptSwitch('calendario')">Calendário</div>
         <div class="ptab" data-tab="chat" onclick="ptSwitch('chat')">Chat IA</div>
       </div>
 
@@ -860,6 +888,59 @@ html,body{font-size:13px}
           <div style="font-size:.58rem;color:var(--text3);margin-top:4px">Desvio SHAP local em rela&#231;&#227;o ao global para este munic&#237;pio</div>
         </div>
         <div style="font-size:.61rem;color:var(--text3);line-height:1.5;margin-top:4px">M&#233;todo: TreeSHAP sobre PyMC posterior m&#233;dio &middot; bootstrap 1.000 itera&#231;&#245;es</div>
+      </div>
+
+      <!-- PERFIL DEMOGRÁFICO -->
+      <div class="pbody" id="pt-perfil">
+        <div class="pc">
+          <h4>Perfil do Eleitorado <span id="perfil-uf-label" class="tag ibge">SP</span></h4>
+          <div id="perfil-genero-rows"><div class="mrp-empty">Clique em um estado</div></div>
+        </div>
+        <div class="pc">
+          <h4>Faixa Etária</h4>
+          <div id="perfil-faixa-rows"><div class="mrp-empty">—</div></div>
+        </div>
+        <div class="pc">
+          <h4>Escolaridade</h4>
+          <div id="perfil-esc-rows"><div class="mrp-empty">—</div></div>
+        </div>
+        <div class="leg-source">TSE &middot; Cadastro de eleitores &middot; Atualizado anualmente</div>
+      </div>
+
+      <!-- HISTÓRICO PARTIDÁRIO -->
+      <div class="pbody" id="pt-partidos">
+        <div class="pc">
+          <h4>Partido <span id="part-label" class="tag tse">PT</span></h4>
+          <div style="display:flex;gap:5px;margin-bottom:8px;flex-wrap:wrap" id="part-btns">
+            <button class="lbtn active" style="padding:2px 8px;font-size:.64rem" onclick="selectPartido(this,'PT')">PT</button>
+            <button class="lbtn" style="padding:2px 8px;font-size:.64rem" onclick="selectPartido(this,'PL')">PL</button>
+            <button class="lbtn" style="padding:2px 8px;font-size:.64rem" onclick="selectPartido(this,'MDB')">MDB</button>
+            <button class="lbtn" style="padding:2px 8px;font-size:.64rem" onclick="selectPartido(this,'PSDB')">PSDB</button>
+            <button class="lbtn" style="padding:2px 8px;font-size:.64rem" onclick="selectPartido(this,'PSD')">PSD</button>
+            <button class="lbtn" style="padding:2px 8px;font-size:.64rem" onclick="selectPartido(this,'UNIÃO')">UNIÃO</button>
+          </div>
+        </div>
+        <div class="pc">
+          <h4>Candidaturas &amp; Eleitos por Eleição</h4>
+          <div id="part-hist-rows"><div class="mrp-empty">Selecione um partido</div></div>
+        </div>
+        <div class="pc">
+          <h4>Total de Votos</h4>
+          <canvas id="chart-partidos" height="100"></canvas>
+        </div>
+        <div class="leg-source">TSE Gold &middot; fact_municipio_candidato_eleicao &middot; 2018/2022</div>
+      </div>
+
+      <!-- CALENDÁRIO TSE 2026 -->
+      <div class="pbody" id="pt-calendario">
+        <div class="pc">
+          <h4>Calendário Eleitoral 2026 <span class="tag tse">TSE</span></h4>
+          <div id="cal-countdown" style="text-align:center;padding:8px 0;margin-bottom:6px">
+            <div style="font-size:1.6rem;font-weight:800;color:var(--orange)" id="cal-days">—</div>
+            <div style="font-size:.65rem;color:var(--text2)">dias até o 1º Turno</div>
+          </div>
+        </div>
+        <div id="cal-items"></div>
       </div>
 
       <!-- CHAT IA -->
@@ -1313,6 +1394,7 @@ function applyFilters(){
   const cargo=document.getElementById('f-cargo').value;
   const turno=document.getElementById('f-turno').value;
   const turnoNum=turno.includes('2')?2:1;
+  _updateMesorregioes(uf);
   document.getElementById('bc').innerHTML=`<strong>Dashboard</strong> · ${uf} · ${ano}`;
   toast(`Filtros aplicados — ${uf} ${ano}`);
   renderCargoView(activeCargo);
@@ -3282,6 +3364,9 @@ function ptSwitch(tab) {
   if (tab === 'pesquisas') _loadPesquisasRightPanel();
   if (tab === 'social') _loadSocialPanel();
   if (tab === 'shap') _loadShapPanel();
+  if (tab === 'perfil') _loadPerfilTab();
+  if (tab === 'partidos') _loadPartidosTab();
+  if (tab === 'calendario') _renderCalendario();
 }
 
 function _loadPesquisasRightPanel() {
@@ -3323,6 +3408,208 @@ function _loadShapPanel() {
   document.getElementById('shap-cand') && (document.getElementById('shap-cand').textContent = cargo + ' · ' + uf);
   el.innerHTML = '<div class="mrp-empty">SHAP — modelo não deployado ainda</div>';
 }
+
+// ── QW-1: Countdown ──────────────────────────────────────────────────────────
+function _initCountdown() {
+  const TARGET = new Date('2026-10-04T00:00:00-03:00');
+  function _tick() {
+    const diff = TARGET - new Date();
+    const days = Math.max(0, Math.floor(diff / 86400000));
+    const badge = document.getElementById('countdown-badge');
+    const calDays = document.getElementById('cal-days');
+    const txt = days === 0 ? '🗳 Hoje é o dia!' : `⏱ ${days} dias · 1ºT`;
+    if (badge) badge.textContent = txt;
+    if (calDays) calDays.textContent = days;
+  }
+  _tick();
+  setInterval(_tick, 60000);
+}
+
+// ── QW-3: Mesorregião ─────────────────────────────────────────────────────────
+let _lastMesoUF = '';
+async function _updateMesorregioes(uf) {
+  if (!uf || uf === 'BR' || uf === _lastMesoUF) return;
+  _lastMesoUF = uf;
+  const sel = document.getElementById('f-mesorregiao');
+  if (!sel) return;
+  try {
+    const res = await apiFetch(`/api/mesorregioes?uf=${uf}`);
+    const data = await res.json();
+    const list = data?.mesorregioes || [];
+    sel.innerHTML = '<option value="">Toda a UF</option>' +
+      list.map(m => `<option value="${m.id}">${m.nome}</option>`).join('');
+  } catch { /* keep default */ }
+}
+
+// ── QW-2: Perfil Demográfico ──────────────────────────────────────────────────
+async function _loadPerfilTab() {
+  const uf = document.getElementById('f-uf')?.value || 'SP';
+  const lbl = document.getElementById('perfil-uf-label');
+  if (lbl) lbl.textContent = uf;
+
+  const makeRows = (items, colorFn) => items.length
+    ? items.map(it => {
+        const pct = +(it.percentual || it.pct || 0);
+        return `<div class="dem-row">
+          <span class="dem-lbl">${it.categoria||it.label||'?'}</span>
+          <div class="bar-h"><div class="bar-fill" style="width:${Math.min(pct,100)}%;background:${colorFn(pct)}"></div></div>
+          <span class="dem-pct">${pct.toFixed(1)}%</span>
+        </div>`;
+      }).join('')
+    : '<div class="mrp-empty">Sem dados</div>';
+
+  const setEl = (id, html) => { const e = document.getElementById(id); if(e) e.innerHTML = html; };
+  setEl('perfil-genero-rows', '<div class="mrp-empty">Carregando...</div>');
+  setEl('perfil-faixa-rows',  '<div class="mrp-empty">...</div>');
+  setEl('perfil-esc-rows',    '<div class="mrp-empty">...</div>');
+
+  try {
+    const res = await apiFetch(`/api/perfis?uf=${uf}`);
+    const data = await res.json();
+    setEl('perfil-genero-rows', makeRows(data?.genero || [], p => p > 50 ? '#1976d2' : '#7c3aed'));
+    setEl('perfil-faixa-rows',  makeRows(data?.faixa_etaria || [], () => '#059669'));
+    setEl('perfil-esc-rows',    makeRows(data?.escolaridade || [], p => p > 40 ? '#f59e0b' : '#6b7280'));
+  } catch {
+    setEl('perfil-genero-rows', '<div class="mrp-empty">Dados indisponíveis</div>');
+  }
+}
+
+// ── QW-4: Histórico Partidário ────────────────────────────────────────────────
+let _partidoAtivo = 'PT';
+let _chartPartidos = null;
+
+function selectPartido(btn, partido) {
+  document.querySelectorAll('#part-btns .lbtn').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  _partidoAtivo = partido;
+  const lbl = document.getElementById('part-label');
+  if (lbl) lbl.textContent = partido;
+  _loadPartidosTab();
+}
+
+async function _loadPartidosTab() {
+  const uf = document.getElementById('f-uf')?.value || 'BR';
+  const cargo = document.getElementById('f-cargo')?.value || 'Presidente';
+  const el = document.getElementById('part-hist-rows');
+  if (el) el.innerHTML = '<div class="mrp-empty">Carregando...</div>';
+
+  try {
+    const res = await apiFetch(`/api/resultados/partido?partido=${_partidoAtivo}&cargo=${encodeURIComponent(cargo)}&uf=${uf}`);
+    const data = (await res.json())?.data || [];
+
+    if (!data.length) {
+      if (el) el.innerHTML = '<div class="mrp-empty">Sem dados disponíveis</div>';
+      return;
+    }
+
+    if (el) el.innerHTML = data.map(d => {
+      const tx = d.eleitos > 0 ? 'g' : 'r';
+      return `<div class="hist-row">
+        <span class="hist-ano">${d.ano}</span>
+        <div class="bar-h"><div class="bar-fill" style="width:${Math.min((d.candidaturas/20)*100,100)}%;background:#1976d2"></div></div>
+        <span class="hist-val kv ${tx}">${d.eleitos}/${d.candidaturas}</span>
+      </div>`;
+    }).join('');
+
+    // Votes bar chart
+    const anos = data.map(d => d.ano);
+    const votos = data.map(d => +(d.votos || 0) / 1e6);
+    const ctx = document.getElementById('chart-partidos');
+    if (!ctx) return;
+    if (_chartPartidos) { _chartPartidos.destroy(); _chartPartidos = null; }
+    _chartPartidos = new Chart(ctx, {
+      type: 'bar',
+      data: {
+        labels: anos,
+        datasets: [{ label: 'Votos (M)', data: votos, backgroundColor: '#1976d2aa', borderColor: '#1976d2', borderWidth: 1, borderRadius: 4 }]
+      },
+      options: {
+        responsive: true, maintainAspectRatio: false,
+        plugins: { legend: { display: false } },
+        scales: {
+          x: { ticks: { color: '#8d96a0', font: { size: 10 } }, grid: { color: '#21262d' } },
+          y: { ticks: { color: '#8d96a0', font: { size: 10 }, callback: v => v + 'M' }, grid: { color: '#21262d' } }
+        }
+      }
+    });
+  } catch {
+    if (el) el.innerHTML = '<div class="mrp-empty">Erro ao carregar</div>';
+  }
+}
+
+// ── QW-5: Calendário TSE 2026 ─────────────────────────────────────────────────
+const _TSE_CALENDARIO_2026 = [
+  { data: '19/abr', titulo: 'Início do período eleitoral', desc: 'Ano de eleição começa — vedação de contratação de publicidade.', tag: 'tse' },
+  { data: '05/abr', titulo: 'Prazo para desfiliação', desc: 'Último dia para filiação a partido para disputar as eleições de 2026.', tag: 'reg' },
+  { data: '05/abr', titulo: 'Filiação partidária', desc: 'Prazo final de filiação para candidatos às eleições gerais.', tag: 'reg' },
+  { data: '20/jun', titulo: 'Início das convenções', desc: 'Convenções partidárias para escolha de candidatos (20/jun–05/ago).', tag: 'camp' },
+  { data: '05/ago', titulo: 'Fim das convenções', desc: 'Prazo final para realização de convenções e escolha de candidatos.', tag: 'camp' },
+  { data: '15/ago', titulo: 'Registro de candidaturas', desc: 'Prazo final para registro de candidaturas no TSE/TREs.', tag: 'tse' },
+  { data: '26/ago', titulo: 'Início da propaganda eleitoral', desc: 'Início de propaganda nos meios de comunicação.', tag: 'camp' },
+  { data: '26/ago', titulo: 'Debate eleitoral permitido', desc: 'Debates em TV e rádio podem começar.', tag: 'camp' },
+  { data: '03/out', titulo: 'Silêncio eleitoral', desc: 'Proibida propaganda e manifestações públicas a partir das 22h.', tag: 'tse' },
+  { data: '04/out', titulo: '🗳 1º Turno', desc: 'Eleições para Presidente, Governadores, Senadores e Deputados (26 estados + DF).', tag: 'vote' },
+  { data: '05/out', titulo: 'Divulgação dos resultados', desc: 'TSE divulga resultado oficial do 1º turno.', tag: 'tse' },
+  { data: '10/out', titulo: 'Início do 2º turno — propaganda', desc: 'Início da propaganda para candidatos ao 2º turno.', tag: 'camp' },
+  { data: '24/out', titulo: 'Silêncio — 2º turno', desc: 'Proibida propaganda eleitoral a partir das 22h.', tag: 'tse' },
+  { data: '25/out', titulo: '🗳 2º Turno', desc: 'Eleições para cargos sem maioria no 1º turno (Presidente + Governadores).', tag: 'vote' },
+];
+
+function _renderCalendario() {
+  const el = document.getElementById('cal-items');
+  if (!el) return;
+  el.innerHTML = _TSE_CALENDARIO_2026.map(ev => `
+    <div class="cal-item">
+      <div class="cal-date">${ev.data}</div>
+      <div>
+        <div class="cal-title">${ev.titulo}</div>
+        <div class="cal-desc">${ev.desc}</div>
+        <span class="cal-tag ${ev.tag}">${{tse:'TSE',reg:'Registro',camp:'Campanha',vote:'Votação'}[ev.tag]||ev.tag}</span>
+      </div>
+    </div>
+  `).join('');
+}
+
+// ── Heat Map (Leaflet.heat) ───────────────────────────────────────────────────
+function toggleHeatmap(btn) {
+  if (!gMap) return;
+  if (window._heatLayerInst) {
+    gMap.removeLayer(window._heatLayerInst);
+    window._heatLayerInst = null;
+    btn.classList.remove('active');
+    return;
+  }
+  btn.classList.add('active');
+  _buildHeatmap();
+}
+
+function _buildHeatmap() {
+  if (!gMap || typeof L.heatLayer !== 'function') return;
+  const points = [];
+  gMap.eachLayer(layer => {
+    if (!layer.feature || !layer.feature.properties) return;
+    try {
+      const center = layer.getBounds().getCenter();
+      const p = layer.feature.properties;
+      const raw = p.valor ?? p.idhm ?? p.pct_votos ?? p.pct ?? 0.5;
+      const v = isNaN(raw) ? 0.5 : Math.min(Math.max(Number(raw), 0), 1);
+      points.push([center.lat, center.lng, v]);
+    } catch { /* skip if no bounds */ }
+  });
+  if (!points.length) {
+    toast('Carregue uma camada no mapa antes de ativar o Calor');
+    document.getElementById('btn-calor')?.classList.remove('active');
+    return;
+  }
+  window._heatLayerInst = L.heatLayer(points, {
+    radius: 28, blur: 18, maxZoom: 10,
+    gradient: { 0.2: '#1e40af', 0.5: '#f59e0b', 0.8: '#ef4444', 1.0: '#7f1d1d' }
+  }).addTo(gMap);
+}
+
+// ── Init ──────────────────────────────────────────────────────────────────────
+_initCountdown();
+_renderCalendario();
 </script>
 </body>
 </html>
