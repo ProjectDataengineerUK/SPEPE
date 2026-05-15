@@ -1783,7 +1783,21 @@ function applyFilters(){
   refreshSentimentChart(uf, ano);
   refreshResultadosChart(cargo, uf, ano, turnoNum);
   loadCandidatoList();
-  if(gMap && document.getElementById('tab-mapa')?.classList.contains('active')) reloadMap();
+  if (gMap) {
+    // Sync map level with UF filter
+    if (uf && uf !== 'BR') {
+      _mapCtx.uf = uf;
+      if (_mapLevel === 'uf' || _mapLevel === 'nacional' || _mapLevel === 'regiao') {
+        _mapLevel = 'municipio';
+        _updateLevelButtons();
+      }
+    } else if (uf === 'BR') {
+      _mapCtx = {};
+      _mapLevel = 'uf';
+      _updateLevelButtons();
+    }
+    reloadMap();
+  }
 }
 function onCargoSelect(val){
   const tab=[...document.querySelectorAll('.cargo-tab')].find(t=>t.textContent.includes(val.split('.')[0].trim()));
@@ -2607,6 +2621,11 @@ function renderGeoJSON(geojsonData, colorBy, layer) {
       });
     }
   }).addTo(gMap);
+  // Zoom to fit newly rendered data
+  try {
+    const b = _geoLayer.getBounds();
+    if (b.isValid()) gMap.fitBounds(b, {padding:[12,12], maxZoom:12, animate:true});
+  } catch(e) {}
 }
 
 async function setMapLevel(level){
@@ -4322,16 +4341,23 @@ function toggleHeatmap(btn) {
 
 function _buildHeatmap() {
   if (!gMap || typeof L.heatLayer !== 'function') return;
+  const src = window._geoLayer;
+  if (!src) {
+    toast('Carregue uma camada no mapa antes de ativar o Calor');
+    document.getElementById('btn-calor')?.classList.remove('active');
+    return;
+  }
   const points = [];
-  gMap.eachLayer(layer => {
+  src.eachLayer(layer => {
     if (!layer.feature || !layer.feature.properties) return;
     try {
       const center = layer.getBounds().getCenter();
-      const p = layer.feature.properties;
-      const raw = p.valor ?? p.idhm ?? p.pct_votos ?? p.pct ?? 0.5;
-      const v = isNaN(raw) ? 0.5 : Math.min(Math.max(Number(raw), 0), 1);
-      points.push([center.lat, center.lng, v]);
-    } catch { /* skip if no bounds */ }
+      const props = layer.feature.properties;
+      const cod = String(props.codarea || props.CD_MUN || props.CD_UF || props.CD_REGIAO || '');
+      const d = _mapData[cod] || _mapData[cod.slice(0, 2)];
+      const raw = d ? Math.min(Math.max((d.pct || 50) / 100, 0), 1) : 0.5;
+      points.push([center.lat, center.lng, raw]);
+    } catch { /* skip layers without bounds */ }
   });
   if (!points.length) {
     toast('Carregue uma camada no mapa antes de ativar o Calor');
