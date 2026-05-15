@@ -1085,9 +1085,9 @@ html,body{font-size:13px}
       <!-- FONTES DE DADOS -->
       <div class="pbody" id="pt-fontes" style="display:flex;flex-direction:column;overflow:hidden">
         <div style="display:flex;align-items:center;justify-content:space-between;padding:8px 10px 4px;flex-shrink:0">
-          <span style="font-size:.72rem;font-weight:600;color:var(--text1)">Validação de Fontes</span>
+          <span style="font-size:.72rem;font-weight:600;color:var(--text)">Validação de Fontes</span>
           <button onclick="_loadFontesTab(true)"
-            style="font-size:.62rem;background:var(--surface3);border:1px solid var(--border1);color:var(--accent1);cursor:pointer;padding:2px 8px;border-radius:4px">↻ Atualizar</button>
+            style="font-size:.62rem;background:var(--bg3);border:1px solid var(--border);color:var(--green2);cursor:pointer;padding:2px 8px;border-radius:4px">↻ Atualizar</button>
         </div>
         <div id="fnt-summary" style="padding:0 10px 6px;font-size:.6rem;color:var(--text3);flex-shrink:0">A carregar fontes...</div>
         <div id="fnt-tabs" style="display:flex;overflow-x:auto;gap:3px;padding:0 8px 6px;flex-shrink:0;scrollbar-width:none"></div>
@@ -4540,7 +4540,7 @@ function _renderFontesTabs() {
     const dot = s.status === 'ok' ? '#00c853' : s.status === 'empty' ? '#fcd34d' : '#ef4444';
     const lbl = s.label.split(' ')[0];
     return `<button class="fnt-tab-btn" data-src="${s.id}" onclick="_renderFontesContent('${s.id}')"
-      style="white-space:nowrap;font-size:.59rem;padding:3px 7px;background:var(--surface3);border:1px solid var(--border1);border-radius:4px;cursor:pointer;color:var(--text2)">
+      style="white-space:nowrap;font-size:.59rem;padding:3px 7px;background:var(--bg3);border:1px solid var(--border);border-radius:4px;cursor:pointer;color:var(--text2)">
       <span style="color:${dot}">●</span> ${s.icon} ${lbl}
     </button>`;
   }).join('');
@@ -4550,9 +4550,9 @@ function _renderFontesContent(srcId) {
   _fontesActiveSrc = srcId;
   document.querySelectorAll('.fnt-tab-btn').forEach(b => {
     const active = b.dataset.src === srcId;
-    b.style.borderColor = active ? 'var(--accent1)' : 'var(--border1)';
-    b.style.color = active ? 'var(--accent1)' : 'var(--text2)';
-    b.style.background = active ? 'var(--surface4,#2a2a3a)' : 'var(--surface3)';
+    b.style.borderColor = active ? 'var(--green2)' : 'var(--border)';
+    b.style.color = active ? 'var(--green2)' : 'var(--text2)';
+    b.style.background = active ? 'var(--bg4)' : 'var(--bg3)';
   });
   const src = (_fontesCache || []).find(s => s.id === srcId);
   const el = document.getElementById('fnt-content');
@@ -4562,14 +4562,14 @@ function _renderFontesContent(srcId) {
   let tableHtml = '';
   if (src.sample?.length > 0) {
     const cols = Object.keys(src.sample[0]);
-    tableHtml = `<div style="overflow-x:auto;margin-top:8px;border:1px solid var(--border1);border-radius:4px">
+    tableHtml = `<div style="overflow-x:auto;margin-top:8px;border:1px solid var(--border);border-radius:4px">
       <table style="width:100%;border-collapse:collapse;font-size:.57rem">
         <thead><tr>${cols.map(c =>
-          `<th style="padding:3px 7px;text-align:left;background:var(--surface3);color:var(--text3);white-space:nowrap;border-bottom:1px solid var(--border1)">${c}</th>`
+          `<th style="padding:3px 7px;text-align:left;background:var(--bg3);color:var(--text3);white-space:nowrap;border-bottom:1px solid var(--border)">${c}</th>`
         ).join('')}</tr></thead>
         <tbody>${src.sample.map((row, i) =>
-          `<tr style="background:${i%2?'var(--surface2)':'transparent'}">${cols.map(c =>
-            `<td style="padding:3px 7px;border-bottom:1px solid var(--surface3);white-space:nowrap;max-width:140px;overflow:hidden;text-overflow:ellipsis" title="${row[c]??''}">${row[c]??'—'}</td>`
+          `<tr style="background:${i%2?'var(--bg2)':'transparent'}">${cols.map(c =>
+            `<td style="padding:3px 7px;border-bottom:1px solid var(--bg3);white-space:nowrap;max-width:140px;overflow:hidden;text-overflow:ellipsis" title="${row[c]??''}">${row[c]??'—'}</td>`
           ).join('')}</tr>`
         ).join('')}</tbody>
       </table></div>`;
@@ -4582,7 +4582,7 @@ function _renderFontesContent(srcId) {
     <div style="display:flex;align-items:flex-start;gap:10px;margin-bottom:6px">
       <span style="font-size:1.4rem;line-height:1">${src.icon}</span>
       <div style="flex:1">
-        <div style="font-weight:600;color:var(--text1);font-size:.72rem">${src.label}</div>
+        <div style="font-weight:600;color:var(--text);font-size:.72rem">${src.label}</div>
         <div style="font-size:.58rem;color:var(--text3);font-family:monospace">${src.table}</div>
       </div>
       <span style="font-weight:700;color:${dot};font-size:.72rem">${rowsLabel}</span>
