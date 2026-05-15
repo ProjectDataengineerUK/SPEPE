@@ -2520,11 +2520,13 @@ async def _bq_indicadores(
     elif tipo == "sentimento":
         resolved_date = data_ref or __import__("datetime").date.today().isoformat()
         query = f"""
-            SELECT cd_municipio_ibge, sg_uf, sentimento_score AS valor
-            FROM `{gold}.fact_sentiment_municipio`
+            SELECT NULL AS cd_municipio_ibge, sg_uf,
+                   ROUND(AVG(score_liquido_sentimento), 4) AS valor
+            FROM `{gold}.fact_social_municipio`
             WHERE data_referencia = @data_ref
               AND (@candidato IS NULL OR candidato = @candidato)
               AND (@uf IS NULL OR sg_uf = @uf)
+            GROUP BY sg_uf
             LIMIT 5600
         """
         job_config = bigquery.QueryJobConfig(
@@ -2891,8 +2893,8 @@ async def _bq_choropleth(layer: str, cargo: str, candidato: str, ano: int) -> li
 
     elif layer == "sentimento":
         query = f"""
-            SELECT sg_uf, ROUND(AVG(score_sentimento), 4) AS value
-            FROM `{gold}.fact_sentiment_municipio`
+            SELECT sg_uf, ROUND(AVG(score_liquido_sentimento), 4) AS value
+            FROM `{gold}.fact_social_municipio`
             WHERE data_referencia >= DATE_SUB(CURRENT_DATE(), INTERVAL 30 DAY)
               AND (@candidato = '' OR LOWER(candidato) LIKE CONCAT('%', LOWER(@candidato), '%'))
             GROUP BY sg_uf
@@ -4449,6 +4451,196 @@ async def debug_tables() -> JSONResponse:
         return JSONResponse({"tables": results, "total": len(results)})
     except Exception as exc:
         return JSONResponse({"error": str(exc), "tables": []}, status_code=500)
+
+
+# ── Debug: Validação de Fontes ────────────────────────────────────────────────
+
+_FONTES_SPEC: list[dict] = [
+    {
+        "id": "eleitoral", "icon": "🏆", "label": "Eleitoral TSE",
+        "bq_table": "fact_municipio_candidato_eleicao", "bq_dataset": "gold",
+        "bq_date_col": "ano_eleicao",
+        "bq_sample": "sg_uf, nm_municipio, nm_candidato, ROUND(pct_votos_municipio,3) AS pct_votos, ano_eleicao",
+        "local_glob": "tse_*_*.parquet", "local_date_col": "ano_eleicao",
+    },
+    {
+        "id": "ibge", "icon": "📊", "label": "IBGE / IDH",
+        "bq_table": "fact_ibge_municipio", "bq_dataset": "gold",
+        "bq_date_col": "ano",
+        "bq_sample": "sg_uf, nm_municipio, ano, idhm, renda_per_capita, gini",
+        "local_glob": "ibge_*.parquet", "local_date_col": "ano",
+    },
+    {
+        "id": "saude", "icon": "🏥", "label": "Saúde DATASUS",
+        "bq_table": "fact_saude_municipio", "bq_dataset": "gold",
+        "bq_date_col": "ano",
+        "bq_sample": "sg_uf, nm_municipio, ano, taxa_mortalidade_infantil_1000, idsus_score",
+        "local_glob": "saude_municipal_*.parquet", "local_date_col": "ano",
+    },
+    {
+        "id": "seguranca", "icon": "🛡", "label": "Segurança SINESP",
+        "bq_table": "fact_seguranca_municipio", "bq_dataset": "gold",
+        "bq_date_col": "ano",
+        "bq_sample": "sg_uf, nm_municipio, ano, taxa_homicidio_100k, ivs_total",
+        "local_glob": "seguranca_municipal_*.parquet", "local_date_col": "ano",
+    },
+    {
+        "id": "pesquisas", "icon": "📋", "label": "Pesquisas Polls",
+        "bq_table": "fact_intencao_voto", "bq_dataset": "gold",
+        "bq_date_col": "ano_eleitoral",
+        "bq_sample": "uf, candidato_normalizado, cd_cargo, ano_eleitoral, ROUND(intencao_ponderada,3) AS intencao",
+        "local_glob": "fact_pesquisa_intencao_*.parquet", "local_date_col": "ano_eleitoral",
+    },
+    {
+        "id": "sentimento", "icon": "📱", "label": "Sentimento Social",
+        "bq_table": "fact_social_municipio", "bq_dataset": "gold",
+        "bq_date_col": "data_referencia",
+        "bq_sample": "sg_uf, candidato, fonte, ano, qt_posts, ROUND(score_liquido_sentimento,2) AS score",
+        "local_glob": "social_mencoes_br_*.parquet", "local_date_col": "ano",
+    },
+    {
+        "id": "trends", "icon": "🔥", "label": "Google Trends",
+        "bq_table": "fact_google_trends_uf", "bq_dataset": "gold",
+        "bq_date_col": "ano",
+        "bq_sample": "sg_uf, candidato, ano, interesse_busca_medio, qt_semanas",
+        "local_glob": "google_trends_uf_*.parquet", "local_date_col": "ano",
+    },
+    {
+        "id": "bolsa", "icon": "💰", "label": "Bolsa Família",
+        "bq_table": "fact_transferencias_sociais", "bq_dataset": "gold",
+        "bq_date_col": "ano",
+        "bq_sample": "sg_uf, nm_municipio, ano, qtd_beneficiarios_bolsa_familia, valor_total_bolsa_familia_reais",
+        "local_glob": "transferencias_sociais_*.parquet", "local_date_col": "ano",
+    },
+    {
+        "id": "meta", "icon": "📢", "label": "Meta Ads",
+        "bq_table": "fact_meta_ads_uf", "bq_dataset": "gold",
+        "bq_date_col": "ano",
+        "bq_sample": "sg_uf, candidato, ano, qt_anuncios, vl_gasto_total_uf, qt_impressoes_total_uf",
+        "local_glob": "meta_ads_regioes_*.parquet", "local_date_col": "ano",
+    },
+    {
+        "id": "predicao", "icon": "🔮", "label": "Predição PyMC",
+        "bq_table": "fact_predictions", "bq_dataset": "mlops",
+        "bq_date_col": "prediction_date",
+        "bq_sample": "sg_uf, candidato, cd_cargo, ROUND(p_mean,3) AS p_mean, ROUND(p_low,3) AS p_low, prediction_date",
+        "local_glob": None, "local_date_col": None,
+    },
+]
+
+
+async def _validate_fonte_bq(spec: dict, base: dict) -> dict:
+    import asyncio
+    from google.cloud import bigquery
+
+    client = bigquery.Client(project=settings.gcp_project_id)
+    dataset_name = (
+        settings.bigquery_dataset_gold
+        if spec["bq_dataset"] == "gold"
+        else "spepe_mlops"
+    )
+    full = f"`{settings.gcp_project_id}.{dataset_name}.{spec['bq_table']}`"
+    dc = spec["bq_date_col"]
+
+    count_q = f"SELECT COUNT(*) AS n, CAST(MIN({dc}) AS STRING) AS d_min, CAST(MAX({dc}) AS STRING) AS d_max FROM {full}"
+    rows = await asyncio.to_thread(lambda: list(client.query(count_q).result()))
+    n = int(rows[0]["n"] or 0)
+    base.update(
+        rows=n,
+        date_min=str(rows[0]["d_min"] or ""),
+        date_max=str(rows[0]["d_max"] or ""),
+        status="ok" if n > 0 else "empty",
+        source_type="bigquery",
+    )
+    if n > 0:
+        sample_rows = await asyncio.to_thread(
+            lambda: list(client.query(f"SELECT {spec['bq_sample']} FROM {full} LIMIT 5").result())
+        )
+        base["sample"] = [
+            {k: (str(v) if v is not None else None) for k, v in dict(r).items()}
+            for r in sample_rows
+        ]
+    return base
+
+
+def _validate_fonte_local(spec: dict, base: dict) -> dict:
+    import pandas as pd
+
+    glob_pat = spec.get("local_glob")
+    if not glob_pat:
+        base.update(status="error", error="sem fallback local")
+        return base
+
+    files = sorted(_LOCAL_SILVER_DIR.glob(glob_pat))
+    if not files:
+        gold_dir = Path(os.environ.get("DATA_DIR", "data")) / "gold"
+        files = sorted(gold_dir.glob(glob_pat)) if gold_dir.exists() else []
+
+    if not files:
+        base["status"] = "empty"
+        return base
+
+    total, sample_df, dates = 0, None, []
+    dc = spec.get("local_date_col")
+    for f in files:
+        try:
+            df = pd.read_parquet(f)
+            total += len(df)
+            if sample_df is None:
+                sample_df = df
+            if dc and dc in df.columns:
+                dates.extend(df[dc].dropna().tolist())
+        except Exception:
+            pass
+
+    base.update(rows=total, status="ok" if total > 0 else "empty", source_type="local_parquet")
+    if dates:
+        base["date_min"] = str(min(dates))
+        base["date_max"] = str(max(dates))
+    if sample_df is not None and total > 0:
+        cols = sample_df.columns.tolist()[:6]
+        sample = sample_df[cols].head(5).fillna("").astype(str)
+        base["sample"] = sample.to_dict(orient="records")
+    return base
+
+
+@app.get("/api/debug/fontes")
+async def debug_fontes() -> JSONResponse:
+    """Valida cada tabela Gold — row count, date range, amostra de 5 linhas.
+    Tenta BigQuery; fallback para parquet local se USE_BIGQUERY não ativo.
+    """
+    use_bq = bool(
+        settings.gcp_project_id and os.environ.get("USE_BIGQUERY", "").lower() == "true"
+    )
+    results = []
+    for spec in _FONTES_SPEC:
+        base: dict = {
+            "id": spec["id"], "icon": spec["icon"], "label": spec["label"],
+            "table": spec["bq_table"], "rows": 0, "date_min": None, "date_max": None,
+            "sample": [], "status": "empty", "source_type": "local",
+        }
+        try:
+            if use_bq:
+                base = await _validate_fonte_bq(spec, base)
+            else:
+                base = _validate_fonte_local(spec, base)
+        except Exception as exc:
+            logger.warning("debug_fontes %s: %s", spec["id"], exc)
+            base.update(status="error", error=str(exc))
+        results.append(base)
+
+    ok = sum(1 for r in results if r["status"] == "ok")
+    empty = sum(1 for r in results if r["status"] == "empty")
+    err = sum(1 for r in results if r["status"] == "error")
+    return JSONResponse(
+        {
+            "sources": results,
+            "ok": ok,
+            "empty": empty,
+            "error": err,
+            "source_type": "bigquery" if use_bq else "local_parquet",
+        }
+    )
 
 
 # ── Config: Google Maps Key ───────────────────────────────────────────────────
