@@ -391,11 +391,11 @@ html,body{font-size:13px}
 
 /* Right panel */
 .right-panel{width:360px;background:var(--bg2);border-left:1px solid var(--border);display:flex;flex-direction:column;flex-shrink:0}
-.ptabs{display:flex;border-bottom:1px solid var(--border);flex-shrink:0;overflow-x:auto}
-.ptabs::-webkit-scrollbar{height:2px}
-.ptab{padding:7px 9px;font-size:.63rem;font-weight:600;color:var(--text2);cursor:pointer;border-bottom:2px solid transparent;white-space:nowrap;text-transform:uppercase;letter-spacing:.05em;transition:all .15s}
-.ptab.active{color:var(--green2);border-bottom-color:var(--green)}
-.ptab:hover:not(.active){color:var(--text)}
+.ptabs{display:flex;overflow-x:auto;gap:1px;background:var(--bg2);border-bottom:1px solid var(--border);scrollbar-width:none;flex-shrink:0}
+.ptabs::-webkit-scrollbar{display:none}
+.ptab{flex:0 0 auto;padding:7px 10px;font-size:.6rem;font-weight:500;color:var(--text3);cursor:pointer;white-space:nowrap;border-bottom:2px solid transparent;transition:all .15s;text-align:center;user-select:none}
+.ptab:hover{color:var(--text);background:var(--bg3)}
+.ptab.active{color:var(--green2);border-bottom-color:var(--green);background:var(--bg3)}
 .pbody{flex:1;overflow-y:auto;padding:10px;display:none}
 .pbody.active{display:block}
 .pbody::-webkit-scrollbar{width:4px}
@@ -541,6 +541,45 @@ html,body{font-size:13px}
 .delta{font-size:.6rem;padding:1px 5px;border-radius:8px;font-weight:600}
 .delta.up{background:#003d1933;color:var(--green2)}
 .delta.dn{background:#3f0f0f33;color:#ef4444}
+
+/* ── Inner tabs (Digital, Estratégia) ──────────────────────────── */
+.inner-tab-strip{display:flex;gap:2px;padding:6px 8px 4px;background:var(--bg2);border-bottom:1px solid var(--border);overflow-x:auto;scrollbar-width:none;flex-shrink:0}
+.inner-tab-strip::-webkit-scrollbar{display:none}
+.inner-tab{font-size:.6rem;padding:3px 9px;background:transparent;border:1px solid transparent;color:var(--text3);cursor:pointer;border-radius:4px;white-space:nowrap;transition:all .15s}
+.inner-tab.active{background:var(--blue2);color:#fff;border-color:var(--blue2)}
+.inner-tab:hover:not(.active){background:var(--bg4);color:var(--text)}
+
+/* ── Bar rows (Confirma-style demographics) ──────────────────── */
+.bar-row{display:flex;align-items:center;gap:6px;margin-bottom:5px;font-size:.62rem}
+.bar-label{min-width:120px;color:var(--text2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.bar-track{flex:1;height:6px;background:var(--bg4);border-radius:3px;overflow:hidden}
+.bar-fill{height:100%;border-radius:3px;background:var(--blue2);transition:width .5s cubic-bezier(.4,0,.2,1)}
+.bar-fill.bar-alt{background:var(--purple)}
+.bar-fill.bar-green{background:var(--green)}
+.bar-fill.bar-orange{background:var(--orange)}
+.bar-pct{min-width:38px;text-align:right;color:var(--text);font-weight:600;font-size:.61rem}
+.bar-abs{min-width:52px;text-align:right;color:var(--text3);font-size:.58rem}
+
+/* ── Distribuição municípios ────────────────────────────────── */
+.dist-row{display:flex;align-items:center;gap:5px;margin-bottom:5px;font-size:.61rem}
+.dist-nm{min-width:90px;color:var(--text2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.dist-track{flex:1;height:5px;background:var(--bg4);border-radius:2px}
+.dist-fill{height:100%;background:var(--green2);border-radius:2px;transition:width .4s}
+.dist-pct{min-width:36px;text-align:right;font-weight:600;color:var(--green2);font-size:.61rem}
+
+/* ── Calendário timeline (Confirma-style) ──────────────────── */
+.cal-timeline{position:relative;padding-left:20px}
+.cal-timeline::before{content:'';position:absolute;left:6px;top:4px;bottom:0;width:2px;background:var(--border)}
+.cal-item{position:relative;margin-bottom:10px;padding:8px 10px;background:var(--bg3);border-radius:6px;border-left:3px solid var(--blue2)}
+.cal-item.cal-past{border-left-color:var(--text3);opacity:.7}
+.cal-item.cal-next{border-left-color:var(--orange);background:rgba(249,115,22,.08)}
+.cal-item::before{content:'';position:absolute;left:-14px;top:10px;width:8px;height:8px;border-radius:50%;background:var(--blue2);border:2px solid var(--bg2)}
+.cal-item.cal-past::before{background:var(--text3)}
+.cal-item.cal-next::before{background:var(--orange)}
+.cal-date{font-size:.6rem;font-weight:700;color:var(--blue2);margin-bottom:2px}
+.cal-item.cal-past .cal-date{color:var(--text3)}
+.cal-item.cal-next .cal-date{color:var(--orange)}
+.cal-desc{font-size:.63rem;color:var(--text2);line-height:1.4}
 </style>
 </head>
 <body>
@@ -686,47 +725,22 @@ html,body{font-size:13px}
 
     <div class="right-panel">
       <div class="ptabs">
-        <div class="ptab active" data-tab="modelo" onclick="ptSwitch('modelo')">Modelo</div>
-        <div class="ptab" data-tab="chat" onclick="ptSwitch('chat')">💬 Chat IA</div>
-        <div class="ptab" data-tab="pesquisas" onclick="ptSwitch('pesquisas')">Pesquisas</div>
-        <div class="ptab" data-tab="social" onclick="ptSwitch('social')">Social</div>
-        <div class="ptab" data-tab="contexto" onclick="ptSwitch('contexto')">Contexto</div>
-        <div class="ptab" data-tab="shap" onclick="ptSwitch('shap')">SHAP</div>
-        <div class="ptab" data-tab="perfil" onclick="ptSwitch('perfil')">Perfil</div>
-        <div class="ptab" data-tab="partidos" onclick="ptSwitch('partidos')">Partidos</div>
-        <div class="ptab" data-tab="calendario" onclick="ptSwitch('calendario')">Calendário</div>
-        <div class="ptab" data-tab="aliancas" onclick="ptSwitch('aliancas')">Alianças</div>
-        <div class="ptab" data-tab="adversarios" onclick="ptSwitch('adversarios')">Adversários</div>
-        <div class="ptab" data-tab="parcerias" onclick="ptSwitch('parcerias')">Parcerias</div>
-        <div class="ptab" data-tab="meta" onclick="ptSwitch('meta')">Meta</div>
-        <div class="ptab" data-tab="gdelt" onclick="ptSwitch('gdelt')">GDELT</div>
-        <div class="ptab" data-tab="secoes" onclick="ptSwitch('secoes')">Seções</div>
-        <div class="ptab" data-tab="fontes" onclick="ptSwitch('fontes')">Fontes</div>
+        <div class="ptab active" data-tab="analise" onclick="ptSwitch('analise')">&#128202; An&#225;lise</div>
+        <div class="ptab" data-tab="chat" onclick="ptSwitch('chat')">&#128172; Chat</div>
+        <div class="ptab" data-tab="eleitorado" onclick="ptSwitch('eleitorado')">&#128101; Eleitorado</div>
+        <div class="ptab" data-tab="pesquisas" onclick="ptSwitch('pesquisas')">&#128203; Pesquisas</div>
+        <div class="ptab" data-tab="digital" onclick="ptSwitch('digital')">&#128241; Digital</div>
+        <div class="ptab" data-tab="estrategia" onclick="ptSwitch('estrategia')">&#127919; Estrat&#233;gia</div>
+        <div class="ptab" data-tab="agenda" onclick="ptSwitch('agenda')">&#128197; Agenda</div>
+        <div class="ptab" data-tab="fontes" onclick="ptSwitch('fontes')">&#128270; Dados</div>
       </div>
 
-      <!-- MODELO -->
-      <div class="pbody active" id="pt-modelo">
+      <!-- ANALISE (default) -->
+      <div class="pbody active" id="pt-analise">
         <div class="leg-mini">
-          <div class="leg-mini-title">Legenda do mapa <span id="map-legend-title">Resultado &#215; IDH</span></div>
+          <div class="leg-mini-title">Camada ativa: <span id="map-legend-title">Resultado &#215; IDH</span></div>
           <div class="leg-items" id="map-legend-items"></div>
           <div class="leg-source" id="leg-source">TSE 2022 &middot; IBGE SIDRA</div>
-        </div>
-        <div class="mtog">
-          <button class="mtbtn active" data-m="1" onclick="setModelMode(this,'1')">M1 &#8212; Estrutural</button>
-          <button class="mtbtn" data-m="2" onclick="setModelMode(this,'2')">M2 &#8212; Din&#226;mico</button>
-          <button class="mtbtn" data-m="diff" onclick="setModelMode(this,'diff')">&#916; Diferen&#231;a</button>
-        </div>
-        <div class="pc">
-          <h4>Predi&#231;&#227;o 2026 &#8212; IC 95% <span id="m-region" style="font-weight:400;color:var(--text2);text-transform:none;font-size:.61rem">Brasil &middot; Presidente</span></h4>
-          <div id="m-cands"><div class="mrp-empty">Selecione UF ou candidato</div></div>
-          <div style="font-size:.59rem;color:var(--text3);margin-top:5px;line-height:1.6">
-            PyMC MCMC &middot; 4 chains &#215; 2.000 amostras &middot; 14 features estruturais<br>
-            Barra = IC 95% &middot; Ponto = mediana posterior
-          </div>
-        </div>
-        <div class="pc">
-          <h4>Tracking &#8212; Pesquisa + Modelo</h4>
-          <canvas id="chart-tracking" height="110"></canvas>
         </div>
         <div class="pc">
           <h4>Resultado <span style="font-weight:400;color:var(--text2);text-transform:none;font-size:.61rem" id="ms-context"></span></h4>
@@ -736,19 +750,72 @@ html,body{font-size:13px}
           <div class="krow"><span class="klbl">Total votos</span><span class="kv" id="ms-total">&#8212;</span></div>
         </div>
         <div class="pc">
-          <h4>Status M1/M2</h4>
-          <div style="font-size:.69rem;line-height:1.9">
-            <div><span id="ms-m1-icon" style="color:var(--text3)">&#9675;</span> M1 &#8212; <strong id="ms-m1-txt" style="color:var(--text3)">aguardando</strong></div>
-            <div><span id="ms-m2-icon" style="color:var(--text3)">&#9675;</span> M2 &#8212; <strong id="ms-m2-txt" style="color:var(--text3)">pendente polls</strong></div>
-          </div>
+          <h4>Distribui&#231;&#227;o por Munic&#237;pio <span class="tag tse">top 10</span></h4>
+          <div id="dist-municipios-rows"><div class="mrp-empty">&#8592; Selecione UF no mapa</div></div>
         </div>
         <div class="pc">
-          <div style="display:flex;gap:6px;flex-wrap:wrap">
-            <button class="btn-pdf" style="flex:1;padding:5px;font-size:.7rem" onclick="gerarRelatorioPDF()">&#128196; Relat&#243;rio PDF</button>
+          <h4>Cobertura Territorial</h4>
+          <div id="cov-score-display" style="text-align:center;padding:8px 0">
+            <div style="font-size:2rem;font-weight:800;color:var(--green2)" id="cov-pct">&#8212;</div>
+            <div style="font-size:.62rem;color:var(--text3)" id="cov-label">munic&#237;pios com presen&#231;a relevante</div>
+            <div style="height:6px;background:var(--bg4);border-radius:3px;margin-top:8px">
+              <div id="cov-bar" style="height:100%;background:var(--green);border-radius:3px;width:0%;transition:width .6s"></div>
+            </div>
+          </div>
+          <div class="krow"><span class="klbl">Munic. &gt;10% votos</span><span class="kv g" id="cov-forte">&#8212;</span></div>
+          <div class="krow"><span class="klbl">Munic. 5&#8211;10%</span><span class="kv y" id="cov-medio">&#8212;</span></div>
+          <div class="krow"><span class="klbl">Munic. &lt;5%</span><span class="kv r" id="cov-fraco">&#8212;</span></div>
+        </div>
+        <div class="pc">
+          <div style="font-size:.63rem;color:var(--text3)">Regi&#227;o selecionada</div>
+          <div style="font-size:.95rem;font-weight:700" id="mrp-uf-label">&#8592; Clique no mapa</div>
+          <span class="tag tse" id="mrp-uf-badge" style="display:none"></span>
+        </div>
+        <div class="pc">
+          <h4>Socioecon&#244;mico <span class="tag ibge">IBGE</span></h4>
+          <div class="krow"><span class="klbl">IDH Municipal</span><span class="kv b" id="c-idh">&#8212;</span></div>
+          <div class="krow"><span class="klbl">Renda per capita</span><span class="kv" id="c-renda">&#8212;</span></div>
+          <div class="krow"><span class="klbl">&#205;ndice Gini</span><span class="kv" id="c-gini">&#8212;</span></div>
+          <div class="krow"><span class="klbl">Analfabetismo</span><span class="kv r" id="c-analf">&#8212;</span></div>
+          <div class="krow"><span class="klbl">Popula&#231;&#227;o</span><span class="kv" id="c-pop">&#8212;</span></div>
+        </div>
+        <div class="pc">
+          <h4>Transfer&#234;ncias <span class="tag ibge">CadÚnico</span></h4>
+          <div class="krow"><span class="klbl">% fam&#237;lias BF</span><span class="kv y" id="c-bf">&#8212;</span></div>
+          <div class="krow"><span class="klbl">Fam&#237;lias BF</span><span class="kv" id="c-fbf">&#8212;</span></div>
+        </div>
+        <div class="pc">
+          <h4>Sa&#250;de &amp; Seguran&#231;a</h4>
+          <div class="krow"><span class="klbl">Mort. Infantil /1k</span><span class="kv r" id="c-mi">&#8212;</span></div>
+          <div class="krow"><span class="klbl">Cobertura APS</span><span class="kv g" id="c-aps">&#8212;</span></div>
+          <div class="krow"><span class="klbl">Homic&#237;dio /100k</span><span class="kv r" id="c-hom">&#8212;</span></div>
+          <div class="krow"><span class="klbl">IVS Vulnerab.</span><span class="kv" id="c-ivs">&#8212;</span></div>
+        </div>
+        <div class="pc" style="background:#0a2540;border-color:#1976d2">
+          <h4 style="color:#60a5fa">Predi&#231;&#227;o 2026 &#8212; M1/M2 <span id="m-region" style="font-weight:400;color:var(--text2);text-transform:none;font-size:.61rem">Brasil</span></h4>
+          <div id="m-cands"><div class="mrp-empty">Selecione UF ou candidato</div></div>
+          <div style="font-size:.59rem;color:var(--text3);margin-top:5px;line-height:1.6">IC 95% &middot; mediana posterior PyMC MCMC</div>
+        </div>
+        <div class="pc">
+          <div style="display:flex;gap:6px">
+            <button class="btn-pdf" style="flex:1;padding:5px;font-size:.7rem" onclick="gerarRelatorioPDF()">&#128196; PDF</button>
             <button class="btn-pdf" style="flex:1;padding:5px;font-size:.7rem;color:#22c55e;border-color:#22c55e33" onclick="solicitarParecerAuditor()">&#128269; Auditor</button>
           </div>
         </div>
-        <div style="display:none"><span id="map-stats"></span></div>
+        <!-- compat IDs for existing JS -->
+        <div style="display:none">
+          <span id="map-stats"></span>
+          <span id="ctx-sub"></span>
+          <span id="c-urb"></span><span id="c-plano"></span>
+          <span id="c-vbf"></span>
+          <span id="c-w"></span><span id="c-p1"></span><span id="c-p2"></span><span id="c-cp"></span><span id="c-bn"></span>
+          <span id="c-uf-poll"></span><span id="c-poll-lula"></span><span id="c-poll-bolso"></span><span id="c-poll-inst"></span>
+          <span id="c-sent-lula"></span><span id="c-sent-bolso"></span><span id="c-polar"></span>
+          <span id="c-pcand"></span><span id="c-pprob"></span><span id="c-pic"></span><span id="c-pdelta"></span><span id="c-cluster"></span>
+          <span id="mrp-contexto"></span><span id="mrp-previsao"></span><span id="mrp-pesquisas"></span>
+          <span id="ms-m1-icon"></span><span id="ms-m1-txt"></span><span id="ms-m2-icon"></span><span id="ms-m2-txt"></span>
+          <canvas id="chart-tracking" height="110"></canvas>
+        </div>
       </div>
 
       <!-- PESQUISAS -->
@@ -792,297 +859,227 @@ html,body{font-size:13px}
         </div>
       </div>
 
-      <!-- SOCIAL -->
-      <div class="pbody" id="pt-social">
-        <div class="leg-mini">
-          <div class="leg-mini-title">Mapa &#8212; Sentimento nas Redes <span>&#237;ndice agregado 24h</span></div>
-          <div class="leg-items">
-            <div class="leg-item"><div class="leg-swatch" style="background:#1a9641"></div><div class="leg-text"><b>&gt;+0.5</b><small>Positivo forte</small></div></div>
-            <div class="leg-item"><div class="leg-swatch" style="background:#74c476"></div><div class="leg-text"><b>+0.15 a +0.5</b><small>Positivo</small></div></div>
-            <div class="leg-item"><div class="leg-swatch" style="background:#aaaaaa"></div><div class="leg-text"><b>-0.15 a +0.15</b><small>Neutro / polarizado</small></div></div>
-            <div class="leg-item"><div class="leg-swatch" style="background:#fdae61"></div><div class="leg-text"><b>-0.5 a -0.15</b><small>Negativo</small></div></div>
-            <div class="leg-item"><div class="leg-swatch" style="background:#d7191c"></div><div class="leg-text"><b>&lt;-0.5</b><small>Negativo forte</small></div></div>
-          </div>
-          <div class="leg-source"><strong>Twitter/X + BlueSky + Facebook + YouTube</strong> &middot; BERTimbau fine-tuned &middot; &#250;ltimas 24h</div>
+      <!-- ELEITORADO (Perfil demográfico) -->
+      <div class="pbody" id="pt-eleitorado">
+        <div style="display:flex;align-items:center;gap:8px;padding-bottom:8px;border-bottom:1px solid var(--border)">
+          <span style="font-size:.72rem;font-weight:600;color:var(--text)">Perfil do Eleitorado</span>
+          <span class="tag ibge" id="perfil-uf-label" style="margin-left:auto">SP</span>
+          <select id="perfil-ano-sel" onchange="_loadEleitoradoTab()" style="font-size:.62rem;background:var(--bg3);border:1px solid var(--border);color:var(--text2);padding:2px 4px;border-radius:4px">
+            <option value="2022">2022</option>
+            <option value="2018">2018</option>
+          </select>
         </div>
         <div class="pc">
-          <h4>Sentimento por Plataforma <span class="tag soc">&#916;24h</span></h4>
-          <div id="social-platforms"><div class="mrp-empty">Sem dados configurados</div></div>
-          <div style="font-size:.59rem;color:var(--text3);margin-top:4px">M&#233;todo: BERTimbau fine-tuned &middot; positivo / neutro / negativo</div>
+          <h4>G&#234;nero</h4>
+          <div id="perf-genero"><div class="mrp-empty">Clique em um estado</div></div>
         </div>
         <div class="pc">
-          <h4>Evolu&#231;&#227;o de Sentimento &#8212; 30 dias</h4>
-          <canvas id="chart-sentiment-evo" height="110"></canvas>
-        </div>
-        <div class="pc">
-          <h4>T&#243;picos em Alta <span class="tag soc">&#250;ltimas 6h</span></h4>
-          <div id="social-topics"><div class="mrp-empty">Sem dados dispon&#237;veis</div></div>
-          <div style="font-size:.59rem;color:var(--text3);margin-top:4px">&#128308; viral (&gt;50k) &middot; &#127841; em alta (&gt;10k)</div>
-        </div>
-        <div class="pc">
-          <h4>Polariza&#231;&#227;o por UF</h4>
-          <canvas id="chart-polar" height="90"></canvas>
-          <div style="font-size:.59rem;color:var(--text3);margin-top:4px">&#205;ndice &gt;0.6 = altamente polarizado</div>
-        </div>
-        <div class="pc">
-          <h4>Volume e Qualidade</h4>
-          <div class="krow"><span class="klbl">Men&#231;&#245;es hoje</span><span class="kv b" id="soc-mencoes">&#8212;</span></div>
-          <div class="krow"><span class="klbl">% org&#226;nico estimado</span><span class="kv g" id="soc-organico">&#8212;</span></div>
-          <div class="krow"><span class="klbl">% potenc. pago</span><span class="kv y" id="soc-pago">&#8212;</span></div>
-          <div class="krow"><span class="klbl">Contas suspeitas (bots)</span><span class="kv r" id="soc-bots">&#8212;</span></div>
-          <div class="krow"><span class="klbl">Alcance estimado</span><span class="kv" id="soc-alcance">&#8212;</span></div>
-        </div>
-      </div>
-
-      <!-- CONTEXTO -->
-      <div class="pbody" id="pt-contexto">
-        <div style="padding-bottom:8px;border-bottom:1px solid var(--border);margin-bottom:8px">
-          <div style="font-size:.63rem;color:var(--text3)">Munic&#237;pio / Estado selecionado</div>
-          <div style="font-size:.95rem;font-weight:700" id="mrp-uf-label">&#8592; Clique no mapa</div>
-          <div style="font-size:.65rem;color:var(--text2)" id="ctx-sub">Selecione uma regi&#227;o para ver o contexto completo</div>
-          <span class="tag tse" id="mrp-uf-badge" style="display:none"></span>
-        </div>
-        <div class="pc">
-          <h4>Resultado Eleitoral <span class="tag tse">TSE</span></h4>
-          <div class="krow"><span class="klbl">Vencedor T1</span><span class="kv g" id="c-w">&#8212;</span></div>
-          <div class="krow"><span class="klbl">% votos T1</span><span class="kv" id="c-p1">&#8212;</span></div>
-          <div class="krow"><span class="klbl">% votos T2</span><span class="kv" id="c-p2">&#8212;</span></div>
-          <div class="krow"><span class="klbl">Comparecimento</span><span class="kv" id="c-cp">&#8212;</span></div>
-          <div class="krow"><span class="klbl">Brancos/Nulos</span><span class="kv" id="c-bn">&#8212;</span></div>
-        </div>
-        <div class="pc">
-          <h4>Socioecon&#244;mico <span class="tag ibge">IBGE</span></h4>
-          <div class="krow"><span class="klbl">IDH Municipal</span><span class="kv b" id="c-idh">&#8212;</span></div>
-          <div class="krow"><span class="klbl">Renda per capita</span><span class="kv" id="c-renda">&#8212;</span></div>
-          <div class="krow"><span class="klbl">&#205;ndice Gini</span><span class="kv" id="c-gini">&#8212;</span></div>
-          <div class="krow"><span class="klbl">Analfabetismo</span><span class="kv r" id="c-analf">&#8212;</span></div>
-          <div class="krow"><span class="klbl">% Urbano</span><span class="kv" id="c-urb">&#8212;</span></div>
-          <div class="krow"><span class="klbl">Popula&#231;&#227;o</span><span class="kv" id="c-pop">&#8212;</span></div>
-        </div>
-        <div class="pc">
-          <h4>Transfer&#234;ncias Sociais <span class="tag ibge">CadÚnico</span></h4>
-          <div class="krow"><span class="klbl">% fam&#237;lias BF</span><span class="kv y" id="c-bf">&#8212;</span></div>
-          <div class="krow"><span class="klbl">Fam&#237;lias beneficiadas</span><span class="kv" id="c-fbf">&#8212;</span></div>
-          <div class="krow"><span class="klbl">Valor m&#233;dio BF</span><span class="kv" id="c-vbf">&#8212;</span></div>
-        </div>
-        <div class="pc">
-          <h4>Sa&#250;de <span class="tag ds">DataSUS</span></h4>
-          <div class="krow"><span class="klbl">Mort. Infantil /1k NV</span><span class="kv r" id="c-mi">&#8212;</span></div>
-          <div class="krow"><span class="klbl">Cobertura APS</span><span class="kv g" id="c-aps">&#8212;</span></div>
-          <div class="krow"><span class="klbl">Cobertura plano</span><span class="kv" id="c-plano">&#8212;</span></div>
-        </div>
-        <div class="pc">
-          <h4>Seguran&#231;a</h4>
-          <div class="krow"><span class="klbl">Homic&#237;dio /100k</span><span class="kv r" id="c-hom">&#8212;</span></div>
-          <div class="krow"><span class="klbl">IVS &#8212; Vulnerab. Social</span><span class="kv" id="c-ivs">&#8212;</span></div>
-        </div>
-        <div class="pc">
-          <h4>Pesquisas &#8212; <span id="c-uf-poll">&#8212;</span> <span class="tag poll">&#250;ltima pesquisa</span></h4>
-          <div class="krow"><span class="klbl">Lula (PT)</span><span class="kv g" id="c-poll-lula">&#8212;</span></div>
-          <div class="krow"><span class="klbl">Bolsonaro (PL)</span><span class="kv b" id="c-poll-bolso">&#8212;</span></div>
-          <div class="krow"><span class="klbl">Instituto / Data</span><span class="kv" id="c-poll-inst" style="font-size:.63rem">&#8212;</span></div>
-        </div>
-        <div class="pc">
-          <h4>Sentimento Social <span class="tag soc">&#250;ltimas 24h</span></h4>
-          <div class="krow"><span class="klbl">Sentimento Lula</span><span class="kv g" id="c-sent-lula">&#8212;</span></div>
-          <div class="krow"><span class="klbl">Sentimento Bolsonaro</span><span class="kv b" id="c-sent-bolso">&#8212;</span></div>
-          <div class="krow"><span class="klbl">Polariza&#231;&#227;o</span><span class="kv y" id="c-polar">&#8212;</span></div>
-        </div>
-        <div class="pc" style="background:#0a2540;border-color:#1976d2">
-          <h4 style="color:#60a5fa">Predi&#231;&#227;o 2026 &#8212; M1</h4>
-          <div class="krow"><span class="klbl">Candidato projetado</span><span class="kv g" id="c-pcand">&#8212;</span></div>
-          <div class="krow"><span class="klbl">Probabilidade</span><span class="kv b" id="c-pprob">&#8212;</span></div>
-          <div class="krow"><span class="klbl">IC 95%</span><span class="kv" id="c-pic" style="font-size:.66rem">&#8212;</span></div>
-          <div class="krow"><span class="klbl">&#916; vs 2022</span><span class="kv" id="c-pdelta">&#8212;</span></div>
-          <div class="krow"><span class="klbl">Cluster eleitoral</span><span class="kv p" id="c-cluster">&#8212;</span></div>
-        </div>
-        <!-- compat divs for _loadRightPanel() -->
-        <div id="mrp-contexto" style="display:none"></div>
-        <div id="mrp-previsao" style="display:none"></div>
-        <div id="mrp-pesquisas" style="display:none"></div>
-      </div>
-
-      <!-- SHAP -->
-      <div class="pbody" id="pt-shap">
-        <div style="font-size:.69rem;color:var(--text2);margin-bottom:8px;line-height:1.5">SHAP values: contribui&#231;&#227;o de cada feature para a predi&#231;&#227;o. Positivo = aumenta probabilidade do candidato selecionado.</div>
-        <div class="pc">
-          <h4>SHAP Global &#8212; <span id="shap-cand">&#8212;</span></h4>
-          <div id="shap-global"><div class="mrp-empty">Selecione cargo e UF para ver SHAP</div></div>
-          <div style="margin-top:5px"><span class="tag tse">TSE</span><span class="tag ibge">IBGE</span><span class="tag ibge">CadÚnico</span><span class="tag ds">DataSUS</span></div>
-        </div>
-        <div class="pc" id="shap-local-card" style="display:none">
-          <h4>SHAP Local &#8212; <span id="shap-local-nm">&#8212;</span></h4>
-          <div id="shap-local"></div>
-          <div style="font-size:.58rem;color:var(--text3);margin-top:4px">Desvio SHAP local em rela&#231;&#227;o ao global para este munic&#237;pio</div>
-        </div>
-        <div style="font-size:.61rem;color:var(--text3);line-height:1.5;margin-top:4px">M&#233;todo: TreeSHAP sobre PyMC posterior m&#233;dio &middot; bootstrap 1.000 itera&#231;&#245;es</div>
-      </div>
-
-      <!-- PERFIL DEMOGRÁFICO -->
-      <div class="pbody" id="pt-perfil">
-        <div class="pc">
-          <h4>Perfil do Eleitorado <span id="perfil-uf-label" class="tag ibge">SP</span></h4>
-          <div id="perfil-genero-rows"><div class="mrp-empty">Clique em um estado</div></div>
-        </div>
-        <div class="pc">
-          <h4>Faixa Etária</h4>
-          <div id="perfil-faixa-rows"><div class="mrp-empty">—</div></div>
+          <h4>Faixa Et&#225;ria</h4>
+          <div id="perf-faixa"><div class="mrp-empty">&#8212;</div></div>
         </div>
         <div class="pc">
           <h4>Escolaridade</h4>
-          <div id="perfil-esc-rows"><div class="mrp-empty">—</div></div>
+          <div id="perf-esc"><div class="mrp-empty">&#8212;</div></div>
         </div>
-        <div class="leg-source">TSE &middot; Cadastro de eleitores &middot; Atualizado anualmente</div>
+        <div class="pc">
+          <h4>Estado Civil</h4>
+          <div id="perf-civil"><div class="mrp-empty">&#8212;</div></div>
+        </div>
+        <div class="leg-source">TSE &middot; Cadastro de Eleitores &middot; Atualizado anualmente</div>
+        <!-- compat IDs -->
+        <div style="display:none">
+          <div id="perfil-genero-rows"></div>
+          <div id="perfil-faixa-rows"></div>
+          <div id="perfil-esc-rows"></div>
+        </div>
       </div>
 
-      <!-- HISTÓRICO PARTIDÁRIO -->
-      <div class="pbody" id="pt-partidos">
-        <div class="pc">
-          <h4>Partido <span id="part-label" class="tag tse">PT</span></h4>
-          <div style="display:flex;gap:5px;margin-bottom:8px;flex-wrap:wrap" id="part-btns">
-            <button class="lbtn active" style="padding:2px 8px;font-size:.64rem" onclick="selectPartido(this,'PT')">PT</button>
-            <button class="lbtn" style="padding:2px 8px;font-size:.64rem" onclick="selectPartido(this,'PL')">PL</button>
-            <button class="lbtn" style="padding:2px 8px;font-size:.64rem" onclick="selectPartido(this,'MDB')">MDB</button>
-            <button class="lbtn" style="padding:2px 8px;font-size:.64rem" onclick="selectPartido(this,'PSDB')">PSDB</button>
-            <button class="lbtn" style="padding:2px 8px;font-size:.64rem" onclick="selectPartido(this,'PSD')">PSD</button>
-            <button class="lbtn" style="padding:2px 8px;font-size:.64rem" onclick="selectPartido(this,'UNIÃO')">UNIÃO</button>
+      <!-- DIGITAL (Social + Meta + Trends + GDELT) -->
+      <div class="pbody" id="pt-digital" style="padding:0;display:flex;flex-direction:column">
+        <div class="inner-tab-strip">
+          <button class="inner-tab active" data-itab="dig-social" onclick="_digSwitch(this,'dig-social')">&#128101; Social</button>
+          <button class="inner-tab" data-itab="dig-meta" onclick="_digSwitch(this,'dig-meta')">Meta Ads</button>
+          <button class="inner-tab" data-itab="dig-trends" onclick="_digSwitch(this,'dig-trends')">Trends</button>
+          <button class="inner-tab" data-itab="dig-gdelt" onclick="_digSwitch(this,'dig-gdelt')">GDELT</button>
+        </div>
+
+        <div class="inner-body" id="dig-social" style="overflow-y:auto;flex:1;padding:8px 10px">
+          <div class="leg-mini">
+            <div class="leg-mini-title">Sentimento nas Redes <span>&#237;ndice agregado</span></div>
+            <div class="leg-items">
+              <div class="leg-item"><div class="leg-swatch" style="background:#1a9641"></div><div class="leg-text"><b>&gt;+0.5</b><small>Positivo forte</small></div></div>
+              <div class="leg-item"><div class="leg-swatch" style="background:#aaaaaa"></div><div class="leg-text"><b>~0</b><small>Neutro</small></div></div>
+              <div class="leg-item"><div class="leg-swatch" style="background:#d7191c"></div><div class="leg-text"><b>&lt;-0.5</b><small>Negativo forte</small></div></div>
+            </div>
+          </div>
+          <div class="pc">
+            <h4>Sentimento por Plataforma <span class="tag soc">&#916;24h</span></h4>
+            <div id="social-platforms"><div class="mrp-empty">Sem dados configurados</div></div>
+          </div>
+          <div class="pc">
+            <h4>Evolu&#231;&#227;o &#8212; 30 dias</h4>
+            <canvas id="chart-sentiment-evo" height="110"></canvas>
+          </div>
+          <div class="pc">
+            <h4>T&#243;picos em Alta <span class="tag soc">6h</span></h4>
+            <div id="social-topics"><div class="mrp-empty">Sem dados dispon&#237;veis</div></div>
+          </div>
+          <div class="pc">
+            <h4>Polariza&#231;&#227;o por UF</h4>
+            <canvas id="chart-polar" height="90"></canvas>
+          </div>
+          <div class="pc">
+            <h4>Volume</h4>
+            <div class="krow"><span class="klbl">Men&#231;&#245;es hoje</span><span class="kv b" id="soc-mencoes">&#8212;</span></div>
+            <div class="krow"><span class="klbl">% org&#226;nico</span><span class="kv g" id="soc-organico">&#8212;</span></div>
+            <div class="krow"><span class="klbl">% pago</span><span class="kv y" id="soc-pago">&#8212;</span></div>
+            <div class="krow"><span class="klbl">Bots detectados</span><span class="kv r" id="soc-bots">&#8212;</span></div>
+            <div class="krow"><span class="klbl">Alcance estimado</span><span class="kv" id="soc-alcance">&#8212;</span></div>
           </div>
         </div>
-        <div class="pc">
-          <h4>Candidaturas &amp; Eleitos por Eleição</h4>
-          <div id="part-hist-rows"><div class="mrp-empty">Selecione um partido</div></div>
+
+        <div class="inner-body" id="dig-meta" style="display:none;overflow-y:auto;flex:1;padding:8px 10px">
+          <div class="pc">
+            <h4>Meta Ad Library <span class="tag soc">Facebook &amp; Instagram</span></h4>
+            <div id="meta-chart-area">
+              <canvas id="chart-meta-spend" height="100"></canvas>
+            </div>
+          </div>
+          <div class="pc">
+            <h4>Gasto por Candidato <span id="meta-uf-label-dig" class="tag tse">SP</span></h4>
+            <div id="meta-cands"><div class="mrp-empty">Carregando...</div></div>
+          </div>
+          <div class="pc">
+            <h4>Demogr&#225;fico dos An&#250;ncios</h4>
+            <div id="meta-demo"><div class="mrp-empty">&#8212;</div></div>
+          </div>
         </div>
-        <div class="pc">
-          <h4>Total de Votos</h4>
-          <canvas id="chart-partidos" height="100"></canvas>
+
+        <div class="inner-body" id="dig-trends" style="display:none;overflow-y:auto;flex:1;padding:8px 10px">
+          <div class="pc">
+            <h4>Google Trends <span class="tag ibge">interesse de busca</span></h4>
+            <canvas id="chart-trends-line" height="100"></canvas>
+            <div style="font-size:.59rem;color:var(--text3);margin-top:4px">Interesse relativo 0&#8211;100 por semana &middot; pytrends</div>
+          </div>
+          <div class="pc">
+            <h4>Por Estado</h4>
+            <div id="trends-uf-rows"><div class="mrp-empty">Clique em um estado</div></div>
+          </div>
         </div>
-        <div class="leg-source">TSE Gold &middot; fact_municipio_candidato_eleicao &middot; 2018/2022</div>
+
+        <div class="inner-body" id="dig-gdelt" style="display:none;overflow-y:auto;flex:1;padding:8px 10px">
+          <div class="pc">
+            <h4>Eventos GDELT <span id="gdelt-uf-label" class="tag ibge">Brasil</span></h4>
+            <div id="gdelt-rows"><div class="mrp-empty">Carregando eventos...</div></div>
+          </div>
+          <div class="pc">
+            <h4>Intensidade Semanal</h4>
+            <canvas id="chart-gdelt" height="90"></canvas>
+          </div>
+          <div class="leg-source">GDELT 2.0 &middot; Cobertura internacional &middot; Atualiza&#231;&#227;o di&#225;ria</div>
+        </div>
       </div>
 
-      <!-- CALENDÁRIO TSE 2026 -->
-      <div class="pbody" id="pt-calendario">
-        <div class="pc">
-          <h4>Calendário Eleitoral 2026 <span class="tag tse">TSE</span></h4>
-          <div id="cal-countdown" style="text-align:center;padding:8px 0;margin-bottom:6px">
-            <div style="font-size:1.6rem;font-weight:800;color:var(--orange)" id="cal-days">—</div>
-            <div style="font-size:.65rem;color:var(--text2)">dias até o 1º Turno</div>
+      <!-- ESTRATEGIA (Partidos + Alianças + Adversários + Meta Votos + SHAP) -->
+      <div class="pbody" id="pt-estrategia" style="padding:0;display:flex;flex-direction:column">
+        <div class="inner-tab-strip">
+          <button class="inner-tab active" data-itab="est-partidos" onclick="_estSwitch(this,'est-partidos')">Partidos</button>
+          <button class="inner-tab" data-itab="est-aliancas" onclick="_estSwitch(this,'est-aliancas')">Alian&#231;as</button>
+          <button class="inner-tab" data-itab="est-adv" onclick="_estSwitch(this,'est-adv')">Advers&#225;rios</button>
+          <button class="inner-tab" data-itab="est-meta" onclick="_estSwitch(this,'est-meta')">Meta Votos</button>
+          <button class="inner-tab" data-itab="est-shap" onclick="_estSwitch(this,'est-shap')">SHAP</button>
+        </div>
+
+        <div class="inner-body" id="est-partidos" style="overflow-y:auto;flex:1;padding:8px 10px">
+          <div class="pc">
+            <h4>Desempenho Hist&#243;rico <span id="part-label" class="tag tse">PT</span></h4>
+            <div style="display:flex;gap:5px;margin-bottom:8px;flex-wrap:wrap" id="part-btns">
+              <button class="lbtn active" style="padding:2px 8px;font-size:.64rem" onclick="selectPartido(this,'PT')">PT</button>
+              <button class="lbtn" style="padding:2px 8px;font-size:.64rem" onclick="selectPartido(this,'PL')">PL</button>
+              <button class="lbtn" style="padding:2px 8px;font-size:.64rem" onclick="selectPartido(this,'MDB')">MDB</button>
+              <button class="lbtn" style="padding:2px 8px;font-size:.64rem" onclick="selectPartido(this,'PSDB')">PSDB</button>
+              <button class="lbtn" style="padding:2px 8px;font-size:.64rem" onclick="selectPartido(this,'PSD')">PSD</button>
+              <button class="lbtn" style="padding:2px 8px;font-size:.64rem" onclick="selectPartido(this,'UNI&#195;O')">UNI&#195;O</button>
+            </div>
+            <div id="part-hist-rows"><div class="mrp-empty">Selecione um partido</div></div>
           </div>
+          <div class="pc">
+            <h4>Votos por Elei&#231;&#227;o</h4>
+            <canvas id="chart-partidos" height="100"></canvas>
+          </div>
+          <div class="leg-source">TSE Gold &middot; fact_municipio_candidato_eleicao &middot; 2018/2022</div>
+        </div>
+
+        <div class="inner-body" id="est-aliancas" style="display:none;overflow-y:auto;flex:1;padding:8px 10px">
+          <div class="pc">
+            <h4>Alian&#231;as Hist&#243;ricas <span id="ali-cargo-label" class="tag tse">Presidente</span></h4>
+            <div id="ali-rows"><div class="mrp-empty">Selecione UF e cargo</div></div>
+          </div>
+          <div class="pc">
+            <h4>Coliga&#231;&#227;o Projetada 2026</h4>
+            <div id="ali-proj"><div class="mrp-empty">Carregando proje&#231;&#227;o...</div></div>
+          </div>
+          <div class="pc">
+            <h4>Oportunidades de Coaliz&#227;o <span id="parc-label" class="tag ibge">SP</span></h4>
+            <div id="parc-rows"><div class="mrp-empty">Analisando munic&#237;pios...</div></div>
+            <canvas id="chart-parcerias" height="100" style="margin-top:6px"></canvas>
+          </div>
+          <div class="leg-source">TSE &middot; fact_municipio_candidato_eleicao &middot; 2018+2022</div>
+        </div>
+
+        <div class="inner-body" id="est-adv" style="display:none;overflow-y:auto;flex:1;padding:8px 10px">
+          <div class="pc">
+            <h4>Top Advers&#225;rios <span id="adv-uf-label" class="tag tse">SP</span></h4>
+            <div id="adv-rows"><div class="mrp-empty">Clique em um estado</div></div>
+          </div>
+          <div class="pc">
+            <h4>An&#225;lise de Vulnerabilidade</h4>
+            <div class="krow"><span class="klbl">Munic. em risco</span><span class="kv r" id="adv-risco">&#8212;</span></div>
+            <div class="krow"><span class="klbl">Munic. seguros</span><span class="kv g" id="adv-seg">&#8212;</span></div>
+            <div class="krow"><span class="klbl">Margem m&#233;dia</span><span class="kv" id="adv-margem">&#8212;</span></div>
+          </div>
+          <div class="leg-source">TSE &middot; fact_municipio_candidato_eleicao &middot; 2022</div>
+        </div>
+
+        <div class="inner-body" id="est-meta" style="display:none;overflow-y:auto;flex:1;padding:8px 10px">
+          <div class="pc">
+            <h4>Meta de Votos 2026 <span id="meta-uf-label" class="tag tse">SP</span></h4>
+            <div class="krow"><span class="klbl">Votos em 2022</span><span class="kv" id="meta-votos22">&#8212;</span></div>
+            <div class="krow"><span class="klbl">Crescimento eleitorado</span><span class="kv g" id="meta-crescimento">+4.2%</span></div>
+            <div class="krow"><span class="klbl">Meta 2026 (vit&#243;ria)</span><span class="kv b" id="meta-alvo">&#8212;</span></div>
+            <div class="krow"><span class="klbl">Meta m&#237;nima (2&#186;T)</span><span class="kv y" id="meta-min">&#8212;</span></div>
+          </div>
+          <div class="pc">
+            <h4>Top Munic&#237;pios &#8212; Potencial</h4>
+            <div id="meta-municipios"><div class="mrp-empty">Carregando...</div></div>
+          </div>
+          <div class="pc">
+            <h4>Distribui&#231;&#227;o por Regi&#227;o</h4>
+            <canvas id="chart-meta" height="100"></canvas>
+          </div>
+        </div>
+
+        <div class="inner-body" id="est-shap" style="display:none;overflow-y:auto;flex:1;padding:8px 10px">
+          <div style="font-size:.69rem;color:var(--text2);margin-bottom:8px;line-height:1.5">SHAP: contribui&#231;&#227;o de cada feature para a predi&#231;&#227;o.</div>
+          <div class="pc">
+            <h4>SHAP Global &#8212; <span id="shap-cand">&#8212;</span></h4>
+            <div id="shap-global"><div class="mrp-empty">Selecione cargo e UF</div></div>
+          </div>
+          <div class="pc" id="shap-local-card" style="display:none">
+            <h4>SHAP Local &#8212; <span id="shap-local-nm">&#8212;</span></h4>
+            <div id="shap-local"></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- AGENDA (Calendário) -->
+      <div class="pbody" id="pt-agenda">
+        <div class="pc" style="text-align:center">
+          <div style="font-size:.62rem;color:var(--text3);margin-bottom:4px">dias at&#233; o 1&#186; Turno das Elei&#231;&#245;es 2026</div>
+          <div style="font-size:2.4rem;font-weight:900;color:var(--orange);line-height:1" id="cal-days">&#8212;</div>
+          <div style="font-size:.6rem;color:var(--text3);margin-top:4px">04 de outubro de 2026</div>
         </div>
         <div id="cal-items"></div>
-      </div>
-
-      <!-- ALIANÇAS HISTÓRICAS -->
-      <div class="pbody" id="pt-aliancas">
-        <div class="pc">
-          <h4>Alianças Históricas <span id="ali-cargo-label" class="tag tse">Presidente</span></h4>
-          <div style="font-size:.62rem;color:var(--text2);margin-bottom:8px">
-            Partidos que coligaram com o partido selecionado em eleições passadas (2018/2022).
-          </div>
-          <div id="ali-rows"><div class="mrp-empty">Selecione UF e cargo</div></div>
-        </div>
-        <div class="pc">
-          <h4>Coligação Projetada 2026</h4>
-          <div id="ali-proj"><div class="mrp-empty">Carregando projeção...</div></div>
-        </div>
-        <div class="leg-source">TSE · fact_municipio_candidato_eleicao · Coligações 2018+2022</div>
-      </div>
-
-      <!-- MAPEAMENTO DE ADVERSÁRIOS -->
-      <div class="pbody" id="pt-adversarios">
-        <div class="pc">
-          <h4>Top Adversários <span id="adv-uf-label" class="tag tse">SP</span></h4>
-          <div style="font-size:.62rem;color:var(--text2);margin-bottom:8px">
-            Candidatos que disputaram o mesmo cargo nas eleições anteriores.
-          </div>
-          <div id="adv-rows"><div class="mrp-empty">Clique em um estado</div></div>
-        </div>
-        <div class="pc">
-          <h4>Análise de Vulnerabilidade</h4>
-          <div class="krow"><span class="klbl">Municípios em risco</span><span class="kv r" id="adv-risco">—</span></div>
-          <div class="krow"><span class="klbl">Municípios seguros</span><span class="kv g" id="adv-seg">—</span></div>
-          <div class="krow"><span class="klbl">Margem média de vitória</span><span class="kv" id="adv-margem">—</span></div>
-        </div>
-        <div class="leg-source">TSE · fact_municipio_candidato_eleicao · 2022</div>
-      </div>
-
-      <!-- OPORTUNIDADES DE PARCERIAS -->
-      <div class="pbody" id="pt-parcerias">
-        <div class="pc">
-          <h4>Oportunidades de Coalizão <span id="parc-label" class="tag ibge">SP</span></h4>
-          <div style="font-size:.62rem;color:var(--text2);margin-bottom:8px">
-            Municípios onde A + B somam mais de 50% — alvo ideal para negociação de apoio.
-          </div>
-          <div id="parc-rows"><div class="mrp-empty">Analisando municípios...</div></div>
-        </div>
-        <div class="pc">
-          <h4>Score de Oportunidade por UF</h4>
-          <canvas id="chart-parcerias" height="100"></canvas>
-          <div style="font-size:.59rem;color:var(--text3);margin-top:4px">Score = % municípios com potencial de coalizão acima de 50%</div>
-        </div>
-        <div class="leg-source">TSE · fact_municipio_candidato_eleicao · 2022 + modelo M1</div>
-      </div>
-
-      <!-- META DE VOTOS -->
-      <div class="pbody" id="pt-meta">
-        <div class="pc">
-          <h4>Meta de Votos 2026 <span id="meta-uf-label" class="tag tse">SP</span></h4>
-          <div style="font-size:.62rem;color:var(--text2);margin-bottom:8px">
-            Projeção de votos necessários para vitória com base em 2022 + crescimento estimado do eleitorado.
-          </div>
-          <div class="krow"><span class="klbl">Votos em 2022</span><span class="kv" id="meta-votos22">—</span></div>
-          <div class="krow"><span class="klbl">Crescimento eleitorado</span><span class="kv g" id="meta-crescimento">+4.2%</span></div>
-          <div class="krow"><span class="klbl">Meta 2026 (vitória)</span><span class="kv b" id="meta-alvo">—</span></div>
-          <div class="krow"><span class="klbl">Meta mínima (2º turno)</span><span class="kv y" id="meta-min">—</span></div>
-        </div>
-        <div class="pc">
-          <h4>Top Municípios — Potencial de Votos</h4>
-          <div id="meta-municipios"><div class="mrp-empty">Carregando...</div></div>
-        </div>
-        <div class="pc">
-          <h4>Distribuição de Metas por Região</h4>
-          <canvas id="chart-meta" height="100"></canvas>
-        </div>
-        <div class="leg-source">TSE 2022 · fact_municipio_candidato_eleicao · IBGE estimativa eleitorado</div>
-      </div>
-
-      <!-- GDELT CLIPPING -->
-      <div class="pbody" id="pt-gdelt">
-        <div class="pc">
-          <h4>Eventos GDELT <span id="gdelt-uf-label" class="tag ibge">Brasil</span></h4>
-          <div style="font-size:.62rem;color:var(--text2);margin-bottom:8px">
-            Eventos políticos de repercussão internacional indexados pelo GDELT — impacto potencial no eleitorado.
-          </div>
-          <div id="gdelt-rows"><div class="mrp-empty">Carregando eventos...</div></div>
-        </div>
-        <div class="pc">
-          <h4>Intensidade Semanal <span style="font-size:.6rem;font-weight:400;color:var(--text3)">nº eventos / semana</span></h4>
-          <canvas id="chart-gdelt" height="90"></canvas>
-        </div>
-        <div class="leg-source">GDELT 2.0 · Cobertura internacional · Atualização diária</div>
-      </div>
-
-      <!-- SEÇÕES ELEITORAIS (Stub Fase 2) -->
-      <div class="pbody" id="pt-secoes">
-        <div class="pc">
-          <h4>Seções Eleitorais <span class="tag tse">Fase 2</span></h4>
-          <div style="font-size:.72rem;line-height:1.7;color:var(--text2);padding:8px 0">
-            O mapa por seção eleitoral exigirá a geolocalização de <strong>~500 mil seções</strong>
-            do TSE com coordenadas lat/lng por local de votação.<br><br>
-            <strong>Pipeline planejado:</strong><br>
-            1. TSE → seções_votacao_job (endereços) → Bronze<br>
-            2. Geocoding via Google Maps API → Silver<br>
-            3. Gold: fact_secao_eleitoral (lat, lng, qt_eleitores, resultado)<br>
-            4. Frontend: Leaflet clusters por zoom level
-          </div>
-        </div>
-        <div class="pc">
-          <h4>Status de Implementação</h4>
-          <div class="krow"><span class="klbl">Seções cadastradas (TSE)</span><span class="kv">~497.000</span></div>
-          <div class="krow"><span class="klbl">Com endereço completo</span><span class="kv y">~78%</span></div>
-          <div class="krow"><span class="klbl">Geocodificadas</span><span class="kv r">0%</span></div>
-          <div class="krow"><span class="klbl">Estimativa Fase 2</span><span class="kv b">~2026-Q3</span></div>
-        </div>
-        <div class="leg-source">TSE · Endereços de seções eleitorais · Geocoding planejado para Fase 2</div>
       </div>
 
       <!-- FONTES DE DADOS -->
@@ -2363,7 +2360,7 @@ function handleMapClick(cod, nome) {
   if(d) _updateStats(d);
   const uf = (d?.id?.length === 2 ? d.id : null) || _mapCtx.uf || null;
   if(uf) {
-    ptSwitch('contexto');
+    ptSwitch('analise');
     _loadRightPanel(uf);
   }
 }
@@ -3787,21 +3784,183 @@ function setModelMode(btn, mode) {
 function ptSwitch(tab) {
   document.querySelectorAll('.ptab').forEach(t => t.classList.toggle('active', t.dataset.tab === tab));
   document.querySelectorAll('.pbody').forEach(b => {
-    b.style.display = b.id === 'pt-' + tab ? (tab === 'chat' ? 'flex' : 'block') : 'none';
-    b.classList.toggle('active', b.id === 'pt-' + tab);
+    const on = b.id === 'pt-' + tab;
+    // chat, digital, estrategia use flex layout for inner-tab strip + body
+    const flexTabs = ['chat', 'digital', 'estrategia'];
+    b.style.display = on ? (flexTabs.includes(tab) ? 'flex' : 'block') : 'none';
+    b.classList.toggle('active', on);
   });
+  if (tab === 'analise') _loadAnaliseTab();
   if (tab === 'pesquisas') _loadPesquisasRightPanel();
-  if (tab === 'social') _loadSocialPanel();
-  if (tab === 'shap') _loadShapPanel();
-  if (tab === 'perfil') _loadPerfilTab();
-  if (tab === 'partidos') _loadPartidosTab();
-  if (tab === 'calendario') _renderCalendario();
-  if (tab === 'aliancas') _loadAliancasTab();
-  if (tab === 'adversarios') _loadAdversariosTab();
-  if (tab === 'parcerias') _loadParceriasTab();
-  if (tab === 'meta') _loadMetaTab();
-  if (tab === 'gdelt') _loadGdeltTab();
+  if (tab === 'digital') _loadDigitalTab();
+  if (tab === 'eleitorado') _loadEleitoradoTab();
+  if (tab === 'estrategia') _loadEstrategiaTab();
+  if (tab === 'agenda') _renderCalendario();
   if (tab === 'fontes') _loadFontesTab();
+}
+
+/* ── Inner-tab switchers ───────────────────────────────────────── */
+function _digSwitch(btn, id) {
+  const body = btn.closest('.pbody');
+  body.querySelectorAll('.inner-tab').forEach(b => b.classList.toggle('active', b.dataset.itab === id));
+  body.querySelectorAll('.inner-body').forEach(d => {
+    d.style.display = d.id === id ? 'flex' : 'none';
+    d.style.flexDirection = 'column';
+  });
+  if (id === 'dig-social') _loadSocialPanel();
+  if (id === 'dig-meta') _loadMetaTab();
+  if (id === 'dig-gdelt') _loadGdeltTab();
+  if (id === 'dig-trends') _loadTrendsTab();
+}
+function _estSwitch(btn, id) {
+  const body = btn.closest('.pbody');
+  body.querySelectorAll('.inner-tab').forEach(b => b.classList.toggle('active', b.dataset.itab === id));
+  body.querySelectorAll('.inner-body').forEach(d => {
+    d.style.display = d.id === id ? 'flex' : 'none';
+    d.style.flexDirection = 'column';
+  });
+  if (id === 'est-partidos') _loadPartidosTab();
+  if (id === 'est-aliancas') { _loadAliancasTab(); _loadParceriasTab(); }
+  if (id === 'est-adv') _loadAdversariosTab();
+  if (id === 'est-shap') _loadShapPanel();
+  if (id === 'est-meta') _loadMetaTab();
+}
+
+/* ── Digital wrapper (loads currently-active inner) ───────────── */
+function _loadDigitalTab() {
+  const active = document.querySelector('#pt-digital .inner-tab.active');
+  const id = active?.dataset?.itab || 'dig-social';
+  if (id === 'dig-social') _loadSocialPanel();
+  if (id === 'dig-meta') _loadMetaTab();
+  if (id === 'dig-gdelt') _loadGdeltTab();
+  if (id === 'dig-trends') _loadTrendsTab();
+}
+
+/* ── Estrategia wrapper ─────────────────────────────────────── */
+function _loadEstrategiaTab() {
+  const active = document.querySelector('#pt-estrategia .inner-tab.active');
+  const id = active?.dataset?.itab || 'est-partidos';
+  if (id === 'est-partidos') _loadPartidosTab();
+  if (id === 'est-aliancas') { _loadAliancasTab(); _loadParceriasTab(); }
+  if (id === 'est-adv') _loadAdversariosTab();
+  if (id === 'est-shap') _loadShapPanel();
+  if (id === 'est-meta') _loadMetaTab();
+}
+
+/* ── Análise tab — coverage + distribution ──────────────────── */
+function _loadAnaliseTab() {
+  const uf = (window._mapCtx && window._mapCtx.uf) || document.getElementById('f-uf')?.value || null;
+  if (!uf || uf === 'BR') return;
+  const cargo = document.getElementById('map-cargo-sel')?.value || document.getElementById('f-cargo')?.value || 'Governador';
+  const ano = parseInt(document.getElementById('f-ano')?.value || 2022);
+  apiFetch(`/api/resultados/${encodeURIComponent(cargo)}?uf=${uf}&ano=${ano}&nivel=municipio`)
+    .then(r => r?.json()).then(data => {
+      if (!data?.features?.length) return;
+      const total = data.features.length;
+      const forte = data.features.filter(f => (f.pct_votos || 0) > 10).length;
+      const medio = data.features.filter(f => (f.pct_votos || 0) > 5 && (f.pct_votos || 0) <= 10).length;
+      const fraco = total - forte - medio;
+      const pct = total > 0 ? Math.round(((forte + medio) / total) * 100) : 0;
+      const $ = id => document.getElementById(id);
+      if ($('cov-pct')) $('cov-pct').textContent = pct + '%';
+      if ($('cov-bar')) $('cov-bar').style.width = pct + '%';
+      if ($('cov-label')) $('cov-label').textContent = `cobertura em ${uf} (${forte + medio}/${total} munic.)`;
+      if ($('cov-forte')) $('cov-forte').textContent = forte;
+      if ($('cov-medio')) $('cov-medio').textContent = medio;
+      if ($('cov-fraco')) $('cov-fraco').textContent = fraco;
+      const sorted = [...data.features].sort((a, b) => (b.pct_votos || 0) - (a.pct_votos || 0)).slice(0, 10);
+      const max = sorted[0]?.pct_votos || 1;
+      const rowsEl = $('dist-municipios-rows');
+      if (rowsEl) rowsEl.innerHTML = sorted.map(f => `
+        <div class="dist-row">
+          <span class="dist-nm" title="${f.nm_municipio || f.id}">${f.nm_municipio || f.id || '—'}</span>
+          <div class="dist-track"><div class="dist-fill" style="width:${Math.round(((f.pct_votos || 0) / max) * 100)}%"></div></div>
+          <span class="dist-pct">${(f.pct_votos || 0).toFixed(1)}%</span>
+        </div>`).join('');
+    }).catch(() => {});
+}
+
+/* ── Eleitorado — perfil demográfico ─────────────────────────── */
+function _renderBarRows(containerId, rows, fillClass = '') {
+  const el = document.getElementById(containerId);
+  if (!el) return;
+  if (!rows?.length) { el.innerHTML = '<div class="mrp-empty">Sem dados</div>'; return; }
+  const max = Math.max(...rows.map(r => r.pct || 0), 1);
+  el.innerHTML = rows.map(r => `
+    <div class="bar-row">
+      <span class="bar-label" title="${r.label}">${r.label}</span>
+      <div class="bar-track"><div class="bar-fill ${fillClass}" style="width:${Math.round((r.pct / max) * 100)}%"></div></div>
+      <span class="bar-pct">${(r.pct || 0).toFixed(1)}%</span>
+      ${r.abs != null ? `<span class="bar-abs">${Number(r.abs).toLocaleString('pt-BR')}</span>` : ''}
+    </div>`).join('');
+}
+
+async function _loadEleitoradoTab() {
+  const uf = (window._mapCtx && window._mapCtx.uf) || document.getElementById('f-uf')?.value || 'SP';
+  const ano = document.getElementById('perfil-ano-sel')?.value || 2022;
+  const lbl = document.getElementById('perfil-uf-label');
+  if (lbl) lbl.textContent = uf;
+  try {
+    let r = await apiFetch(`/api/perfil?uf=${uf}&ano=${ano}`);
+    if (!r?.ok) r = await apiFetch(`/api/perfis?uf=${uf}`);
+    if (!r?.ok) throw new Error();
+    const d = await r.json();
+    const mk = arr => (arr || []).map(x => ({
+      label: x.categoria || x.label || '?',
+      pct: +(x.pct ?? x.percentual ?? 0),
+      abs: x.qt_eleitores || x.qtd || null
+    }));
+    _renderBarRows('perf-genero', mk(d.genero), 'bar-alt');
+    _renderBarRows('perf-faixa', mk(d.faixa_etaria));
+    _renderBarRows('perf-esc', mk(d.escolaridade), 'bar-green');
+    _renderBarRows('perf-civil', mk(d.estado_civil), 'bar-orange');
+  } catch (e) {
+    ['perf-genero', 'perf-faixa', 'perf-esc', 'perf-civil'].forEach(id => {
+      const el = document.getElementById(id);
+      if (el) el.innerHTML = '<div class="mrp-empty">Sem dados para ' + uf + '</div>';
+    });
+  }
+}
+
+/* ── Trends (Google Trends) ─────────────────────────────────── */
+async function _loadTrendsTab() {
+  try {
+    const cargo = document.getElementById('map-cargo-sel')?.value || 'Governador';
+    const r = await apiFetch(`/api/trends?cargo=${encodeURIComponent(cargo)}`);
+    if (!r?.ok) throw new Error();
+    const d = await r.json();
+    const canvas = document.getElementById('chart-trends-line');
+    if (canvas && d.series?.length) {
+      const ctx = canvas.getContext('2d');
+      if (window._chartTrends) window._chartTrends.destroy();
+      window._chartTrends = new Chart(ctx, {
+        type: 'line',
+        data: {
+          labels: d.series[0]?.data?.map(p => p.week) || [],
+          datasets: d.series.map((s, i) => ({
+            label: s.candidato,
+            data: s.data.map(p => p.value),
+            borderColor: ['#60a5fa', '#f97316', '#22c55e', '#a855f7'][i % 4],
+            tension: .3, fill: false, pointRadius: 2,
+          }))
+        },
+        options: {
+          responsive: true, maintainAspectRatio: false,
+          plugins: { legend: { labels: { color: '#94a3b8', font: { size: 10 } } } },
+          scales: { x: { display: false }, y: { ticks: { color: '#64748b', font: { size: 10 } } } }
+        }
+      });
+    }
+    const rowsEl = document.getElementById('trends-uf-rows');
+    if (rowsEl && d.by_uf?.length) {
+      rowsEl.innerHTML = d.by_uf.slice(0, 10).map(u =>
+        `<div class="krow"><span class="klbl">${u.sg_uf}</span><span class="kv">${(u.interesse_medio || 0).toFixed(0)}</span></div>`
+      ).join('');
+    }
+  } catch (e) {
+    const rowsEl = document.getElementById('trends-uf-rows');
+    if (rowsEl) rowsEl.innerHTML = '<div class="mrp-empty">Trends indispon&iacute;vel</div>';
+  }
 }
 
 function _loadPesquisasRightPanel() {
@@ -4037,18 +4196,43 @@ const _TSE_CALENDARIO_2026 = [
 ];
 
 function _renderCalendario() {
+  const items = [
+    { date: '2026-03-05', end: '2026-04-03', label: 'Janela partid&aacute;ria', desc: 'Parlamentares podem trocar de partido sem perder mandato.' },
+    { date: '2026-04-04', label: 'Domic&iacute;lio eleitoral e filia&ccedil;&atilde;o', desc: 'Prazo final para domic&iacute;lio eleitoral e filia&ccedil;&atilde;o partid&aacute;ria. Desincompatibiliza&ccedil;&atilde;o de cargos.' },
+    { date: '2026-05-06', label: 'Alistamento eleitoral', desc: 'Prazo final para t&iacute;tulo, transfer&ecirc;ncia e revis&atilde;o do cadastro.' },
+    { date: '2026-05-15', label: 'Arrecada&ccedil;&atilde;o pr&eacute;via', desc: 'In&iacute;cio do financiamento coletivo para pr&eacute;-candidatos.' },
+    { date: '2026-06-16', label: 'Fundo Eleitoral (FEFC)', desc: 'TSE divulga montante dispon&iacute;vel.' },
+    { date: '2026-06-30', label: 'Veda&ccedil;&atilde;o de programas', desc: 'Emissoras n&atilde;o podem transmitir programas de pr&eacute;-candidatos.' },
+    { date: '2026-07-04', label: 'Condutas vedadas', desc: 'Nomea&ccedil;&otilde;es, obras p&uacute;blicas e inaugura&ccedil;&otilde;es s&atilde;o vedadas a agentes p&uacute;blicos.' },
+    { date: '2026-07-20', end: '2026-08-05', label: 'Conven&ccedil;&otilde;es partid&aacute;rias', desc: 'Delibera&ccedil;&atilde;o sobre coliga&ccedil;&otilde;es e escolha de candidatos.' },
+    { date: '2026-08-15', label: 'Registro de candidaturas', desc: '&Uacute;ltimo dia para registro na Justi&ccedil;a Eleitoral.' },
+    { date: '2026-08-16', label: 'Propaganda eleitoral', desc: 'In&iacute;cio da propaganda &mdash; internet, alto-falantes, com&iacute;cios.' },
+    { date: '2026-10-04', label: '1&ordm; TURNO', desc: '8h&ndash;17h (hor&aacute;rio de Bras&iacute;lia). Presidente, governadores, senadores, deputados.', highlight: true },
+    { date: '2026-10-25', label: '2&ordm; TURNO', desc: '8h&ndash;17h (hor&aacute;rio de Bras&iacute;lia).', highlight: true },
+    { date: '2026-12-18', label: 'Diploma&ccedil;&atilde;o', desc: '&Uacute;ltimo dia para diploma&ccedil;&atilde;o dos eleitos.' },
+  ];
+  const today = new Date();
   const el = document.getElementById('cal-items');
   if (!el) return;
-  el.innerHTML = _TSE_CALENDARIO_2026.map(ev => `
-    <div class="cal-item">
-      <div class="cal-date">${ev.data}</div>
-      <div>
-        <div class="cal-title">${ev.titulo}</div>
-        <div class="cal-desc">${ev.desc}</div>
-        <span class="cal-tag ${ev.tag}">${{tse:'TSE',reg:'Registro',camp:'Campanha',vote:'Votação'}[ev.tag]||ev.tag}</span>
-      </div>
-    </div>
-  `).join('');
+  const upcoming = items.filter(x => new Date(x.date + 'T12:00:00') >= today);
+  const nextDate = upcoming[0]?.date;
+  const html = items.map(it => {
+    const d = new Date(it.date + 'T12:00:00');
+    const isPast = d < today;
+    const isNext = !isPast && it.date === nextDate;
+    const cls = it.highlight ? 'cal-item' : isPast ? 'cal-item cal-past' : isNext ? 'cal-item cal-next' : 'cal-item';
+    const dateStr = d.toLocaleDateString('pt-BR', { day: '2-digit', month: 'short', year: 'numeric' });
+    const endStr = it.end ? ' &rarr; ' + new Date(it.end + 'T12:00:00').toLocaleDateString('pt-BR', { day: '2-digit', month: 'short' }) : '';
+    return `<div class="${cls}">
+      <div class="cal-date">${dateStr}${endStr}</div>
+      <div class="cal-desc"><strong>${it.label}</strong>${it.desc ? '<br>' + it.desc : ''}</div>
+    </div>`;
+  }).join('');
+  el.innerHTML = '<div class="cal-timeline">' + html + '</div>';
+  const election = new Date('2026-10-04T08:00:00');
+  const diff = Math.ceil((election - today) / 86400000);
+  const dEl = document.getElementById('cal-days');
+  if (dEl) dEl.textContent = diff > 0 ? diff : '0';
 }
 
 // ── Heat Map (Leaflet.heat) ───────────────────────────────────────────────────
