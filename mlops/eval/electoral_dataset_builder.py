@@ -237,6 +237,23 @@ def build_electoral_dataset(
         logger.error("BQ query failed: %s", exc)
         return pd.DataFrame()
 
+    # ── Enrich with dynamic external signals (optional) ──────────────────────
+    try:
+        df = _enrich_dynamic_signals(df, client, project_id)
+    except Exception as exc:
+        logger.warning("Dynamic signal enrichment failed (optional): %s", exc)
+        # Initialize with zeros — model handles missing gracefully
+        for col in [
+            "sentimento_score",
+            "tendencia_busca",
+            "gdelt_intensidade",
+            "gdelt_tom",
+            "reputacao_score",
+            "delta_poll",
+        ]:
+            if col not in df.columns:
+                df[col] = 0.0
+
     if df.empty:
         logger.error("Electoral dataset is empty — check Silver data")
         return df
@@ -293,6 +310,80 @@ def build_electoral_dataset(
             logger.info("Electoral dataset saved → %s", table_id)
         except Exception as exc:
             logger.error("BQ write failed (non-fatal): %s", exc)
+
+    return df
+
+
+def _enrich_dynamic_signals(
+    df: pd.DataFrame, client: bigquery.Client, project_id: str
+) -> pd.DataFrame:
+    """Join electoral dataset with social sentiment, Google Trends, and GDELT signals."""
+    silver = f"{project_id}.spepe_silver"
+    gold = f"{project_id}.spepe_gold"
+
+    # Google Trends — aggregate per (candidato, sg_uf, ano)
+    try:
+        trends_query = f"""
+            SELECT candidato, sg_uf, ano, AVG(interesse_busca_medio) / 100.0 AS tendencia_busca
+            FROM `{gold}.fact_google_trends_uf`
+            GROUP BY candidato, sg_uf, ano
+        """
+        trends_df = client.query(trends_query).to_dataframe()
+        trends_df.columns = [c.lower() for c in trends_df.columns]
+        df = df.merge(
+            trends_df.rename(columns={"ano": "ano_eleicao"}),
+            on=["candidato", "sg_uf", "ano_eleicao"],
+            how="left",
+        )
+    except Exception as exc:
+        logger.debug("Trends join failed: %s", exc)
+        df["tendencia_busca"] = 0.0
+
+    # Social sentiment — avg per (candidato, sg_uf, ano)
+    try:
+        sent_query = f"""
+            SELECT candidato, sg_uf, EXTRACT(YEAR FROM data_referencia) AS ano,
+                   AVG(sentimento_score) AS sentimento_score
+            FROM `{silver}.social_mencoes_br`
+            WHERE candidato IS NOT NULL
+            GROUP BY candidato, sg_uf, ano
+        """
+        sent_df = client.query(sent_query).to_dataframe()
+        sent_df.columns = [c.lower() for c in sent_df.columns]
+        df = df.merge(
+            sent_df.rename(columns={"ano": "ano_eleicao"}),
+            on=["candidato", "sg_uf", "ano_eleicao"],
+            how="left",
+        )
+    except Exception as exc:
+        logger.debug("Sentiment join failed: %s", exc)
+        df["sentimento_score"] = 0.0
+
+    # Fill remaining dynamic cols with 0
+    for col in ["gdelt_intensidade", "gdelt_tom"]:
+        if col not in df.columns:
+            df[col] = 0.0
+
+    # Compute reputacao_score
+    from mlops.shared_schema import compute_reputacao_score
+
+    df["reputacao_score"] = df.apply(
+        lambda r: compute_reputacao_score(
+            float(r.get("sentimento_score", 0) or 0),
+            float(r.get("gdelt_tom", 0) or 0),
+            float(r.get("tendencia_busca", 0) or 0) * 2 - 1,  # [0,1] → [-1,1]
+        ),
+        axis=1,
+    )
+
+    # delta_poll: change in poll intention vs previous available poll (per candidato/UF)
+    if "media_intencao_voto_uf" in df.columns:
+        df_sorted = df.sort_values(["candidato", "sg_uf", "ano_eleicao"])
+        df["delta_poll"] = (
+            df_sorted.groupby(["candidato", "sg_uf"])["media_intencao_voto_uf"].diff().fillna(0.0)
+        )
+    else:
+        df["delta_poll"] = 0.0
 
     return df
 

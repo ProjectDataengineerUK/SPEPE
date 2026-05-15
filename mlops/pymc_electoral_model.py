@@ -37,6 +37,8 @@ import logging
 import numpy as np
 import pandas as pd
 
+from mlops.shared_schema import DYNAMIC_FEATURE_COLS, POLL_DELTA_COL
+
 logger = logging.getLogger("spepe.mlops.pymc_electoral_model")
 
 _TOP_N_CANDIDATES = 10
@@ -79,6 +81,32 @@ def prepare_electoral_features(
         [(df[c].values - train_mean[c]) / (train_std[c] + 1e-6) for c in demo_cols]
     )
 
+    # ── Dynamic external features (optional — zeroed when unavailable) ───────
+    dyn_cols_present = [c for c in DYNAMIC_FEATURE_COLS if c in df.columns]
+
+    if dyn_cols_present:
+        X_dyn_list = []
+        for col in DYNAMIC_FEATURE_COLS:
+            if col in df.columns:
+                vals = df[col].fillna(0.0).values.astype(float)
+            else:
+                vals = np.zeros(len(df))
+            X_dyn_list.append(vals)
+        X_dyn = np.column_stack(X_dyn_list)
+
+        # Add delta_poll
+        delta = (
+            df[POLL_DELTA_COL].fillna(0.0).values.astype(float)
+            if POLL_DELTA_COL in df.columns
+            else np.zeros(len(df))
+        )
+        X_dyn = np.column_stack([X_dyn, delta])
+        X_combined = np.column_stack([X_demo, X_dyn])
+        n_features_dynamic = X_dyn.shape[1]
+    else:
+        X_combined = X_demo
+        n_features_dynamic = 0
+
     # UF encoding
     uf_cat = pd.Categorical(df["sg_uf"])
     uf_idx = uf_cat.codes
@@ -96,7 +124,7 @@ def prepare_electoral_features(
     cand_labels = list(cand_cat.categories)
 
     features = {
-        "X_demo": X_demo,
+        "X_demo": X_combined,
         "hist": df["pct_votos_historico"].values.astype(float),
         "poll": df["media_intencao_voto_uf"].values.astype(float),
         "is_new": df["is_new_candidate"].values.astype(int),
@@ -107,7 +135,8 @@ def prepare_electoral_features(
         "cand_labels": cand_labels,
         "n_uf": len(uf_labels),
         "n_cand": len(cand_labels),
-        "n_demo": len(demo_cols),
+        "n_demo": X_combined.shape[1],
+        "n_features_dynamic": n_features_dynamic,
         "y": df["y"].values.astype(float),
     }
 
@@ -118,6 +147,7 @@ def prepare_electoral_features(
         "uf_labels": uf_labels,
         "cand_labels": cand_labels,
         "top_candidates": top_cands,
+        "n_features_dynamic": n_features_dynamic,
     }
 
     return features, stats
@@ -188,7 +218,12 @@ def build_electoral_model(features: dict):
         w_hist = pm.TruncatedNormal("w_hist", mu=1.5, sigma=0.5, lower=0.0)
         w_poll = pm.TruncatedNormal("w_poll", mu=1.0, sigma=0.5, lower=0.0)
 
-        # ── Level 4: UF-varying demo slopes (hierarchical partial pooling) ────
+        # ── Level 4: UF-varying slopes (hierarchical partial pooling) ────────
+        # n_demo includes both structural (IBGE) and dynamic external features
+        # (sentimento, tendencia_busca, gdelt_intensidade, gdelt_tom,
+        #  reputacao_score, delta_poll) when present.
+        # Prior sigma 0.3 is conservative for all features — dynamic features
+        # are already pre-scaled to [-1, 1] so the same prior width applies.
         # Hyperpriors share information across UFs → stabilises small-sample UFs
         # (AC, RR, AP with ~20 municipalities). Non-centered for sampling efficiency.
         mu_beta = pm.Normal("mu_beta", 0.0, 0.3, shape=n_demo)

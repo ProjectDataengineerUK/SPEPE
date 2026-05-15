@@ -24,6 +24,41 @@ IBGE_COL_ALIASES: dict[str, str] = {
 }
 
 
+# Dynamic external features — available when social tokens are configured
+DYNAMIC_FEATURE_COLS = [
+    "sentimento_score",  # social media sentiment [-1, 1]
+    "tendencia_busca",  # Google Trends normalized [0, 1]
+    "gdelt_intensidade",  # GDELT event count (log-normalized)
+    "gdelt_tom",  # GDELT tone [-1, 1]
+    "reputacao_score",  # composite external signal [-1, 1]
+]
+
+# delta_poll: rate of change in poll intention (week-over-week)
+POLL_DELTA_COL = "delta_poll"
+
+# All features used in M2 (full electoral model)
+ELECTORAL_M2_COLS = IBGE_DEMOGRAPHIC_COLS + [
+    "pct_votos_historico",
+    "media_intencao_voto_uf",
+]
+
+# All features used in M3 (with dynamic external signals)
+ELECTORAL_M3_COLS = ELECTORAL_M2_COLS + DYNAMIC_FEATURE_COLS + [POLL_DELTA_COL]
+
+
+def compute_reputacao_score(
+    sentimento: float,
+    gdelt_tom: float,
+    tendencia_norm: float,
+) -> float:
+    """Composite external reputation signal.
+
+    Weights: sentimento (0.5), gdelt_tom (0.3), tendencia (0.2).
+    All inputs in [-1, 1]. Output in [-1, 1].
+    """
+    return 0.5 * sentimento + 0.3 * gdelt_tom + 0.2 * tendencia_norm
+
+
 def resolve_ibge_columns(df_columns: list[str]) -> list[str]:
     """Return canonical column names available in df_columns.
 
