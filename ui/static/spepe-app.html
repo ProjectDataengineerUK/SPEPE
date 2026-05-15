@@ -1034,9 +1034,12 @@ html,body{font-size:13px}
           </div>
           <div class="pc">
             <h4>An&#225;lise de Vulnerabilidade</h4>
-            <div class="krow"><span class="klbl">Munic. em risco</span><span class="kv r" id="adv-risco">&#8212;</span></div>
-            <div class="krow"><span class="klbl">Munic. seguros</span><span class="kv g" id="adv-seg">&#8212;</span></div>
-            <div class="krow"><span class="klbl">Margem m&#233;dia</span><span class="kv" id="adv-margem">&#8212;</span></div>
+            <div class="krow"><span class="klbl">Munic. em risco (&lt;25%)</span><span class="kv r" id="adv-risco">&#8212;</span></div>
+            <div class="krow"><span class="klbl">Munic. seguros (&gt;45%)</span><span class="kv g" id="adv-seg">&#8212;</span></div>
+            <div class="krow"><span class="klbl">Zona competitiva</span><span class="kv y" id="adv-margem">&#8212;</span></div>
+          </div>
+          <div class="pc">
+            <div id="adv-onde-focar"><div class="mrp-empty">&#8592; Selecione UF para ver onde focar</div></div>
           </div>
           <div class="leg-source">TSE &middot; fact_municipio_candidato_eleicao &middot; 2022</div>
         </div>
@@ -3923,23 +3926,28 @@ function _renderBarRows(containerId, rows, fillClass = '') {
 
 async function _loadEleitoradoTab() {
   const uf = (window._mapCtx && window._mapCtx.uf) || document.getElementById('f-uf')?.value || 'SP';
-  const ano = document.getElementById('perfil-ano-sel')?.value || 2022;
   const lbl = document.getElementById('perfil-uf-label');
   if (lbl) lbl.textContent = uf;
   try {
-    let r = await apiFetch(`/api/perfil?uf=${uf}&ano=${ano}`);
-    if (!r?.ok) r = await apiFetch(`/api/perfis?uf=${uf}`);
+    const r = await apiFetch(`/api/perfis?uf=${uf}`);
     if (!r?.ok) throw new Error();
     const d = await r.json();
-    const mk = arr => (arr || []).map(x => ({
-      label: x.categoria || x.label || '?',
-      pct: +(x.pct ?? x.percentual ?? 0),
-      abs: x.qt_eleitores || x.qtd || null
-    }));
-    _renderBarRows('perf-genero', mk(d.genero), 'bar-alt');
-    _renderBarRows('perf-faixa', mk(d.faixa_etaria));
-    _renderBarRows('perf-esc', mk(d.escolaridade), 'bar-green');
-    _renderBarRows('perf-civil', mk(d.estado_civil), 'bar-orange');
+    // /api/perfis returns qt_eleitores — compute pct from totals
+    const mkPct = arr => {
+      if (!arr?.length) return [];
+      const tot = arr.reduce((s, x) => s + (x.qt_eleitores || 0), 0) || 1;
+      return arr.map(x => ({
+        label: x.label || x.categoria || '?',
+        pct: (x.qt_eleitores / tot) * 100,
+        abs: x.qt_eleitores || null
+      }));
+    };
+    _renderBarRows('perf-genero', mkPct(d.genero), 'bar-alt');
+    _renderBarRows('perf-faixa', mkPct(d.faixa_etaria));
+    _renderBarRows('perf-esc', mkPct(d.escolaridade), 'bar-green');
+    // estado_civil not in /api/perfis — show message
+    const civil = document.getElementById('perf-civil');
+    if (civil) civil.innerHTML = '<div class="mrp-empty">Estado civil: aguardando enriquecimento TSE</div>';
   } catch (e) {
     ['perf-genero', 'perf-faixa', 'perf-esc', 'perf-civil'].forEach(id => {
       const el = document.getElementById(id);
@@ -4154,47 +4162,57 @@ function selectPartido(btn, partido) {
 }
 
 async function _loadPartidosTab() {
-  const uf = document.getElementById('f-uf')?.value || 'BR';
-  const cargo = document.getElementById('f-cargo')?.value || 'Presidente';
+  const uf = document.getElementById('f-uf')?.value || 'SP';
+  const cargo = document.getElementById('map-cargo-sel')?.value || document.getElementById('f-cargo')?.value || 'Governador';
   const el = document.getElementById('part-hist-rows');
   if (el) el.innerHTML = '<div class="mrp-empty">Carregando...</div>';
 
   try {
-    const res = await apiFetch(`/api/resultados/partido?partido=${_partidoAtivo}&cargo=${encodeURIComponent(cargo)}&uf=${uf}`);
-    const data = (await res.json())?.data || [];
+    // Build historical data by fetching 2018 + 2022 results and filtering by party
+    const [r18, r22] = await Promise.all([
+      apiFetch(`/api/resultados/${encodeURIComponent(cargo)}?uf=${uf}&ano=2018`).then(r => r?.json()).catch(() => null),
+      apiFetch(`/api/resultados/${encodeURIComponent(cargo)}?uf=${uf}&ano=2022`).then(r => r?.json()).catch(() => null),
+    ]);
+
+    const findParty = (res, ano) => {
+      const cands = res?.candidatos || [];
+      const match = cands.find(c => (c.partido || '').toUpperCase() === _partidoAtivo.toUpperCase());
+      if (!match) return null;
+      return { ano, votos: match.total_votos || 0, pct: match.pct || match.pct_votos_validos || 0, candidato: match.nm_candidato || match.candidato };
+    };
+
+    const data = [findParty(r18, 2018), findParty(r22, 2022)].filter(Boolean);
 
     if (!data.length) {
-      if (el) el.innerHTML = '<div class="mrp-empty">Sem dados disponíveis</div>';
-      return;
+      if (el) el.innerHTML = `<div class="mrp-empty">Sem candidatos ${_partidoAtivo} para ${cargo} em ${uf}</div>`;
+      // still render empty chart
     }
 
-    if (el) el.innerHTML = data.map(d => {
-      const tx = d.eleitos > 0 ? 'g' : 'r';
-      return `<div class="hist-row">
+    const maxPct = Math.max(...data.map(d => d.pct || 0), 1);
+    if (el) el.innerHTML = data.map(d => `
+      <div class="hist-row">
         <span class="hist-ano">${d.ano}</span>
-        <div class="bar-h"><div class="bar-fill" style="width:${Math.min((d.candidaturas/20)*100,100)}%;background:#1976d2"></div></div>
-        <span class="hist-val kv ${tx}">${d.eleitos}/${d.candidaturas}</span>
-      </div>`;
-    }).join('');
+        <div class="bar-h"><div class="bar-fill" style="width:${Math.round((d.pct/maxPct)*100)}%;background:#1976d2"></div></div>
+        <span class="hist-val kv">${(d.pct||0).toFixed(1)}%</span>
+      </div>
+      <div style="font-size:.59rem;color:var(--text3);padding:0 0 4px 6px">${d.candidato||''} · ${Number(d.votos||0).toLocaleString('pt-BR')} votos</div>
+    `).join('') || '<div class="mrp-empty">Sem dados</div>';
 
-    // Votes bar chart
-    const anos = data.map(d => d.ano);
-    const votos = data.map(d => +(d.votos || 0) / 1e6);
     const ctx = document.getElementById('chart-partidos');
     if (!ctx) return;
     if (_chartPartidos) { _chartPartidos.destroy(); _chartPartidos = null; }
     _chartPartidos = new Chart(ctx, {
       type: 'bar',
       data: {
-        labels: anos,
-        datasets: [{ label: 'Votos (M)', data: votos, backgroundColor: '#1976d2aa', borderColor: '#1976d2', borderWidth: 1, borderRadius: 4 }]
+        labels: data.map(d => String(d.ano)),
+        datasets: [{ label: '% votos', data: data.map(d => +(d.pct||0).toFixed(1)), backgroundColor: '#1976d2aa', borderColor: '#1976d2', borderWidth: 1, borderRadius: 4 }]
       },
       options: {
         responsive: true, maintainAspectRatio: false,
         plugins: { legend: { display: false } },
         scales: {
           x: { ticks: { color: '#8d96a0', font: { size: 10 } }, grid: { color: '#21262d' } },
-          y: { ticks: { color: '#8d96a0', font: { size: 10 }, callback: v => v + 'M' }, grid: { color: '#21262d' } }
+          y: { min: 0, max: 100, ticks: { color: '#8d96a0', font: { size: 10 }, callback: v => v + '%' }, grid: { color: '#21262d' } }
         }
       }
     });
@@ -4340,42 +4358,80 @@ function _loadAliancasTab() {
 }
 
 // ── Adversários ───────────────────────────────────────────────────────────────
-function _loadAdversariosTab() {
+async function _loadAdversariosTab() {
   const uf = document.getElementById('f-uf')?.value || 'SP';
-  const cargo = document.getElementById('map-cargo-sel')?.value || 'Presidente';
+  const cargo = document.getElementById('map-cargo-sel')?.value || 'Governador';
   const labelEl = document.getElementById('adv-uf-label');
   if (labelEl) labelEl.textContent = uf;
   const rowsEl = document.getElementById('adv-rows');
   if (rowsEl) rowsEl.innerHTML = '<div class="mrp-empty">Carregando...</div>';
-  fetch(`/api/adversarios?uf=${encodeURIComponent(uf)}&cargo=${encodeURIComponent(cargo)}&ano=2022`)
-    .then(r => r.json())
-    .then(data => {
-      if (rowsEl && data.adversarios) {
-        const maxPct = Math.max(...data.adversarios.map(a => a.pct || 0), 0.01);
-        rowsEl.innerHTML = data.adversarios.map(a => {
-          const barW = Math.round((a.pct / maxPct) * 100);
-          const pct = (a.pct * 100).toFixed(1);
-          return `<div style="margin-bottom:8px">
-            <div class="krow" style="margin-bottom:2px">
-              <span class="klbl">${a.candidato} <small style="color:var(--text3)">(${a.partido})</small></span>
-              <span class="kv">${pct}%</span>
-            </div>
-            <div style="background:var(--bg3);border-radius:3px;height:5px">
-              <div style="background:var(--blue,#3b82f6);width:${barW}%;height:100%;border-radius:3px"></div>
-            </div>
-          </div>`;
-        }).join('');
-      }
+
+  try {
+    const [advData, munData] = await Promise.all([
+      fetch(`/api/adversarios?uf=${encodeURIComponent(uf)}&cargo=${encodeURIComponent(cargo)}&ano=2022`).then(r => r.json()).catch(() => ({})),
+      apiFetch(`/api/mapa/municipio?cargo=${encodeURIComponent(cargo)}&ano=2022&turno=1&layer=electoral&uf=${uf}`).then(r => r?.json()).catch(() => null),
+    ]);
+
+    // Adversários ranking
+    if (rowsEl && advData.adversarios?.length) {
+      const maxPct = Math.max(...advData.adversarios.map(a => a.pct || 0), 0.01);
+      rowsEl.innerHTML = advData.adversarios.map(a => {
+        const barW = Math.round(((a.pct||0) / maxPct) * 100);
+        const pct = typeof a.pct === 'number' ? (a.pct < 1 ? (a.pct*100).toFixed(1) : a.pct.toFixed(1)) : '—';
+        return `<div style="margin-bottom:8px">
+          <div class="krow" style="margin-bottom:2px">
+            <span class="klbl">${a.candidato} <small style="color:var(--text3)">(${a.partido||''})</small></span>
+            <span class="kv">${pct}%</span>
+          </div>
+          <div style="background:var(--bg3);border-radius:3px;height:5px">
+            <div style="background:#ef4444;width:${barW}%;height:100%;border-radius:3px"></div>
+          </div>
+        </div>`;
+      }).join('');
+    } else if (rowsEl) {
+      rowsEl.innerHTML = '<div class="mrp-empty">Sem dados de adversários</div>';
+    }
+
+    // "Onde focar" — municípios na zona competitiva (pct entre 25-45%)
+    const ondeEl = document.getElementById('adv-onde-focar');
+    if (ondeEl && munData?.features?.length) {
+      const competitivos = munData.features
+        .filter(f => (f.pct || 0) >= 25 && (f.pct || 0) <= 45)
+        .sort((a, b) => (b.pct || 0) - (a.pct || 0))
+        .slice(0, 8);
+      ondeEl.innerHTML = competitivos.length ? `
+        <div style="font-size:.62rem;font-weight:600;color:var(--text);margin-bottom:4px">🎯 Onde Focar (zona competitiva 25–45%)</div>
+        ${competitivos.map(f => `
+        <div class="krow">
+          <span class="klbl" style="font-size:.6rem">${f.label||f.id}</span>
+          <div style="flex:1;margin:0 6px;background:var(--bg3);border-radius:2px;height:4px">
+            <div style="background:#f59e0b;width:${Math.round(f.pct)}%;height:100%;border-radius:2px"></div>
+          </div>
+          <span class="kv y" style="font-size:.62rem">${(f.pct||0).toFixed(1)}%</span>
+        </div>`).join('')}` :
+        '<div class="mrp-empty">Sem municípios na zona competitiva</div>';
+
+      const total = munData.features.length;
+      const risco = munData.features.filter(f => (f.pct||0) < 25).length;
+      const seguros = munData.features.filter(f => (f.pct||0) > 45).length;
       const riscoEl = document.getElementById('adv-risco');
       const segEl = document.getElementById('adv-seg');
       const margemEl = document.getElementById('adv-margem');
-      if (riscoEl) riscoEl.textContent = (data.municipios_risco ?? '—').toLocaleString('pt-BR');
-      if (segEl) segEl.textContent = (data.municipios_seguros ?? '—').toLocaleString('pt-BR');
-      if (margemEl) margemEl.textContent = data.margem_media ?? '—';
-    })
-    .catch(() => {
-      if (rowsEl) rowsEl.innerHTML = '<div class="mrp-empty">Erro ao carregar adversários</div>';
-    });
+      if (riscoEl) riscoEl.textContent = risco.toLocaleString('pt-BR');
+      if (segEl) segEl.textContent = seguros.toLocaleString('pt-BR');
+      if (margemEl) margemEl.textContent = competitivos.length + ' municípios';
+    } else if (ondeEl) {
+      ondeEl.innerHTML = '<div class="mrp-empty">Selecione uma UF para ver oportunidades</div>';
+      const riscoEl = document.getElementById('adv-risco');
+      const segEl = document.getElementById('adv-seg');
+      const margemEl = document.getElementById('adv-margem');
+      if (riscoEl) riscoEl.textContent = advData.municipios_risco ?? '—';
+      if (segEl) segEl.textContent = advData.municipios_seguros ?? '—';
+      if (margemEl) margemEl.textContent = advData.margem_media ?? '—';
+    }
+  } catch {
+    if (rowsEl) rowsEl.innerHTML = '<div class="mrp-empty">Erro ao carregar adversários</div>';
+  }
 }
 
 // ── Parcerias ─────────────────────────────────────────────────────────────────
@@ -4435,30 +4491,47 @@ function _loadParceriasTab() {
 // ── Meta de Votos ─────────────────────────────────────────────────────────────
 async function _loadMetaTab() {
   const uf = document.getElementById('f-uf')?.value || 'SP';
-  const cargo = document.getElementById('f-cargo')?.value || 'Governador';
+  const cargo = document.getElementById('map-cargo-sel')?.value || document.getElementById('f-cargo')?.value || 'Governador';
   const el = document.getElementById('meta-municipios');
   const lbl = document.getElementById('meta-uf-label');
   if (lbl) lbl.textContent = uf;
   if (el) el.innerHTML = '<div class="mrp-empty">Carregando...</div>';
 
   try {
-    const res = await apiFetch(`/api/meta_votos?uf=${uf}&cargo=${encodeURIComponent(cargo)}`);
-    const json = await res.json();
-    const fmt = n => n ? Number(n).toLocaleString('pt-BR') : '—';
-    document.getElementById('meta-votos22').textContent = fmt(json.total_votos_2022);
-    document.getElementById('meta-alvo').textContent = fmt(json.meta_2026);
-    document.getElementById('meta-min').textContent = fmt(Math.round(json.meta_2026 * 0.5));
-    document.getElementById('meta-crescimento').textContent = '+' + ((json.crescimento_pct||0)*100).toFixed(1) + '%';
+    // Get real vote totals from /api/resultados and top municipalities from /api/mapa/municipio
+    const [resData, munData] = await Promise.all([
+      apiFetch(`/api/resultados/${encodeURIComponent(cargo)}?uf=${uf}&ano=2022`).then(r => r?.json()).catch(() => null),
+      apiFetch(`/api/mapa/municipio?cargo=${encodeURIComponent(cargo)}&ano=2022&turno=1&layer=electoral&uf=${uf}`).then(r => r?.json()).catch(() => null),
+    ]);
 
-    const top = (json.data || []).slice(0, 8);
-    if (el) el.innerHTML = top.length ? top.map(d => {
-      const pct = json.meta_2026 ? Math.min((d.votos_2022/json.meta_2026)*100*10, 100) : 0;
-      return `<div class="hist-row">
-        <span class="hist-ano" style="width:90px;font-size:.62rem">${(d.nm_municipio||'').slice(0,12)}</span>
-        <div class="bar-h"><div class="bar-fill" style="width:${pct}%;background:#1976d2"></div></div>
-        <span class="hist-val kv">${Number(d.votos_2022||0).toLocaleString('pt-BR')}</span>
-      </div>`;
-    }).join('') : '<div class="mrp-empty">Sem dados</div>';
+    const fmt = n => n ? Number(n).toLocaleString('pt-BR') : '—';
+    const cands = resData?.candidatos || [];
+    const totalVotos = cands.reduce((s, c) => s + (c.total_votos || 0), 0);
+    const topCand = cands[0];
+    const votosLider = topCand?.total_votos || 0;
+    const meta2026 = Math.round(votosLider * 1.05); // meta = +5% sobre líder 2022
+
+    const v22El = document.getElementById('meta-votos22');
+    const alvEl = document.getElementById('meta-alvo');
+    const minEl = document.getElementById('meta-min');
+    const cresEl = document.getElementById('meta-crescimento');
+    if (v22El) v22El.textContent = fmt(votosLider);
+    if (alvEl) alvEl.textContent = fmt(meta2026);
+    if (minEl) minEl.textContent = fmt(Math.round(meta2026 * 0.5));
+    if (cresEl) cresEl.textContent = '+5.0%';
+
+    // Top municípios por votos
+    const features = (munData?.features || [])
+      .sort((a, b) => (b.total_votos || b.pct || 0) - (a.total_votos || a.pct || 0))
+      .slice(0, 8);
+
+    const maxPct = Math.max(...features.map(f => f.pct || 0), 1);
+    if (el) el.innerHTML = features.length ? features.map(f => `
+      <div class="hist-row">
+        <span class="hist-ano" style="width:90px;font-size:.62rem">${(f.label||f.id||'').slice(0,12)}</span>
+        <div class="bar-h"><div class="bar-fill" style="width:${Math.round((f.pct||0)/maxPct*100)}%;background:#1976d2"></div></div>
+        <span class="hist-val kv">${(f.pct||0).toFixed(1)}%</span>
+      </div>`).join('') : '<div class="mrp-empty">Sem dados de municípios</div>';
   } catch {
     if (el) el.innerHTML = '<div class="mrp-empty">Indisponível</div>';
   }
