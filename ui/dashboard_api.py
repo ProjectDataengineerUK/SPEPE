@@ -3154,7 +3154,9 @@ async def get_historico_partido(
             """
             job_config = bigquery.QueryJobConfig(query_parameters=params)
             rows = list(client.query(query, job_config=job_config).result())
-            return JSONResponse({"data": [dict(r) for r in rows], "partido": partido, "cargo": cargo})
+            return JSONResponse(
+                {"data": [dict(r) for r in rows], "partido": partido, "cargo": cargo}
+            )
         except Exception as exc:
             logger.warning("BigQuery historico_partido falhou: %s", exc)
     return JSONResponse({"data": [], "partido": partido, "cargo": cargo, "status": "no_bq"})
