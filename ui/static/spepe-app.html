@@ -339,6 +339,89 @@ tr.rhl td{background:rgba(0,200,83,.07)!important}
 .zona-card-btn:hover{border-color:var(--green);color:var(--green2)}
 .leg-gradient{display:flex;align-items:stretch;border-radius:4px;overflow:hidden;height:12px;margin:4px 0}
 .leg-grad-labels{display:flex;justify-content:space-between;font-size:.6rem;color:var(--text3);font-family:'JetBrains Mono',monospace}
+
+/* ── PROTOTYPE LAYOUT OVERRIDES ─────────────────────────────────────────── */
+.topnav{height:46px!important;font-size:13px}
+html,body{font-size:13px}
+.nav-filters{display:flex;align-items:center;gap:5px;margin-left:8px}
+.nav-filters select{background:var(--bg3);border:1px solid var(--border2);border-radius:6px;padding:3px 7px;color:var(--text);font-size:.74rem;outline:none;appearance:none}
+.nav-filters select:focus{border-color:var(--green)}
+.nav-filters input{background:var(--bg3);border:1px solid var(--border2);border-radius:6px;padding:3px 7px;color:var(--text);font-size:.74rem;outline:none}
+.nav-filters input:focus{border-color:var(--green)}
+
+/* Layer bar */
+.layer-bar{height:35px;background:var(--bg2);border-bottom:1px solid var(--border);display:flex;align-items:center;padding:0 12px;gap:5px;flex-shrink:0;overflow-x:auto;z-index:10}
+.layer-bar::-webkit-scrollbar{height:3px}
+.lbtn{padding:3px 11px;font-size:.68rem;font-weight:500;border:1px solid var(--border2);border-radius:20px;color:var(--text2);background:transparent;white-space:nowrap;transition:all .15s;cursor:pointer}
+.lbtn.active,.lbtn.layer-btn.active{background:var(--green-dim);border-color:var(--green);color:var(--green2)}
+.lbtn:hover:not(.active){color:var(--text);border-color:var(--border2)}
+.lbtn-mode.active{background:var(--blue-dim)!important;border-color:var(--blue2)!important;color:#60a5fa!important}
+.lsep{width:1px;height:16px;background:var(--border);flex-shrink:0;margin:0 2px}
+
+/* Shell */
+.shell{display:flex;flex:1;overflow:hidden;min-height:0}
+.map-pane{flex:1;position:relative;min-width:0;display:flex;flex-direction:column}
+#leaflet-map{flex:1;min-height:0}
+.map-float-bar{position:absolute;top:8px;left:8px;z-index:20;display:flex;align-items:center;gap:6px;background:rgba(13,17,23,.88);border:1px solid var(--border2);border-radius:8px;padding:5px 9px;backdrop-filter:blur(4px)}
+.map-hint{position:absolute;bottom:28px;left:50%;transform:translateX(-50%);background:rgba(13,17,23,.9);border:1px solid var(--border2);border-radius:20px;padding:3px 12px;font-size:.65rem;color:var(--text2);pointer-events:none;z-index:10;white-space:nowrap}
+#zona-panel{position:absolute;bottom:0;left:0;right:0;z-index:11;max-height:55%;overflow-y:auto}
+#agent-narration{position:absolute;bottom:28px;left:8px;right:8px;z-index:12;pointer-events:none}
+
+/* Right panel */
+.right-panel{width:360px;background:var(--bg2);border-left:1px solid var(--border);display:flex;flex-direction:column;flex-shrink:0}
+.ptabs{display:flex;border-bottom:1px solid var(--border);flex-shrink:0;overflow-x:auto}
+.ptabs::-webkit-scrollbar{height:2px}
+.ptab{padding:7px 9px;font-size:.63rem;font-weight:600;color:var(--text2);cursor:pointer;border-bottom:2px solid transparent;white-space:nowrap;text-transform:uppercase;letter-spacing:.05em;transition:all .15s}
+.ptab.active{color:var(--green2);border-bottom-color:var(--green)}
+.ptab:hover:not(.active){color:var(--text)}
+.pbody{flex:1;overflow-y:auto;padding:10px;display:none}
+.pbody.active{display:block}
+.pbody::-webkit-scrollbar{width:4px}
+
+/* Compact data cards */
+.pc{background:var(--bg3);border:1px solid var(--border);border-radius:var(--radius);padding:9px 11px;margin-bottom:8px}
+.pc h4{font-size:.62rem;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:var(--text3);margin-bottom:7px;display:flex;align-items:center;justify-content:space-between}
+.krow{display:flex;justify-content:space-between;align-items:center;margin-bottom:5px}
+.klbl{font-size:.69rem;color:var(--text2)}
+.kv{font-size:.78rem;font-weight:700}
+.kv.g{color:var(--green2)}.kv.r{color:#ef4444}.kv.y{color:#f59e0b}.kv.b{color:#60a5fa}.kv.p{color:#a78bfa}
+
+/* Tags */
+.tag{display:inline-block;font-size:.58rem;padding:1px 5px;border-radius:8px;font-weight:600;margin:1px}
+.tag.tse{background:#1e3a5f;color:#60a5fa}
+.tag.ibge{background:#1a3a1a;color:#4ade80}
+.tag.ds{background:#2d1a1a;color:#f87171}
+.tag.poll{background:#2d2a1a;color:#fbbf24}
+.tag.soc{background:#2a1a3a;color:#c084fc}
+
+/* Compact legend in panel */
+.leg-mini{background:var(--bg4);border:1px solid var(--border2);border-radius:var(--radius);padding:8px 10px;margin-bottom:8px}
+.leg-mini-title{font-size:.58rem;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:var(--text3);margin-bottom:6px}
+.leg-items{display:flex;flex-direction:column;gap:3px}
+.leg-item{display:flex;align-items:flex-start;gap:8px}
+.leg-swatch{width:12px;height:12px;border-radius:2px;flex-shrink:0;margin-top:1px}
+.leg-text{font-size:.65rem;line-height:1.4}
+.leg-text b{color:var(--text)}
+.leg-text small{color:var(--text3);display:block;font-size:.58rem}
+
+/* Empty state */
+.mrp-empty{color:var(--text3);font-size:.72rem;padding:12px 0;text-align:center}
+.mrp-row{display:flex;justify-content:space-between;align-items:center;font-size:.72rem;padding:3px 0;border-bottom:1px solid var(--border)}
+.mrp-row:last-child{border-bottom:none}
+.mrp-section{font-size:.6rem;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:var(--text3);margin:8px 0 4px;padding-top:4px;border-top:1px solid var(--border)}
+.mrp-section:first-child{border-top:none;margin-top:0}
+
+/* Map floating controls */
+.map-float-bar .level-btn{padding:2px 7px;font-size:.65rem;border:1px solid var(--border2);border-radius:4px;color:var(--text2);background:transparent;cursor:pointer;transition:all .15s}
+.map-float-bar .level-btn.active{background:var(--green-dim);border-color:var(--green);color:var(--green2)}
+.map-float-bar .level-btn.disabled{opacity:.4;cursor:default}
+.map-float-bar .map-breadcrumb{font-size:.65rem;color:var(--text2);white-space:nowrap;max-width:120px;overflow:hidden;text-overflow:ellipsis}
+.map-float-bar .map-breadcrumb span{cursor:pointer;color:var(--blue2)}
+.map-float-bar .map-breadcrumb span:hover{text-decoration:underline}
+
+/* Chat in right panel tab */
+#pt-chat .chat-panel{border:none;width:100%}
+#pt-chat{padding:0;overflow:hidden}
 </style>
 </head>
 <body>
@@ -366,631 +449,243 @@ tr.rhl td{background:rgba(0,200,83,.07)!important}
   <nav class="topnav">
     <span class="logo">SP<span>E</span>PE</span>
     <span class="sep"></span>
-    <span class="breadcrumb" id="bc"><strong>Dashboard</strong> · São Paulo · 2022</span>
+    <!-- Inline filters (prototype style) -->
+    <div class="nav-filters">
+      <select id="f-cargo" onchange="onCargoSelect(this.value)">
+        <option>Governador</option><option>Presidente</option><option>Senador</option>
+        <option>Dep. Federal</option><option>Dep. Estadual</option>
+      </select>
+      <select id="f-uf" onchange="applyFilters()">
+        <option value="AC">AC</option><option value="AL">AL</option><option value="AM">AM</option>
+        <option value="AP">AP</option><option value="BA">BA</option><option value="CE">CE</option>
+        <option value="DF">DF</option><option value="ES">ES</option><option value="GO">GO</option>
+        <option value="MA">MA</option><option value="MG">MG</option><option value="MS">MS</option>
+        <option value="MT">MT</option><option value="PA">PA</option><option value="PB">PB</option>
+        <option value="PE">PE</option><option value="PI">PI</option><option value="PR">PR</option>
+        <option value="RJ">RJ</option><option value="RN">RN</option><option value="RO">RO</option>
+        <option value="RR">RR</option><option value="RS">RS</option><option value="SC">SC</option>
+        <option value="SE">SE</option><option value="SP" selected>SP</option><option value="TO">TO</option>
+        <option value="BR">🇧🇷 Brasil</option>
+      </select>
+      <select id="f-ano" onchange="applyFilters()">
+        <option>2026</option><option selected>2022</option><option>2020</option><option>2018</option>
+      </select>
+      <select id="f-turno" onchange="applyFilters()">
+        <option>1º Turno</option><option>2º Turno</option>
+      </select>
+      <input id="map-candidato" type="text" placeholder="Candidato…" list="map-candidato-list"
+             autocomplete="off" oninput="reloadMap()" style="width:120px">
+      <datalist id="map-candidato-list"></datalist>
+    </div>
     <div class="topnav-right">
+      <!-- Model pills -->
+      <div class="model-pills" id="model-pills">
+        <div class="model-pill" id="pill-m1" title="M1 — Modelo demográfico baseline">
+          <span class="mdot gray" id="m1-dot"></span>
+          <span id="m1-label">M1 …</span>
+        </div>
+        <div class="model-pill" id="pill-m2" title="M2 — Modelo eleitoral preditivo">
+          <span class="mdot gray" id="m2-dot"></span>
+          <span id="m2-label">M2 …</span>
+        </div>
+      </div>
       <span class="badge-live">● Live</span>
       <div class="user-pill">
         <div class="user-avatar" id="uav">JL</div>
         <span class="user-name" id="unm">J. Lima</span>
       </div>
-      <button onclick="toggleAdminSentinel()" style="background:transparent;border:1px solid #334155;color:#94a3b8;border-radius:6px;padding:3px 10px;font-size:.72rem;cursor:pointer;letter-spacing:.03em" title="Admin / Sentinel">&#9881; Admin</button>
+      <button onclick="toggleAdminSentinel()" style="background:transparent;border:1px solid #334155;color:#94a3b8;border-radius:6px;padding:3px 10px;font-size:.72rem;cursor:pointer" title="Admin / Sentinel">&#9881; Admin</button>
       <button class="btn-logout" onclick="doLogout()">Sair</button>
     </div>
   </nav>
 
-  <div class="main-tabs">
-    <div class="main-tab active" onclick="switchTab(this,'Dashboard')">📊 Dashboard</div>
-    <div class="main-tab" onclick="switchTab(this,'Mapa')" data-src-tab="tse">🗺️ Mapa</div>
-    <div class="main-tab" onclick="switchTab(this,'Socioeconômico')" data-src-tab="ibge">📈 Socioeconômico</div>
-    <div class="main-tab" onclick="switchTab(this,'Segurança')" data-src-tab="ibge">🛡️ Segurança</div>
-    <div class="main-tab" onclick="switchTab(this,'Saúde')" data-src-tab="ibge">🏥 Saúde</div>
-    <div class="main-tab" onclick="switchTab(this,'Pesquisas')" data-src-tab="pesquisas">📋 Pesquisas</div>
-    <div class="main-tab" onclick="switchTab(this,'Predição')">🎯 Predição</div>
-    <div class="main-tab" onclick="switchTab(this,'Perfis Eleitorais')">🗂️ Perfis</div>
-    <div class="main-tab" onclick="switchTab(this,'Relatórios')">📄 Relatórios</div>
-    <div class="main-tab" onclick="switchTab(this,'Social')" data-src-tab="google-trends meta-ads youtube">📡 Social</div>
-    <div class="main-tab" onclick="switchTab(this,'Endividamento')">💳 Endividamento</div>
-    <div class="main-tab" onclick="switchTab(this,'Parlamentares')">🏛️ Parlamentares</div>
+  <!-- Layer bar (prototype style — replaces main-tabs) -->
+  <div class="layer-bar" id="layer-controls">
+    <button class="lbtn layer-btn active" data-layer="eleitoral">🏆 Eleitoral</button>
+    <button class="lbtn layer-btn" data-layer="ibge">📊 IBGE/IDH</button>
+    <button class="lbtn layer-btn" data-layer="saude">🏥 Saúde</button>
+    <button class="lbtn layer-btn" data-layer="seguranca">🛡 Segurança</button>
+    <button class="lbtn layer-btn" data-layer="pesquisas">📋 Pesquisas</button>
+    <button class="lbtn layer-btn" data-layer="sentimento">📱 Sentimento</button>
+    <button class="lbtn layer-btn" data-layer="predicao">🔮 Predição 2026</button>
+    <div class="lsep"></div>
+    <button id="btn-mode-historico" class="lbtn lbtn-mode active" onclick="setMapMode('historico')">📜 Histórico</button>
+    <button id="btn-mode-2026" class="lbtn lbtn-mode" onclick="setMapMode('2026')">🗳 2026</button>
+    <div id="poll-date-badge" style="display:none;margin-left:8px;font-size:.65rem;background:var(--teal-dim);color:var(--teal);padding:2px 9px;border-radius:12px;border:1px solid var(--teal)"></div>
   </div>
 
-  <div class="layout">
-    <!-- SIDEBAR -->
-    <aside class="sidebar">
-      <div class="sb-section">
-        <h4>Geográfico</h4>
-        <div class="filt"><label>Estado (UF)</label>
-          <select id="f-uf" onchange="applyFilters()">
-            <option value="AC">Acre — AC</option>
-            <option value="AL">Alagoas — AL</option>
-            <option value="AM">Amazonas — AM</option>
-            <option value="AP">Amapá — AP</option>
-            <option value="BA">Bahia — BA</option>
-            <option value="CE">Ceará — CE</option>
-            <option value="DF">Distrito Federal — DF</option>
-            <option value="ES">Espírito Santo — ES</option>
-            <option value="GO">Goiás — GO</option>
-            <option value="MA">Maranhão — MA</option>
-            <option value="MG">Minas Gerais — MG</option>
-            <option value="MS">Mato Grosso do Sul — MS</option>
-            <option value="MT">Mato Grosso — MT</option>
-            <option value="PA">Pará — PA</option>
-            <option value="PB">Paraíba — PB</option>
-            <option value="PE">Pernambuco — PE</option>
-            <option value="PI">Piauí — PI</option>
-            <option value="PR">Paraná — PR</option>
-            <option value="RJ">Rio de Janeiro — RJ</option>
-            <option value="RN">Rio Grande do Norte — RN</option>
-            <option value="RO">Rondônia — RO</option>
-            <option value="RR">Roraima — RR</option>
-            <option value="RS">Rio Grande do Sul — RS</option>
-            <option value="SC">Santa Catarina — SC</option>
-            <option value="SE">Sergipe — SE</option>
-            <option value="SP" selected>São Paulo — SP</option>
-            <option value="TO">Tocantins — TO</option>
-            <option value="BR">Brasil (todos)</option>
-          </select>
-        </div>
-        <div class="filt"><label>Mesorregião</label>
-          <select id="filterMeso" onchange="applyFilters()">
-            <option value="">Todas</option>
-          </select>
-        </div>
-      </div>
-      <div class="sb-section">
-        <h4>Eleição</h4>
-        <div class="filt"><label>Ano</label>
-          <select id="f-ano" onchange="applyFilters()">
-            <option>2026</option><option selected>2022</option><option>2020</option><option>2018</option><option>2016</option>
-          </select>
-        </div>
-        <div class="filt"><label>Cargo</label>
-          <select id="f-cargo" onchange="onCargoSelect(this.value)">
-            <option>Governador</option><option>Senador</option>
-            <option>Dep. Federal</option><option>Dep. Estadual</option><option>Presidente</option><option>Prefeito</option>
-          </select>
-        </div>
-        <div class="filt"><label>Turno</label>
-          <select id="f-turno" onchange="applyFilters()">
-            <option>1º Turno</option><option>2º Turno</option>
-          </select>
-        </div>
-      </div>
-      <div class="sb-section">
-        <h4>Fontes de Dados</h4>
-        <div class="src-list">
-          <label class="src-item"><input type="checkbox" data-source="tse" checked><span class="src-dot d-tse"></span><span>TSE</span></label>
-          <label class="src-item"><input type="checkbox" data-source="ibge" checked><span class="src-dot d-ibge"></span><span>IBGE</span></label>
-          <label class="src-item"><input type="checkbox" data-source="google-trends" checked><span class="src-dot d-trends"></span><span>Google Trends</span></label>
-          <label class="src-item"><input type="checkbox" data-source="meta-ads" checked><span class="src-dot d-meta"></span><span>Meta Ads</span></label>
-          <label class="src-item"><input type="checkbox" data-source="pesquisas" checked><span class="src-dot d-pesq"></span><span>Pesquisas</span></label>
-          <label class="src-item"><input type="checkbox" data-source="youtube"><span class="src-dot d-yt"></span><span>YouTube</span></label>
-        </div>
-      </div>
-      <div class="sb-actions">
-        <button class="btn-apply" onclick="applyFilters()">Aplicar Filtros</button>
-        <button class="btn-pdf" onclick="gerarRelatorioPDF()">Gerar Relatório PDF</button>
-        <button class="btn-pdf" style="margin-top:4px;color:#22c55e;border-color:#22c55e33" onclick="solicitarParecerAuditor()">🔍 Parecer Auditor</button>
-      </div>
-    </aside>
-
-    <!-- DASHBOARD -->
-    <main class="dashboard" id="dash">
-
-      <!-- Cargo sub-tabs -->
-      <div class="cargo-tabs" id="cargo-tabs">
-        <span class="cargo-tab active" onclick="switchCargo(this,'Governador')">🏟 Governador</span>
-        <span class="cargo-tab" onclick="switchCargo(this,'Presidente')">🏛 Presidente</span>
-        <span class="cargo-tab" onclick="switchCargo(this,'Senador')">⚖️ Senador</span>
-        <span class="cargo-tab" onclick="switchCargo(this,'Dep. Federal')">📜 Dep. Federal</span>
-        <span class="cargo-tab" onclick="switchCargo(this,'Dep. Estadual')">🗳 Dep. Estadual</span>
-        <span class="cargo-tab" onclick="switchCargo(this,'Comparativo')">📊 Comparar Cargos</span>
-      </div>
-
-      <!-- KPIs -->
-      <div class="kpi-row" id="kpi-row">
-        <div class="kpi accent" id="k0"><div class="kpi-label">Vencedor</div>
-          <div class="kpi-val" id="kv0" style="color:var(--green2)">LULA</div>
-          <div class="kpi-sub" id="ks0">PT · 1º Turno</div>
-          <div class="kpi-delta up" id="kd0">43,8% votos válidos</div></div>
-        <div class="kpi" id="k1"><div class="kpi-label">2º Lugar</div>
-          <div class="kpi-val" id="kv1">BOLSONARO</div>
-          <div class="kpi-sub" id="ks1">PL · 1º Turno</div>
-          <div class="kpi-delta dn" id="kd1">43,0% votos válidos</div></div>
-        <div class="kpi" id="k2"><div class="kpi-label">Margem</div>
-          <div class="kpi-val" id="kv2">0,8pp</div>
-          <div class="kpi-sub">Entre 1º e 2º</div>
-          <div class="kpi-delta wn">⚠ Polarização extrema</div></div>
-        <div class="kpi" id="k3"><div class="kpi-label">Municípios</div>
-          <div class="kpi-val" id="kv3">645</div>
-          <div class="kpi-sub" id="ks3">100% mapeados · SP</div>
-          <div class="kpi-delta up">TSE + IBGE</div></div>
-        <div class="kpi" id="k4"><div class="kpi-label">DQ Score</div>
-          <div class="kpi-val" style="color:var(--green2)">98,5%</div>
-          <div class="kpi-sub">Qualidade dados</div>
-          <div class="kpi-delta up">0 inconsistências</div></div>
-      </div>
-
-      <!-- Candidate cards -->
-      <div class="card" id="card-cands" style="padding:14px">
-        <div class="card-hdr">
-          <div><div class="card-title" id="cands-title">Candidatos — Presidente · SP 2022</div>
-            <div class="card-sub">Clique para destacar no dashboard</div></div>
-          <div class="tags"><span class="tag t-tse">TSE</span><span class="tag t-pesq">Pesquisas</span></div>
-        </div>
-        <div class="cand-grid" id="cand-grid"></div>
-      </div>
-
-      <!-- Charts row 1 -->
-      <div class="grid2">
-        <div class="card" id="card-resultado">
-          <div class="card-hdr">
-            <div><div class="card-title" id="res-title">Resultado Eleitoral — 1º Turno</div>
-              <div class="card-sub" id="res-sub">% votos válidos · São Paulo 2022</div></div>
-            <div class="tags"><span class="tag t-tse">TSE</span><span class="tag t-upd" id="upd-res"></span></div>
-          </div>
-          <div class="cw" style="height:210px"><canvas id="ch-resultado"></canvas></div>
-        </div>
-        <div class="card" id="card-socio">
-          <div class="card-hdr">
-            <div><div class="card-title">Perfil Socioeconômico</div>
-              <div class="card-sub" id="sub-socio">Indicadores · municípios SP</div></div>
-            <div class="tags"><span class="tag t-ibge">IBGE</span><span class="tag t-upd" id="upd-socio"></span></div>
-          </div>
-          <div class="cw" style="height:210px"><canvas id="ch-socio"></canvas></div>
-        </div>
-      </div>
-
-      <!-- Charts row 2 -->
-      <div class="grid2">
-        <div class="card" id="card-trends" data-requires="google-trends">
-          <div class="card-hdr">
-            <div><div class="card-title" id="trends-title">Google Trends — Interesse por Candidato</div>
-              <div class="card-sub" id="trends-sub">Jun–Out 2022 · Brasil</div></div>
-            <div class="tags"><span class="tag t-trends">Trends</span><span class="tag t-upd" id="upd-trends"></span></div>
-          </div>
-          <div class="cw" style="height:185px"><canvas id="ch-trends"></canvas></div>
-        </div>
-        <div class="card" id="card-meta" data-requires="meta-ads">
-          <div class="card-hdr">
-            <div><div class="card-title">Gasto — Meta Ads</div>
-              <div class="card-sub" id="meta-sub">R$ mil · período eleitoral</div></div>
-            <div class="tags"><span class="tag t-meta">Meta</span><span class="tag t-upd" id="upd-meta"></span></div>
-          </div>
-          <div class="cw" style="height:185px"><canvas id="ch-meta"></canvas></div>
-        </div>
-      </div>
-
-      <!-- Cross-cargo comparison (hidden by default) -->
-      <div class="compare-card" id="card-compare" style="display:none">
-        <div class="compare-hdr">
-          <div><div class="card-title">Comparativo de Partidos por Cargo — SP 2022</div>
-            <div class="card-sub">PT × PL × MDB · todos os cargos · 1º turno</div></div>
-          <div class="tags"><span class="tag t-tse">TSE</span><span class="tag t-ia">Multi-cargo</span></div>
-        </div>
-        <div class="cw" style="height:220px"><canvas id="ch-compare"></canvas></div>
-      </div>
-
-      <!-- Charts row 3 -->
-      <div class="grid3">
-        <div class="card" id="card-previsao">
-          <div class="card-hdr">
-            <div><div class="card-title" id="prev-title">Previsão 2026 — P(vitória)</div>
-              <div class="card-sub">Modelo bayesiano · IC 95%</div></div>
-            <div class="tags"><span class="tag t-ia">IA</span><span class="tag t-upd" id="upd-prev"></span></div>
-          </div>
-          <div class="cw" style="height:165px"><canvas id="ch-previsao"></canvas></div>
-        </div>
-        <div class="card" id="card-sentiment">
-          <div class="card-hdr">
-            <div><div class="card-title">Sentimento Digital</div>
-              <div class="card-sub">NLP · Meta · out 2022</div></div>
-            <div class="tags"><span class="tag t-meta">Digital</span><span class="tag t-upd" id="upd-sent"></span></div>
-          </div>
-          <div class="cw" style="height:165px"><canvas id="ch-sentiment"></canvas></div>
-        </div>
-        <div class="card" id="card-polls">
-          <div class="card-hdr">
-            <div><div class="card-title">Pesquisas vs Resultado</div>
-              <div class="card-sub">Datafolha · Quaest · TSE</div></div>
-            <div class="tags"><span class="tag t-pesq">Pesquisas</span><span class="tag t-upd" id="upd-polls"></span></div>
-          </div>
-          <div class="cw" style="height:165px"><canvas id="ch-polls"></canvas></div>
-        </div>
-      </div>
-
-      <!-- Multi-fonte comparison -->
-      <div class="card" id="card-multifonte" style="margin-bottom:12px">
-        <div class="card-hdr">
-          <div><div class="card-title">Comparação Multi-Fonte</div>
-            <div class="card-sub">TSE · Pesquisas · Sentimento Social — mesmos candidatos</div></div>
-          <div class="tags"><span class="tag t-ia">17 Fontes</span>
-            <button onclick="loadMultifonte()" style="background:none;border:none;color:var(--text2);cursor:pointer;font-size:.7rem;padding:2px 6px;border:1px solid var(--border);border-radius:4px">↺</button>
-          </div>
-        </div>
-        <div id="multifonte-body" style="padding:8px 0">
-          <div style="color:var(--text3);font-size:.78rem;text-align:center;padding:1rem">Carregando dados multi-fonte...</div>
-        </div>
-      </div>
-
-      <!-- Table -->
-      <div class="table-card" id="card-table">
-        <div class="table-hdr">
-          <div><div class="table-title" id="tbl-title">Municípios · São Paulo 2022 · Presidente</div>
-            <div style="font-size:.66rem;color:var(--text2);margin-top:2px" id="tbl-sub">Top por volume de votos</div></div>
-          <input class="tsearch" id="tsearch" placeholder="🔍 Buscar município..." oninput="filterTable(this.value)">
-        </div>
-        <table><thead><tr id="tbl-head"></tr></thead><tbody id="tbl-body"></tbody></table>
-      </div>
-
-    </main>
-
-    <!-- MAP TAB -->
-    <div id="tab-mapa" class="tab-content">
-      <!-- MAP MODE TOGGLE -->
-      <div class="map-mode-bar">
-        <span style="font-size:.65rem;font-weight:700;text-transform:uppercase;letter-spacing:.09em;color:var(--text3);margin-right:4px">Modo</span>
-        <button id="btn-mode-historico" class="map-mode-btn active" onclick="setMapMode('historico')">📜 Histórico (TSE)</button>
-        <button id="btn-mode-2026" class="map-mode-btn" onclick="setMapMode('2026')">🗳 Eleição 2026</button>
-        <div id="poll-date-badge" class="poll-date-badge"></div>
-        <div class="model-pills" id="model-pills">
-          <div class="model-pill" id="pill-m1" title="Modelo demográfico baseline">
-            <span class="mdot gray" id="m1-dot"></span>
-            <span id="m1-label">M1 …</span>
-          </div>
-          <div class="model-pill" id="pill-m2" title="Modelo eleitoral preditivo">
-            <span class="mdot gray" id="m2-dot"></span>
-            <span id="m2-label">M2 …</span>
-          </div>
-        </div>
-      </div>
-      <div id="layer-controls" class="layer-toggle-bar">
-        <button class="layer-btn active" data-layer="eleitoral">Eleitoral</button>
-        <button class="layer-btn" data-layer="ibge">IBGE</button>
-        <button class="layer-btn" data-layer="sentimento">Sentimento</button>
-        <button class="layer-btn" data-layer="previsao">Previsao 2026</button>
-      </div>
-      <div class="map-toolbar">
-        <h3>Mapa Eleitoral</h3>
-        <div style="display:flex;gap:4px" id="level-btns">
-          <button class="level-btn" onclick="setMapLevel('nacional')">🌎 Nacional</button>
-          <button class="level-btn" onclick="setMapLevel('regiao')">🗾 Região</button>
-          <button class="level-btn active" onclick="setMapLevel('uf')">📍 Estado</button>
-          <button class="level-btn disabled" onclick="setMapLevel('municipio')" id="btn-municipio">🏘 Município</button>
-          <button class="level-btn disabled" onclick="setMapLevel('zona')" id="btn-zona">🏠 Zona</button>
-          <button class="level-btn disabled" onclick="setMapLevel('secao')" id="btn-secao">📋 Seção</button>
+  <!-- Shell: mapa + painel direito -->
+  <div class="shell">
+    <div class="map-pane">
+      <!-- Floating map controls -->
+      <div class="map-float-bar" id="map-float-bar">
+        <div style="display:flex;gap:3px" id="level-btns">
+          <button class="level-btn" onclick="setMapLevel('nacional')" title="Nacional">&#127758;</button>
+          <button class="level-btn" onclick="setMapLevel('regiao')" title="Região">&#128510;</button>
+          <button class="level-btn active" onclick="setMapLevel('uf')" title="Estado">&#128205; UF</button>
+          <button class="level-btn disabled" onclick="setMapLevel('municipio')" id="btn-municipio" title="Município">&#127864;</button>
+          <button class="level-btn disabled" onclick="setMapLevel('zona')" id="btn-zona" title="Zona">&#127968;</button>
+          <button class="level-btn disabled" onclick="setMapLevel('secao')" id="btn-secao" title="Seção">&#128203;</button>
         </div>
         <span class="map-breadcrumb" id="map-breadcrumb">Brasil</span>
-        <select class="map-cargo-sel" id="map-cargo-sel" onchange="loadCandidatoList();reloadMap()">
-          <option>Governador</option>
-          <option>Presidente</option>
-          <option>Senador</option>
-          <option>Dep. Federal</option>
-          <option>Dep. Estadual</option>
+        <select id="map-cargo-sel" onchange="loadCandidatoList();reloadMap()" style="background:var(--bg3);border:1px solid var(--border2);border-radius:6px;padding:3px 7px;color:var(--text);font-size:.72rem;outline:none">
+          <option>Governador</option><option>Presidente</option><option>Senador</option>
+          <option>Dep. Federal</option><option>Dep. Estadual</option>
         </select>
-        <select class="map-cargo-sel" id="map-layer-sel" onchange="reloadMap()" title="Camada temática">
-          <option value="electoral">🗳 Eleitoral</option>
-          <option value="archetype">🧩 Arquétipos</option>
-          <option value="security">🛡 Segurança</option>
-          <option value="health">🏥 Saúde</option>
-          <option value="economic">💰 Econômico</option>
-        </select>
-        <input type="text" id="map-candidato" placeholder="Candidato (opcional)"
-          style="background:var(--bg3);border:1px solid var(--border);border-radius:6px;padding:5px 9px;color:var(--text);font-size:.75rem;outline:none;margin-left:0;width:180px"
-          list="map-candidato-list" autocomplete="off" oninput="reloadMap()">
-        <datalist id="map-candidato-list"></datalist>
       </div>
-      <div class="map-body">
-        <div id="leaflet-map"></div>
-        <div id="zona-panel"></div>
-        <div class="map-legend">
-          <div class="leg-title" id="map-legend-title">Legenda</div>
-          <div id="map-legend-items"></div>
-          <div class="leg-title" style="margin-top:6px">Stats</div>
-          <div class="map-stats" id="map-stats">
-            <strong id="ms-lider">—</strong>
-            <div id="ms-pct">—</div>
-            <div id="ms-segundo">—</div>
-            <div id="ms-total">—</div>
-          </div>
-          <div style="margin-top:auto">
-            <div class="leg-title">Cor</div>
-            <select class="map-cargo-sel" style="width:100%;margin-top:4px;font-size:.65rem" id="map-color-by" onchange="reloadMap()">
-              <option value="lider">Líder</option>
-              <option value="margem">Margem</option>
-              <option value="partido">Partido</option>
-            </select>
-          </div>
+      <div id="leaflet-map"></div>
+      <div class="map-hint" id="map-hint">Clique em um estado para explorar</div>
+      <div id="zona-panel"></div>
+      <div id="agent-narration" style="display:none;position:absolute;bottom:36px;left:8px;right:8px;padding:10px 14px;background:rgba(34,197,94,.08);border-left:3px solid #22c55e;border-radius:6px;color:#cbd5e1;font-size:.78rem;line-height:1.45;white-space:pre-wrap;z-index:12;pointer-events:none"></div>
+    </div>
+
+    <div class="right-panel">
+      <div class="ptabs">
+        <div class="ptab active" data-tab="modelo" onclick="ptSwitch('modelo')">Modelo</div>
+        <div class="ptab" data-tab="pesquisas" onclick="ptSwitch('pesquisas')">Pesquisas</div>
+        <div class="ptab" data-tab="social" onclick="ptSwitch('social')">Social</div>
+        <div class="ptab" data-tab="contexto" onclick="ptSwitch('contexto')">Contexto</div>
+        <div class="ptab" data-tab="shap" onclick="ptSwitch('shap')">SHAP</div>
+        <div class="ptab" data-tab="chat" onclick="ptSwitch('chat')">Chat IA</div>
+      </div>
+
+      <!-- MODELO -->
+      <div class="pbody active" id="pt-modelo">
+        <div class="leg-mini">
+          <div class="leg-mini-title">Legenda &#8212; <span id="map-legend-title">Eleitoral</span></div>
+          <div class="leg-items" id="map-legend-items"></div>
         </div>
-        <!-- ── Painel direito — Contexto / Predição / Pesquisas ── -->
-        <div class="map-right-panel" id="map-right-panel">
-          <div class="mrp-header">
-            <span>📍</span>
-            <span id="mrp-uf-label" style="color:var(--text)">Selecione um estado</span>
-            <span class="mrp-uf" id="mrp-uf-badge" style="display:none"></span>
-          </div>
-          <div class="mrp-tabs">
-            <button class="mrp-tab active" data-tab="contexto" onclick="switchMrpTab('contexto')">Contexto</button>
-            <button class="mrp-tab" data-tab="previsao" onclick="switchMrpTab('previsao')">Predição</button>
-            <button class="mrp-tab" data-tab="pesquisas" onclick="switchMrpTab('pesquisas')">Pesquisas</button>
-          </div>
-          <div id="mrp-contexto" class="mrp-body active">
-            <div class="mrp-empty">Clique em um estado para ver indicadores</div>
-          </div>
-          <div id="mrp-previsao" class="mrp-body">
-            <div class="mrp-empty">Selecione um estado para ver a predição M1</div>
-          </div>
-          <div id="mrp-pesquisas" class="mrp-body">
-            <div class="mrp-empty">Selecione um estado para ver o tracking de pesquisas</div>
+        <div class="pc">
+          <h4>Resultado <span style="font-weight:400;color:var(--text2);text-transform:none;font-size:.61rem" id="ms-context"></span></h4>
+          <div class="krow"><span class="klbl">1&#186; Lugar</span><span class="kv g" id="ms-lider">&#8212;</span></div>
+          <div class="krow"><span class="klbl">% votos</span><span class="kv" id="ms-pct">&#8212;</span></div>
+          <div class="krow"><span class="klbl">2&#186; Lugar</span><span class="kv" id="ms-segundo">&#8212;</span></div>
+          <div class="krow"><span class="klbl">Total votos</span><span class="kv" id="ms-total">&#8212;</span></div>
+        </div>
+        <div class="pc">
+          <h4>Status M1/M2</h4>
+          <div style="font-size:.69rem;line-height:1.9">
+            <div><span id="ms-m1-icon" style="color:var(--text3)">&#9675;</span> M1 &#8212; <strong id="ms-m1-txt" style="color:var(--text3)">aguardando</strong></div>
+            <div><span id="ms-m2-icon" style="color:var(--text3)">&#9675;</span> M2 &#8212; <strong id="ms-m2-txt" style="color:var(--text3)">pendente polls</strong></div>
           </div>
         </div>
-      </div>
-      <div id="agent-narration" style="display:none;margin:8px 16px;padding:10px 14px;background:rgba(34,197,94,.08);border-left:3px solid #22c55e;border-radius:6px;color:#cbd5e1;font-size:.78rem;line-height:1.45;white-space:pre-wrap"></div>
-    </div>
-
-    <!-- SOCIOECONÔMICO TAB -->
-    <div id="tab-socioeconomico" class="tab-content" style="display:none;flex:1;overflow-y:auto;padding:16px;flex-direction:column;gap:12px">
-      <div style="display:flex;gap:8px;align-items:center;margin-bottom:4px">
-        <span style="font-size:1rem;font-weight:700">Perfil Socioeconômico — IBGE</span>
-        <span id="socio-uf-badge" style="font-size:.75rem;background:var(--accent2);color:#fff;padding:2px 8px;border-radius:4px">SP 2022</span>
-      </div>
-      <div class="chart-grid">
-        <div class="card" style="padding:12px">
-          <div style="font-size:.8rem;color:var(--text3);margin-bottom:8px">IDHM por Município (Top 10)</div>
-          <canvas id="chart-idhm" height="200"></canvas>
-        </div>
-        <div class="card" style="padding:12px">
-          <div style="font-size:.8rem;color:var(--text3);margin-bottom:8px">Renda per Capita (R$)</div>
-          <canvas id="chart-renda" height="200"></canvas>
-        </div>
-      </div>
-      <div class="card" style="padding:12px;overflow-x:auto">
-        <div style="font-size:.8rem;color:var(--text3);margin-bottom:8px">Indicadores Municipais — IBGE</div>
-        <table style="width:100%;border-collapse:collapse;font-size:.78rem" id="tbl-socio">
-          <thead><tr style="border-bottom:1px solid var(--border)">
-            <th style="text-align:left;padding:4px 8px;color:var(--text3)">Município</th>
-            <th style="text-align:right;padding:4px 8px;color:var(--text3)">IDHM</th>
-            <th style="text-align:right;padding:4px 8px;color:var(--text3)">Renda/cap</th>
-            <th style="text-align:right;padding:4px 8px;color:var(--text3)">Gini</th>
-            <th style="text-align:right;padding:4px 8px;color:var(--text3)">Ext.Pobreza%</th>
-            <th style="text-align:right;padding:4px 8px;color:var(--text3)">Analfab.%</th>
-            <th style="text-align:right;padding:4px 8px;color:var(--text3)">Urbano%</th>
-          </tr></thead>
-          <tbody id="tbody-socio"></tbody>
-        </table>
-      </div>
-    </div>
-
-    <!-- SEGURANÇA TAB -->
-    <div id="tab-seguranca" class="tab-content" style="display:none;flex:1;overflow-y:auto;padding:16px;flex-direction:column;gap:12px">
-      <div style="display:flex;gap:8px;align-items:center;margin-bottom:4px">
-        <span style="font-size:1rem;font-weight:700">Segurança Pública — IVS + Atlas da Violência</span>
-        <span id="seg-uf-badge" style="font-size:.75rem;background:#ef4444;color:#fff;padding:2px 8px;border-radius:4px">SP 2022</span>
-      </div>
-      <div class="chart-grid">
-        <div class="card" style="padding:12px">
-          <div style="font-size:.8rem;color:var(--text3);margin-bottom:8px">Taxa Homicídio (por 100k hab.)</div>
-          <canvas id="chart-homicidio" height="200"></canvas>
-        </div>
-        <div class="card" style="padding:12px">
-          <div style="font-size:.8rem;color:var(--text3);margin-bottom:8px">IVS — Índice Vulnerabilidade Social</div>
-          <canvas id="chart-ivs" height="200"></canvas>
-        </div>
-      </div>
-      <div class="card" style="padding:12px;overflow-x:auto">
-        <div style="font-size:.8rem;color:var(--text3);margin-bottom:8px">Indicadores de Segurança por Município</div>
-        <table style="width:100%;border-collapse:collapse;font-size:.78rem" id="tbl-seg">
-          <thead><tr style="border-bottom:1px solid var(--border)">
-            <th style="text-align:left;padding:4px 8px;color:var(--text3)">Município</th>
-            <th style="text-align:right;padding:4px 8px;color:var(--text3)">Homicídio/100k</th>
-            <th style="text-align:right;padding:4px 8px;color:var(--text3)">IVS Total</th>
-            <th style="text-align:right;padding:4px 8px;color:var(--text3)">IVS Infra</th>
-            <th style="text-align:right;padding:4px 8px;color:var(--text3)">IVS Cap.Humano</th>
-            <th style="text-align:right;padding:4px 8px;color:var(--text3)">Roubo/100k</th>
-            <th style="text-align:right;padding:4px 8px;color:var(--text3)">Feminicídio</th>
-          </tr></thead>
-          <tbody id="tbody-seg"></tbody>
-        </table>
-      </div>
-    </div>
-
-    <!-- SAÚDE TAB -->
-    <div id="tab-saude" class="tab-content" style="display:none;flex:1;overflow-y:auto;padding:16px;flex-direction:column;gap:12px">
-      <div style="display:flex;gap:8px;align-items:center;margin-bottom:4px">
-        <span style="font-size:1rem;font-weight:700">Saúde Pública — DataSUS + ANS</span>
-        <span id="saude-uf-badge" style="font-size:.75rem;background:#22c55e;color:#fff;padding:2px 8px;border-radius:4px">SP 2022</span>
-      </div>
-      <div class="chart-grid">
-        <div class="card" style="padding:12px">
-          <div style="font-size:.8rem;color:var(--text3);margin-bottom:8px">Mortalidade Infantil (por 1000 nascidos vivos)</div>
-          <canvas id="chart-mortalidade" height="200"></canvas>
-        </div>
-        <div class="card" style="padding:12px">
-          <div style="font-size:.8rem;color:var(--text3);margin-bottom:8px">Cobertura Plano de Saúde (%)</div>
-          <canvas id="chart-plano" height="200"></canvas>
-        </div>
-      </div>
-      <div class="card" style="padding:12px;overflow-x:auto">
-        <div style="font-size:.8rem;color:var(--text3);margin-bottom:8px">Indicadores de Saúde por Município</div>
-        <table style="width:100%;border-collapse:collapse;font-size:.78rem" id="tbl-saude">
-          <thead><tr style="border-bottom:1px solid var(--border)">
-            <th style="text-align:left;padding:4px 8px;color:var(--text3)">Município</th>
-            <th style="text-align:right;padding:4px 8px;color:var(--text3)">Mort.Infantil/1k</th>
-            <th style="text-align:right;padding:4px 8px;color:var(--text3)">Mort.Materna/100k</th>
-            <th style="text-align:right;padding:4px 8px;color:var(--text3)">Cobertura Plano%</th>
-            <th style="text-align:right;padding:4px 8px;color:var(--text3)">IDSUS</th>
-          </tr></thead>
-          <tbody id="tbody-saude"></tbody>
-        </table>
-      </div>
-    </div>
-
-    <!-- PESQUISAS TAB -->
-    <div id="tab-pesquisas" class="tab-content" style="display:none;flex:1;overflow-y:auto;padding:16px;flex-direction:column;gap:12px">
-      <div style="display:flex;gap:8px;align-items:center;margin-bottom:4px">
-        <span style="font-size:1rem;font-weight:700">Pesquisas Eleitorais — Tracking + House Effect</span>
-        <span id="pesq-cargo-badge" style="font-size:.75rem;background:var(--accent);color:#fff;padding:2px 8px;border-radius:4px">Presidente 2022</span>
-      </div>
-      <div class="chart-grid-21">
-        <div class="card" style="padding:12px">
-          <div style="font-size:.8rem;color:var(--text3);margin-bottom:8px">Intenção de Voto ao Longo do Tempo (%)</div>
-          <canvas id="chart-polls-tracking" height="220"></canvas>
-        </div>
-        <div class="card" style="padding:12px">
-          <div style="font-size:.8rem;color:var(--text3);margin-bottom:8px">House Effect por Instituto (pp vs Datafolha)</div>
-          <canvas id="chart-house-effect" height="220"></canvas>
-        </div>
-      </div>
-      <div class="card" style="padding:12px;overflow-x:auto">
-        <div style="font-size:.8rem;color:var(--text3);margin-bottom:8px">Últimas Pesquisas Registradas</div>
-        <table style="width:100%;border-collapse:collapse;font-size:.78rem" id="tbl-pesq">
-          <thead><tr style="border-bottom:1px solid var(--border)">
-            <th style="text-align:left;padding:4px 8px;color:var(--text3)">Data</th>
-            <th style="text-align:left;padding:4px 8px;color:var(--text3)">Instituto</th>
-            <th style="text-align:left;padding:4px 8px;color:var(--text3)">Candidato</th>
-            <th style="text-align:right;padding:4px 8px;color:var(--text3)">Intenção%</th>
-            <th style="text-align:right;padding:4px 8px;color:var(--text3)">Ajustada%</th>
-          </tr></thead>
-          <tbody id="tbody-pesq"></tbody>
-        </table>
-      </div>
-    </div>
-
-    <!-- PREDIÇÃO TAB -->
-    <div id="tab-predicao" class="tab-content" style="display:none;flex:1;overflow-y:auto;padding:16px;flex-direction:column;gap:12px">
-      <div style="color:var(--text2);font-size:.84rem;padding:20px 0">
-        <div style="font-size:1rem;font-weight:700;margin-bottom:8px">Predição Bayesiana 2026</div>
-        <div style="color:var(--text3)">Modelo PyMC com IC 95% para probabilidade de vitória por candidato × cargo × UF. SHAP explicabilidade por feature. <em>Requer perfil Consultor ou superior.</em></div>
-      </div>
-    </div>
-
-    <!-- PERFIS ELEITORAIS TAB -->
-    <div id="tab-perfis" class="tab-content" style="display:none;flex:1;overflow-y:auto;padding:16px;flex-direction:column;gap:12px">
-      <div style="display:flex;gap:8px;align-items:center;margin-bottom:4px">
-        <span style="font-size:1rem;font-weight:700">Perfis do Eleitorado — TSE Perfil Eleitorado</span>
-        <span id="perfis-uf-badge" style="font-size:.75rem;background:#7c3aed;color:#fff;padding:2px 8px;border-radius:4px">SP 2022</span>
-      </div>
-      <div class="chart-grid">
-        <div class="card" style="padding:12px">
-          <div style="font-size:.8rem;color:var(--text3);margin-bottom:8px">Distribuição por Faixa Etária</div>
-          <canvas id="chart-faixa-etaria" height="220"></canvas>
-        </div>
-        <div class="card" style="padding:12px">
-          <div style="font-size:.8rem;color:var(--text3);margin-bottom:8px">Escolaridade do Eleitorado</div>
-          <canvas id="chart-escolaridade" height="220"></canvas>
-        </div>
-      </div>
-      <div class="card" style="padding:12px">
-        <div style="font-size:.8rem;color:var(--text3);margin-bottom:8px">Gênero do Eleitorado</div>
-        <div style="display:flex;justify-content:center">
-          <canvas id="chart-genero" width="300" height="160"></canvas>
-        </div>
-      </div>
-    </div>
-
-    <!-- SOCIAL TAB -->
-    <div id="tab-social" class="tab-content" style="display:none;flex:1;overflow-y:auto;padding:16px;flex-direction:column;gap:12px">
-      <div style="display:flex;gap:8px;align-items:center;margin-bottom:4px">
-        <span style="font-size:1rem;font-weight:700">Redes Sociais — Sentimento + Engajamento</span>
-        <span id="social-uf-badge" style="font-size:.75rem;background:#7c3aed;color:#fff;padding:2px 8px;border-radius:4px">SP 2022</span>
-      </div>
-      <div class="chart-grid">
-        <div class="card" style="padding:12px">
-          <div style="font-size:.8rem;color:var(--text3);margin-bottom:8px">Sentimento por Candidato</div>
-          <canvas id="ch-sentimento-timeline" height="200"></canvas>
-        </div>
-        <div class="card" style="padding:12px">
-          <div style="font-size:.8rem;color:var(--text3);margin-bottom:8px">Engajamento por Plataforma</div>
-          <canvas id="ch-plataformas" height="200"></canvas>
-        </div>
-        <div class="card" style="padding:12px">
-          <div style="font-size:.8rem;color:var(--text3);margin-bottom:8px">Temas Dominantes</div>
-          <canvas id="ch-temas" height="200"></canvas>
-        </div>
-        <div class="card" style="padding:12px">
-          <div style="font-size:.8rem;color:var(--text3);margin-bottom:8px">Alertas de Crise</div>
-          <div id="crisis-list" style="font-size:.76rem;display:flex;flex-direction:column;gap:8px;color:var(--text2)">
-            <p style="color:var(--text3)">Carregando alertas...</p>
+        <div class="pc" style="margin-top:auto">
+          <div style="display:flex;gap:6px;flex-wrap:wrap">
+            <button class="btn-pdf" style="flex:1;padding:5px;font-size:.7rem" onclick="gerarRelatorioPDF()">&#128196; Relat&#243;rio PDF</button>
+            <button class="btn-pdf" style="flex:1;padding:5px;font-size:.7rem;color:#22c55e;border-color:#22c55e33" onclick="solicitarParecerAuditor()">&#128269; Auditor</button>
           </div>
         </div>
+        <!-- Stats compat elements -->
+        <div style="display:none">
+          <span id="map-stats"></span>
+        </div>
+      </div>
+
+      <!-- PESQUISAS -->
+      <div class="pbody" id="pt-pesquisas">
+        <div class="pc">
+          <h4>Tracking &#8212; Inten&#231;&#227;o de Voto <span class="tag poll">pesquisas</span></h4>
+          <canvas id="chart-pesquisas-tracking" height="130"></canvas>
+          <div style="font-size:.59rem;color:var(--text3);margin-top:4px">M&#233;dia ponderada &middot; Banda = IC 90%</div>
+        </div>
+        <div class="pc">
+          <h4>&#218;ltimas Pesquisas <span id="pesq-uf-label" class="tag poll">Brasil</span></h4>
+          <div id="pesq-list"><div class="mrp-empty">Clique em um estado</div></div>
+        </div>
+      </div>
+
+      <!-- SOCIAL -->
+      <div class="pbody" id="pt-social">
+        <div class="pc">
+          <h4>Sentimento por Plataforma <span class="tag soc">24h</span></h4>
+          <div id="social-platforms"><div class="mrp-empty">Sem dados configurados</div></div>
+          <div style="font-size:.59rem;color:var(--text3);margin-top:4px">BERTimbau fine-tuned &middot; positivo/neutro/negativo</div>
+        </div>
+        <div class="pc">
+          <h4>Evolu&#231;&#227;o de Sentimento &#8212; 30 dias</h4>
+          <canvas id="chart-sentiment-evo" height="110"></canvas>
+        </div>
+        <div class="pc">
+          <h4>T&#243;picos em Alta <span class="tag soc">6h</span></h4>
+          <div id="social-topics"><div class="mrp-empty">Sem dados dispon&#237;veis</div></div>
+          <div style="font-size:.59rem;color:var(--text3);margin-top:4px">&#128308; viral (&gt;50k) &middot; &#127841; em alta (&gt;10k)</div>
+        </div>
+      </div>
+
+      <!-- CONTEXTO -->
+      <div class="pbody" id="pt-contexto">
+        <div style="padding-bottom:8px;border-bottom:1px solid var(--border);margin-bottom:8px;display:flex;align-items:center;gap:8px">
+          <span style="font-size:.95rem;font-weight:700" id="mrp-uf-label">&#8592; Clique no mapa</span>
+          <span class="tag tse" id="mrp-uf-badge" style="display:none"></span>
+        </div>
+        <div id="mrp-contexto"><div class="mrp-empty">Clique em um estado para ver indicadores</div></div>
+        <div id="mrp-previsao"><div class="mrp-empty">Selecione um estado para ver predi&#231;&#227;o M1</div></div>
+        <div id="mrp-pesquisas"><div class="mrp-empty">Selecione um estado para ver pesquisas</div></div>
+      </div>
+
+      <!-- SHAP -->
+      <div class="pbody" id="pt-shap">
+        <div style="font-size:.69rem;color:var(--text2);margin-bottom:8px;line-height:1.5">SHAP values: contribui&#231;&#227;o de cada feature para a predi&#231;&#227;o. Positivo = aumenta probabilidade do candidato.</div>
+        <div class="pc">
+          <h4>SHAP Global &#8212; <span id="shap-cand">&#8212;</span></h4>
+          <div id="shap-global"><div class="mrp-empty">Selecione cargo e UF para ver SHAP</div></div>
+        </div>
+      </div>
+
+      <!-- CHAT IA -->
+      <div class="pbody" id="pt-chat" style="padding:0;overflow:hidden;display:flex;flex-direction:column">
+        <div class="chat-hdr">
+          <span class="ai-dot"></span>
+          <div><h3>SPEPE AI</h3><span class="csub">Chat + Dashboard sync</span></div>
+          <span class="model-badge">Sonnet 4.6</span>
+        </div>
+        <div class="sync-bar" id="sbar"></div>
+        <div class="msgs" id="msgs">
+          <div class="msg"><div class="mav ai">AI</div><div>
+            <div class="mb">Ol&#225;! Mapa eleitoral carregado.<br><br>
+            Clique em um estado, mude os filtros, ou pergunte aqui &#8212; o mapa sincroniza com cada resposta.</div>
+            <div class="mmeta"><span class="mtime">agora</span></div>
+          </div></div>
+        </div>
+        <div class="chips" id="chips">
+          <span class="chip" onclick="sc(this)">Mapa eleitoral Brasil 2022</span>
+          <span class="chip" onclick="sc(this)">Previs&#227;o Lula 2026</span>
+          <span class="chip" onclick="sc(this)">Governador SP 2022</span>
+          <span class="chip" onclick="sc(this)">Top munic&#237;pios Bolsonaro</span>
+          <span class="chip" onclick="sc(this)">IDH vs resultado eleitoral</span>
+          <span class="chip" onclick="sc(this)">Sentimento social candidatos</span>
+        </div>
+        <div class="cin-row">
+          <textarea class="cin" id="cin" rows="1" placeholder="Pergunte sobre o mapa ou eleitorado..."
+            onkeydown="if(event.key==='Enter'&amp;&amp;!event.shiftKey){event.preventDefault();sendMsg()}"></textarea>
+          <button class="bsend" id="bsend" onclick="sendMsg()">&#9658;</button>
+        </div>
       </div>
     </div>
-
-    <!-- ENDIVIDAMENTO TAB -->
-    <div id="tab-endividamento" class="tab-content" style="display:none;flex:1;overflow-y:auto;padding:16px;flex-direction:column;gap:12px">
-      <div style="display:flex;gap:8px;align-items:center;margin-bottom:4px">
-        <span style="font-size:1rem;font-weight:700">Endividamento Familiar — BCB/BACEN</span>
-        <span id="endiv-ano-badge" style="font-size:.75rem;background:#0891b2;color:#fff;padding:2px 8px;border-radius:4px">2025-2026</span>
-      </div>
-      <div class="chart-grid">
-        <div class="card" style="padding:12px">
-          <div style="font-size:.8rem;color:var(--text3);margin-bottom:8px">Endividamento das Famílias (%)</div>
-          <canvas id="ch-endividamento" height="200"></canvas>
-        </div>
-        <div class="card" style="padding:12px">
-          <div style="font-size:.8rem;color:var(--text3);margin-bottom:8px">Comprometimento de Renda e Inadimplência (%)</div>
-          <canvas id="ch-inadimplencia" height="200"></canvas>
-        </div>
-      </div>
-      <div class="card" style="padding:12px">
-        <div style="font-size:.8rem;color:var(--text3);margin-bottom:6px">Dados BACEN — Série mensal (SGS API)</div>
-        <div id="endiv-table" style="font-size:.74rem;color:var(--text2)">Carregando...</div>
-      </div>
-    </div>
-
-    <!-- PARLAMENTARES TAB -->
-    <div id="tab-parlamentares" class="tab-content" style="display:none;flex:1;overflow-y:auto;padding:16px;flex-direction:column;gap:12px">
-      <div style="display:flex;gap:8px;align-items:center;margin-bottom:4px">
-        <span style="font-size:1rem;font-weight:700">Câmara &amp; Senado — Votações Parlamentares</span>
-        <span id="parl-ano-badge" style="font-size:.75rem;background:#059669;color:#fff;padding:2px 8px;border-radius:4px">2025</span>
-      </div>
-      <div class="chart-grid">
-        <div class="card" style="padding:12px">
-          <div style="font-size:.8rem;color:var(--text3);margin-bottom:8px">Votações por Partido (% favorável)</div>
-          <canvas id="ch-partido-voto" height="220"></canvas>
-        </div>
-        <div class="card" style="padding:12px">
-          <div style="font-size:.8rem;color:var(--text3);margin-bottom:8px">Câmara vs Senado — Volume de Votações</div>
-          <canvas id="ch-casa-voto" height="220"></canvas>
-        </div>
-      </div>
-      <div class="card" style="padding:12px">
-        <div style="font-size:.8rem;color:var(--text3);margin-bottom:6px">Top Temas por Volume de Votações</div>
-        <div id="parl-table" style="font-size:.74rem;color:var(--text2)">Carregando...</div>
-      </div>
-    </div>
-
-    <!-- CHAT -->
-    <aside class="chat-panel">
-      <div class="chat-hdr">
-        <span class="ai-dot"></span>
-        <div><h3>SPEPE AI</h3><span class="csub">Chat + Dashboard sync</span></div>
-        <span class="model-badge">Sonnet 4.6</span>
-      </div>
-      <div class="sync-bar" id="sbar"></div>
-      <div class="msgs" id="msgs">
-        <div class="msg"><div class="mav ai">AI</div><div>
-          <div class="mb">Olá! Dashboard carregado para <strong>SP 2022</strong>.<br><br>
-          Use os tabs de cargo acima ou pergunte aqui — o dashboard sincroniza automaticamente com cada resposta.</div>
-          <div class="mmeta"><span class="mtime">agora</span></div>
-        </div></div>
-      </div>
-      <div class="chips" id="chips">
-        <span class="chip" onclick="sc(this)">Mapa eleitoral Brasil 2022</span>
-        <span class="chip" onclick="sc(this)">Previsão Lula 2026</span>
-        <span class="chip" onclick="sc(this)">Comparar todos os cargos</span>
-        <span class="chip" onclick="sc(this)">Governador SP 2022</span>
-        <span class="chip" onclick="sc(this)">Dep. Federal top 5</span>
-        <span class="chip" onclick="sc(this)">PT vs PL em cada cargo</span>
-        <span class="chip" onclick="sc(this)">Top municípios Bolsonaro</span>
-        <span class="chip" onclick="sc(this)">Perfil socioecon. vencedor</span>
-      </div>
-      <div class="cin-row">
-        <textarea class="cin" id="cin" rows="1" placeholder="Pergunte sobre o dashboard..."
-          onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();sendMsg()}"></textarea>
-        <button class="bsend" id="bsend" onclick="sendMsg()">➤</button>
-      </div>
-    </aside>
   </div>
+
+  <!-- Hidden compat elements (referenced by existing JS without optional chaining) -->
+  <span id="bc" style="display:none"></span>
+  <div id="tab-mapa" class="active" style="display:none"></div>
+  <div id="dash" style="display:none"></div>
+  <div id="card-compare" style="display:none"></div>
+  <span id="cands-title" style="display:none"></span>
+  <div id="cand-grid" style="display:none"></div>
+  <table style="display:none"><thead id="tbl-head"></thead><tbody id="tbl-body"></tbody></table>
+  <span id="res-title" style="display:none"></span><span id="res-sub" style="display:none"></span>
+  <span id="tbl-title" style="display:none"></span>
+  <span id="kv0" style="display:none"></span><span id="ks0" style="display:none"></span><span id="kd0" style="display:none"></span>
+  <span id="kv1" style="display:none"></span><span id="ks1" style="display:none"></span><span id="kd1" style="display:none"></span>
+  <span id="kv2" style="display:none"></span><span id="kv3" style="display:none"></span><span id="ks3" style="display:none"></span>
+  <select id="map-color-by" style="display:none"><option value="lider">L&#237;der</option><option value="margem">Margem</option></select>
+  <select id="map-layer-sel" style="display:none"><option value="electoral">Eleitoral</option></select>
+  <span id="socio-uf-badge" style="display:none"></span><span id="seg-uf-badge" style="display:none"></span>
+  <span id="saude-uf-badge" style="display:none"></span><span id="pesq-cargo-badge" style="display:none"></span>
+  <span id="perfis-uf-badge" style="display:none"></span><span id="endiv-ano-badge" style="display:none"></span>
+  <span id="parl-ano-badge" style="display:none"></span>
+  <div id="endiv-table" style="display:none"></div><div id="parl-table" style="display:none"></div>
+  <tbody id="tbody-socio" style="display:none"></tbody><tbody id="tbody-seg" style="display:none"></tbody>
+  <tbody id="tbody-saude" style="display:none"></tbody><tbody id="tbody-pesq" style="display:none"></tbody>
 </div>
 <div class="toast" id="tst"></div>
 
@@ -1941,9 +1636,11 @@ function setMapMode(mode) {
 function handleMapClick(cod, nome) {
   const d = _mapData[String(cod)] || null;
   if(d) _updateStats(d);
-  // Preenche painel direito quando clicando em UF ou Município com UF no contexto
   const uf = (d?.id?.length === 2 ? d.id : null) || _mapCtx.uf || null;
-  if(uf) _loadRightPanel(uf);
+  if(uf) {
+    ptSwitch('contexto');
+    _loadRightPanel(uf);
+  }
 }
 
 // ── Painel direito — Contexto / Predição / Pesquisas ─────────────────────
@@ -3331,6 +3028,58 @@ function solicitarParecerAuditor() {
   const chatPanel = document.querySelector('.chat-panel');
   if (chatPanel) chatPanel.scrollIntoView({behavior:'smooth'});
   toast('📋 Prompt de auditoria carregado — pressione Enviar');
+}
+
+// ── Right panel tab switching (prototype layout) ───────────────────────────
+function ptSwitch(tab) {
+  document.querySelectorAll('.ptab').forEach(t => t.classList.toggle('active', t.dataset.tab === tab));
+  document.querySelectorAll('.pbody').forEach(b => {
+    b.style.display = b.id === 'pt-' + tab ? (tab === 'chat' ? 'flex' : 'block') : 'none';
+    b.classList.toggle('active', b.id === 'pt-' + tab);
+  });
+  if (tab === 'pesquisas') _loadPesquisasRightPanel();
+  if (tab === 'social') _loadSocialPanel();
+  if (tab === 'shap') _loadShapPanel();
+}
+
+function _loadPesquisasRightPanel() {
+  const uf = document.getElementById('f-uf')?.value || 'BR';
+  const cargo = document.getElementById('map-cargo-sel')?.value || 'Governador';
+  const cdCargo = {Presidente:1,Governador:3,Senador:5,'Dep. Federal':6,'Dep. Estadual':7}[cargo]||3;
+  const el = document.getElementById('pesq-list');
+  if(!el) return;
+  el.innerHTML = '<div class="mrp-empty">Carregando...</div>';
+  document.getElementById('pesq-uf-label').textContent = uf;
+  apiFetch(`/api/pesquisas/intencao?uf=${uf}&cd_cargo=${cdCargo}&ano=2026`)
+    .then(r => r?.json()).then(data => {
+      const rows = (data?.data || []).slice(0, 8);
+      if (!rows.length) { el.innerHTML = '<div class="mrp-empty">Sem pesquisas disponíveis</div>'; return; }
+      el.innerHTML = rows.map(r => `<div class="mrp-row"><span>${r.candidato||'?'}</span><span>${(+(r.intencao_ponderada||0)).toFixed(1)}%</span></div>`).join('');
+    }).catch(() => { el.innerHTML = '<div class="mrp-empty">Pesquisas indisponíveis</div>'; });
+}
+
+async function _loadSocialPanel() {
+  try {
+    const uf = document.getElementById('f-uf')?.value || 'BR';
+    const res = await apiFetch(`/api/social/sentimento?uf=${uf}`);
+    const data = (await res?.json())?.data || [];
+    const el = document.getElementById('social-platforms');
+    if(!el) return;
+    if(!data.length){ el.innerHTML = '<div class="mrp-empty">Sem dados de sentimento</div>'; return; }
+    el.innerHTML = data.slice(0,5).map(d => {
+      const pct = ((d.score_sentimento||0)+1)/2*100;
+      return `<div class="krow"><span class="klbl">${d.plataforma||d.sg_uf||'?'}</span><span class="kv ${pct>55?'g':pct<45?'r':'y'}">${(+(d.score_sentimento||0)).toFixed(2)}</span></div>`;
+    }).join('');
+  } catch { /* no-op */ }
+}
+
+function _loadShapPanel() {
+  const el = document.getElementById('shap-global');
+  if(!el) return;
+  const cargo = document.getElementById('f-cargo')?.value || 'Governador';
+  const uf = document.getElementById('f-uf')?.value || 'SP';
+  document.getElementById('shap-cand') && (document.getElementById('shap-cand').textContent = cargo + ' · ' + uf);
+  el.innerHTML = '<div class="mrp-empty">SHAP — modelo não deployado ainda</div>';
 }
 </script>
 </body>
