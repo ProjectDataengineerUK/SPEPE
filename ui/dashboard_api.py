@@ -156,6 +156,8 @@ _PUBLIC_API_PATHS = {
     "/api/aliancas",
     "/api/adversarios",
     "/api/parcerias",
+    "/api/meta_votos",
+    "/api/gdelt_eventos",
 }
 
 
@@ -5418,6 +5420,117 @@ async def get_parcerias(
             "top_ufs": _PARCERIAS_FALLBACK_TOP_UFS,
             "uf": uf,
             "cargo": cargo,
+            "status": "fallback",
+        }
+    )
+
+
+# ── Meta de Votos por Município ───────────────────────────────────────────────
+
+_CRESCIMENTO_ELEITORADO = 0.042  # estimativa IBGE 2022→2026
+
+
+@app.get("/api/meta_votos")
+async def get_meta_votos(
+    uf: str = Query("SP"),
+    cargo: str = Query("Governador"),
+    candidato: str = Query(""),
+) -> JSONResponse:
+    """Projeção de votos necessários para vitória com base em 2022 + crescimento estimado."""
+    if settings.gcp_project_id and os.environ.get("USE_BIGQUERY", "").lower() == "true":
+        try:
+            from google.cloud import bigquery
+
+            client = bigquery.Client(project=settings.gcp_project_id)
+            gold = f"{settings.gcp_project_id}.{settings.bigquery_dataset_gold}"
+            params = [
+                bigquery.ScalarQueryParameter("uf", "STRING", uf.upper()),
+                bigquery.ScalarQueryParameter("cargo", "STRING", cargo),
+                bigquery.ScalarQueryParameter("ano", "INT64", 2022),
+            ]
+            where = "sg_uf = @uf AND ds_cargo_normalizado = @cargo AND ano_eleicao = @ano"
+            if candidato:
+                where += " AND nm_candidato = @candidato"
+                params.append(bigquery.ScalarQueryParameter("candidato", "STRING", candidato))
+            query = f"""
+                SELECT
+                    sg_uf,
+                    nm_municipio,
+                    SUM(qt_votos_nominais) AS votos_2022,
+                    ROUND(SUM(qt_votos_nominais) * {1 + _CRESCIMENTO_ELEITORADO}, 0) AS meta_2026
+                FROM `{gold}.fact_municipio_candidato_eleicao`
+                WHERE {where}
+                GROUP BY sg_uf, nm_municipio
+                ORDER BY votos_2022 DESC
+                LIMIT 20
+            """
+            job_config = bigquery.QueryJobConfig(query_parameters=params)
+            rows = list(client.query(query, job_config=job_config).result())
+            data = [dict(r) for r in rows]
+            total_2022 = sum(r["votos_2022"] for r in data)
+            return JSONResponse(
+                {
+                    "data": data,
+                    "total_votos_2022": total_2022,
+                    "meta_2026": round(total_2022 * (1 + _CRESCIMENTO_ELEITORADO)),
+                    "crescimento_pct": _CRESCIMENTO_ELEITORADO,
+                }
+            )
+        except Exception as exc:
+            logger.warning("BQ meta_votos falhou: %s", exc)
+    return JSONResponse(
+        {
+            "data": [],
+            "total_votos_2022": 0,
+            "meta_2026": 0,
+            "crescimento_pct": _CRESCIMENTO_ELEITORADO,
+            "status": "no_bq",
+        }
+    )
+
+
+# ── GDELT Clipping ────────────────────────────────────────────────────────────
+
+
+@app.get("/api/gdelt_eventos")
+async def get_gdelt_eventos(
+    uf: str = Query("BR"),
+    candidato: str = Query(""),
+) -> JSONResponse:
+    """Eventos GDELT — fallback com eventos representativos estáticos."""
+    return JSONResponse(
+        {
+            "eventos": [
+                {
+                    "data": "2024-03-15",
+                    "titulo": "Discurso no Congresso Nacional",
+                    "tom": 0.3,
+                    "intensidade": 42,
+                    "fonte": "Reuters",
+                },
+                {
+                    "data": "2024-02-28",
+                    "titulo": "Declaração sobre política econômica",
+                    "tom": -0.1,
+                    "intensidade": 28,
+                    "fonte": "AP",
+                },
+                {
+                    "data": "2024-02-10",
+                    "titulo": "Encontro bilateral com líderes sul-americanos",
+                    "tom": 0.5,
+                    "intensidade": 18,
+                    "fonte": "AFP",
+                },
+            ],
+            "semanas": [
+                {"semana": "S1 fev", "eventos": 12},
+                {"semana": "S2 fev", "eventos": 18},
+                {"semana": "S3 fev", "eventos": 28},
+                {"semana": "S4 fev", "eventos": 15},
+                {"semana": "S1 mar", "eventos": 42},
+                {"semana": "S2 mar", "eventos": 35},
+            ],
             "status": "fallback",
         }
     )

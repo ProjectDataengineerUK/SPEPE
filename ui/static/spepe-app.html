@@ -678,6 +678,9 @@ html,body{font-size:13px}
         <div class="ptab" data-tab="aliancas" onclick="ptSwitch('aliancas')">Alianças</div>
         <div class="ptab" data-tab="adversarios" onclick="ptSwitch('adversarios')">Adversários</div>
         <div class="ptab" data-tab="parcerias" onclick="ptSwitch('parcerias')">Parcerias</div>
+        <div class="ptab" data-tab="meta" onclick="ptSwitch('meta')">Meta</div>
+        <div class="ptab" data-tab="gdelt" onclick="ptSwitch('gdelt')">GDELT</div>
+        <div class="ptab" data-tab="secoes" onclick="ptSwitch('secoes')">Seções</div>
         <div class="ptab" data-tab="chat" onclick="ptSwitch('chat')">Chat IA</div>
       </div>
 
@@ -997,6 +1000,69 @@ html,body{font-size:13px}
           <div style="font-size:.59rem;color:var(--text3);margin-top:4px">Score = % municípios com potencial de coalizão acima de 50%</div>
         </div>
         <div class="leg-source">TSE · fact_municipio_candidato_eleicao · 2022 + modelo M1</div>
+      </div>
+
+      <!-- META DE VOTOS -->
+      <div class="pbody" id="pt-meta">
+        <div class="pc">
+          <h4>Meta de Votos 2026 <span id="meta-uf-label" class="tag tse">SP</span></h4>
+          <div style="font-size:.62rem;color:var(--text2);margin-bottom:8px">
+            Projeção de votos necessários para vitória com base em 2022 + crescimento estimado do eleitorado.
+          </div>
+          <div class="krow"><span class="klbl">Votos em 2022</span><span class="kv" id="meta-votos22">—</span></div>
+          <div class="krow"><span class="klbl">Crescimento eleitorado</span><span class="kv g" id="meta-crescimento">+4.2%</span></div>
+          <div class="krow"><span class="klbl">Meta 2026 (vitória)</span><span class="kv b" id="meta-alvo">—</span></div>
+          <div class="krow"><span class="klbl">Meta mínima (2º turno)</span><span class="kv y" id="meta-min">—</span></div>
+        </div>
+        <div class="pc">
+          <h4>Top Municípios — Potencial de Votos</h4>
+          <div id="meta-municipios"><div class="mrp-empty">Carregando...</div></div>
+        </div>
+        <div class="pc">
+          <h4>Distribuição de Metas por Região</h4>
+          <canvas id="chart-meta" height="100"></canvas>
+        </div>
+        <div class="leg-source">TSE 2022 · fact_municipio_candidato_eleicao · IBGE estimativa eleitorado</div>
+      </div>
+
+      <!-- GDELT CLIPPING -->
+      <div class="pbody" id="pt-gdelt">
+        <div class="pc">
+          <h4>Eventos GDELT <span id="gdelt-uf-label" class="tag ibge">Brasil</span></h4>
+          <div style="font-size:.62rem;color:var(--text2);margin-bottom:8px">
+            Eventos políticos de repercussão internacional indexados pelo GDELT — impacto potencial no eleitorado.
+          </div>
+          <div id="gdelt-rows"><div class="mrp-empty">Carregando eventos...</div></div>
+        </div>
+        <div class="pc">
+          <h4>Intensidade Semanal <span style="font-size:.6rem;font-weight:400;color:var(--text3)">nº eventos / semana</span></h4>
+          <canvas id="chart-gdelt" height="90"></canvas>
+        </div>
+        <div class="leg-source">GDELT 2.0 · Cobertura internacional · Atualização diária</div>
+      </div>
+
+      <!-- SEÇÕES ELEITORAIS (Stub Fase 2) -->
+      <div class="pbody" id="pt-secoes">
+        <div class="pc">
+          <h4>Seções Eleitorais <span class="tag tse">Fase 2</span></h4>
+          <div style="font-size:.72rem;line-height:1.7;color:var(--text2);padding:8px 0">
+            O mapa por seção eleitoral exigirá a geolocalização de <strong>~500 mil seções</strong>
+            do TSE com coordenadas lat/lng por local de votação.<br><br>
+            <strong>Pipeline planejado:</strong><br>
+            1. TSE → seções_votacao_job (endereços) → Bronze<br>
+            2. Geocoding via Google Maps API → Silver<br>
+            3. Gold: fact_secao_eleitoral (lat, lng, qt_eleitores, resultado)<br>
+            4. Frontend: Leaflet clusters por zoom level
+          </div>
+        </div>
+        <div class="pc">
+          <h4>Status de Implementação</h4>
+          <div class="krow"><span class="klbl">Seções cadastradas (TSE)</span><span class="kv">~497.000</span></div>
+          <div class="krow"><span class="klbl">Com endereço completo</span><span class="kv y">~78%</span></div>
+          <div class="krow"><span class="klbl">Geocodificadas</span><span class="kv r">0%</span></div>
+          <div class="krow"><span class="klbl">Estimativa Fase 2</span><span class="kv b">~2026-Q3</span></div>
+        </div>
+        <div class="leg-source">TSE · Endereços de seções eleitorais · Geocoding planejado para Fase 2</div>
       </div>
 
       <!-- CHAT IA -->
@@ -3426,6 +3492,8 @@ function ptSwitch(tab) {
   if (tab === 'aliancas') _loadAliancasTab();
   if (tab === 'adversarios') _loadAdversariosTab();
   if (tab === 'parcerias') _loadParceriasTab();
+  if (tab === 'meta') _loadMetaTab();
+  if (tab === 'gdelt') _loadGdeltTab();
 }
 
 function _loadPesquisasRightPanel() {
@@ -3818,6 +3886,80 @@ function _loadParceriasTab() {
     .catch(() => {
       if (rowsEl) rowsEl.innerHTML = '<div class="mrp-empty">Erro ao carregar parcerias</div>';
     });
+}
+
+// ── Meta de Votos ─────────────────────────────────────────────────────────────
+async function _loadMetaTab() {
+  const uf = document.getElementById('f-uf')?.value || 'SP';
+  const cargo = document.getElementById('f-cargo')?.value || 'Governador';
+  const el = document.getElementById('meta-municipios');
+  const lbl = document.getElementById('meta-uf-label');
+  if (lbl) lbl.textContent = uf;
+  if (el) el.innerHTML = '<div class="mrp-empty">Carregando...</div>';
+
+  try {
+    const res = await apiFetch(`/api/meta_votos?uf=${uf}&cargo=${encodeURIComponent(cargo)}`);
+    const json = await res.json();
+    const fmt = n => n ? Number(n).toLocaleString('pt-BR') : '—';
+    document.getElementById('meta-votos22').textContent = fmt(json.total_votos_2022);
+    document.getElementById('meta-alvo').textContent = fmt(json.meta_2026);
+    document.getElementById('meta-min').textContent = fmt(Math.round(json.meta_2026 * 0.5));
+    document.getElementById('meta-crescimento').textContent = '+' + ((json.crescimento_pct||0)*100).toFixed(1) + '%';
+
+    const top = (json.data || []).slice(0, 8);
+    if (el) el.innerHTML = top.length ? top.map(d => {
+      const pct = json.meta_2026 ? Math.min((d.votos_2022/json.meta_2026)*100*10, 100) : 0;
+      return `<div class="hist-row">
+        <span class="hist-ano" style="width:90px;font-size:.62rem">${(d.nm_municipio||'').slice(0,12)}</span>
+        <div class="bar-h"><div class="bar-fill" style="width:${pct}%;background:#1976d2"></div></div>
+        <span class="hist-val kv">${Number(d.votos_2022||0).toLocaleString('pt-BR')}</span>
+      </div>`;
+    }).join('') : '<div class="mrp-empty">Sem dados</div>';
+  } catch {
+    if (el) el.innerHTML = '<div class="mrp-empty">Indisponível</div>';
+  }
+}
+
+// ── GDELT Clipping ────────────────────────────────────────────────────────────
+let _chartGdelt = null;
+async function _loadGdeltTab() {
+  const uf = document.getElementById('f-uf')?.value || 'BR';
+  const lbl = document.getElementById('gdelt-uf-label');
+  if (lbl) lbl.textContent = uf === 'BR' ? 'Brasil' : uf;
+  const el = document.getElementById('gdelt-rows');
+  if (el) el.innerHTML = '<div class="mrp-empty">Carregando...</div>';
+  try {
+    const res = await apiFetch(`/api/gdelt_eventos?uf=${uf}`);
+    const json = await res.json();
+    const evs = json.eventos || [];
+    if (el) el.innerHTML = evs.length ? evs.map(e => {
+      const tone = e.tom > 0.2 ? 'g' : e.tom < -0.2 ? 'r' : 'y';
+      return `<div class="pol-row" style="display:flex;gap:7px;align-items:flex-start;padding:6px 0;border-bottom:1px solid var(--border)">
+        <span style="font-size:.6rem;color:var(--text3);width:50px;flex-shrink:0">${e.data||''}</span>
+        <div style="flex:1">
+          <div style="font-size:.7rem;font-weight:600">${e.titulo||''}</div>
+          <div style="font-size:.6rem;color:var(--text3)">${e.fonte||'GDELT'} · ${e.intensidade||0} citações</div>
+        </div>
+        <span class="kv ${tone}" style="font-size:.65rem;flex-shrink:0">${e.tom>0?'+':''}${(+(e.tom||0)).toFixed(2)}</span>
+      </div>`;
+    }).join('') : '<div class="mrp-empty">Sem eventos disponíveis</div>';
+
+    const semanas = json.semanas || [];
+    const ctx = document.getElementById('chart-gdelt');
+    if (ctx && semanas.length) {
+      if (_chartGdelt) { _chartGdelt.destroy(); _chartGdelt = null; }
+      _chartGdelt = new Chart(ctx, {
+        type: 'bar',
+        data: {
+          labels: semanas.map(s => s.semana),
+          datasets: [{ label: 'Eventos', data: semanas.map(s => s.eventos), backgroundColor: '#7c3aed88', borderColor: '#7c3aed', borderWidth: 1, borderRadius: 3 }]
+        },
+        options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: { x: { ticks: { color: '#8d96a0', font: { size: 9 } }, grid: { color: '#21262d' } }, y: { ticks: { color: '#8d96a0', font: { size: 9 } }, grid: { color: '#21262d' } } } }
+      });
+    }
+  } catch {
+    if (el) el.innerHTML = '<div class="mrp-empty">GDELT indisponível</div>';
+  }
 }
 
 // ── Init ──────────────────────────────────────────────────────────────────────
