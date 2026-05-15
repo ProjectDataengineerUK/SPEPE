@@ -426,6 +426,25 @@ html,body{font-size:13px}
 .leg-text b{color:var(--text)}
 .leg-text small{color:var(--text3);display:block;font-size:.58rem}
 
+/* Layer source attribution badge */
+.lsrc{font-size:.52rem;opacity:.65;margin-left:3px;font-weight:500;letter-spacing:.02em}
+.lbtn.active .lsrc{opacity:.85}
+
+/* Source registry (Fontes tab) */
+.src-domain-hdr{font-size:.58rem;font-weight:700;text-transform:uppercase;letter-spacing:.09em;color:var(--text3);padding:8px 0 4px;border-top:1px solid var(--border);margin-top:6px}
+.src-domain-hdr:first-child{border-top:none;margin-top:0;padding-top:0}
+.src-row{display:grid;grid-template-columns:8px 1fr auto auto;gap:5px;align-items:center;padding:4px 0;border-bottom:1px solid rgba(48,54,61,.5)}
+.src-row:last-child{border-bottom:none}
+.src-dot-sm{width:7px;height:7px;border-radius:50%;flex-shrink:0}
+.src-nm{font-size:.7rem;font-weight:600;color:var(--text)}
+.src-sub{font-size:.58rem;color:var(--text3);display:block;margin-top:1px}
+.src-feeds{font-size:.58rem;color:var(--text2)}
+.src-badge{font-size:.54rem;font-weight:700;padding:1px 5px;border-radius:8px;white-space:nowrap}
+.src-ok{background:var(--green-dim);color:var(--green2);border:1px solid rgba(0,200,83,.3)}
+.src-partial{background:var(--yellow-dim);color:#fcd34d;border:1px solid rgba(245,158,11,.3)}
+.src-off{background:var(--bg4);color:var(--text3);border:1px solid var(--border)}
+.src-summary{display:flex;gap:10px;font-size:.66rem;padding:6px 0 8px}
+
 /* Empty state */
 .mrp-empty{color:var(--text3);font-size:.72rem;padding:12px 0;text-align:center}
 .mrp-row{display:flex;justify-content:space-between;align-items:center;font-size:.72rem;padding:3px 0;border-bottom:1px solid var(--border)}
@@ -605,15 +624,15 @@ html,body{font-size:13px}
 
   <!-- Layer bar (prototype style — replaces main-tabs) -->
   <div class="layer-bar" id="layer-controls">
-    <button class="lbtn layer-btn" data-layer="bivariate">&#128506; Resultado &#215; IDH</button>
-    <button class="lbtn layer-btn active" data-layer="eleitoral">&#127942; Eleitoral</button>
-    <button class="lbtn layer-btn" data-layer="ibge">&#128202; IBGE/IDH</button>
-    <button class="lbtn layer-btn" data-layer="saude">&#127973; Sa&#250;de</button>
-    <button class="lbtn layer-btn" data-layer="seguranca">&#128737; Seguran&#231;a</button>
-    <button class="lbtn layer-btn" data-layer="pesquisas">&#128203; Pesquisas</button>
-    <button class="lbtn layer-btn" data-layer="sentimento">&#128241; Sentimento</button>
-    <button class="lbtn layer-btn" data-layer="predicao">&#128302; Predi&#231;&#227;o 2026</button>
-    <button class="lbtn" id="btn-calor" data-layer="calor" onclick="toggleHeatmap(this)">&#128293; Calor</button>
+    <button class="lbtn layer-btn" data-layer="bivariate">&#128506; Resultado&#215;IDH <span class="lsrc">TSE+IBGE</span></button>
+    <button class="lbtn layer-btn active" data-layer="eleitoral">&#127942; Eleitoral <span class="lsrc">TSE</span></button>
+    <button class="lbtn layer-btn" data-layer="ibge">&#128202; IBGE/IDH <span class="lsrc">IBGE</span></button>
+    <button class="lbtn layer-btn" data-layer="saude">&#127973; Sa&#250;de <span class="lsrc">DATASUS</span></button>
+    <button class="lbtn layer-btn" data-layer="seguranca">&#128737; Seguran&#231;a <span class="lsrc">SINESP</span></button>
+    <button class="lbtn layer-btn" data-layer="pesquisas">&#128203; Pesquisas <span class="lsrc">Polls</span></button>
+    <button class="lbtn layer-btn" data-layer="sentimento">&#128241; Sentimento <span class="lsrc">Social</span></button>
+    <button class="lbtn layer-btn" data-layer="predicao">&#128302; Predi&#231;&#227;o 2026 <span class="lsrc">PyMC</span></button>
+    <button class="lbtn" id="btn-calor" data-layer="calor" onclick="toggleHeatmap(this)">&#128293; Calor <span class="lsrc">Trends</span></button>
     <div class="lsep"></div>
     <select id="overlay-ind" style="background:var(--bg3);border:1px solid var(--border2);border-radius:6px;padding:3px 7px;color:var(--text);font-size:.67rem;outline:none;flex-shrink:0" title="Indicador do eixo Y (modo Bivariate)">
       <option value="idhm">Y: IDH Municipal</option>
@@ -681,6 +700,7 @@ html,body{font-size:13px}
         <div class="ptab" data-tab="meta" onclick="ptSwitch('meta')">Meta</div>
         <div class="ptab" data-tab="gdelt" onclick="ptSwitch('gdelt')">GDELT</div>
         <div class="ptab" data-tab="secoes" onclick="ptSwitch('secoes')">Seções</div>
+        <div class="ptab" data-tab="fontes" onclick="ptSwitch('fontes')">Fontes</div>
         <div class="ptab" data-tab="chat" onclick="ptSwitch('chat')">Chat IA</div>
       </div>
 
@@ -1063,6 +1083,225 @@ html,body{font-size:13px}
           <div class="krow"><span class="klbl">Estimativa Fase 2</span><span class="kv b">~2026-Q3</span></div>
         </div>
         <div class="leg-source">TSE · Endereços de seções eleitorais · Geocoding planejado para Fase 2</div>
+      </div>
+
+      <!-- FONTES DE DADOS -->
+      <div class="pbody" id="pt-fontes">
+        <div class="leg-mini">
+          <div class="leg-mini-title">Fontes de dados mapeadas</div>
+          <div class="src-summary">
+            <span style="color:var(--green2)">● <strong id="fnt-ok">14</strong> ativas</span>
+            <span style="color:#fcd34d">● <strong id="fnt-partial">3</strong> parciais</span>
+            <span style="color:var(--text3)">● <strong id="fnt-off">4</strong> Fase 2</span>
+          </div>
+        </div>
+
+        <!-- ELEITORAL -->
+        <div class="src-domain-hdr">&#127942; Eleitoral (TSE)</div>
+        <div class="pc" style="padding:7px 10px">
+          <div class="src-row">
+            <div class="src-dot-sm" style="background:#00c853"></div>
+            <div><span class="src-nm">TSE — Resultados</span><span class="src-sub">fact_municipio_candidato_eleicao · 2018 / 2022</span></div>
+            <span class="src-feeds">Eleitoral · Modelo · Meta</span>
+            <span class="src-badge src-ok">✅ Ativo</span>
+          </div>
+          <div class="src-row">
+            <div class="src-dot-sm" style="background:#00c853"></div>
+            <div><span class="src-nm">TSE — Candidaturas 2026</span><span class="src-sub">fact_candidato_eleicao · pesquisa como proxy</span></div>
+            <span class="src-feeds">Alianças · Adversários · Parcerias</span>
+            <span class="src-badge src-ok">✅ Ativo</span>
+          </div>
+          <div class="src-row">
+            <div class="src-dot-sm" style="background:#00c853"></div>
+            <div><span class="src-nm">TSE — Perfil Candidato</span><span class="src-sub">dim_candidato · bens, ficha, partido</span></div>
+            <span class="src-feeds">Perfil</span>
+            <span class="src-badge src-ok">✅ Ativo</span>
+          </div>
+          <div class="src-row">
+            <div class="src-dot-sm" style="background:#f59e0b"></div>
+            <div><span class="src-nm">Pesquisas / Polls</span><span class="src-sub">Atlas Intel · Datafolha · MDA · IBOPE</span></div>
+            <span class="src-feeds">Pesquisas · Modelo M2</span>
+            <span class="src-badge src-partial">🟡 Parcial</span>
+          </div>
+        </div>
+
+        <!-- DEMOGRÁFICO -->
+        <div class="src-domain-hdr">&#128202; Demográfico (IBGE)</div>
+        <div class="pc" style="padding:7px 10px">
+          <div class="src-row">
+            <div class="src-dot-sm" style="background:#1976d2"></div>
+            <div><span class="src-nm">IBGE — SIDRA</span><span class="src-sub">fact_ibge_municipio · renda, IDH, alfabetização</span></div>
+            <span class="src-feeds">IBGE/IDH · Contexto · Modelo M1</span>
+            <span class="src-badge src-ok">✅ Ativo</span>
+          </div>
+          <div class="src-row">
+            <div class="src-dot-sm" style="background:#1976d2"></div>
+            <div><span class="src-nm">IBGE — Geometria GeoJSON</span><span class="src-sub">malha UF / município / região (IBGE 2022)</span></div>
+            <span class="src-feeds">Mapa (todos os níveis)</span>
+            <span class="src-badge src-ok">✅ Ativo</span>
+          </div>
+          <div class="src-row">
+            <div class="src-dot-sm" style="background:#1976d2"></div>
+            <div><span class="src-nm">IBGE — Localidades</span><span class="src-sub">municípios · códigos · UF lookup</span></div>
+            <span class="src-feeds">Mapa · join TSE↔IBGE</span>
+            <span class="src-badge src-ok">✅ Ativo</span>
+          </div>
+        </div>
+
+        <!-- SAÚDE & SEGURANÇA -->
+        <div class="src-domain-hdr">&#127973; Saúde &amp; Seguran&#231;a</div>
+        <div class="pc" style="padding:7px 10px">
+          <div class="src-row">
+            <div class="src-dot-sm" style="background:#00bcd4"></div>
+            <div><span class="src-nm">DATASUS — SIASUS / SIHSUS</span><span class="src-sub">mortalidade infantil · cobertura SUS · internações</span></div>
+            <span class="src-feeds">Saúde</span>
+            <span class="src-badge src-ok">✅ Ativo</span>
+          </div>
+          <div class="src-row">
+            <div class="src-dot-sm" style="background:#ef4444"></div>
+            <div><span class="src-nm">Segurança Pública (SINESP/SSP)</span><span class="src-sub">homicídios / 100k · ocorrências por UF/município</span></div>
+            <span class="src-feeds">Segurança</span>
+            <span class="src-badge src-ok">✅ Ativo</span>
+          </div>
+        </div>
+
+        <!-- SOCIAL GOV -->
+        <div class="src-domain-hdr">&#128101; Social Governamental</div>
+        <div class="pc" style="padding:7px 10px">
+          <div class="src-row">
+            <div class="src-dot-sm" style="background:#f97316"></div>
+            <div><span class="src-nm">CadÚnico / Bolsa Família</span><span class="src-sub">fact_transferencias_sociais · 2018–2025</span></div>
+            <span class="src-feeds">Contexto · IBGE/IDH layer</span>
+            <span class="src-badge src-ok">✅ Ativo</span>
+          </div>
+          <div class="src-row">
+            <div class="src-dot-sm" style="background:#f97316"></div>
+            <div><span class="src-nm">Emendas Parlamentares</span><span class="src-sub">fact_emendas_parlamentares · 2018 / 2022 / 2025</span></div>
+            <span class="src-feeds">Contexto · Partidos</span>
+            <span class="src-badge src-ok">✅ Ativo</span>
+          </div>
+          <div class="src-row">
+            <div class="src-dot-sm" style="background:#ef4444"></div>
+            <div><span class="src-nm">Sanções CEIS / CNEP</span><span class="src-sub">fact_sancoes · empresas e pessoas sancionadas</span></div>
+            <span class="src-feeds">Adversários · Compliance</span>
+            <span class="src-badge src-ok">✅ Ativo</span>
+          </div>
+        </div>
+
+        <!-- DIGITAL -->
+        <div class="src-domain-hdr">&#128241; Digital &amp; M&#237;dia</div>
+        <div class="pc" style="padding:7px 10px">
+          <div class="src-row">
+            <div class="src-dot-sm" style="background:#f59e0b"></div>
+            <div><span class="src-nm">Google Trends (pytrends)</span><span class="src-sub">fact_google_trends_uf · interesse de busca por candidato</span></div>
+            <span class="src-feeds">Calor (heat map) · Modelo M3</span>
+            <span class="src-badge src-ok">✅ Ativo</span>
+          </div>
+          <div class="src-row">
+            <div class="src-dot-sm" style="background:#7c3aed"></div>
+            <div><span class="src-nm">Meta Ad Library (Facebook/Instagram)</span><span class="src-sub">gastos políticos · alcance · segmentação</span></div>
+            <span class="src-feeds">Social · Digital tab</span>
+            <span class="src-badge src-ok">✅ Ativo</span>
+          </div>
+          <div class="src-row">
+            <div class="src-dot-sm" style="background:#7c3aed"></div>
+            <div><span class="src-nm">GDELT Events</span><span class="src-sub">spepe_silver.gdelt_events · volume e tom de notícias</span></div>
+            <span class="src-feeds">GDELT · Modelo M3 (cobertura_midia)</span>
+            <span class="src-badge src-partial">🟡 Parcial</span>
+          </div>
+          <div class="src-row">
+            <div class="src-dot-sm" style="background:#57606a"></div>
+            <div><span class="src-nm">CETIC — TIC Domicílios</span><span class="src-sub">acesso internet por UF · perfil digital do eleitor</span></div>
+            <span class="src-feeds">Contexto</span>
+            <span class="src-badge src-ok">✅ Ativo</span>
+          </div>
+        </div>
+
+        <!-- SOCIAL MEDIA -->
+        <div class="src-domain-hdr">&#127758; Redes Sociais</div>
+        <div class="pc" style="padding:7px 10px">
+          <div class="src-row">
+            <div class="src-dot-sm" style="background:#f59e0b"></div>
+            <div><span class="src-nm">Twitter / X</span><span class="src-sub">social_mencoes_br · sentimento BERTimbau</span></div>
+            <span class="src-feeds">Sentimento · Social · Modelo M3</span>
+            <span class="src-badge src-partial">🟡 Parcial</span>
+          </div>
+          <div class="src-row">
+            <div class="src-dot-sm" style="background:#00bcd4"></div>
+            <div><span class="src-nm">BlueSky</span><span class="src-sub">client implementado · Silver OK · job pendente</span></div>
+            <span class="src-feeds">Sentimento · Social</span>
+            <span class="src-badge src-partial">🟡 Parcial</span>
+          </div>
+          <div class="src-row">
+            <div class="src-dot-sm" style="background:#57606a"></div>
+            <div><span class="src-nm">YouTube Data API</span><span class="src-sub">comentários políticos · visualizações · token pendente</span></div>
+            <span class="src-feeds">Social (Fase 2)</span>
+            <span class="src-badge src-off">⬜ Fase 2</span>
+          </div>
+          <div class="src-row">
+            <div class="src-dot-sm" style="background:#57606a"></div>
+            <div><span class="src-nm">Reddit (r/brasil · r/politica)</span><span class="src-sub">PRAW · threads políticas · implementado</span></div>
+            <span class="src-feeds">Social (Fase 2)</span>
+            <span class="src-badge src-off">⬜ Fase 2</span>
+          </div>
+        </div>
+
+        <!-- ECONÔMICO & LEGISLATIVO -->
+        <div class="src-domain-hdr">&#127968; Econ&#244;mico &amp; Legislativo</div>
+        <div class="pc" style="padding:7px 10px">
+          <div class="src-row">
+            <div class="src-dot-sm" style="background:#00c853"></div>
+            <div><span class="src-nm">Câmara / Senado</span><span class="src-sub">fact_parlamentares · votações · presença · mandatos</span></div>
+            <span class="src-feeds">Partidos</span>
+            <span class="src-badge src-ok">✅ Ativo</span>
+          </div>
+          <div class="src-row">
+            <div class="src-dot-sm" style="background:#1976d2"></div>
+            <div><span class="src-nm">DIEESE — Salário Mínimo / Desemprego</span><span class="src-sub">fact_dieese · indicadores por UF · mensal</span></div>
+            <span class="src-feeds">Contexto</span>
+            <span class="src-badge src-ok">✅ Ativo</span>
+          </div>
+          <div class="src-row">
+            <div class="src-dot-sm" style="background:#57606a"></div>
+            <div><span class="src-nm">BACEN — Taxa SELIC / Crédito</span><span class="src-sub">client planejado · não implementado ainda</span></div>
+            <span class="src-feeds">Contexto (Fase 2)</span>
+            <span class="src-badge src-off">⬜ Fase 2</span>
+          </div>
+          <div class="src-row">
+            <div class="src-dot-sm" style="background:#57606a"></div>
+            <div><span class="src-nm">News RSS / Portais</span><span class="src-sub">G1, UOL, R7 · client planejado</span></div>
+            <span class="src-feeds">cobertura_midia (Fase 2)</span>
+            <span class="src-badge src-off">⬜ Fase 2</span>
+          </div>
+        </div>
+
+        <!-- MLOps -->
+        <div class="src-domain-hdr">&#128302; MLOps — Saídas do Modelo</div>
+        <div class="pc" style="padding:7px 10px">
+          <div class="src-row">
+            <div class="src-dot-sm" style="background:#00c853"></div>
+            <div><span class="src-nm">PyMC M1 — Baseline Demográfico</span><span class="src-sub">4 features IBGE · Brier ~0.25 esperado</span></div>
+            <span class="src-feeds">Modelo · Predição 2026</span>
+            <span class="src-badge src-ok">✅ Ativo</span>
+          </div>
+          <div class="src-row">
+            <div class="src-dot-sm" style="background:#00c853"></div>
+            <div><span class="src-nm">PyMC M2 — Eleitoral Completo</span><span class="src-sub">+hist +polls · 14 features · Brier ~0.10–0.18</span></div>
+            <span class="src-feeds">Modelo · SHAP · Predição 2026</span>
+            <span class="src-badge src-ok">✅ Ativo</span>
+          </div>
+          <div class="src-row">
+            <div class="src-dot-sm" style="background:#f59e0b"></div>
+            <div><span class="src-nm">PyMC M3 — Dinâmicas Externas</span><span class="src-sub">+sentiment +GDELT +trends · Brier ~0.08–0.14 est.</span></div>
+            <span class="src-feeds">Modelo M3 (requer tokens sociais)</span>
+            <span class="src-badge src-partial">🟡 Aguardando M3</span>
+          </div>
+        </div>
+
+        <div style="font-size:.58rem;color:var(--text3);line-height:1.7;padding:8px 0">
+          21 clientes implementados &middot; 17 prontos para modelo (14 completos + 3 parciais)<br>
+          Fontes auditadas em 2026-05-12 &middot; Pipeline Medallion: Bronze &#8594; Silver &#8594; Gold
+        </div>
       </div>
 
       <!-- CHAT IA -->
@@ -3495,6 +3734,7 @@ function ptSwitch(tab) {
   if (tab === 'parcerias') _loadParceriasTab();
   if (tab === 'meta') _loadMetaTab();
   if (tab === 'gdelt') _loadGdeltTab();
+  if (tab === 'fontes') _loadFontesTab();
 }
 
 function _loadPesquisasRightPanel() {
@@ -3961,6 +4201,31 @@ async function _loadGdeltTab() {
   } catch {
     if (el) el.innerHTML = '<div class="mrp-empty">GDELT indisponível</div>';
   }
+}
+
+// ── Fontes de Dados ──────────────────────────────────────────────────────────
+async function _loadFontesTab() {
+  const checks = [
+    { id: 'fnt-tse',    url: '/api/mapa/uf?cargo=Governador&ano=2022&turno=1' },
+    { id: 'fnt-ibge',   url: '/api/socioeconomico?uf=SP&ano=2022&limit=1' },
+    { id: 'fnt-polls',  url: '/api/pesquisas/intencao?uf=SP&cd_cargo=3&ano=2026' },
+    { id: 'fnt-social', url: '/api/social/sentimento?uf=SP' },
+    { id: 'fnt-gdelt',  url: '/api/gdelt_eventos?uf=SP' },
+    { id: 'fnt-shap',   url: '/api/model/shap?cargo=Governador&uf=SP' },
+  ];
+  let ok = 14, partial = 3, off = 4;
+  for (const { url } of checks) {
+    try {
+      const r = await apiFetch(url);
+      if (!r || !r.ok) { ok--; partial++; }
+    } catch { ok--; partial++; }
+  }
+  const okEl = document.getElementById('fnt-ok');
+  const pEl = document.getElementById('fnt-partial');
+  const oEl = document.getElementById('fnt-off');
+  if (okEl) okEl.textContent = ok;
+  if (pEl) pEl.textContent = partial;
+  if (oEl) oEl.textContent = off;
 }
 
 // ── Init ──────────────────────────────────────────────────────────────────────
