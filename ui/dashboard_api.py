@@ -159,6 +159,7 @@ _PUBLIC_API_PATHS = {
     "/api/meta_votos",
     "/api/gdelt_eventos",
     "/api/debug/fontes",
+    "/api/previsao",
 }
 
 
@@ -4486,7 +4487,7 @@ _FONTES_SPEC: list[dict] = [
         "bq_table": "fact_saude_municipio",
         "bq_dataset": "gold",
         "bq_date_col": "ano",
-        "bq_sample": "sg_uf, nm_municipio, ano, taxa_mortalidade_infantil_1000, idsus_score",
+        "bq_sample": "cd_municipio_ibge, sg_uf, ano, taxa_mortalidade_infantil_1000, idsus_score",
         "local_glob": "saude_municipal_*.parquet",
         "local_date_col": "ano",
     },
@@ -4497,7 +4498,7 @@ _FONTES_SPEC: list[dict] = [
         "bq_table": "fact_seguranca_municipio",
         "bq_dataset": "gold",
         "bq_date_col": "ano",
-        "bq_sample": "sg_uf, nm_municipio, ano, taxa_homicidio_100k, ivs_total",
+        "bq_sample": "cd_municipio_ibge, sg_uf, ano, taxa_homicidio_100k, ivs_total",
         "local_glob": "seguranca_municipal_*.parquet",
         "local_date_col": "ano",
     },
@@ -4563,7 +4564,8 @@ _FONTES_SPEC: list[dict] = [
         "bq_table": "fact_predictions",
         "bq_dataset": "mlops",
         "bq_date_col": "prediction_date",
-        "bq_sample": "sg_uf, candidato, cd_cargo, ROUND(p_mean,3) AS p_mean, ROUND(p_low,3) AS p_low, prediction_date",
+        "bq_sample": "sg_uf, candidato, ROUND(p_mean,3) AS p_mean, ROUND(p_lower,3) AS p_lower, ROUND(p_upper,3) AS p_upper, prediction_date",
+        "bq_where": "prediction_date >= TIMESTAMP_SUB(CURRENT_TIMESTAMP(), INTERVAL 365 DAY)",
         "local_glob": None,
         "local_date_col": None,
     },
@@ -4579,7 +4581,9 @@ async def _validate_fonte_bq(spec: dict, base: dict) -> dict:
     full = f"`{settings.gcp_project_id}.{dataset_name}.{spec['bq_table']}`"
     dc = spec["bq_date_col"]
 
-    count_q = f"SELECT COUNT(*) AS n, CAST(MIN({dc}) AS STRING) AS d_min, CAST(MAX({dc}) AS STRING) AS d_max FROM {full}"
+    bq_where = spec.get("bq_where")
+    where_clause = f" WHERE {bq_where}" if bq_where else ""
+    count_q = f"SELECT COUNT(*) AS n, CAST(MIN({dc}) AS STRING) AS d_min, CAST(MAX({dc}) AS STRING) AS d_max FROM {full}{where_clause}"
     rows = await asyncio.to_thread(lambda: list(client.query(count_q).result()))
     n = int(rows[0]["n"] or 0)
     base.update(
@@ -4591,7 +4595,11 @@ async def _validate_fonte_bq(spec: dict, base: dict) -> dict:
     )
     if n > 0:
         sample_rows = await asyncio.to_thread(
-            lambda: list(client.query(f"SELECT {spec['bq_sample']} FROM {full} LIMIT 5").result())
+            lambda: list(
+                client.query(
+                    f"SELECT {spec['bq_sample']} FROM {full}{where_clause} LIMIT 5"
+                ).result()
+            )
         )
         base["sample"] = [
             {k: (str(v) if v is not None else None) for k, v in dict(r).items()}
