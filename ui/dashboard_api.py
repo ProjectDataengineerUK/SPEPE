@@ -4457,74 +4457,114 @@ async def debug_tables() -> JSONResponse:
 
 _FONTES_SPEC: list[dict] = [
     {
-        "id": "eleitoral", "icon": "🏆", "label": "Eleitoral TSE",
-        "bq_table": "fact_municipio_candidato_eleicao", "bq_dataset": "gold",
+        "id": "eleitoral",
+        "icon": "🏆",
+        "label": "Eleitoral TSE",
+        "bq_table": "fact_municipio_candidato_eleicao",
+        "bq_dataset": "gold",
         "bq_date_col": "ano_eleicao",
         "bq_sample": "sg_uf, nm_municipio, nm_candidato, ROUND(pct_votos_municipio,3) AS pct_votos, ano_eleicao",
-        "local_glob": "tse_*_*.parquet", "local_date_col": "ano_eleicao",
+        "local_glob": "tse_*_*.parquet",
+        "local_date_col": "ano_eleicao",
     },
     {
-        "id": "ibge", "icon": "📊", "label": "IBGE / IDH",
-        "bq_table": "fact_ibge_municipio", "bq_dataset": "gold",
+        "id": "ibge",
+        "icon": "📊",
+        "label": "IBGE / IDH",
+        "bq_table": "fact_ibge_municipio",
+        "bq_dataset": "gold",
         "bq_date_col": "ano",
         "bq_sample": "sg_uf, nm_municipio, ano, idhm, renda_per_capita, gini",
-        "local_glob": "ibge_*.parquet", "local_date_col": "ano",
+        "local_glob": "ibge_*.parquet",
+        "local_date_col": "ano",
     },
     {
-        "id": "saude", "icon": "🏥", "label": "Saúde DATASUS",
-        "bq_table": "fact_saude_municipio", "bq_dataset": "gold",
+        "id": "saude",
+        "icon": "🏥",
+        "label": "Saúde DATASUS",
+        "bq_table": "fact_saude_municipio",
+        "bq_dataset": "gold",
         "bq_date_col": "ano",
         "bq_sample": "sg_uf, nm_municipio, ano, taxa_mortalidade_infantil_1000, idsus_score",
-        "local_glob": "saude_municipal_*.parquet", "local_date_col": "ano",
+        "local_glob": "saude_municipal_*.parquet",
+        "local_date_col": "ano",
     },
     {
-        "id": "seguranca", "icon": "🛡", "label": "Segurança SINESP",
-        "bq_table": "fact_seguranca_municipio", "bq_dataset": "gold",
+        "id": "seguranca",
+        "icon": "🛡",
+        "label": "Segurança SINESP",
+        "bq_table": "fact_seguranca_municipio",
+        "bq_dataset": "gold",
         "bq_date_col": "ano",
         "bq_sample": "sg_uf, nm_municipio, ano, taxa_homicidio_100k, ivs_total",
-        "local_glob": "seguranca_municipal_*.parquet", "local_date_col": "ano",
+        "local_glob": "seguranca_municipal_*.parquet",
+        "local_date_col": "ano",
     },
     {
-        "id": "pesquisas", "icon": "📋", "label": "Pesquisas Polls",
-        "bq_table": "fact_intencao_voto", "bq_dataset": "gold",
+        "id": "pesquisas",
+        "icon": "📋",
+        "label": "Pesquisas Polls",
+        "bq_table": "fact_intencao_voto",
+        "bq_dataset": "gold",
         "bq_date_col": "ano_eleitoral",
         "bq_sample": "uf, candidato_normalizado, cd_cargo, ano_eleitoral, ROUND(intencao_ponderada,3) AS intencao",
-        "local_glob": "fact_pesquisa_intencao_*.parquet", "local_date_col": "ano_eleitoral",
+        "local_glob": "fact_pesquisa_intencao_*.parquet",
+        "local_date_col": "ano_eleitoral",
     },
     {
-        "id": "sentimento", "icon": "📱", "label": "Sentimento Social",
-        "bq_table": "fact_social_municipio", "bq_dataset": "gold",
+        "id": "sentimento",
+        "icon": "📱",
+        "label": "Sentimento Social",
+        "bq_table": "fact_social_municipio",
+        "bq_dataset": "gold",
         "bq_date_col": "data_referencia",
         "bq_sample": "sg_uf, candidato, fonte, ano, qt_posts, ROUND(score_liquido_sentimento,2) AS score",
-        "local_glob": "social_mencoes_br_*.parquet", "local_date_col": "ano",
+        "local_glob": "social_mencoes_br_*.parquet",
+        "local_date_col": "ano",
     },
     {
-        "id": "trends", "icon": "🔥", "label": "Google Trends",
-        "bq_table": "fact_google_trends_uf", "bq_dataset": "gold",
+        "id": "trends",
+        "icon": "🔥",
+        "label": "Google Trends",
+        "bq_table": "fact_google_trends_uf",
+        "bq_dataset": "gold",
         "bq_date_col": "ano",
         "bq_sample": "sg_uf, candidato, ano, interesse_busca_medio, qt_semanas",
-        "local_glob": "google_trends_uf_*.parquet", "local_date_col": "ano",
+        "local_glob": "google_trends_uf_*.parquet",
+        "local_date_col": "ano",
     },
     {
-        "id": "bolsa", "icon": "💰", "label": "Bolsa Família",
-        "bq_table": "fact_transferencias_sociais", "bq_dataset": "gold",
+        "id": "bolsa",
+        "icon": "💰",
+        "label": "Bolsa Família",
+        "bq_table": "fact_transferencias_sociais",
+        "bq_dataset": "gold",
         "bq_date_col": "ano",
         "bq_sample": "sg_uf, nm_municipio, ano, qtd_beneficiarios_bolsa_familia, valor_total_bolsa_familia_reais",
-        "local_glob": "transferencias_sociais_*.parquet", "local_date_col": "ano",
+        "local_glob": "transferencias_sociais_*.parquet",
+        "local_date_col": "ano",
     },
     {
-        "id": "meta", "icon": "📢", "label": "Meta Ads",
-        "bq_table": "fact_meta_ads_uf", "bq_dataset": "gold",
+        "id": "meta",
+        "icon": "📢",
+        "label": "Meta Ads",
+        "bq_table": "fact_meta_ads_uf",
+        "bq_dataset": "gold",
         "bq_date_col": "ano",
         "bq_sample": "sg_uf, candidato, ano, qt_anuncios, vl_gasto_total_uf, qt_impressoes_total_uf",
-        "local_glob": "meta_ads_regioes_*.parquet", "local_date_col": "ano",
+        "local_glob": "meta_ads_regioes_*.parquet",
+        "local_date_col": "ano",
     },
     {
-        "id": "predicao", "icon": "🔮", "label": "Predição PyMC",
-        "bq_table": "fact_predictions", "bq_dataset": "mlops",
+        "id": "predicao",
+        "icon": "🔮",
+        "label": "Predição PyMC",
+        "bq_table": "fact_predictions",
+        "bq_dataset": "mlops",
         "bq_date_col": "prediction_date",
         "bq_sample": "sg_uf, candidato, cd_cargo, ROUND(p_mean,3) AS p_mean, ROUND(p_low,3) AS p_low, prediction_date",
-        "local_glob": None, "local_date_col": None,
+        "local_glob": None,
+        "local_date_col": None,
     },
 ]
 
@@ -4534,11 +4574,7 @@ async def _validate_fonte_bq(spec: dict, base: dict) -> dict:
     from google.cloud import bigquery
 
     client = bigquery.Client(project=settings.gcp_project_id)
-    dataset_name = (
-        settings.bigquery_dataset_gold
-        if spec["bq_dataset"] == "gold"
-        else "spepe_mlops"
-    )
+    dataset_name = settings.bigquery_dataset_gold if spec["bq_dataset"] == "gold" else "spepe_mlops"
     full = f"`{settings.gcp_project_id}.{dataset_name}.{spec['bq_table']}`"
     dc = spec["bq_date_col"]
 
@@ -4609,15 +4645,20 @@ async def debug_fontes() -> JSONResponse:
     """Valida cada tabela Gold — row count, date range, amostra de 5 linhas.
     Tenta BigQuery; fallback para parquet local se USE_BIGQUERY não ativo.
     """
-    use_bq = bool(
-        settings.gcp_project_id and os.environ.get("USE_BIGQUERY", "").lower() == "true"
-    )
+    use_bq = bool(settings.gcp_project_id and os.environ.get("USE_BIGQUERY", "").lower() == "true")
     results = []
     for spec in _FONTES_SPEC:
         base: dict = {
-            "id": spec["id"], "icon": spec["icon"], "label": spec["label"],
-            "table": spec["bq_table"], "rows": 0, "date_min": None, "date_max": None,
-            "sample": [], "status": "empty", "source_type": "local",
+            "id": spec["id"],
+            "icon": spec["icon"],
+            "label": spec["label"],
+            "table": spec["bq_table"],
+            "rows": 0,
+            "date_min": None,
+            "date_max": None,
+            "sample": [],
+            "status": "empty",
+            "source_type": "local",
         }
         try:
             if use_bq:
