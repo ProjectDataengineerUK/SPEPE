@@ -1988,49 +1988,66 @@ function _safeChart(id, config) {
 }
 
 function initCharts(){
-  CH.resultado=_safeChart('ch-resultado',{type:'bar',
-    data:{labels:[],datasets:[{data:[],backgroundColor:[],borderRadius:6}]},
-    options:{...baseOpt,indexAxis:'y',
-      plugins:{...baseOpt.plugins,tooltip:{callbacks:{label:v=>`${v.formattedValue}%`}}},
-      scales:{x:{ticks:{color:'#8d96a0',callback:v=>v+'%'},grid:{color:'#21262d'}},
-              y:{ticks:{color:'#e6edf3',font:{weight:'600'}},grid:{display:false}}}}});
-
-  CH.socio=_safeChart('ch-socio',{type:'radar',
-    data:{labels:['IDHM','Renda','Emprego','Educação','Urbanização','Gini(inv)'],
-      datasets:[
-        {label:'SP',data:[72,65,70,68,90,55],borderColor:'rgba(25,118,210,.85)',backgroundColor:'rgba(25,118,210,.1)',pointBackgroundColor:'rgba(25,118,210,.85)'},
-        {label:'Brasil',data:[60,50,60,58,78,45],borderColor:'rgba(100,100,100,.5)',backgroundColor:'rgba(100,100,100,.05)',pointBackgroundColor:'#666'}]},
-    options:{...baseOpt,scales:{r:{ticks:{display:false},grid:{color:'#21262d'},
-      pointLabels:{color:'#8d96a0',font:{size:10}}}}}});
-
-  CH.trends=_safeChart('ch-trends',{type:'line',
+  // pt-modelo: prediction tracking (polls vs model over time)
+  CH.tracking=_safeChart('chart-tracking',{type:'line',
     data:{labels:[],datasets:[]},
-    options:{...baseOpt,scales:{x:{ticks:{color:'#8d96a0'},grid:{color:'#21262d'}},
-      y:{min:0,max:100,ticks:{color:'#8d96a0'},grid:{color:'#21262d'}}}}});
-
-  CH.meta=_safeChart('ch-meta',{type:'bar',
-    data:{labels:[],datasets:[{label:'R$ mil',data:[],backgroundColor:[],borderRadius:6}]},
-    options:{...baseOpt,scales:{x:{ticks:{color:'#8d96a0'},grid:{display:false}},
-      y:{ticks:{color:'#8d96a0',callback:v=>'R$'+v/1000+'k'},grid:{color:'#21262d'}}}}});
-
-  CH.previsao=_safeChart('ch-previsao',{type:'bar',
-    data:{labels:['Lula 1T','Lula 2T','Oponente'],
-      datasets:[{label:'P(vitória) %',data:[31,58,42],
-        backgroundColor:['rgba(0,200,83,.8)','rgba(0,200,83,.55)','rgba(25,118,210,.6)'],borderRadius:6}]},
-    options:{...baseOpt,scales:{x:{ticks:{color:'#8d96a0'},grid:{display:false}},
+    options:{...baseOpt,scales:{x:{ticks:{color:'#8d96a0',font:{size:9}},grid:{color:'#21262d'}},
       y:{min:0,max:100,ticks:{color:'#8d96a0',callback:v=>v+'%'},grid:{color:'#21262d'}}}}});
 
-  CH.sentiment=_safeChart('ch-sentiment',{type:'doughnut',
+  // pt-pesquisas: national poll tracking line chart
+  CH.trends=_safeChart('chart-pesquisas-tracking',{type:'line',
+    data:{labels:[],datasets:[]},
+    options:{...baseOpt,scales:{x:{ticks:{color:'#8d96a0',font:{size:9},maxTicksLimit:6},grid:{color:'#21262d'}},
+      y:{min:0,max:60,ticks:{color:'#8d96a0',callback:v=>v+'%'},grid:{color:'#21262d'}}}}});
+
+  // pt-pesquisas: house effect by institute (horizontal bar)
+  CH.polls=_safeChart('chart-house',{type:'bar',
+    data:{labels:[],datasets:[{label:'House Effect (pp)',data:[],backgroundColor:[],borderRadius:3}]},
+    options:{...baseOpt,indexAxis:'y',
+      plugins:{...baseOpt.plugins,tooltip:{callbacks:{label:c=>`${c.raw>=0?'+':''}${c.raw}pp`}}},
+      scales:{x:{ticks:{color:'#8d96a0'},grid:{color:'#21262d'}},
+              y:{ticks:{color:'#e6edf3',font:{size:9}},grid:{display:false}}}}});
+
+  // pt-social: sentiment doughnut (polarization)
+  CH.sentiment=_safeChart('chart-polar',{type:'doughnut',
     data:{labels:['Positivo','Neutro','Negativo'],
       datasets:[{data:[34,28,38],
         backgroundColor:['rgba(0,200,83,.8)','rgba(100,100,100,.5)','rgba(239,68,68,.75)'],
         borderWidth:0,hoverOffset:4}]},
     options:{...baseOpt,cutout:'65%'}});
 
-  CH.polls=_safeChart('ch-polls',{type:'bar',
+  // pt-social: sentiment evolution line chart (30 days)
+  CH.sentEvo=_safeChart('chart-sentiment-evo',{type:'line',
     data:{labels:[],datasets:[]},
-    options:{...baseOpt,scales:{x:{ticks:{color:'#8d96a0',font:{size:10}},grid:{display:false}},
-      y:{min:0,max:55,ticks:{color:'#8d96a0',callback:v=>v+'%'},grid:{color:'#21262d'}}}}});
+    options:{...baseOpt,scales:{x:{ticks:{color:'#8d96a0',font:{size:9}},grid:{color:'#21262d'}},
+      y:{min:-1,max:1,ticks:{color:'#8d96a0'},grid:{color:'#21262d'}}}}});
+
+  // pt-meta: votos meta distribution bar chart
+  CH.meta=_safeChart('chart-meta',{type:'bar',
+    data:{labels:[],datasets:[{label:'Votos',data:[],backgroundColor:[],borderRadius:6}]},
+    options:{...baseOpt,scales:{x:{ticks:{color:'#8d96a0',font:{size:9}},grid:{display:false}},
+      y:{ticks:{color:'#8d96a0'},grid:{color:'#21262d'}}}}});
+
+  // pt-partidos: historical party votes bar chart
+  CH.partidos=_safeChart('chart-partidos',{type:'bar',
+    data:{labels:[],datasets:[]},
+    options:{...baseOpt,scales:{x:{ticks:{color:'#8d96a0',font:{size:9}},grid:{display:false}},
+      y:{ticks:{color:'#8d96a0'},grid:{color:'#21262d'}}}}});
+
+  // pt-parcerias: coalition score by UF
+  CH.parcerias=_safeChart('chart-parcerias',{type:'bar',
+    data:{labels:[],datasets:[{label:'Score',data:[],backgroundColor:'rgba(99,102,241,.6)',borderRadius:4}]},
+    options:{...baseOpt,scales:{x:{ticks:{color:'#8d96a0',font:{size:9}},grid:{display:false}},
+      y:{min:0,max:100,ticks:{color:'#8d96a0'},grid:{color:'#21262d'}}}}});
+
+  // pt-gdelt: GDELT event intensity over time
+  CH.gdelt=_safeChart('chart-gdelt',{type:'line',
+    data:{labels:[],datasets:[{label:'Eventos',data:[],borderColor:'#f59e0b',backgroundColor:'rgba(245,158,11,.15)',borderWidth:1.5,tension:.3,fill:true}]},
+    options:{...baseOpt,scales:{x:{ticks:{color:'#8d96a0',font:{size:9}},grid:{color:'#21262d'}},
+      y:{ticks:{color:'#8d96a0'},grid:{color:'#21262d'}}}}});
+
+  // removed in new layout — set to null so guards work
+  CH.resultado=null; CH.socio=null; CH.previsao=null;
 }
 
 // ══════════════════════════════════════════════════════
@@ -2368,93 +2385,101 @@ async function _loadRightPanel(uf) {
 }
 
 async function _loadContextPanel(uf) {
-  const el = document.getElementById('mrp-contexto');
-  el.innerHTML = '<div class="mrp-empty">Carregando...</div>';
   const ano = document.getElementById('f-ano')?.value || '2022';
-  const row = (label, val, unit='') =>
-    `<div class="mrp-row"><span>${label}</span><span>${val != null ? val+unit : '—'}</span></div>`;
+  const cargo = document.getElementById('map-cargo-sel')?.value || 'Governador';
+  const _set = (id, val) => { const el = document.getElementById(id); if(el) el.textContent = val ?? '—'; };
+  const ctxSub = document.getElementById('ctx-sub');
+  if(ctxSub) ctxSub.textContent = `${uf} · ${ano} · carregando…`;
   try {
-    const [socio, saude, seg] = await Promise.all([
+    const [socio, saude, seg, resEl] = await Promise.all([
       apiFetch(`/api/socioeconomico?uf=${uf}&ano=${ano}`).then(r=>r?.json()).catch(()=>null),
       apiFetch(`/api/saude?uf=${uf}&ano=${ano}`).then(r=>r?.json()).catch(()=>null),
       apiFetch(`/api/seguranca?uf=${uf}&ano=${ano}`).then(r=>r?.json()).catch(()=>null),
+      apiFetch(`/api/resultados/${encodeURIComponent(cargo)}?uf=${uf}&ano=${ano}&turno=1`).then(r=>r?.json()).catch(()=>null),
     ]);
-    const s0 = socio?.data?.[0]; const sa0 = saude?.data?.[0]; const se0 = seg?.data?.[0];
-    el.innerHTML = `
-      <div class="mrp-section">IBGE — Socioeconômico</div>
-      ${row('IDHM', s0?.idhm?.toFixed?.(3))}
-      ${row('Renda per capita', s0?.renda_per_capita ? 'R$ '+Math.round(s0.renda_per_capita).toLocaleString('pt-BR') : null)}
-      ${row('Alfabetização', s0?.taxa_alfabetizacao?.toFixed?.(1), '%')}
-      ${row('População', s0?.populacao_total ? Math.round(s0.populacao_total/1e3)+'k' : null)}
-      <div class="mrp-section">DATASUS — Saúde</div>
-      ${row('Mortalidade infantil', sa0?.tx_mortalidade_infantil_1000?.toFixed?.(1), ' /mil')}
-      ${row('Cobertura plano', sa0?.cobertura_plano_saude_pct?.toFixed?.(1), '%')}
-      <div class="mrp-section">SINESP — Segurança</div>
-      ${row('Taxa homicídio', se0?.taxa_homicidio_100k?.toFixed?.(1), ' /100k')}
-      ${row('Taxa roubo', se0?.taxa_roubo_100k?.toFixed?.(1), ' /100k')}`;
-  } catch {
-    el.innerHTML = '<div class="mrp-empty">Dados indisponíveis</div>';
-  }
+    const s0 = socio?.data?.[0];
+    const sa0 = saude?.data?.[0];
+    const se0 = seg?.data?.[0];
+    const cands = resEl?.candidatos || resEl?.resultados || resEl?.data || [];
+    if(cands.length){
+      const top = cands[0];
+      _set('c-w', top.candidato || top.nm_candidato || null);
+      _set('c-p1', top.pct_votos_validos != null ? (+top.pct_votos_validos).toFixed(1)+'%' : null);
+      _set('c-cp', resEl?.comparecimento_pct != null ? (+resEl.comparecimento_pct).toFixed(1)+'%' : null);
+      _set('c-bn', resEl?.brancos_nulos_pct != null ? (+resEl.brancos_nulos_pct).toFixed(1)+'%' : null);
+    }
+    _set('c-idh', s0?.idhm?.toFixed?.(3));
+    _set('c-renda', s0?.renda_per_capita ? 'R$ '+Math.round(s0.renda_per_capita).toLocaleString('pt-BR') : null);
+    _set('c-gini', s0?.gini?.toFixed?.(3));
+    _set('c-analf', s0?.taxa_analfabetismo != null ? (+s0.taxa_analfabetismo).toFixed(1)+'%' : null);
+    _set('c-urb', s0?.taxa_urbanizacao != null ? (+s0.taxa_urbanizacao).toFixed(1)+'%' : null);
+    _set('c-pop', s0?.populacao_total ? Math.round(s0.populacao_total/1e3).toLocaleString('pt-BR')+'k' : null);
+    _set('c-mi', sa0?.tx_mortalidade_infantil_1000 != null ? (+sa0.tx_mortalidade_infantil_1000).toFixed(1)+' /mil' : null);
+    _set('c-aps', sa0?.cobertura_aps_pct != null ? (+sa0.cobertura_aps_pct).toFixed(1)+'%' : null);
+    _set('c-plano', sa0?.cobertura_plano_saude_pct != null ? (+sa0.cobertura_plano_saude_pct).toFixed(1)+'%' : null);
+    _set('c-hom', se0?.taxa_homicidio_100k != null ? (+se0.taxa_homicidio_100k).toFixed(1)+' /100k' : null);
+    _set('c-ivs', se0?.ivs?.toFixed?.(3));
+    if(ctxSub) ctxSub.textContent = `${uf} · ${ano} · IBGE + DATASUS + SINESP`;
+  } catch { if(ctxSub) ctxSub.textContent = `${uf} · dados parcialmente indisponíveis`; }
 }
-
 async function _loadPrevisaoPanel(uf) {
-  const el = document.getElementById('mrp-previsao');
-  el.innerHTML = '<div class="mrp-empty">Carregando...</div>';
   const cargo = document.getElementById('map-cargo-sel')?.value || 'Governador';
+  const _set = (id, val) => { const el = document.getElementById(id); if(el) el.textContent = val ?? '—'; };
   try {
     const res = await apiFetch(`/api/previsao?uf=${uf}&cargo=${encodeURIComponent(cargo)}&ano=2026`);
     const data = (await res?.json())?.data || [];
-    if(!data.length){ el.innerHTML = '<div class="mrp-empty">Sem previsão para '+uf+'</div>'; return; }
-    el.innerHTML = '<canvas id="mrp-chart-prev" height="190"></canvas><div id="mrp-prev-ic" style="margin-top:8px"></div>';
-    const labels = data.map(d=>(d.candidato||'?').split(' ').slice(0,2).join(' '));
-    const vals = data.map(d=>+(((d.prob_vitoria||0)*100).toFixed(1)));
-    if(_mrpCharts.prev) _mrpCharts.prev.destroy();
-    _mrpCharts.prev = new Chart(document.getElementById('mrp-chart-prev'),{
-      type:'bar',
-      data:{labels,datasets:[{data:vals,
-        backgroundColor:vals.map(v=>v>=50?'rgba(26,150,65,.75)':v>=40?'rgba(116,196,118,.7)':'rgba(215,25,28,.5)'),
-        borderRadius:3}]},
-      options:{indexAxis:'y',plugins:{legend:{display:false},tooltip:{callbacks:{label:c=>c.raw+'%'}}},
-        scales:{x:{min:0,max:100,ticks:{font:{size:9},color:'#8b949e'},grid:{color:'#21262d'}},
-                y:{ticks:{font:{size:9},color:'#c9d1d9'},grid:{display:false}}}}});
-    document.getElementById('mrp-prev-ic').innerHTML = data.slice(0,5).map(d=>{
-      const p=+((d.prob_vitoria||0)*100).toFixed(1);
-      const lo=+((d.intervalo_inferior||0)*100).toFixed(1);
-      const hi=+((d.intervalo_superior||0)*100).toFixed(1);
-      return `<div class="mrp-row"><span>${d.candidato}</span><span>${p}% <small style="color:var(--text3)">[${lo}–${hi}]</small></span></div>`;
-    }).join('');
-  } catch { el.innerHTML = '<div class="mrp-empty">Previsão indisponível</div>'; }
+    if(!data.length) return;
+    const top = data[0];
+    _set('c-pcand', top.candidato || null);
+    _set('c-pprob', top.prob_vitoria != null ? Math.round(top.prob_vitoria*100)+'%' : null);
+    const lo = top.intervalo_inferior != null ? Math.round(top.intervalo_inferior*100)+'%' : '?';
+    const hi = top.intervalo_superior != null ? Math.round(top.intervalo_superior*100)+'%' : '?';
+    _set('c-pic', `[${lo} – ${hi}]`);
+    _set('c-pdelta', top.delta_vs_historico != null ? (top.delta_vs_historico>=0?'+':'')+Math.round(top.delta_vs_historico*100)+'pp' : null);
+    _set('c-cluster', top.cluster || null);
+    const mCands = document.getElementById('m-cands');
+    if(mCands && data.length){
+      const mRegion = document.getElementById('m-region');
+      if(mRegion) mRegion.textContent = `${uf} · ${cargo}`;
+      mCands.innerHTML = data.slice(0,5).map(d=>{
+        const p = Math.round((d.prob_vitoria||0)*100);
+        const lo2 = Math.round((d.intervalo_inferior||0)*100);
+        const hi2 = Math.round((d.intervalo_superior||0)*100);
+        const color = p>=50?'#1a9641':p>=40?'#74c476':'#d7191c';
+        return `<div style="margin-bottom:6px">
+          <div style="display:flex;justify-content:space-between;font-size:.72rem">
+            <span style="color:#e6edf3">${d.candidato}</span>
+            <span style="color:${color};font-weight:700">${p}%</span>
+          </div>
+          <div style="background:#21262d;border-radius:3px;height:5px;margin-top:3px">
+            <div style="background:${color};width:${p}%;height:100%;border-radius:3px;opacity:.8"></div>
+          </div>
+          <div style="font-size:.6rem;color:var(--text3)">IC95: [${lo2}% – ${hi2}%]</div>
+        </div>`;
+      }).join('');
+    }
+  } catch {}
 }
-
 async function _loadPesquisasPanel(uf) {
-  const el = document.getElementById('mrp-pesquisas');
-  el.innerHTML = '<div class="mrp-empty">Carregando...</div>';
-  const cargo = document.getElementById('map-cargo-sel')?.value || 'Governador';
-  const cdCargo = {Presidente:1,Governador:3,Senador:5,'Dep. Federal':6,'Dep. Estadual':7}[cargo]||3;
+  const cargo = document.getElementById('map-cargo-sel')?.value || 'Presidente';
+  const cdCargo = {Presidente:1,Governador:3,Senador:5,'Dep. Federal':6,'Dep. Estadual':7}[cargo]||1;
+  const _set = (id, val) => { const el = document.getElementById(id); if(el) el.textContent = val ?? '—'; };
+  _set('c-uf-poll', uf);
   try {
     const res = await apiFetch(`/api/pesquisas/intencao?uf=${uf}&cd_cargo=${cdCargo}&ano=2026`);
     const data = (await res?.json())?.data || [];
-    if(!data.length){ el.innerHTML = '<div class="mrp-empty">Sem pesquisas para '+uf+'/'+cargo+'</div>'; return; }
-    el.innerHTML = '<canvas id="mrp-chart-polls" height="200"></canvas>';
-    const byCand = {};
-    data.forEach(r=>{ if(!byCand[r.candidato]) byCand[r.candidato]=[]; byCand[r.candidato].push(r); });
-    const top5 = Object.keys(byCand).slice(0,5);
-    const dates = [...new Set(data.map(r=>r.data_pesquisa).filter(Boolean))].sort();
-    const pal = ['#3b82f6','#ef4444','#22c55e','#f59e0b','#a855f7'];
-    const datasets = top5.map((c,i)=>({
-      label:c.split(' ').slice(0,2).join(' '),
-      data:dates.map(dt=>{ const r=byCand[c]?.find(x=>x.data_pesquisa===dt); return r?+(r.intencao_ponderada||0).toFixed(1):null; }),
-      borderColor:pal[i],backgroundColor:pal[i]+'22',borderWidth:1.5,tension:.35,spanGaps:true,pointRadius:2,
-    }));
-    if(_mrpCharts.polls) _mrpCharts.polls.destroy();
-    _mrpCharts.polls = new Chart(document.getElementById('mrp-chart-polls'),{
-      type:'line',data:{labels:dates,datasets},
-      options:{plugins:{legend:{position:'bottom',labels:{boxWidth:8,font:{size:8},color:'#8b949e'}}},
-        scales:{x:{ticks:{font:{size:7},color:'#8b949e',maxTicksLimit:5},grid:{color:'#21262d'}},
-                y:{min:0,ticks:{font:{size:8},color:'#8b949e'},grid:{color:'#21262d'}}}}});
-  } catch { el.innerHTML = '<div class="mrp-empty">Pesquisas indisponíveis</div>'; }
+    if(!data.length) return;
+    const byName = {};
+    data.forEach(r => { const nm=(r.candidato||'').toUpperCase(); if(!byName[nm]) byName[nm]=r; });
+    const findCand = (...kws) => { for(const kw of kws){ const k=Object.keys(byName).find(n=>n.includes(kw)); if(k) return byName[k]; } return null; };
+    const lula = findCand('LULA','PT');
+    const bolso = findCand('BOLSONARO','BOLSO','PL');
+    const latest = data[data.length-1];
+    _set('c-poll-lula', lula ? Math.round(lula.intencao_ponderada||0)+'%' : null);
+    _set('c-poll-bolso', bolso ? Math.round(bolso.intencao_ponderada||0)+'%' : null);
+    _set('c-poll-inst', latest ? `${latest.instituto||'?'} · ${latest.data_pesquisa||''}` : null);
+  } catch {}
 }
-
 const PARTIDO_COR = {
   'PT':'#ef4444','PL':'#1565c0','MDB':'#f59e0b','PSDB':'#00bcd4',
   'Rep':'#7c3aed','PDT':'#f97316','PP':'#06b6d4','PSD':'#84cc16',
@@ -3072,10 +3097,40 @@ async function refreshPrevisaoChart(cargo, uf, ano) {
   try {
     const res = await apiFetch(`/api/previsao?cargo=${cargo||'Governador'}&uf=${uf||'SP'}&ano=${ano||2022}`);
     const {data=[]} = await res.json();
-    if (!data.length || !CH.previsao) return;
-    CH.previsao.data.labels = data.map(d=>d.candidato);
-    CH.previsao.data.datasets[0].data = data.map(d=>Math.round((d.prob_vitoria||0)*100));
-    CH.previsao.update();
+    if (!data.length) return;
+    // Update m-cands in pt-modelo
+    const mCands = document.getElementById('m-cands');
+    if(mCands){
+      const mRegion = document.getElementById('m-region');
+      if(mRegion) mRegion.textContent = `${uf} · ${cargo}`;
+      mCands.innerHTML = data.slice(0,5).map(d=>{
+        const p = Math.round((d.prob_vitoria||0)*100);
+        const lo = Math.round((d.intervalo_inferior||0)*100);
+        const hi = Math.round((d.intervalo_superior||0)*100);
+        const color = p>=50?'#1a9641':p>=40?'#74c476':'#d7191c';
+        return `<div style="margin-bottom:6px">
+          <div style="display:flex;justify-content:space-between;font-size:.72rem">
+            <span style="color:#e6edf3">${d.candidato}</span>
+            <span style="color:${color};font-weight:700">${p}%</span>
+          </div>
+          <div style="background:#21262d;border-radius:3px;height:5px;margin-top:3px">
+            <div style="background:${color};width:${p}%;height:100%;border-radius:3px;opacity:.8"></div>
+          </div>
+          <div style="font-size:.6rem;color:var(--text3)">IC95: [${lo}% – ${hi}%]</div>
+        </div>`;
+      }).join('');
+    }
+    // Update tracking chart (chart-tracking)
+    if(CH.tracking){
+      const pal = ['#22c55e','#3b82f6','#ef4444','#f59e0b','#a855f7'];
+      CH.tracking.data.labels = [cargo+' 2026'];
+      CH.tracking.data.datasets = data.slice(0,5).map((d,i)=>({
+        label: d.candidato?.split(' ')[0]||'?',
+        data: [Math.round((d.prob_vitoria||0)*100)],
+        borderColor:pal[i], backgroundColor:pal[i]+'33', borderWidth:2, tension:.35, pointRadius:3,
+      }));
+      CH.tracking.update();
+    }
   } catch(e) {}
 }
 
@@ -3120,46 +3175,11 @@ let _socialChartsInit = false;
 function initSocialCharts() {
   if (_socialChartsInit) return;
   _socialChartsInit = true;
-
-  const stCtx = document.getElementById('ch-sentimento-timeline')?.getContext('2d');
-  if (stCtx) chSentTimeline = new Chart(stCtx, {
-    type:'line', data:{labels:[],datasets:[]},
-    options:{
-      responsive:true, maintainAspectRatio:false,
-      plugins:{legend:{position:'top',labels:{color:'#8d96a0',font:{size:11}}}},
-      scales:{
-        x:{ticks:{color:'#8d96a0',font:{size:10}},grid:{color:'#21262d'}},
-        y:{min:-1,max:1,ticks:{color:'#8d96a0',font:{size:10}},grid:{color:'#21262d'},
-           title:{display:true,text:'Score',color:'#57606a',font:{size:10}}}
-      }
-    }
-  });
-
-  const plCtx = document.getElementById('ch-plataformas')?.getContext('2d');
-  if (plCtx) chPlataformas = new Chart(plCtx, {
-    type:'bar',
-    data:{labels:[],datasets:[{label:'Posts',data:[],backgroundColor:CHART_COLORS}]},
-    options:{
-      responsive:true, maintainAspectRatio:false,
-      plugins:{legend:{display:false}},
-      scales:{
-        x:{ticks:{color:'#8d96a0',font:{size:10}},grid:{display:false}},
-        y:{ticks:{color:'#8d96a0',font:{size:10}},grid:{color:'#21262d'}}
-      }
-    }
-  });
-
-  const tCtx = document.getElementById('ch-temas')?.getContext('2d');
-  if (tCtx) chTemas = new Chart(tCtx, {
-    type:'doughnut',
-    data:{labels:[],datasets:[{data:[],backgroundColor:CHART_COLORS}]},
-    options:{
-      responsive:true, maintainAspectRatio:false,
-      plugins:{legend:{position:'right',labels:{color:'#8d96a0',font:{size:11}}}}
-    }
-  });
+  // Reuse charts already created in initCharts() for the correct canvas IDs
+  chSentTimeline = CH.sentEvo || null;  // chart-sentiment-evo
+  chPlataformas = null;                  // no canvas in current layout
+  chTemas = null;                        // no canvas in current layout
 }
-
 async function refreshSocialTab(uf, ano) {
   const badge = document.getElementById('social-uf-badge');
   if(badge) badge.textContent = `${uf||'BR'} ${ano||2022}`;
@@ -3799,6 +3819,18 @@ function _loadPesquisasRightPanel() {
         return {candidato: s.candidato, intencao: last.ajustada || last.intencao || 0};
       }).sort((a,b) => b.intencao - a.intencao).slice(0, 8);
       el.innerHTML = rows.map(r => `<div class="mrp-row"><span>${r.candidato||'?'}</span><span>${(+r.intencao).toFixed(1)}%</span></div>`).join('');
+      // Draw chart-pesquisas-tracking
+      if(CH.trends && series.length){
+        const allDates = [...new Set(series.flatMap(s=>s.pontos.map(p=>p.data)))].sort();
+        const pal = ['#3b82f6','#ef4444','#22c55e','#f59e0b','#a855f7'];
+        CH.trends.data.labels = allDates;
+        CH.trends.data.datasets = series.slice(0,5).map((s,i)=>({
+          label: s.candidato?.split(' ').slice(0,2).join(' '),
+          data: allDates.map(d=>{ const p=s.pontos.find(pp=>pp.data===d); return p?+(p.ajustada||p.intencao||0).toFixed(1):null; }),
+          borderColor:pal[i],backgroundColor:pal[i]+'22',borderWidth:1.5,tension:.35,spanGaps:true,pointRadius:2,
+        }));
+        CH.trends.update();
+      }
     }).catch(() => { el.innerHTML = '<div class="mrp-empty">Pesquisas indisponíveis</div>'; });
 }
 
@@ -3816,6 +3848,13 @@ async function _loadSocialPanel() {
       const label = d.candidato || d.plataforma || d.sg_uf || '?';
       return `<div class="krow"><span class="klbl">${label}</span><span class="kv ${pct>55?'g':pct<45?'r':'y'}">${score.toFixed(2)}</span></div>`;
     }).join('');
+    // Update sentiment doughnut (chart-polar)
+    if(CH.sentiment && data.length){
+      let pos=0, neg=0, neu=0;
+      data.forEach(d=>{ const s=d.sentimento_score_medio||0; if(s>0.1) pos++; else if(s<-0.1) neg++; else neu++; });
+      CH.sentiment.data.datasets[0].data = [pos||1, neu||1, neg||1];
+      CH.sentiment.update();
+    }
   } catch { /* no-op */ }
 }
 
