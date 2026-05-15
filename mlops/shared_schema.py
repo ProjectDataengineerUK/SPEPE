@@ -30,6 +30,7 @@ DYNAMIC_FEATURE_COLS = [
     "tendencia_busca",  # Google Trends normalized [0, 1]
     "gdelt_intensidade",  # GDELT event count (log-normalized)
     "gdelt_tom",  # GDELT tone [-1, 1]
+    "cobertura_midia",  # news volume (GDELT + RSS article count, log-normalized)
     "reputacao_score",  # composite external signal [-1, 1]
 ]
 
@@ -50,13 +51,18 @@ def compute_reputacao_score(
     sentimento: float,
     gdelt_tom: float,
     tendencia_norm: float,
+    cobertura_norm: float = 0.0,
 ) -> float:
     """Composite external reputation signal.
 
-    Weights: sentimento (0.5), gdelt_tom (0.3), tendencia (0.2).
+    Weights: sentimento (0.40), gdelt_tom (0.25), tendencia (0.20), cobertura (0.15).
+    cobertura_midia amplifies the signal — high media coverage + negative tone = crisis.
     All inputs in [-1, 1]. Output in [-1, 1].
     """
-    return 0.5 * sentimento + 0.3 * gdelt_tom + 0.2 * tendencia_norm
+    base = 0.40 * sentimento + 0.25 * gdelt_tom + 0.20 * tendencia_norm
+    # cobertura amplifies negative/positive signal (high coverage magnifies direction)
+    amplifier = 1.0 + 0.15 * abs(cobertura_norm)
+    return max(-1.0, min(1.0, base * amplifier))
 
 
 def resolve_ibge_columns(df_columns: list[str]) -> list[str]:

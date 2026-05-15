@@ -360,11 +360,19 @@ def _enrich_dynamic_signals(
         df["sentimento_score"] = 0.0
 
     # Fill remaining dynamic cols with 0
-    for col in ["gdelt_intensidade", "gdelt_tom"]:
+    for col in ["gdelt_intensidade", "gdelt_tom", "cobertura_midia"]:
         if col not in df.columns:
             df[col] = 0.0
 
-    # Compute reputacao_score
+    # cobertura_midia: log-normalize GDELT event count → [-1, 1]
+    # high coverage (>100 articles/week) → 1.0; zero → 0.0; normalized around log scale
+    import numpy as np
+
+    df["cobertura_midia"] = (np.log1p(df["gdelt_intensidade"].clip(lower=0)) / np.log1p(100)).clip(
+        0, 1
+    ) * 2 - 1  # [0,1] → [-1,1]
+
+    # Compute reputacao_score (cobertura amplifies tone direction)
     from mlops.shared_schema import compute_reputacao_score
 
     df["reputacao_score"] = df.apply(
@@ -372,6 +380,7 @@ def _enrich_dynamic_signals(
             float(r.get("sentimento_score", 0) or 0),
             float(r.get("gdelt_tom", 0) or 0),
             float(r.get("tendencia_busca", 0) or 0) * 2 - 1,  # [0,1] → [-1,1]
+            float(r.get("cobertura_midia", 0) or 0),
         ),
         axis=1,
     )

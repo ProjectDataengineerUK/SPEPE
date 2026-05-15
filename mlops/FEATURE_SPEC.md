@@ -26,16 +26,23 @@
 | tendencia_busca | Google Trends | spepe_gold.fact_google_trends_uf | médio-baixo — interesse correlaciona com voto em cargos nacionais | 0.3 | sim |
 | gdelt_intensidade | GDELT | spepe_silver.gdelt_events | médio — volume de eventos políticos por candidato | 0.4 | parcial |
 | gdelt_tom | GDELT | spepe_silver.gdelt_events | médio — tonalidade dos eventos (positivo/negativo) | 0.4 | parcial |
-| reputacao_score | computed | — | DIFERENCIAL — captura "casos de repercussão" antes das pesquisas | 0.6 | computado |
+| cobertura_midia | GDELT + News RSS | spepe_silver.gdelt_events (count) | **DIFERENCIAL** — volume total de notícias (log-norm); amplifica o sinal de escândalos | 0.4 | parcial |
+| reputacao_score | computed | — | **DIFERENCIAL** — sinal composto; captura "casos de repercussão" 2-3 semanas antes das pesquisas | 0.6 | computado |
 
-## Fórmula do reputacao_score
+## Fórmula do reputacao_score (com cobertura_midia)
 
 ```python
 # reputacao_score ∈ [-1, 1]
-# Inputs: sentimento_score ∈ [-1,1], gdelt_tom ∈ [-1,1], tendencia_norm ∈ [-1,1]
-# Pesos: sentimento (0.5), gdelt_tom (0.3), tendencia (0.2)
-reputacao_score = 0.5 * sentimento_score + 0.3 * gdelt_tom + 0.2 * tendencia_norm
+# Pesos base: sentimento (0.40), gdelt_tom (0.25), tendencia (0.20)
+# cobertura_midia (0.15): amplifica o sinal — alta cobertura + tom negativo = crise grave
+base = 0.40 * sentimento_score + 0.25 * gdelt_tom + 0.20 * tendencia_norm
+amplifier = 1.0 + 0.15 * abs(cobertura_norm)  # alta cobertura magnifica a direção
+reputacao_score = clip(base * amplifier, -1, 1)
 ```
+
+### Por que cobertura_midia amplifica em vez de somar?
+
+Um escândalo com **alto volume de notícias negativas** é muito mais grave do que o mesmo escândalo com baixa cobertura. A função de amplificação captura esse efeito multiplicador da mídia.
 
 ## Estratégia de Impacto — "Casos de Repercussão"
 
@@ -55,6 +62,7 @@ As features dinâmicas estão disponíveis apenas para eleições recentes e qua
 |---------|-----------|
 | sentimento sem tokens | 0.0 (neutro) |
 | GDELT sem dados para candidato | 0.0 |
+| cobertura_midia sem GDELT | 0.0 (sem amplificação) |
 | Google Trends sem dados | média UF |
 | delta_poll sem pesquisa anterior | 0.0 + flag poll_missing=True |
 
