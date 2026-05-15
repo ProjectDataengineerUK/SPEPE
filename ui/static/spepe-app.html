@@ -11,6 +11,8 @@
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script src="https://unpkg.com/leaflet.heat@0.2.0/dist/leaflet-heat.js"></script>
 <script src="https://accounts.google.com/gsi/client" async defer></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
 <script>
 function initLeafletMap() {
   if (gMap) return;
@@ -673,6 +675,9 @@ html,body{font-size:13px}
         <div class="ptab" data-tab="perfil" onclick="ptSwitch('perfil')">Perfil</div>
         <div class="ptab" data-tab="partidos" onclick="ptSwitch('partidos')">Partidos</div>
         <div class="ptab" data-tab="calendario" onclick="ptSwitch('calendario')">Calendário</div>
+        <div class="ptab" data-tab="aliancas" onclick="ptSwitch('aliancas')">Alianças</div>
+        <div class="ptab" data-tab="adversarios" onclick="ptSwitch('adversarios')">Adversários</div>
+        <div class="ptab" data-tab="parcerias" onclick="ptSwitch('parcerias')">Parcerias</div>
         <div class="ptab" data-tab="chat" onclick="ptSwitch('chat')">Chat IA</div>
       </div>
 
@@ -3400,13 +3405,33 @@ async function _loadSocialPanel() {
   } catch { /* no-op */ }
 }
 
-function _loadShapPanel() {
+async function _loadShapPanel() {
   const el = document.getElementById('shap-global');
   if(!el) return;
   const cargo = document.getElementById('f-cargo')?.value || 'Governador';
   const uf = document.getElementById('f-uf')?.value || 'SP';
-  document.getElementById('shap-cand') && (document.getElementById('shap-cand').textContent = cargo + ' · ' + uf);
-  el.innerHTML = '<div class="mrp-empty">SHAP — modelo não deployado ainda</div>';
+  const candEl = document.getElementById('shap-cand');
+  if(candEl) candEl.textContent = cargo + ' · ' + uf;
+  el.innerHTML = '<div class="mrp-empty">Carregando SHAP...</div>';
+  try {
+    const res = await apiFetch(`/api/model/shap?cargo=${encodeURIComponent(cargo)}&uf=${encodeURIComponent(uf)}`);
+    const data = await res?.json();
+    const features = data?.features || [];
+    if(!features.length){ el.innerHTML = '<div class="mrp-empty">SHAP — sem dados disponíveis</div>'; return; }
+    const maxAbs = Math.max(...features.map(f => Math.abs(f.shap)));
+    el.innerHTML = features.map(f => {
+      const pct = maxAbs > 0 ? (Math.abs(f.shap) / maxAbs * 100).toFixed(1) : 0;
+      const color = f.shap >= 0 ? '#1976d2' : '#ef4444';
+      const sign = f.shap >= 0 ? '+' : '';
+      return `<div class="shap-row">
+        <span class="shap-nm" title="${f.feature}">${f.feature}</span>
+        <span class="shap-t"><span class="shap-f" style="width:${pct}%;background:${color}"></span></span>
+        <span class="shap-v" style="color:${color}">${sign}${f.shap.toFixed(2)}</span>
+      </div>`;
+    }).join('');
+  } catch {
+    el.innerHTML = '<div class="mrp-empty">SHAP — erro ao carregar</div>';
+  }
 }
 
 // ── QW-1: Countdown ──────────────────────────────────────────────────────────

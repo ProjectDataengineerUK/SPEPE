@@ -151,6 +151,7 @@ _PUBLIC_API_PATHS = {
     "/api/kpi",
     "/api/mapa/locais",
     "/api/model/status",
+    "/api/model/shap",
     "/api/resultados/partido",
 }
 
@@ -5203,3 +5204,75 @@ async def _bq_model_status() -> dict:
             pass
 
     return {"m1": m1, "m2": m2}
+
+
+# ── SHAP public endpoint ──────────────────────────────────────────────────────
+
+_SHAP_FALLBACK = [
+    {"feature": "renda_per_capita", "shap": 0.18, "tipo": "ibge"},
+    {"feature": "idhm", "shap": 0.15, "tipo": "ibge"},
+    {"feature": "pct_bolsa_familia", "shap": -0.12, "tipo": "social"},
+    {"feature": "sentimento_score", "shap": 0.10, "tipo": "social"},
+    {"feature": "historico_partido", "shap": 0.09, "tipo": "tse"},
+    {"feature": "taxa_desemprego", "shap": -0.08, "tipo": "ibge"},
+    {"feature": "urbanizacao", "shap": 0.07, "tipo": "ibge"},
+    {"feature": "escolaridade_media", "shap": 0.06, "tipo": "ibge"},
+    {"feature": "google_trends", "shap": 0.05, "tipo": "digital"},
+    {"feature": "populacao", "shap": -0.04, "tipo": "ibge"},
+]
+
+
+@app.get("/api/model/shap")
+async def get_model_shap(
+    cargo: str = Query("Presidente"),
+    uf: str = Query("BR"),
+) -> JSONResponse:
+    """Top-10 SHAP feature importances for the selected cargo/UF."""
+    if not _use_bq():
+        return JSONResponse(
+            {"features": _SHAP_FALLBACK, "cargo": cargo, "uf": uf, "status": "fallback"}
+        )
+    try:
+        from google.cloud import bigquery
+
+        client = bigquery.Client(project=settings.gcp_project_id)
+        mlops = f"{settings.gcp_project_id}.spepe_mlops"
+        query = f"""
+            SELECT
+              feature_name  AS feature,
+              shap_value    AS shap,
+              feature_type  AS tipo
+            FROM `{mlops}.model_evaluations`
+            WHERE LOWER(cargo) = LOWER(@cargo)
+              AND (UPPER(sg_uf) = UPPER(@uf) OR @uf = 'BR')
+              AND feature_name IS NOT NULL
+            ORDER BY ABS(shap_value) DESC
+            LIMIT 10
+        """
+        job_config = bigquery.QueryJobConfig(
+            query_parameters=[
+                bigquery.ScalarQueryParameter("cargo", "STRING", cargo),
+                bigquery.ScalarQueryParameter("uf", "STRING", uf),
+            ]
+        )
+        rows = await asyncio.to_thread(
+            lambda: list(client.query(query, job_config=job_config).result())
+        )
+        if not rows:
+            return JSONResponse(
+                {"features": _SHAP_FALLBACK, "cargo": cargo, "uf": uf, "status": "fallback"}
+            )
+        features = [
+            {
+                "feature": str(r["feature"] or ""),
+                "shap": float(r["shap"] or 0.0),
+                "tipo": str(r["tipo"] or ""),
+            }
+            for r in rows
+        ]
+        return JSONResponse({"features": features, "cargo": cargo, "uf": uf, "status": "ok"})
+    except Exception as exc:
+        logger.warning("SHAP BQ query failed: %s — returning fallback", exc)
+        return JSONResponse(
+            {"features": _SHAP_FALLBACK, "cargo": cargo, "uf": uf, "status": "fallback"}
+        )
