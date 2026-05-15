@@ -158,6 +158,7 @@ _PUBLIC_API_PATHS = {
     "/api/parcerias",
     "/api/meta_votos",
     "/api/gdelt_eventos",
+    "/api/debug/fontes",
 }
 
 

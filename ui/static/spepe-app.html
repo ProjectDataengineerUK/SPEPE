@@ -2531,7 +2531,7 @@ function initMap(){
   setTimeout(()=>{
     gMap.invalidateSize();
     gMap.setView([-14.235,-51.925], 4);  // re-center after resize
-    reloadMap();
+    reloadMap().then(() => { setTimeout(_loadAnaliseTab, 300); });
   }, 200);
   setTimeout(_loadModelStatus, 800);
 }
@@ -3850,32 +3850,58 @@ function _loadEstrategiaTab() {
 /* ── Análise tab — coverage + distribution ──────────────────── */
 function _loadAnaliseTab() {
   const uf = (window._mapCtx && window._mapCtx.uf) || document.getElementById('f-uf')?.value || null;
-  if (!uf || uf === 'BR') return;
   const cargo = document.getElementById('map-cargo-sel')?.value || document.getElementById('f-cargo')?.value || 'Governador';
   const ano = parseInt(document.getElementById('f-ano')?.value || 2022);
-  apiFetch(`/api/resultados/${encodeURIComponent(cargo)}?uf=${uf}&ano=${ano}&nivel=municipio`)
+  const $ = id => document.getElementById(id);
+
+  // Nacional: render UF ranking from already-loaded _mapData
+  if (!uf || uf === 'BR') {
+    const ufs = Object.values(window._mapData || {}).filter(f => f.id && f.id.length === 2 && f.lider);
+    if (!ufs.length) {
+      if ($('dist-municipios-rows')) $('dist-municipios-rows').innerHTML = '<div class="mrp-empty">&#8592; Clique em um estado no mapa</div>';
+      return;
+    }
+    if ($('cov-pct')) $('cov-pct').textContent = '27';
+    if ($('cov-bar')) $('cov-bar').style.width = '100%';
+    if ($('cov-label')) $('cov-label').textContent = `Brasil — ${ufs.length} UFs`;
+    if ($('cov-forte')) $('cov-forte').textContent = ufs.filter(f => (f.pct || 0) > 40).length;
+    if ($('cov-medio')) $('cov-medio').textContent = ufs.filter(f => (f.pct || 0) > 30 && (f.pct || 0) <= 40).length;
+    if ($('cov-fraco')) $('cov-fraco').textContent = ufs.filter(f => (f.pct || 0) <= 30).length;
+    const sorted = [...ufs].sort((a, b) => (b.pct || 0) - (a.pct || 0)).slice(0, 10);
+    const max = sorted[0]?.pct || 1;
+    const rowsEl = $('dist-municipios-rows');
+    if (rowsEl) rowsEl.innerHTML = sorted.map(f => `
+      <div class="dist-row">
+        <span class="dist-nm">${f.id} — ${(f.lider||'').split(' ')[0]}</span>
+        <div class="dist-track"><div class="dist-fill" style="width:${Math.round(((f.pct || 0) / max) * 100)}%"></div></div>
+        <span class="dist-pct">${(f.pct || 0).toFixed(1)}%</span>
+      </div>`).join('');
+    return;
+  }
+
+  // UF selecionada: buscar municípios via /api/mapa/municipio
+  apiFetch(`/api/mapa/municipio?cargo=${encodeURIComponent(cargo)}&ano=${ano}&turno=1&layer=electoral&uf=${uf}`)
     .then(r => r?.json()).then(data => {
       if (!data?.features?.length) return;
       const total = data.features.length;
-      const forte = data.features.filter(f => (f.pct_votos || 0) > 10).length;
-      const medio = data.features.filter(f => (f.pct_votos || 0) > 5 && (f.pct_votos || 0) <= 10).length;
+      const forte = data.features.filter(f => (f.pct || 0) > 10).length;
+      const medio = data.features.filter(f => (f.pct || 0) > 5 && (f.pct || 0) <= 10).length;
       const fraco = total - forte - medio;
       const pct = total > 0 ? Math.round(((forte + medio) / total) * 100) : 0;
-      const $ = id => document.getElementById(id);
       if ($('cov-pct')) $('cov-pct').textContent = pct + '%';
       if ($('cov-bar')) $('cov-bar').style.width = pct + '%';
       if ($('cov-label')) $('cov-label').textContent = `cobertura em ${uf} (${forte + medio}/${total} munic.)`;
       if ($('cov-forte')) $('cov-forte').textContent = forte;
       if ($('cov-medio')) $('cov-medio').textContent = medio;
       if ($('cov-fraco')) $('cov-fraco').textContent = fraco;
-      const sorted = [...data.features].sort((a, b) => (b.pct_votos || 0) - (a.pct_votos || 0)).slice(0, 10);
-      const max = sorted[0]?.pct_votos || 1;
+      const sorted = [...data.features].sort((a, b) => (b.pct || 0) - (a.pct || 0)).slice(0, 10);
+      const max = sorted[0]?.pct || 1;
       const rowsEl = $('dist-municipios-rows');
       if (rowsEl) rowsEl.innerHTML = sorted.map(f => `
         <div class="dist-row">
-          <span class="dist-nm" title="${f.nm_municipio || f.id}">${f.nm_municipio || f.id || '—'}</span>
-          <div class="dist-track"><div class="dist-fill" style="width:${Math.round(((f.pct_votos || 0) / max) * 100)}%"></div></div>
-          <span class="dist-pct">${(f.pct_votos || 0).toFixed(1)}%</span>
+          <span class="dist-nm" title="${f.label || f.id}">${f.label || f.id || '—'}</span>
+          <div class="dist-track"><div class="dist-fill" style="width:${Math.round(((f.pct || 0) / max) * 100)}%"></div></div>
+          <span class="dist-pct">${(f.pct || 0).toFixed(1)}%</span>
         </div>`).join('');
     }).catch(() => {});
 }
