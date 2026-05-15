@@ -1183,6 +1183,7 @@ async function handleGoogleCredential(response) {
   document.getElementById('app').classList.add('visible');
   initCharts(); renderCargoView('Governador');
   loadUFOptions();
+  setTimeout(() => initLeafletMap(), 150);
 }
 function doLogin() { /* replaced by Google Sign-In */ }
 function doLogout() {
