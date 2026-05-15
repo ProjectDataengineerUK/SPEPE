@@ -302,7 +302,7 @@ tr.rhl td{background:rgba(0,200,83,.07)!important}
 .chart-grid-21{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,280px),1fr));gap:12px}
 .chart-grid-21 .card canvas{max-height:240px}
 .map-body{flex:1;display:flex;overflow:hidden;min-height:0}
-#leaflet-map{flex:1;min-height:0;height:100%;background:#0d1117}
+#leaflet-map{flex:1;min-height:0;height:100%;width:100%;background:#0d1117}
 #zona-panel{width:320px;background:var(--bg2);border-left:1px solid var(--border);overflow-y:auto;flex-shrink:0;display:none}
 .map-legend{width:160px;background:var(--bg2);border-left:1px solid var(--border);padding:10px;overflow-y:auto;flex-shrink:0;display:flex;flex-direction:column;gap:8px}
 .leg-title{font-size:.68rem;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:var(--text2)}
@@ -382,8 +382,8 @@ html,body{font-size:13px}
 
 /* Shell */
 .shell{display:flex;flex:1;overflow:hidden;min-height:0}
-.map-pane{flex:1;position:relative;min-width:0;display:flex;flex-direction:column}
-#leaflet-map{flex:1;min-height:0}
+.map-pane{flex:1;position:relative;min-width:0;display:flex;flex-direction:column;min-height:0}
+#leaflet-map{flex:1;min-height:0;height:100%;width:100%}
 .map-float-bar{position:absolute;top:8px;left:8px;z-index:20;display:flex;align-items:center;gap:6px;background:rgba(13,17,23,.88);border:1px solid var(--border2);border-radius:8px;padding:5px 9px;backdrop-filter:blur(4px)}
 .map-hint{position:absolute;bottom:28px;left:50%;transform:translateX(-50%);background:rgba(13,17,23,.9);border:1px solid var(--border2);border-radius:20px;padding:3px 12px;font-size:.65rem;color:var(--text2);pointer-events:none;z-index:10;white-space:nowrap}
 #zona-panel{position:absolute;bottom:0;left:0;right:0;z-index:11;max-height:55%;overflow-y:auto}
@@ -2486,7 +2486,14 @@ function initMap(){
   const mapEl = document.getElementById('leaflet-map');
   if(!mapEl) return;
 
-  gMap = L.map(mapEl, {zoomControl:true}).setView([-14.235,-51.925], 4);
+  // Guard: wait until container has a real height (flex layout computed)
+  if(mapEl.offsetHeight < 50){
+    setTimeout(initMap, 80);
+    return;
+  }
+
+  gMap = L.map(mapEl, {zoomControl:true, scrollWheelZoom:true})
+    .setView([-14.235,-51.925], 4);
   _map = gMap;
 
   L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
@@ -2496,7 +2503,11 @@ function initMap(){
 
   dataLayer = null;
   if (typeof initMapLayers === 'function') initMapLayers();
-  setTimeout(()=>{ gMap.invalidateSize(); reloadMap(); }, 150);
+  setTimeout(()=>{
+    gMap.invalidateSize();
+    gMap.setView([-14.235,-51.925], 4);  // re-center after resize
+    reloadMap();
+  }, 200);
   setTimeout(_loadModelStatus, 800);
 }
 
@@ -2668,6 +2679,7 @@ async function _loadGeoJSON(level){
   if(!url) return null;
   try {
     const r = await _nativeFetch(url);
+    if(!r.ok) return null;
     return await r.json();
   } catch { return null; }
 }
