@@ -391,14 +391,19 @@ html,body{font-size:13px}
 
 /* Right panel */
 .right-panel{width:360px;background:var(--bg2);border-left:1px solid var(--border);display:flex;flex-direction:column;flex-shrink:0}
-.ptabs{display:flex;overflow-x:auto;gap:1px;background:var(--bg2);border-bottom:1px solid var(--border);scrollbar-width:none;flex-shrink:0}
-.ptabs::-webkit-scrollbar{display:none}
-.ptab{flex:0 0 auto;padding:7px 10px;font-size:.6rem;font-weight:500;color:var(--text3);cursor:pointer;white-space:nowrap;border-bottom:2px solid transparent;transition:all .15s;text-align:center;user-select:none}
-.ptab:hover{color:var(--text);background:var(--bg3)}
-.ptab.active{color:var(--green2);border-bottom-color:var(--green);background:var(--bg3)}
 .pbody{flex:1;overflow-y:auto;padding:10px;display:none}
 .pbody.active{display:block}
 .pbody::-webkit-scrollbar{width:4px}
+
+/* Analytics drawer */
+#analytics-drawer{height:0;overflow:hidden;transition:height .3s ease;background:var(--bg2);border-top:1px solid var(--border);flex-shrink:0;display:flex;flex-direction:column}
+#analytics-drawer.open{height:320px}
+.atabs-bar{display:flex;align-items:center;background:var(--bg2);border-bottom:1px solid var(--border);flex-shrink:0;overflow-x:auto;scrollbar-width:none;gap:1px;padding:0 4px}
+.atab{flex:0 0 auto;padding:6px 10px;font-size:.62rem;font-weight:500;color:var(--text3);cursor:pointer;white-space:nowrap;border-bottom:2px solid transparent;transition:all .15s;user-select:none}
+.atab:hover{color:var(--text);background:var(--bg3)}
+.atab.active{color:var(--green2);border-bottom-color:var(--green);background:var(--bg3)}
+.abodies{flex:1;overflow:hidden;position:relative}
+.abodies .pbody{height:100%}
 
 /* Compact data cards */
 .pc{background:var(--bg3);border:1px solid var(--border);border-radius:var(--radius);padding:9px 11px;margin-bottom:8px}
@@ -724,17 +729,53 @@ html,body{font-size:13px}
     </div>
 
     <div class="right-panel">
-      <div class="ptabs">
-        <div class="ptab active" data-tab="analise" onclick="ptSwitch('analise')">&#128202; An&#225;lise</div>
-        <div class="ptab" data-tab="chat" onclick="ptSwitch('chat')">&#128172; Chat</div>
-        <div class="ptab" data-tab="eleitorado" onclick="ptSwitch('eleitorado')">&#128101; Eleitorado</div>
-        <div class="ptab" data-tab="pesquisas" onclick="ptSwitch('pesquisas')">&#128203; Pesquisas</div>
-        <div class="ptab" data-tab="digital" onclick="ptSwitch('digital')">&#128241; Digital</div>
-        <div class="ptab" data-tab="estrategia" onclick="ptSwitch('estrategia')">&#127919; Estrat&#233;gia</div>
-        <div class="ptab" data-tab="agenda" onclick="ptSwitch('agenda')">&#128197; Agenda</div>
-        <div class="ptab" data-tab="fontes" onclick="ptSwitch('fontes')">&#128270; Dados</div>
+      <div id="btn-analytics-row" style="padding:5px 8px;border-bottom:1px solid var(--border);flex-shrink:0">
+        <button id="btn-analytics-toggle" onclick="toggleDrawer()" style="width:100%;background:var(--bg3);border:1px solid var(--border);border-radius:16px;padding:4px 10px;font-size:.63rem;color:var(--text2);cursor:pointer">&#128202; An&#225;lise / Dados &#9650;</button>
       </div>
+      <div id="pt-chat" style="padding:0;overflow:hidden;display:flex;flex-direction:column;flex:1">
+        <div class="chat-hdr">
+          <span class="ai-dot"></span>
+          <div><h3>SPEPE AI</h3><span class="csub">Chat + Dashboard sync</span></div>
+          <span class="model-badge">Sonnet 4.6</span>
+        </div>
+        <div class="sync-bar" id="sbar"></div>
+        <div class="msgs" id="msgs">
+          <div class="msg"><div class="mav ai">AI</div><div>
+            <div class="mb">Ol&#225;! Mapa eleitoral carregado.<br><br>
+            Clique em um estado, mude os filtros, ou pergunte aqui &#8212; o mapa sincroniza com cada resposta.</div>
+            <div class="mmeta"><span class="mtime">agora</span></div>
+          </div></div>
+        </div>
+        <div class="chips" id="chips">
+          <span class="chip" onclick="sc(this)">Mapa eleitoral Brasil 2022</span>
+          <span class="chip" onclick="sc(this)">Previs&#227;o Lula 2026</span>
+          <span class="chip" onclick="sc(this)">Governador SP 2022</span>
+          <span class="chip" onclick="sc(this)">Top munic&#237;pios Bolsonaro</span>
+          <span class="chip" onclick="sc(this)">IDH vs resultado eleitoral</span>
+          <span class="chip" onclick="sc(this)">Sentimento social candidatos</span>
+        </div>
+        <div class="cin-row">
+          <textarea class="cin" id="cin" rows="1" placeholder="Pergunte sobre o mapa ou eleitorado..."
+            onkeydown="if(event.key==='Enter'&amp;&amp;!event.shiftKey){event.preventDefault();sendMsg()}"></textarea>
+          <button class="bsend" id="bsend" onclick="sendMsg()">&#9658;</button>
+        </div>
+      </div>
+    </div>
+  </div>
 
+  <!-- Analytics drawer — below .shell -->
+  <div id="analytics-drawer">
+    <div class="atabs-bar">
+      <div class="atab active" data-tab="analise" onclick="atSwitch('analise')">&#128202; An&#225;lise</div>
+      <div class="atab" data-tab="pesquisas" onclick="atSwitch('pesquisas')">&#128203; Pesquisas</div>
+      <div class="atab" data-tab="eleitorado" onclick="atSwitch('eleitorado')">&#128101; Eleitorado</div>
+      <div class="atab" data-tab="digital" onclick="atSwitch('digital')">&#128241; Digital</div>
+      <div class="atab" data-tab="estrategia" onclick="atSwitch('estrategia')">&#127919; Estrat&#233;gia</div>
+      <div class="atab" data-tab="agenda" onclick="atSwitch('agenda')">&#128197; Agenda</div>
+      <div class="atab" data-tab="fontes" onclick="atSwitch('fontes')">&#128270; Dados</div>
+      <button onclick="toggleDrawer()" style="margin-left:auto;flex-shrink:0;background:transparent;border:none;color:var(--text3);cursor:pointer;padding:4px 12px;font-size:.85rem;line-height:1">&#10005;</button>
+    </div>
+    <div class="abodies">
       <!-- ANALISE (default) -->
       <div class="pbody active" id="pt-analise">
         <div class="leg-mini">
@@ -1307,35 +1348,6 @@ html,body{font-size:13px}
         </div>
       </div>
 
-      <!-- CHAT IA -->
-      <div class="pbody" id="pt-chat" style="padding:0;overflow:hidden;display:flex;flex-direction:column">
-        <div class="chat-hdr">
-          <span class="ai-dot"></span>
-          <div><h3>SPEPE AI</h3><span class="csub">Chat + Dashboard sync</span></div>
-          <span class="model-badge">Sonnet 4.6</span>
-        </div>
-        <div class="sync-bar" id="sbar"></div>
-        <div class="msgs" id="msgs">
-          <div class="msg"><div class="mav ai">AI</div><div>
-            <div class="mb">Ol&#225;! Mapa eleitoral carregado.<br><br>
-            Clique em um estado, mude os filtros, ou pergunte aqui &#8212; o mapa sincroniza com cada resposta.</div>
-            <div class="mmeta"><span class="mtime">agora</span></div>
-          </div></div>
-        </div>
-        <div class="chips" id="chips">
-          <span class="chip" onclick="sc(this)">Mapa eleitoral Brasil 2022</span>
-          <span class="chip" onclick="sc(this)">Previs&#227;o Lula 2026</span>
-          <span class="chip" onclick="sc(this)">Governador SP 2022</span>
-          <span class="chip" onclick="sc(this)">Top munic&#237;pios Bolsonaro</span>
-          <span class="chip" onclick="sc(this)">IDH vs resultado eleitoral</span>
-          <span class="chip" onclick="sc(this)">Sentimento social candidatos</span>
-        </div>
-        <div class="cin-row">
-          <textarea class="cin" id="cin" rows="1" placeholder="Pergunte sobre o mapa ou eleitorado..."
-            onkeydown="if(event.key==='Enter'&amp;&amp;!event.shiftKey){event.preventDefault();sendMsg()}"></textarea>
-          <button class="bsend" id="bsend" onclick="sendMsg()">&#9658;</button>
-        </div>
-      </div>
     </div>
   </div>
 
@@ -2363,7 +2375,7 @@ function handleMapClick(cod, nome) {
   if(d) _updateStats(d);
   const uf = (d?.id?.length === 2 ? d.id : null) || _mapCtx.uf || null;
   if(uf) {
-    ptSwitch('analise');
+    openDrawer('analise');
     _loadRightPanel(uf);
   }
 }
@@ -3785,11 +3797,14 @@ function setModelMode(btn, mode) {
 }
 
 function ptSwitch(tab) {
-  document.querySelectorAll('.ptab').forEach(t => t.classList.toggle('active', t.dataset.tab === tab));
-  document.querySelectorAll('.pbody').forEach(b => {
+  if (tab === 'chat') return;
+  openDrawer(tab);
+}
+function atSwitch(tab) {
+  document.querySelectorAll('.atab').forEach(t => t.classList.toggle('active', t.dataset.tab === tab));
+  const flexTabs = ['digital', 'estrategia'];
+  document.querySelectorAll('.abodies .pbody').forEach(b => {
     const on = b.id === 'pt-' + tab;
-    // chat, digital, estrategia use flex layout for inner-tab strip + body
-    const flexTabs = ['chat', 'digital', 'estrategia'];
     b.style.display = on ? (flexTabs.includes(tab) ? 'flex' : 'block') : 'none';
     b.classList.toggle('active', on);
   });
@@ -3800,6 +3815,19 @@ function ptSwitch(tab) {
   if (tab === 'estrategia') _loadEstrategiaTab();
   if (tab === 'agenda') _renderCalendario();
   if (tab === 'fontes') _loadFontesTab();
+}
+function openDrawer(tab) {
+  const drawer = document.getElementById('analytics-drawer');
+  drawer.classList.add('open');
+  const btn = document.getElementById('btn-analytics-toggle');
+  if (btn) btn.innerHTML = '&#128202; An&#225;lise / Dados &#9660;';
+  if (tab) atSwitch(tab);
+}
+function toggleDrawer() {
+  const drawer = document.getElementById('analytics-drawer');
+  const isOpen = drawer.classList.toggle('open');
+  const btn = document.getElementById('btn-analytics-toggle');
+  if (btn) btn.innerHTML = isOpen ? '&#128202; An&#225;lise / Dados &#9660;' : '&#128202; An&#225;lise / Dados &#9650;';
 }
 
 /* ── Inner-tab switchers ───────────────────────────────────────── */
