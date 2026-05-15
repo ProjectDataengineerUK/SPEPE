@@ -5231,7 +5231,7 @@ async def get_model_shap(
     uf: str = Query("BR"),
 ) -> JSONResponse:
     """Top-10 SHAP feature importances for the selected cargo/UF."""
-    if not _use_bq():
+    if not (settings.gcp_project_id and os.environ.get("USE_BIGQUERY", "").lower() == "true"):
         return JSONResponse(
             {"features": _SHAP_FALLBACK, "cargo": cargo, "uf": uf, "status": "fallback"}
         )
@@ -5319,7 +5319,7 @@ async def get_adversarios(
     ano: int = Query(2022),
 ) -> JSONResponse:
     """Top adversários por cargo/UF com análise de vulnerabilidade."""
-    if _use_bq():
+    if settings.gcp_project_id and os.environ.get("USE_BIGQUERY", "").lower() == "true":
         try:
             from google.cloud import bigquery
 
