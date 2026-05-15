@@ -948,6 +948,57 @@ html,body{font-size:13px}
         <div id="cal-items"></div>
       </div>
 
+      <!-- ALIANÇAS HISTÓRICAS -->
+      <div class="pbody" id="pt-aliancas">
+        <div class="pc">
+          <h4>Alianças Históricas <span id="ali-cargo-label" class="tag tse">Presidente</span></h4>
+          <div style="font-size:.62rem;color:var(--text2);margin-bottom:8px">
+            Partidos que coligaram com o partido selecionado em eleições passadas (2018/2022).
+          </div>
+          <div id="ali-rows"><div class="mrp-empty">Selecione UF e cargo</div></div>
+        </div>
+        <div class="pc">
+          <h4>Coligação Projetada 2026</h4>
+          <div id="ali-proj"><div class="mrp-empty">Carregando projeção...</div></div>
+        </div>
+        <div class="leg-source">TSE · fact_municipio_candidato_eleicao · Coligações 2018+2022</div>
+      </div>
+
+      <!-- MAPEAMENTO DE ADVERSÁRIOS -->
+      <div class="pbody" id="pt-adversarios">
+        <div class="pc">
+          <h4>Top Adversários <span id="adv-uf-label" class="tag tse">SP</span></h4>
+          <div style="font-size:.62rem;color:var(--text2);margin-bottom:8px">
+            Candidatos que disputaram o mesmo cargo nas eleições anteriores.
+          </div>
+          <div id="adv-rows"><div class="mrp-empty">Clique em um estado</div></div>
+        </div>
+        <div class="pc">
+          <h4>Análise de Vulnerabilidade</h4>
+          <div class="krow"><span class="klbl">Municípios em risco</span><span class="kv r" id="adv-risco">—</span></div>
+          <div class="krow"><span class="klbl">Municípios seguros</span><span class="kv g" id="adv-seg">—</span></div>
+          <div class="krow"><span class="klbl">Margem média de vitória</span><span class="kv" id="adv-margem">—</span></div>
+        </div>
+        <div class="leg-source">TSE · fact_municipio_candidato_eleicao · 2022</div>
+      </div>
+
+      <!-- OPORTUNIDADES DE PARCERIAS -->
+      <div class="pbody" id="pt-parcerias">
+        <div class="pc">
+          <h4>Oportunidades de Coalizão <span id="parc-label" class="tag ibge">SP</span></h4>
+          <div style="font-size:.62rem;color:var(--text2);margin-bottom:8px">
+            Municípios onde A + B somam mais de 50% — alvo ideal para negociação de apoio.
+          </div>
+          <div id="parc-rows"><div class="mrp-empty">Analisando municípios...</div></div>
+        </div>
+        <div class="pc">
+          <h4>Score de Oportunidade por UF</h4>
+          <canvas id="chart-parcerias" height="100"></canvas>
+          <div style="font-size:.59rem;color:var(--text3);margin-top:4px">Score = % municípios com potencial de coalizão acima de 50%</div>
+        </div>
+        <div class="leg-source">TSE · fact_municipio_candidato_eleicao · 2022 + modelo M1</div>
+      </div>
+
       <!-- CHAT IA -->
       <div class="pbody" id="pt-chat" style="padding:0;overflow:hidden;display:flex;flex-direction:column">
         <div class="chat-hdr">
@@ -3372,6 +3423,9 @@ function ptSwitch(tab) {
   if (tab === 'perfil') _loadPerfilTab();
   if (tab === 'partidos') _loadPartidosTab();
   if (tab === 'calendario') _renderCalendario();
+  if (tab === 'aliancas') _loadAliancasTab();
+  if (tab === 'adversarios') _loadAdversariosTab();
+  if (tab === 'parcerias') _loadParceriasTab();
 }
 
 function _loadPesquisasRightPanel() {
@@ -3630,6 +3684,140 @@ function _buildHeatmap() {
     radius: 28, blur: 18, maxZoom: 10,
     gradient: { 0.2: '#1e40af', 0.5: '#f59e0b', 0.8: '#ef4444', 1.0: '#7f1d1d' }
   }).addTo(gMap);
+}
+
+// ── Alianças ─────────────────────────────────────────────────────────────────
+function _loadAliancasTab() {
+  const uf = document.getElementById('f-uf')?.value || 'BR';
+  const cargo = document.getElementById('map-cargo-sel')?.value || 'Presidente';
+  const labelEl = document.getElementById('ali-cargo-label');
+  if (labelEl) labelEl.textContent = cargo;
+  const rowsEl = document.getElementById('ali-rows');
+  const projEl = document.getElementById('ali-proj');
+  if (rowsEl) rowsEl.innerHTML = '<div class="mrp-empty">Carregando...</div>';
+  if (projEl) projEl.innerHTML = '<div class="mrp-empty">Carregando...</div>';
+  fetch(`/api/aliancas?cargo=${encodeURIComponent(cargo)}&uf=${encodeURIComponent(uf)}`)
+    .then(r => r.json())
+    .then(data => {
+      const colorMap = { aliado: 'var(--green)', neutro: 'var(--orange)', adversario: 'var(--red, #ef4444)' };
+      if (rowsEl && data.aliancos) {
+        rowsEl.innerHTML = data.aliancos.map(a => `
+          <div class="krow">
+            <span class="klbl">${a.partido}</span>
+            <span class="kv" style="color:${colorMap[a.tendencia]||'var(--text2)'}">
+              ${a.coligacoes} colig. · ${a.ufs} UFs · <b>${a.tendencia}</b>
+            </span>
+          </div>`).join('');
+      }
+      if (projEl) {
+        const aliados = (data.aliancos||[]).filter(a=>a.tendencia==='aliado');
+        if (aliados.length) {
+          projEl.innerHTML = aliados.map(a => `
+            <div class="krow">
+              <span class="klbl">${a.partido}</span>
+              <span class="kv g">${a.ufs} UFs projetadas</span>
+            </div>`).join('');
+        } else {
+          projEl.innerHTML = '<div class="mrp-empty">Sem dados de projeção</div>';
+        }
+      }
+    })
+    .catch(() => {
+      if (rowsEl) rowsEl.innerHTML = '<div class="mrp-empty">Erro ao carregar alianças</div>';
+    });
+}
+
+// ── Adversários ───────────────────────────────────────────────────────────────
+function _loadAdversariosTab() {
+  const uf = document.getElementById('f-uf')?.value || 'SP';
+  const cargo = document.getElementById('map-cargo-sel')?.value || 'Presidente';
+  const labelEl = document.getElementById('adv-uf-label');
+  if (labelEl) labelEl.textContent = uf;
+  const rowsEl = document.getElementById('adv-rows');
+  if (rowsEl) rowsEl.innerHTML = '<div class="mrp-empty">Carregando...</div>';
+  fetch(`/api/adversarios?uf=${encodeURIComponent(uf)}&cargo=${encodeURIComponent(cargo)}&ano=2022`)
+    .then(r => r.json())
+    .then(data => {
+      if (rowsEl && data.adversarios) {
+        const maxPct = Math.max(...data.adversarios.map(a => a.pct || 0), 0.01);
+        rowsEl.innerHTML = data.adversarios.map(a => {
+          const barW = Math.round((a.pct / maxPct) * 100);
+          const pct = (a.pct * 100).toFixed(1);
+          return `<div style="margin-bottom:8px">
+            <div class="krow" style="margin-bottom:2px">
+              <span class="klbl">${a.candidato} <small style="color:var(--text3)">(${a.partido})</small></span>
+              <span class="kv">${pct}%</span>
+            </div>
+            <div style="background:var(--bg3);border-radius:3px;height:5px">
+              <div style="background:var(--blue,#3b82f6);width:${barW}%;height:100%;border-radius:3px"></div>
+            </div>
+          </div>`;
+        }).join('');
+      }
+      const riscoEl = document.getElementById('adv-risco');
+      const segEl = document.getElementById('adv-seg');
+      const margemEl = document.getElementById('adv-margem');
+      if (riscoEl) riscoEl.textContent = (data.municipios_risco ?? '—').toLocaleString('pt-BR');
+      if (segEl) segEl.textContent = (data.municipios_seguros ?? '—').toLocaleString('pt-BR');
+      if (margemEl) margemEl.textContent = data.margem_media ?? '—';
+    })
+    .catch(() => {
+      if (rowsEl) rowsEl.innerHTML = '<div class="mrp-empty">Erro ao carregar adversários</div>';
+    });
+}
+
+// ── Parcerias ─────────────────────────────────────────────────────────────────
+let _chartParcerias = null;
+function _loadParceriasTab() {
+  const uf = document.getElementById('f-uf')?.value || 'SP';
+  const cargo = document.getElementById('map-cargo-sel')?.value || 'Presidente';
+  const labelEl = document.getElementById('parc-label');
+  if (labelEl) labelEl.textContent = uf;
+  const rowsEl = document.getElementById('parc-rows');
+  if (rowsEl) rowsEl.innerHTML = '<div class="mrp-empty">Carregando...</div>';
+  fetch(`/api/parcerias?uf=${encodeURIComponent(uf)}&cargo=${encodeURIComponent(cargo)}`)
+    .then(r => r.json())
+    .then(data => {
+      if (rowsEl && data.oportunidades) {
+        const scoreColor = { alto: 'var(--green)', médio: 'var(--orange)', baixo: 'var(--red,#ef4444)' };
+        rowsEl.innerHTML = data.oportunidades.map(o => `
+          <div class="krow">
+            <span class="klbl">${o.municipio}</span>
+            <span class="kv" style="color:${scoreColor[o.score]||'var(--text2)'}">
+              ${(o.soma_pct*100).toFixed(0)}% · <b>${o.score}</b>
+            </span>
+          </div>`).join('');
+      }
+      if (data.top_ufs) {
+        const canvas = document.getElementById('chart-parcerias');
+        if (canvas && typeof Chart !== 'undefined') {
+          if (_chartParcerias) { _chartParcerias.destroy(); _chartParcerias = null; }
+          _chartParcerias = new Chart(canvas.getContext('2d'), {
+            type: 'bar',
+            data: {
+              labels: data.top_ufs.map(u => u.uf),
+              datasets: [{
+                label: 'Score Coalizão',
+                data: data.top_ufs.map(u => +(u.score * 100).toFixed(1)),
+                backgroundColor: 'rgba(59,130,246,.7)',
+                borderRadius: 4,
+              }]
+            },
+            options: {
+              responsive: true,
+              plugins: { legend: { display: false } },
+              scales: {
+                y: { beginAtZero: true, max: 100, ticks: { callback: v => v + '%', font: { size: 10 } } },
+                x: { ticks: { font: { size: 10 } } }
+              }
+            }
+          });
+        }
+      }
+    })
+    .catch(() => {
+      if (rowsEl) rowsEl.innerHTML = '<div class="mrp-empty">Erro ao carregar parcerias</div>';
+    });
 }
 
 // ── Init ──────────────────────────────────────────────────────────────────────

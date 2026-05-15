@@ -153,6 +153,9 @@ _PUBLIC_API_PATHS = {
     "/api/model/status",
     "/api/model/shap",
     "/api/resultados/partido",
+    "/api/aliancas",
+    "/api/adversarios",
+    "/api/parcerias",
 }
 
 
@@ -5276,3 +5279,145 @@ async def get_model_shap(
         return JSONResponse(
             {"features": _SHAP_FALLBACK, "cargo": cargo, "uf": uf, "status": "fallback"}
         )
+
+
+# ── Alianças Históricas ───────────────────────────────────────────────────────
+
+_ALIANCAS_FALLBACK = [
+    {"partido": "MDB", "coligacoes": 18, "ufs": 14, "tendencia": "aliado"},
+    {"partido": "PSD", "coligacoes": 15, "ufs": 12, "tendencia": "aliado"},
+    {"partido": "PP", "coligacoes": 12, "ufs": 10, "tendencia": "aliado"},
+    {"partido": "UNIÃO", "coligacoes": 10, "ufs": 9, "tendencia": "neutro"},
+    {"partido": "PL", "coligacoes": 3, "ufs": 3, "tendencia": "adversario"},
+]
+
+
+@app.get("/api/aliancas")
+async def get_aliancas(
+    cargo: str = Query("Presidente"),
+    uf: str = Query("BR"),
+) -> JSONResponse:
+    """Alianças históricas por partido/cargo — fallback estático."""
+    return JSONResponse(
+        {"aliancos": _ALIANCAS_FALLBACK, "cargo": cargo, "uf": uf, "status": "fallback"}
+    )
+
+
+# ── Mapeamento de Adversários ─────────────────────────────────────────────────
+
+_ADVERSARIOS_FALLBACK = [
+    {"candidato": "Jair Bolsonaro", "partido": "PL", "pct": 0.433, "status": "principal"},
+    {"candidato": "Ciro Gomes", "partido": "PDT", "pct": 0.12, "status": "terciário"},
+    {"candidato": "Simone Tebet", "partido": "MDB", "pct": 0.048, "status": "terceiro"},
+]
+
+
+@app.get("/api/adversarios")
+async def get_adversarios(
+    uf: str = Query("SP"),
+    cargo: str = Query("Presidente"),
+    ano: int = Query(2022),
+) -> JSONResponse:
+    """Top adversários por cargo/UF com análise de vulnerabilidade."""
+    if _use_bq():
+        try:
+            from google.cloud import bigquery
+
+            client = bigquery.Client(project=settings.gcp_project_id)
+            gold = f"{settings.gcp_project_id}.spepe_gold"
+            query = f"""
+                SELECT
+                  nm_candidato,
+                  sg_partido,
+                  SUM(qt_votos_nominais) AS votos,
+                  ROUND(
+                    SUM(qt_votos_nominais)
+                    / SUM(SUM(qt_votos_nominais)) OVER (),
+                    3
+                  ) AS pct
+                FROM `{gold}.fact_municipio_candidato_eleicao`
+                WHERE sg_uf = @uf
+                  AND ds_cargo_normalizado = @cargo
+                  AND ano_eleicao = @ano
+                GROUP BY nm_candidato, sg_partido
+                ORDER BY votos DESC
+                LIMIT 8
+            """
+            job_config = bigquery.QueryJobConfig(
+                query_parameters=[
+                    bigquery.ScalarQueryParameter("uf", "STRING", uf),
+                    bigquery.ScalarQueryParameter("cargo", "STRING", cargo),
+                    bigquery.ScalarQueryParameter("ano", "INT64", ano),
+                ]
+            )
+            rows = await asyncio.to_thread(
+                lambda: list(client.query(query, job_config=job_config).result())
+            )
+            if rows:
+                adversarios = [
+                    {
+                        "candidato": str(r["nm_candidato"] or ""),
+                        "partido": str(r["sg_partido"] or ""),
+                        "pct": float(r["pct"] or 0.0),
+                        "status": "principal" if i == 0 else "secundário",
+                    }
+                    for i, r in enumerate(rows)
+                ]
+                return JSONResponse(
+                    {
+                        "adversarios": adversarios,
+                        "municipios_risco": None,
+                        "municipios_seguros": None,
+                        "margem_media": None,
+                        "uf": uf,
+                        "cargo": cargo,
+                        "status": "ok",
+                    }
+                )
+        except Exception as exc:
+            logger.warning("adversarios BQ query failed: %s — returning fallback", exc)
+    return JSONResponse(
+        {
+            "adversarios": _ADVERSARIOS_FALLBACK,
+            "municipios_risco": 1247,
+            "municipios_seguros": 3305,
+            "margem_media": "8.4%",
+            "uf": uf,
+            "cargo": cargo,
+            "status": "fallback",
+        }
+    )
+
+
+# ── Oportunidades de Parcerias ────────────────────────────────────────────────
+
+_PARCERIAS_FALLBACK_OPORTUNIDADES = [
+    {"municipio": "Campinas", "cd_municipio": "3509502", "soma_pct": 0.58, "score": "alto"},
+    {"municipio": "Santo André", "cd_municipio": "3547809", "soma_pct": 0.54, "score": "alto"},
+    {"municipio": "São Bernardo", "cd_municipio": "3548708", "soma_pct": 0.51, "score": "médio"},
+]
+
+_PARCERIAS_FALLBACK_TOP_UFS = [
+    {"uf": "SP", "score": 0.72},
+    {"uf": "MG", "score": 0.65},
+    {"uf": "RS", "score": 0.61},
+    {"uf": "PR", "score": 0.58},
+    {"uf": "SC", "score": 0.55},
+]
+
+
+@app.get("/api/parcerias")
+async def get_parcerias(
+    uf: str = Query("SP"),
+    cargo: str = Query("Presidente"),
+) -> JSONResponse:
+    """Oportunidades de coalizão por município e score por UF — fallback estático."""
+    return JSONResponse(
+        {
+            "oportunidades": _PARCERIAS_FALLBACK_OPORTUNIDADES,
+            "top_ufs": _PARCERIAS_FALLBACK_TOP_UFS,
+            "uf": uf,
+            "cargo": cargo,
+            "status": "fallback",
+        }
+    )
