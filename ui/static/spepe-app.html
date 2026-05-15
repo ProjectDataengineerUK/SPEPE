@@ -2323,7 +2323,7 @@ let _locaisLayer = null; // Leaflet LayerGroup for voting location markers
 
 function setMapMode(mode) {
   _mapMode = mode;
-  document.querySelectorAll('.map-mode-btn').forEach(b => b.classList.remove('active'));
+  document.querySelectorAll('.lbtn-mode').forEach(b => b.classList.remove('active'));
   document.getElementById('btn-mode-' + mode)?.classList.add('active');
   const badge = document.getElementById('poll-date-badge');
   if (badge) badge.style.display = mode === '2026' ? 'block' : 'none';
@@ -2506,11 +2506,12 @@ function renderGeoJSON(geojsonData, colorBy, layer) {
   if(_zonaPanel) _zonaPanel.style.display = 'none';
   if(!gMap) return;
 
-  if(_geoLayer){ _geoLayer.removeFrom(gMap); _geoLayer = null; }
+  if(window._geoLayer){ window._geoLayer.removeFrom(gMap); window._geoLayer = null; }
+  _geoLayer = null;
   if(!geojsonData) return;
 
   const currentLayer = layer;
-  _geoLayer = L.geoJSON(geojsonData, {
+  _geoLayer = window._geoLayer = L.geoJSON(geojsonData, {
     style: function(feature){
       const props = feature.properties||{};
       const cod = String(props.codarea||props.CD_MUN||props.CD_UF||props.CD_REGIAO||'');

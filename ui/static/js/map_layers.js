@@ -1,25 +1,26 @@
 /**
- * SPEPE — map_layers.js v2
- * Gerencia 7 camadas temáticas no mapa Leaflet via /api/mapa/choropleth.
- * Cores extraídas do spepe-prototype.html v3.
- * Depende de: Leaflet.js, _geoLayer e reloadMap() globais do spepe-app.html.
+ * SPEPE — map_layers.js v3
+ * Gerencia camadas temáticas no mapa Leaflet via /api/mapa/choropleth.
+ * _geoLayer e reloadMap() são lidos via window para compatibilidade com o HTML.
  */
 
 // ── Configuração das camadas ───────────────────────────────────────────────
 
 const LAYER_CONFIG = {
-  eleitoral:  { label: "🏆 Eleitoral",       campo: "pct_votos" },
-  ibge:       { label: "📊 IBGE/IDH",        campo: "idhm" },
-  saude:      { label: "🏥 Saúde",           campo: "mortalidade_infantil" },
-  seguranca:  { label: "🛡 Segurança",       campo: "homicidios" },
-  pesquisas:  { label: "📋 Pesquisas",       campo: "intencao_voto" },
-  sentimento: { label: "📱 Sentimento",      campo: "score_sentimento" },
-  predicao:   { label: "🔮 Predição 2026",   campo: "p_mean" },
+  bivariate:  { label: "🗺 Resultado×IDH",    campo: "pct_votos" },
+  eleitoral:  { label: "🏆 Eleitoral",         campo: "pct_votos" },
+  ibge:       { label: "📊 IBGE/IDH",          campo: "idhm" },
+  saude:      { label: "🏥 Saúde",             campo: "mortalidade_infantil" },
+  seguranca:  { label: "🛡 Segurança",         campo: "homicidios" },
+  pesquisas:  { label: "📋 Pesquisas",         campo: "intencao_voto" },
+  sentimento: { label: "📱 Sentimento",        campo: "score_sentimento" },
+  predicao:   { label: "🔮 Predição 2026",     campo: "p_mean" },
 };
 
-// ── Escalas de cor (do protótipo v3) ──────────────────────────────────────
+// ── Escalas de cor ─────────────────────────────────────────────────────────
 
 const _COLOR = {
+  bivariate:  v => v >= 60 ? "#1a9641" : v >= 50 ? "#74c476" : v >= 45 ? "#ffffbf" : v >= 40 ? "#fdae61" : "#d7191c",
   eleitoral:  v => v >= 60 ? "#1a9641" : v >= 50 ? "#74c476" : v >= 45 ? "#ffffbf" : v >= 40 ? "#fdae61" : "#d7191c",
   ibge:       v => v >= 0.78 ? "#08519c" : v >= 0.72 ? "#3182bd" : v >= 0.65 ? "#6baed6" : v >= 0.58 ? "#bdd7e7" : "#ffffd4",
   saude:      v => v >= 22 ? "#d7191c" : v >= 16 ? "#fdae61" : v >= 12 ? "#ffffbf" : v >= 8 ? "#6baed6" : "#08519c",
@@ -30,6 +31,7 @@ const _COLOR = {
 };
 
 const _LEGEND = {
+  bivariate:  [["#1a9641","> 60%"],["#74c476","50–60%"],["#ffffbf","45–50%"],["#fdae61","40–45%"],["#d7191c","< 40%"]],
   eleitoral:  [["#1a9641","> 60%"],["#74c476","50–60%"],["#ffffbf","45–50%"],["#fdae61","40–45%"],["#d7191c","< 40%"]],
   ibge:       [["#08519c","≥ 0,78"],["#3182bd","0,72–0,78"],["#6baed6","0,65–0,72"],["#bdd7e7","0,58–0,65"],["#ffffd4","< 0,58"]],
   saude:      [["#08519c","< 8"],["#6baed6","8–12"],["#ffffbf","12–16"],["#fdae61","16–22"],["#d7191c","≥ 22 /mil"]],
@@ -58,14 +60,14 @@ let _layerData = {};   // { sg_uf: value }
  * Ativa uma camada: busca dados, redesenha mapa, atualiza legenda.
  */
 async function swapLayer(layerName) {
-  if (!(layerName in LAYER_CONFIG)) {
-    if (layerName === "socio") layerName = "ibge";
-    else return;
-  }
+  // Alias
+  if (layerName === "socio") layerName = "ibge";
+
+  if (!(layerName in LAYER_CONFIG)) return;
   _activeLayer = layerName;
 
-  // Eleitoral usa o sistema legado (reloadMap com GeoJSON colorido por pct)
-  if (layerName === "eleitoral") {
+  // bivariate e eleitoral: delegate para reloadMap (sistema legado com GeoJSON colorido por pct)
+  if (layerName === "eleitoral" || layerName === "bivariate") {
     _layerData = {};
     _applyStyle();
     _updateLegend(layerName);
@@ -107,10 +109,9 @@ function getLayerColor(layerName, value) {
 }
 
 /**
- * Inicializa: expande layer bar para 7 botões e registra cliques.
+ * Inicializa: registra cliques em todos os botões .layer-btn.
  */
 function initMapLayers() {
-  _expandLayerBar();
   document.querySelectorAll(".layer-btn").forEach(btn => {
     btn.addEventListener("click", () => {
       document.querySelectorAll(".layer-btn").forEach(b => b.classList.remove("active"));
@@ -140,13 +141,14 @@ async function _fetchChoropleth(layer) {
 }
 
 function _applyStyle() {
-  if (typeof _geoLayer === "undefined" || !_geoLayer) return;
-  if (_activeLayer === "eleitoral") return;  // legado usa renderGeoJSON
+  // Lê _geoLayer via window para funcionar mesmo em script externo com defer
+  const geoLayer = window._geoLayer;
+  if (!geoLayer) return;
+  if (_activeLayer === "eleitoral" || _activeLayer === "bivariate") return;
 
   const colorFn = _COLOR[_activeLayer] || _COLOR.ibge;
-  _geoLayer.setStyle(feature => {
+  geoLayer.setStyle(feature => {
     const props = feature.properties || {};
-    // Tenta sg_uf direto, depois converte CD_UF → sg_uf
     const sgUf = props.SIGLA_UF || props.sg_uf || _cdufToSgUf(
       String(props.CD_UF || props.codarea || props.CD_MUN?.slice(0, 2) || "")
     );
@@ -173,31 +175,10 @@ function _updateLegend(layer) {
   if (title) title.textContent = (LAYER_CONFIG[layer] || {}).label || layer;
 }
 
-function _expandLayerBar() {
-  const bar = document.getElementById("layer-controls");
-  if (!bar) return;
-
-  // Só expande se ainda tiver apenas os 4 botões originais
-  const existing = [...bar.querySelectorAll(".layer-btn")].map(b => b.dataset.layer);
-  const toAdd = [
-    { layer: "saude",     label: "🏥 Saúde" },
-    { layer: "seguranca", label: "🛡 Segurança" },
-    { layer: "pesquisas", label: "📋 Pesquisas" },
-  ];
-  toAdd.forEach(({ layer, label }) => {
-    if (!existing.includes(layer)) {
-      const btn = document.createElement("button");
-      btn.className = "layer-btn";
-      btn.dataset.layer = layer;
-      btn.textContent = label;
-      bar.appendChild(btn);
-    }
-  });
-}
-
 // ── Exports globais ────────────────────────────────────────────────────────
 
 window.swapLayer      = swapLayer;
 window.applyUfValues  = applyUfValues;
 window.getLayerColor  = getLayerColor;
+window.initMapLayers  = initMapLayers;
 window.LAYER_CONFIG   = LAYER_CONFIG;
