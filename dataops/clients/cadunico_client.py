@@ -19,12 +19,13 @@ import time
 
 import pandas as pd
 import requests
-from tenacity import retry, stop_after_attempt, wait_exponential
+from tenacity import RetryError, retry, retry_if_exception, stop_after_attempt, wait_exponential
 
 logger = logging.getLogger("spepe.clients.cadunico")
 
 _BASE = "https://api.portaldatransparencia.gov.br/api-de-dados"
 _PAGE_SIZE = 500
+_SKIP_STATUS = frozenset({403, 404, 405})
 
 
 def _headers() -> dict[str, str]:
@@ -34,7 +35,18 @@ def _headers() -> dict[str, str]:
     return {"chave-api-dados": key} if key else {}
 
 
-@retry(stop=stop_after_attempt(3), wait=wait_exponential(multiplier=1, min=2, max=10))
+def _is_retryable(exc: BaseException) -> bool:
+    """Only retry on 5xx or network errors — never on 4xx client errors."""
+    if isinstance(exc, requests.HTTPError):
+        return exc.response is None or exc.response.status_code >= 500
+    return True
+
+
+@retry(
+    stop=stop_after_attempt(3),
+    wait=wait_exponential(multiplier=1, min=2, max=10),
+    retry=retry_if_exception(_is_retryable),
+)
 def _get(url: str, params: dict) -> list[dict]:
     resp = requests.get(url, params=params, headers=_headers(), timeout=60)
     resp.raise_for_status()
@@ -42,12 +54,19 @@ def _get(url: str, params: dict) -> list[dict]:
 
 
 def _get_safe(url: str, params: dict) -> list[dict]:
-    """Like _get but returns [] on 403/404 instead of raising."""
+    """Like _get but returns [] on 403/404/405 instead of raising."""
     try:
         return _get(url, params)
-    except requests.HTTPError as exc:
-        if exc.response is not None and exc.response.status_code in (403, 404):
-            logger.warning("Endpoint indisponível (HTTP %d): %s", exc.response.status_code, url)
+    except (requests.HTTPError, RetryError) as exc:
+        status: int | None = None
+        if isinstance(exc, requests.HTTPError) and exc.response is not None:
+            status = exc.response.status_code
+        elif isinstance(exc, RetryError):
+            inner = exc.last_attempt.exception()
+            if isinstance(inner, requests.HTTPError) and inner.response is not None:
+                status = inner.response.status_code
+        if status in _SKIP_STATUS:
+            logger.warning("Endpoint indisponível (HTTP %d): %s", status, url)
             return []
         raise
 
