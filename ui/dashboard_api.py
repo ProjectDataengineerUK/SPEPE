@@ -336,6 +336,19 @@ async def serve_dashboard() -> FileResponse:
     )
 
 
+@app.get("/dash2")
+async def serve_dashboard2() -> FileResponse:
+    """Serve o novo dashboard de inteligência eleitoral (spepe-dash2)."""
+    from pathlib import Path
+
+    html_path = Path(__file__).parent / "static" / "spepe-dash2.html"
+    return FileResponse(
+        str(html_path),
+        media_type="text/html",
+        headers={"Cache-Control": "no-cache, no-store, must-revalidate"},
+    )
+
+
 @app.get("/prototype")
 async def serve_prototype() -> FileResponse:
     """Serve o protótipo visual standalone (sem backend)."""
