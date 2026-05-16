@@ -156,7 +156,9 @@ def query_gold_storage() -> list[dict[str, Any]]:
     FROM `{_PROJECT}.{_GOLD}.__TABLES__`
     WHERE type = 1
     """
-    found: dict[str, dict[str, Any]] = {r["table_name"]: dict(r) for r in _bq().query(sql).result(timeout=30)}
+    found: dict[str, dict[str, Any]] = {
+        r["table_name"]: dict(r) for r in _bq().query(sql).result(timeout=30)
+    }
     out: list[dict[str, Any]] = []
     for name in GOLD_TABLES:
         meta = found.get(name)
