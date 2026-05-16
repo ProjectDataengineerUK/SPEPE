@@ -1108,14 +1108,7 @@ async def _bq_candidatos(cargo: str, uf: str, ano: int) -> list[dict]:
     from google.cloud import bigquery
 
     client = bigquery.Client(project=settings.gcp_project_id)
-    cargo_map = {
-        "Presidente": 1,
-        "Governador": 3,
-        "Senador": 5,
-        "Dep. Federal": 6,
-        "Dep. Estadual": 7,
-    }
-    cd_cargo = cargo_map.get(cargo, 1)
+    cd_cargo = _cargo_to_cd(cargo, 1)
     gold = f"{settings.gcp_project_id}.{settings.bigquery_dataset_gold}"
 
     # 2026+: fonte é pesquisas (fact_intencao_voto) — TSE não tem resultados ainda
@@ -1232,7 +1225,7 @@ async def _bq_kpi(cargo: str, uf: str, ano: int) -> dict:
     from google.cloud import bigquery
 
     client = bigquery.Client(project=settings.gcp_project_id)
-    cd_cargo = _CARGO_CD.get(cargo, 1)
+    cd_cargo = _cargo_to_cd(cargo, 1)
     gold = f"{settings.gcp_project_id}.{settings.bigquery_dataset_gold}"
 
     # 2026+: sem resultados TSE — usa pesquisas agregadas (fact_intencao_voto)
@@ -1400,7 +1393,7 @@ async def _bq_municipios(cargo: str, uf: str, ano: int, limit: int) -> list[dict
     from google.cloud import bigquery
 
     client = bigquery.Client(project=settings.gcp_project_id)
-    cd_cargo = _CARGO_CD.get(cargo, 1)
+    cd_cargo = _cargo_to_cd(cargo, 1)
     gold = f"{settings.gcp_project_id}.{settings.bigquery_dataset_gold}"
 
     query = f"""
@@ -1499,7 +1492,7 @@ async def _bq_resultados(cargo: str, uf: str, ano: int, turno: int) -> list[dict
     from google.cloud import bigquery
 
     client = bigquery.Client(project=settings.gcp_project_id)
-    cd_cargo = _CARGO_CD.get(cargo, 1)
+    cd_cargo = _cargo_to_cd(cargo, 1)
     gold = f"{settings.gcp_project_id}.{settings.bigquery_dataset_gold}"
 
     query = f"""
@@ -1564,7 +1557,7 @@ async def get_trends(
             from google.cloud import bigquery as _bq_mod
 
             _bq_client = _bq_mod.Client(project=settings.gcp_project_id)
-            _cd_cargo = _CARGO_CD.get(cargo, 1)
+            _cd_cargo = _cargo_to_cd(cargo, 1)
             _q = (
                 f"SELECT nm_candidato FROM "
                 f"`{settings.gcp_project_id}.{settings.bigquery_dataset_gold}.fact_candidato_eleicao`"
@@ -1620,7 +1613,7 @@ async def get_meta(
             from google.cloud import bigquery as _bq_mod
 
             _bq_client = _bq_mod.Client(project=settings.gcp_project_id)
-            _cd_cargo = _CARGO_CD.get(cargo, 1)
+            _cd_cargo = _cargo_to_cd(cargo, 1)
             _q = (
                 f"SELECT nm_candidato FROM "
                 f"`{settings.gcp_project_id}.{settings.bigquery_dataset_gold}.fact_candidato_eleicao`"
@@ -2190,7 +2183,7 @@ async def _bq_pesquisas(cargo: str, sg_uf: str, ano: int, tipo: str = "corrente"
 
     client = bigquery.Client(project=settings.gcp_project_id)
     gold = f"{settings.gcp_project_id}.{settings.bigquery_dataset_gold}"
-    cd_cargo = _CARGO_CD.get(cargo, 1)
+    cd_cargo = _cargo_to_cd(cargo, 1)
 
     # Try detailed view first; if it fails (table not yet built), fall back to fact_intencao_voto
     try:
@@ -2310,7 +2303,7 @@ async def _bq_pesquisas(cargo: str, sg_uf: str, ano: int, tipo: str = "corrente"
 def _local_pesquisas(cargo: str, sg_uf: str, ano: int, tipo: str) -> dict:
     import pandas as pd
 
-    cd_cargo = _CARGO_CD.get(cargo, 1)
+    cd_cargo = _cargo_to_cd(cargo, 1)
     files = sorted(_LOCAL_SILVER_DIR.glob("fact_pesquisa_*.parquet"))
     if not files:
         return {"series": [], "house_effects": [], "tipo": tipo}
@@ -2660,6 +2653,26 @@ _CARGO_CD = {
     "Dep. Estadual": 7,
 }
 
+# Normalise cargo string → cd_cargo regardless of case / spacing from frontend
+_CARGO_CD_NORM: dict[str, int] = {
+    "presidente": 1,
+    "governador": 3,
+    "senador": 5,
+    "dep federal": 6,
+    "dep. federal": 6,
+    "deputado federal": 6,
+    "dep estadual": 7,
+    "dep. estadual": 7,
+    "deputado estadual": 7,
+}
+
+
+def _cargo_to_cd(cargo: str, default: int = 1) -> int:
+    """Case-insensitive lookup of cargo → cd_cargo code."""
+    key = cargo.strip().lower()
+    return _CARGO_CD_NORM.get(key) or _CARGO_CD.get(cargo, default)
+
+
 _UF_IBGE = {
     "AC": "12",
     "AL": "27",
@@ -2850,7 +2863,7 @@ async def _bq_choropleth(layer: str, cargo: str, candidato: str, ano: int) -> li
     client = bigquery.Client(project=settings.gcp_project_id)
     gold = f"{settings.gcp_project_id}.{settings.bigquery_dataset_gold}"
     mlops = f"{settings.gcp_project_id}.spepe_mlops"
-    cd_cargo = _CARGO_CD.get(cargo, 3)
+    cd_cargo = _cargo_to_cd(cargo, 3)
 
     if layer == "eleitoral":
         query = f"""
@@ -3024,7 +3037,7 @@ async def _bq_mapa_nacional(cargo: str, ano: int, turno: int, candidato: str = "
     from google.cloud import bigquery
 
     client = bigquery.Client(project=settings.gcp_project_id)
-    cd_cargo = _CARGO_CD.get(cargo, 1)
+    cd_cargo = _cargo_to_cd(cargo, 1)
     gold = f"{settings.gcp_project_id}.{settings.bigquery_dataset_gold}"
 
     # 2026+: usa pesquisas nacionais (uf='BR')
@@ -3136,7 +3149,7 @@ async def _bq_mapa_regiao(cargo: str, ano: int, turno: int, candidato: str = "")
     from google.cloud import bigquery
 
     client = bigquery.Client(project=settings.gcp_project_id)
-    cd_cargo = _CARGO_CD.get(cargo, 1)
+    cd_cargo = _cargo_to_cd(cargo, 1)
     _REGIAO_CODE = {"Norte": "1", "Nordeste": "2", "Centro-Oeste": "5", "Sudeste": "3", "Sul": "4"}
     _UF_TO_REGIAO = {
         "AC": "Norte",
@@ -3329,7 +3342,7 @@ async def _bq_mapa_uf(cargo: str, ano: int, turno: int, candidato: str = "") -> 
     from google.cloud import bigquery
 
     client = bigquery.Client(project=settings.gcp_project_id)
-    cd_cargo = _CARGO_CD.get(cargo, 1)
+    cd_cargo = _cargo_to_cd(cargo, 1)
     gold = f"{settings.gcp_project_id}.{settings.bigquery_dataset_gold}"
 
     # 2026+: pesquisas por UF (fact_intencao_voto)
@@ -3462,7 +3475,7 @@ async def _bq_mapa_municipio(
     from google.cloud import bigquery
 
     client = bigquery.Client(project=settings.gcp_project_id)
-    cd_cargo = _CARGO_CD.get(cargo, 1)
+    cd_cargo = _cargo_to_cd(cargo, 1)
     gold = f"{settings.gcp_project_id}.{settings.bigquery_dataset_gold}"
 
     # 2026+: pesquisas não têm granularidade municipal — retorna municípios da UF com dados por UF
@@ -3607,7 +3620,7 @@ async def _bq_mapa_zona(uf: str, cd_municipio: str, cargo: str, ano: int, turno:
     from google.cloud import bigquery
 
     client = bigquery.Client(project=settings.gcp_project_id)
-    cd_cargo = _CARGO_CD.get(cargo, 1)
+    cd_cargo = _cargo_to_cd(cargo, 1)
     query = f"""
         WITH ranked AS (
             SELECT nr_zona, nm_candidato, CAST(NULL AS STRING) AS sg_partido,
@@ -3662,7 +3675,7 @@ async def _bq_mapa_secao(
     from google.cloud import bigquery
 
     client = bigquery.Client(project=settings.gcp_project_id)
-    cd_cargo = _CARGO_CD.get(cargo, 1)
+    cd_cargo = _cargo_to_cd(cargo, 1)
     query = f"""
         WITH ranked AS (
             SELECT nr_secao, nm_candidato, CAST(NULL AS STRING) AS sg_partido,
@@ -4113,7 +4126,7 @@ async def get_previsao(
 
             client = bigquery.Client(project=settings.gcp_project_id)
             mlops = f"{settings.gcp_project_id}.{settings.bigquery_dataset_mlops}"
-            cd_cargo = _CARGO_CD.get(cargo, 3)
+            cd_cargo = _cargo_to_cd(cargo, 3)
             try:
                 # fact_predictions schema: candidato, sg_uf, prediction_date, p_mean, p_lower,
                 # p_upper, model_version — table has require_partition_filter on prediction_date
@@ -4183,7 +4196,7 @@ async def get_multifonte(
 
         client = bigquery.Client(project=settings.gcp_project_id)
         gold = f"{settings.gcp_project_id}.{settings.bigquery_dataset_gold}"
-        cd_cargo = _CARGO_CD.get(cargo, 3)
+        cd_cargo = _cargo_to_cd(cargo, 3)
 
         async def _run_q(key: str, q: str, params: list) -> None:
             try:
