@@ -6585,7 +6585,9 @@ async def get_comparativo_candidatos(
         )
     except Exception as exc:
         logger.error("comparativo BQ erro: %s", exc, exc_info=True)
-        return JSONResponse({"status": "error", "error": str(exc), "candidatos": []}, status_code=500)
+        return JSONResponse(
+            {"status": "error", "error": str(exc), "candidatos": []}, status_code=500
+        )
 
 
 @app.get("/api/comparativo/partidos")
