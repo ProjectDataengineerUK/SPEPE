@@ -2426,7 +2426,7 @@ async def _bq_pesquisas_intencao(
         FROM `{silver}.fact_pesquisa_intencao`
         WHERE ano = @ano
           AND LOWER(COALESCE(uf, 'BR')) = LOWER(@uf)
-          AND LOWER(COALESCE(cargo, 'presidente')) = LOWER(@cargo)
+          AND LOWER(COALESCE(cd_cargo, 'presidente')) = LOWER(@cargo)
           AND data_pesquisa_fim BETWEEN
               DATE_SUB(CURRENT_DATE(), INTERVAL @janela_dias DAY) AND CURRENT_DATE()
           {candidato_filter}
@@ -3863,8 +3863,11 @@ async def get_social_sentimento(
             silver = f"{settings.gcp_project_id}.{settings.bigquery_dataset_silver}"
             params: list = []
             where_clauses = ["data_referencia >= DATE_SUB(CURRENT_DATE(), INTERVAL 12 WEEK)"]
-            if uf:
-                where_clauses.append("sg_uf = @uf")
+            # sg_uf is often empty in social data — only filter when it has real values
+            if uf and uf.upper() != "BR":
+                where_clauses.append(
+                    "(sg_uf = @uf OR sg_uf IS NULL OR sg_uf = '')"
+                )
                 params.append(bigquery.ScalarQueryParameter("uf", "STRING", uf.upper()))
             where_sql = " AND ".join(where_clauses)
             query = f"""

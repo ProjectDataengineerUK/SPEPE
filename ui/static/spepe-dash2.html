@@ -76,7 +76,7 @@ select,input,textarea{font-family:inherit}
 
 #intel-col{width:44%;display:flex;flex-direction:column;background:var(--bg2);border-left:1px solid var(--br);min-height:0}
 #tab-bar{display:flex;flex-wrap:wrap;background:var(--bg3);border-bottom:1px solid var(--br);flex-shrink:0}
-.tab{flex:1 1 25%;padding:7px 4px;font-size:.57rem;font-weight:600;color:var(--tx3);cursor:pointer;text-align:center;border-bottom:2px solid transparent;transition:all .15s;user-select:none;letter-spacing:.01em;white-space:nowrap}
+.tab{flex:1 1 33.33%;padding:7px 4px;font-size:.57rem;font-weight:600;color:var(--tx3);cursor:pointer;text-align:center;border-bottom:2px solid transparent;transition:all .15s;user-select:none;letter-spacing:.01em;white-space:nowrap}
 .tab:hover{color:var(--tx);background:var(--bg4)}
 .tab.active{color:var(--grn2);border-bottom-color:var(--grn);background:var(--bg2)}
 #panels{flex:1;overflow:hidden;position:relative;min-height:0}
@@ -159,6 +159,7 @@ select,input,textarea{font-family:inherit}
 .dig-sub{display:none}
 .dig-sub.active{display:block}
 canvas{display:block}
+#map-legend{position:absolute;bottom:60px;right:8px;background:var(--bg2);border:1px solid var(--br);border-radius:6px;padding:7px 10px;z-index:10;min-width:120px;font-size:.65rem;pointer-events:none;box-shadow:0 2px 8px rgba(0,0,0,.4)}
 </style>
 </head>
 <body>
@@ -236,8 +237,11 @@ canvas{display:block}
         <button class="layer-btn" data-layer="security" onclick="setMapLayer('security')">&#128737; Seg</button>
         <button class="layer-btn" data-layer="poll" onclick="setMapLayer('poll')">&#128203; Pesq</button>
         <button class="layer-btn" data-layer="pred" onclick="setMapLayer('pred')">&#128302; Pred</button>
+        <button id="btn-heat" onclick="toggleHeatmap()" style="padding:3px 8px;font-size:.6rem;border:1px solid var(--br);border-radius:4px;background:transparent;color:var(--tx3);cursor:pointer;margin-left:4px">&#127777; Calor</button>
       </div>
-      <div id="leaflet-map"></div>
+      <div id="leaflet-map" style="position:relative">
+        <div id="map-legend"></div>
+      </div>
       <div id="map-breadcrumb"><span onclick="resetMap()">Brasil</span></div>
     </div>
 
@@ -251,6 +255,7 @@ canvas{display:block}
         <div class="tab" data-tab="parcerias" onclick="switchTab('parcerias')">&#129309; Parcerias</div>
         <div class="tab" data-tab="digital" onclick="switchTab('digital')">&#128241; Digital</div>
         <div class="tab" data-tab="previsao" onclick="switchTab('previsao')">&#128302; Previs&#227;o</div>
+        <div class="tab" id="tab-ranking" data-tab="ranking" onclick="switchTab('ranking')">&#127942; Ranking</div>
       </div>
 
       <div id="panels">
@@ -429,6 +434,24 @@ canvas{display:block}
           <div class="section-hdr">SHAP &mdash; Fatores Principais</div>
           <div id="shap-list"><div class="empty">Carregando...</div></div>
         </div>
+
+        <!-- RANKING -->
+        <div id="panel-ranking" class="panel" style="display:none">
+          <div class="p-title" style="font-size:.7rem;font-weight:700;color:var(--tx2);margin-bottom:10px">Ranking Eleitos &mdash; <span id="rank-title">Selecione cargo e ano</span></div>
+          <div id="rank-table-wrap" style="overflow-y:auto;max-height:calc(100% - 80px)">
+            <table id="rank-table" style="width:100%;border-collapse:collapse;font-size:.7rem">
+              <thead><tr style="border-bottom:1px solid var(--br)">
+                <th style="text-align:left;padding:4px 6px;color:var(--tx2)">#</th>
+                <th style="text-align:left;padding:4px 6px;color:var(--tx2)">Candidato</th>
+                <th style="text-align:left;padding:4px 6px;color:var(--tx2)">Partido</th>
+                <th style="text-align:right;padding:4px 6px;color:var(--tx2)">Votos</th>
+                <th style="text-align:right;padding:4px 6px;color:var(--tx2)">%</th>
+              </tr></thead>
+              <tbody id="rank-tbody"></tbody>
+            </table>
+          </div>
+          <canvas id="chart-partidos" style="margin-top:12px;max-height:140px"></canvas>
+        </div>
       </div>
 
       <div id="chat-section">
@@ -436,6 +459,8 @@ canvas{display:block}
           <span class="ai-dot"></span>
           <span>SPEPE AI</span>
           <span style="font-size:.58rem;color:var(--tx3);margin-left:4px;font-family:'JetBrains Mono',monospace">claude-sonnet-4-6</span>
+          <span id="chat-status" style="font-size:.6rem;color:var(--tx3);margin-left:auto">&#9679;</span>
+          <span id="chat-reconnect" style="display:none;cursor:pointer;color:var(--org);font-size:.65rem;margin-left:4px" onclick="initChat()">&#10227;</span>
         </div>
         <div id="chat-msgs"></div>
         <div id="chat-cin-row">
@@ -574,7 +599,7 @@ function switchTab(tab){
   const loaders = {
     base:_loadBase, territorio:_loadTerritorio, eleitorado:_loadEleitorado,
     pesquisas:_loadPesquisas, adversarios:_loadAdversarios, parcerias:_loadParcerias,
-    digital:_loadDigital, previsao:_loadPrevisao
+    digital:_loadDigital, previsao:_loadPrevisao, ranking:_loadRanking
   };
   if(loaders[tab]) loaders[tab]();
 }
@@ -975,7 +1000,8 @@ function renderGeoJSON(geojsonData, colorBy, layer){
       });
     }
   }).addTo(gMap);
-  try{ const b=_geoLayer.getBounds(); if(b.isValid()) gMap.fitBounds(b,{padding:[12,12],maxZoom:12,animate:true}); }catch(e){}
+  setTimeout(()=>{ try{ const b=_geoLayer.getBounds(); if(b.isValid()) gMap.fitBounds(b,{padding:[12,12],maxZoom:12,animate:true}); }catch(e){} }, 100);
+  updateLegend(_activeLayer, _mapData);
 }
 
 function _buildTooltip(d, layer){
@@ -1046,12 +1072,15 @@ async function loadCandidatoList(){
   });
 }
 
+function initChat(){ _ws=null; _ensureWs(); }
 function _ensureWs(){
   if(_ws&&_ws.readyState<2) return;
   const proto = location.protocol==='https:'?'wss':'ws';
   _ws = new WebSocket(`${proto}://${location.host}/ws/chat`);
   _ws.onmessage = _onWsMsg;
-  _ws.onclose = ()=>{ _ws=null; };
+  _ws.onopen = ()=>{ const s=document.getElementById('chat-status'); const r=document.getElementById('chat-reconnect'); if(s) s.style.color='#22c55e'; if(r) r.style.display='none'; };
+  _ws.onclose = ()=>{ _ws=null; const s=document.getElementById('chat-status'); const r=document.getElementById('chat-reconnect'); if(s) s.style.color='var(--red)'; if(r) r.style.display=''; };
+  _ws.onerror = ()=>{ const s=document.getElementById('chat-status'); const r=document.getElementById('chat-reconnect'); if(s) s.style.color='var(--org)'; if(r) r.style.display=''; };
 }
 
 function _onWsMsg(e){
@@ -1075,6 +1104,7 @@ function _onWsMsg(e){
     _aiBuffer=''; _aiMsgEl=null; _busy=false;
     document.getElementById('chat-send').disabled=false;
   } else if(data.type==='error'){
+    console.error('WS chat error:', data.message);
     if(_aiMsgEl) _aiMsgEl.innerHTML=`<span style="color:var(--red)">${_esc(data.message||'Erro')}</span>`;
     _busy=false; document.getElementById('chat-send').disabled=false;
   }
@@ -1097,6 +1127,98 @@ function _appendMsg(txt, role){
   msgs.appendChild(d);
   msgs.scrollTop=msgs.scrollHeight;
   return d;
+}
+
+function updateLegend(layer, data){
+  const el = document.getElementById('map-legend');
+  if(!el) return;
+  let html = '';
+  if(layer==='electoral'){
+    const seen = {};
+    Object.values(data).forEach(d=>{
+      if(!d.lider) return;
+      const key = d.lider;
+      if(!seen[key]){
+        const cor = (d.partido&&PARTIDO_COR[d.partido])||_candidateColor(d.lider);
+        seen[key] = cor;
+      }
+    });
+    const entries = Object.entries(seen).slice(0,8);
+    if(!entries.length){ el.style.display='none'; return; }
+    el.style.display='block';
+    html = '<div style="font-weight:600;color:var(--tx2);margin-bottom:5px;text-transform:uppercase;letter-spacing:.06em">Líderes</div>'
+      + entries.map(([nm,cor])=>`<div style="display:flex;align-items:center;gap:5px;margin-bottom:3px"><span style="color:${cor};font-size:.9rem;line-height:1">&#9679;</span><span style="color:var(--tx);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:90px">${nm.split(' ')[0]}</span></div>`).join('');
+  } else {
+    const stops = {
+      security:[['Alto','rgb(255,68,68)'],['Médio','rgb(180,48,48)'],['Baixo','rgb(55,55,68)']],
+      health:[['Alto','#00c853'],['Médio','#ffd54f'],['Baixo','#ef9a9a']],
+      economic:[['Alto','#22c55e'],['Médio','#ffd54f'],['Baixo','#ff8f00']],
+      poll:[['Alto','#1f6feb'],['Médio','#7c3aed'],['Baixo','#57606a']],
+      pred:[['Favorável','#22c55e'],['Incerto','#f59e0b'],['Desfavorável','#ef4444']],
+    }[layer]||[];
+    if(!stops.length){ el.style.display='none'; return; }
+    el.style.display='block';
+    html = stops.map(([lbl,cor])=>`<div style="display:flex;align-items:center;gap:5px;margin-bottom:3px"><span style="width:10px;height:10px;border-radius:2px;background:${cor};flex-shrink:0;display:inline-block"></span><span style="color:var(--tx2)">${lbl}</span></div>`).join('');
+  }
+  el.innerHTML = html;
+}
+
+let _heatLayer = null;
+function toggleHeatmap(){
+  const btn = document.getElementById('btn-heat');
+  if(_heatLayer){ gMap.removeLayer(_heatLayer); _heatLayer=null; if(btn) btn.style.background=''; return; }
+  const pts=[];
+  if(window._geoLayer){
+    window._geoLayer.eachLayer(lyr=>{
+      try{
+        const center=lyr.getBounds().getCenter();
+        const props=lyr.feature&&lyr.feature.properties||{};
+        const cod=String(props.codarea||props.CD_MUN||props.CD_UF||'');
+        const d=_mapData[cod]||_mapData[cod.slice(0,2)];
+        const intensity=d?Math.min(Math.max((d.pct||50)/100,0),1):0.5;
+        pts.push([center.lat,center.lng,intensity]);
+      }catch(e){}
+    });
+  }
+  if(pts.length){ _heatLayer=L.heatLayer(pts,{radius:25,blur:15,maxZoom:10}).addTo(gMap); if(btn) btn.style.background='var(--org)'; }
+}
+
+async function _loadRanking(){
+  document.getElementById('rank-title').textContent = `${_cargo} ${_ano} — ${_uf==='BR'?'Brasil':_uf}`;
+  const tbody = document.getElementById('rank-tbody');
+  tbody.innerHTML = '<tr><td colspan="5" style="text-align:center;padding:16px;color:var(--tx2)">Carregando...</td></tr>';
+  let cands = [];
+  try {
+    const d = await api(`/api/resultados/${encodeURIComponent(_cargo)}?ano=${_ano}&uf=${encodeURIComponent(_uf)}&turno=1&limit=50`);
+    cands = d?.candidatos || d?.data || (Array.isArray(d)?d:[]);
+  } catch(e) {}
+  if(!cands.length) {
+    const d = await api(`/api/candidatos?ano=${_ano}&uf=${encodeURIComponent(_uf)}&cargo=${encodeURIComponent(_cargo)}&limit=100`);
+    cands = d?.candidatos || [];
+  }
+  if(!cands.length){
+    tbody.innerHTML = '<tr><td colspan="5" style="text-align:center;padding:16px;color:var(--tx2)">Sem dados para este filtro</td></tr>';
+    return;
+  }
+  cands = cands.sort((a,b)=>(b.votos||b.qt_votos||b.total_votos||0)-(a.votos||a.qt_votos||a.total_votos||0));
+  tbody.innerHTML = cands.slice(0,50).map((c,i)=>{
+    const party = c.sg_partido||c.partido||'—';
+    const cor = PARTIDO_COR[party]||'#888';
+    const votos = c.votos||c.qt_votos||c.total_votos||0;
+    const pct = c.pct_t1||c.pct||0;
+    const rowBg = i%2===0?'transparent':'rgba(255,255,255,.02)';
+    return `<tr style="background:${rowBg};border-bottom:1px solid rgba(48,54,61,.5)">
+      <td style="padding:4px 6px;color:var(--tx2)">${i+1}</td>
+      <td style="padding:4px 6px;font-weight:500">${c.nm||c.candidato||'—'}</td>
+      <td style="padding:4px 6px"><span style="background:${cor};color:#fff;padding:1px 5px;border-radius:3px;font-size:.6rem">${party}</span></td>
+      <td style="padding:4px 6px;text-align:right;font-family:monospace">${_fmt(votos)}</td>
+      <td style="padding:4px 6px;text-align:right;color:var(--grn2)">${pct?pct.toFixed(1)+'%':'—'}</td>
+    </tr>`;
+  }).join('');
+  const byParty = {};
+  cands.forEach(c=>{ const p=c.sg_partido||c.partido||'?'; byParty[p]=(byParty[p]||0)+1; });
+  const sorted = Object.entries(byParty).sort((a,b)=>b[1]-a[1]).slice(0,10);
+  mkChart('chart-partidos','bar',sorted.map(p=>p[0]),sorted.map(p=>p[1]),'#238636');
 }
 
 function sendMsg(){
