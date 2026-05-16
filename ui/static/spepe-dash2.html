@@ -468,6 +468,16 @@ table.data tr:hover td{background:var(--bg3)}
               <button class="pill active" id="cmp2v-cands" onclick="cmp2SetView('candidatos',this)" style="font-size:.63rem">Candidatos</button>
               <button class="pill" id="cmp2v-partidos" onclick="cmp2SetView('partidos',this)" style="font-size:.63rem">Partidos</button>
             </div>
+            <!-- situacao filter (candidatos) -->
+            <div id="cmp2-sit-btns" style="display:flex;gap:3px">
+              <button class="pill active" id="cmp2s-todos" onclick="cmp2SetSit('todos',this)" style="font-size:.6rem">Todos</button>
+              <button class="pill" id="cmp2s-eleito" onclick="cmp2SetSit('eleito',this)" style="font-size:.6rem;color:#4ade80">Eleitos</button>
+              <button class="pill" id="cmp2s-nao" onclick="cmp2SetSit('nao_eleito',this)" style="font-size:.6rem;color:#f87171">N&#227;o Eleitos</button>
+            </div>
+            <!-- agrupar federação (partidos) -->
+            <label id="cmp2-fed-lbl" style="display:none;align-items:center;gap:4px;font-size:.62rem;color:var(--tx2);cursor:pointer">
+              <input type="checkbox" id="cmp2-fed-chk" onchange="loadComparativo()" style="cursor:pointer"> Agrupar Federa&#231;&#245;es
+            </label>
             <button onclick="loadComparativo()" style="padding:3px 12px;font-size:.65rem;background:var(--grn2);color:#fff;border:none;border-radius:5px;cursor:pointer">Buscar</button>
           </div>
         </div>
@@ -490,8 +500,10 @@ table.data tr:hover td{background:var(--bg3)}
               <th>#</th>
               <th onclick="cmp2Sort('nm')" style="cursor:pointer">Candidato &#8597;</th>
               <th onclick="cmp2Sort('partido')" style="cursor:pointer">Partido &#8597;</th>
+              <th style="text-align:center">Sit. 2018</th>
               <th onclick="cmp2Sort('votos18')" style="cursor:pointer;text-align:right;color:#6b7fc4">Votos 2018 &#8597;</th>
               <th onclick="cmp2Sort('rank18')" style="cursor:pointer;text-align:right;color:#6b7fc4">Rank 2018 &#8597;</th>
+              <th style="text-align:center">Sit. 2022</th>
               <th onclick="cmp2Sort('votos22')" style="cursor:pointer;text-align:right;color:#4ade80">Votos 2022 &#8597;</th>
               <th onclick="cmp2Sort('rank22')" style="cursor:pointer;text-align:right;color:#4ade80">Rank 2022 &#8597;</th>
               <th onclick="cmp2Sort('delta')" style="cursor:pointer;text-align:right">&#916; Votos &#8597;</th>
@@ -505,6 +517,7 @@ table.data tr:hover td{background:var(--bg3)}
             <thead><tr>
               <th>#</th>
               <th onclick="cmp2Sort('partido')" style="cursor:pointer">Partido &#8597;</th>
+              <th style="color:var(--tx3)">Federa&#231;&#227;o 2022</th>
               <th onclick="cmp2Sort('votos18')" style="cursor:pointer;text-align:right;color:#6b7fc4">Votos 2018 &#8597;</th>
               <th style="text-align:right;color:#6b7fc4">% 2018</th>
               <th style="text-align:right;color:#6b7fc4">Rank 2018</th>
@@ -1408,12 +1421,26 @@ function sendChat() {
 let _cmp2View = 'candidatos';
 let _cmp2Data = [];
 let _cmp2SortCol = 'votos22', _cmp2SortAsc = false;
+let _cmp2Sit = 'todos';
 
 function cmp2SetView(v, btn) {
   _cmp2View = v;
   document.querySelectorAll('[id^="cmp2v-"]').forEach(b => b.classList.remove('active'));
   if (btn) btn.classList.add('active');
-  _cmp2Render();
+  // toggle situacao vs federação controls
+  const sitBtns = document.getElementById('cmp2-sit-btns');
+  const fedLbl  = document.getElementById('cmp2-fed-lbl');
+  if (sitBtns) sitBtns.style.display = v === 'candidatos' ? 'flex' : 'none';
+  if (fedLbl)  fedLbl.style.display  = v === 'partidos'   ? 'flex' : 'none';
+  _cmp2Data = [];
+  loadComparativo();
+}
+
+function cmp2SetSit(s, btn) {
+  _cmp2Sit = s;
+  document.querySelectorAll('[id^="cmp2s-"]').forEach(b => b.classList.remove('active'));
+  if (btn) btn.classList.add('active');
+  loadComparativo();
 }
 
 function cmp2Sort(col) {
@@ -1422,36 +1449,51 @@ function cmp2Sort(col) {
   _cmp2Render();
 }
 
+function _sitBadge(ds) {
+  if (!ds) return '<span style="color:var(--tx3);font-size:.58rem">N/D</span>';
+  const up = ds.toUpperCase();
+  if (up.includes('ELEITO') && !up.includes('NÃO') && !up.includes('NAO'))
+    return `<span style="background:#16a34a22;color:#4ade80;border-radius:3px;padding:1px 5px;font-size:.58rem;font-weight:600">&#10003; Eleito</span>`;
+  if (up.includes('NÃO') || up.includes('NAO') || up === 'NÃO ELEITO' || up === 'NAO ELEITO')
+    return `<span style="background:#dc262622;color:#f87171;border-radius:3px;padding:1px 5px;font-size:.58rem">&#10007; N&#227;o Eleito</span>`;
+  return `<span style="color:var(--tx3);font-size:.58rem">${_esc(ds)}</span>`;
+}
+
 async function loadComparativo() {
   const uf = (document.getElementById('cmp2-uf') || {}).value || 'SP';
   const cargo = (document.getElementById('cmp2-cargo') || {}).value || 'Deputado Federal';
-  document.getElementById('cmp2-empty').style.display = 'block';
-  document.getElementById('cmp2-empty').textContent = 'Carregando...';
+  const empty = document.getElementById('cmp2-empty');
+  if (empty) { empty.style.display = 'block'; empty.textContent = 'Carregando...'; }
   document.getElementById('cmp2-table-cands').style.display = 'none';
   document.getElementById('cmp2-table-partidos').style.display = 'none';
 
-  const endpoint = _cmp2View === 'candidatos' ? 'candidatos' : 'partidos';
-  const d = await api(`/api/comparativo/${endpoint}?uf=${encodeURIComponent(uf)}&cargo=${encodeURIComponent(cargo)}&limit=200`);
+  let url, key;
+  if (_cmp2View === 'candidatos') {
+    url = `/api/comparativo/candidatos?uf=${encodeURIComponent(uf)}&cargo=${encodeURIComponent(cargo)}&limit=300&situacao=${_cmp2Sit}`;
+    key = 'candidatos';
+  } else {
+    const fed = (document.getElementById('cmp2-fed-chk') || {}).checked ? 'true' : 'false';
+    url = `/api/comparativo/partidos?uf=${encodeURIComponent(uf)}&cargo=${encodeURIComponent(cargo)}&agrupar_federacao=${fed}`;
+    key = 'partidos';
+  }
+
+  const d = await api(url);
   if (!d || d.status === 'error') {
-    document.getElementById('cmp2-empty').textContent = d?.error || 'Erro ao carregar dados';
+    if (empty) empty.textContent = d?.error || 'Erro ao carregar dados';
     return;
   }
-  _cmp2Data = d[endpoint] || [];
-  document.getElementById('cmp2-empty').style.display = 'none';
+  _cmp2Data = d[key] || [];
+  if (empty) empty.style.display = 'none';
 
+  const tot18 = _cmp2Data.reduce((s,r)=>s+r.votos_2018,0);
+  const tot22 = _cmp2Data.reduce((s,r)=>s+r.votos_2022,0);
+  _set('cmp2-tot18', _fmt(tot18));
+  _set('cmp2-tot22', _fmt(tot22));
   if (_cmp2View === 'candidatos') {
-    const tot18 = _cmp2Data.reduce((s,r)=>s+r.votos_2018,0);
-    const tot22 = _cmp2Data.reduce((s,r)=>s+r.votos_2022,0);
     const lider = _cmp2Data.find(r=>r.votos_2022>0);
-    _set('cmp2-tot18', _fmt(tot18));
-    _set('cmp2-tot22', _fmt(tot22));
     _set('cmp2-lider22', lider ? lider.nm_candidato.split(' ').slice(0,2).join(' ') : '—');
     _set('cmp2-cnt', String(_cmp2Data.length));
   } else {
-    const tot18 = _cmp2Data.reduce((s,r)=>s+r.votos_2018,0);
-    const tot22 = _cmp2Data.reduce((s,r)=>s+r.votos_2022,0);
-    _set('cmp2-tot18', _fmt(tot18));
-    _set('cmp2-tot22', _fmt(tot22));
     _set('cmp2-lider22', (_cmp2Data[0]||{}).sg_partido || '—');
     _set('cmp2-cnt', String(_cmp2Data.length) + ' partidos');
   }
@@ -1461,8 +1503,13 @@ async function loadComparativo() {
 function _cmp2Render() {
   if (!_cmp2Data.length) return;
   const data = [..._cmp2Data];
-  const colMap = {nm:'nm_candidato',partido:'sg_partido',votos18:'votos_2018',votos22:'votos_2022',
-    rank18:'rank_2018',rank22:'rank_2022',delta:'delta_votos',deltarank:'delta_rank',pct18:'pct_2018',pct22:'pct_2022'};
+  const colMap = {
+    nm:'nm_candidato', partido:'sg_partido',
+    votos18:'votos_2018', votos22:'votos_2022',
+    rank18:'rank_2018',  rank22:'rank_2022',
+    delta:'delta_votos', deltarank:'delta_rank',
+    pct18:'pct_2018',    pct22:'pct_2022'
+  };
   const col = colMap[_cmp2SortCol] || 'votos_2022';
   data.sort((a,b) => {
     const av = a[col] ?? (_cmp2SortAsc ? Infinity : -Infinity);
@@ -1478,20 +1525,22 @@ function _cmp2Render() {
       const dv = r.delta_votos;
       const dr = r.delta_rank;
       const dvCls = dv > 0 ? 'color:#4ade80' : dv < 0 ? 'color:#f87171' : '';
-      const drCls = dr > 0 ? 'color:#4ade80' : dr < 0 ? 'color:#f87171' : '';
       const dvStr = dv > 0 ? '+'+_fmt(dv) : dv < 0 ? _fmt(dv) : '—';
       const drStr = dr != null ? (dr > 0 ? '&#9650;'+Math.abs(dr) : dr < 0 ? '&#9660;'+Math.abs(dr) : '=') : '—';
       const cor = PARTIDO_COR[r.sg_partido] || '#64748b';
-      return `<tr>
+      const rowBg = r.eleito_2022 ? 'background:rgba(34,197,94,.04)' : r.eleito_2018 ? 'background:rgba(107,127,196,.04)' : '';
+      return `<tr style="${rowBg}">
         <td>${i+1}</td>
         <td style="max-width:140px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${_esc(r.nm_candidato)}</td>
         <td><span style="background:${cor}22;color:${cor};border-radius:3px;padding:1px 5px;font-size:.6rem;font-weight:600">${_esc(r.sg_partido)}</span></td>
+        <td style="text-align:center">${_sitBadge(r.ds_situacao_2018)}</td>
         <td style="text-align:right;color:#93c5fd">${r.votos_2018 ? _fmt(r.votos_2018) : '—'}</td>
         <td style="text-align:right;color:#93c5fd">${r.rank_2018 != null ? '#'+r.rank_2018 : '—'}</td>
+        <td style="text-align:center">${_sitBadge(r.ds_situacao_2022)}</td>
         <td style="text-align:right;color:#4ade80;font-weight:600">${r.votos_2022 ? _fmt(r.votos_2022) : '—'}</td>
         <td style="text-align:right;color:#4ade80">${r.rank_2022 != null ? '#'+r.rank_2022 : '—'}</td>
         <td style="text-align:right;${dvCls}">${dvStr}</td>
-        <td style="text-align:right;${drCls}">${drStr}</td>
+        <td style="text-align:right;${dvCls}">${drStr}</td>
       </tr>`;
     }).join('');
   } else {
@@ -1503,9 +1552,13 @@ function _cmp2Render() {
       const dvCls = dv > 0 ? 'color:#4ade80' : dv < 0 ? 'color:#f87171' : '';
       const dvStr = dv > 0 ? '+'+_fmt(dv) : dv < 0 ? _fmt(dv) : '—';
       const cor = PARTIDO_COR[r.sg_partido] || '#64748b';
+      const fedStr = r.nm_federacao_2022
+        ? `<span style="font-size:.57rem;color:var(--tx3);white-space:nowrap">${_esc(r.nm_federacao_2022)}</span>`
+        : '<span style="color:var(--tx3);font-size:.57rem">—</span>';
       return `<tr>
         <td>${i+1}</td>
         <td><span style="background:${cor}22;color:${cor};border-radius:3px;padding:1px 6px;font-size:.62rem;font-weight:700">${_esc(r.sg_partido)}</span></td>
+        <td>${fedStr}</td>
         <td style="text-align:right;color:#93c5fd">${r.votos_2018 ? _fmt(r.votos_2018) : '—'}</td>
         <td style="text-align:right;color:#93c5fd">${r.pct_2018 ? r.pct_2018.toFixed(1)+'%' : '—'}</td>
         <td style="text-align:right;color:#93c5fd">${r.rank_2018 != null ? '#'+r.rank_2018 : '—'}</td>

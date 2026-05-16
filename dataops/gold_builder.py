@@ -166,9 +166,16 @@ def _build_gold_via_bigquery_sql() -> dict:
                     SAFE_CAST({_s}nr_turno AS INT64)             AS nr_turno,
                     SAFE_CAST({_s}ano_eleicao AS INT64)          AS ano_eleicao,
                     SAFE_CAST(SUM({_s}qt_votos) AS INT64)        AS total_votos,
+                    ANY_VALUE({_s}ds_situacao)                   AS ds_situacao,
                     CURRENT_TIMESTAMP()                          AS ingested_at
                 FROM {_from_tse_s}
                 {_partido_join}
+                WHERE ({_s}nm_candidato IS NOT NULL
+                  AND UPPER(TRIM({_s}nm_candidato)) NOT IN (
+                      'VOTO BRANCO','VOTO NULO','#NULO#','#NULO',
+                      'VOTO EM BRANCO','NULO','BRANCO'
+                  )
+                  AND {_s}nm_candidato NOT LIKE '#%')
                 GROUP BY {_s}sg_uf, {_s}cd_municipio, {_nm_mun_grp}, {_s}cd_municipio_ibge,
                          {_s}nm_candidato, {_partido_grp}
                          {_s}cd_cargo, {_s}ds_cargo, {_s}nr_turno, {_s}ano_eleicao
