@@ -17,6 +17,7 @@
   --tx:#e6edf3;--tx2:#8d96a0;--tx3:#57606a;
   --grn:#238636;--grn2:#2ea043;--blu:#1f6feb;--org:#f97316;--red:#da3633;
   --br:#30363d;
+  --topbar:48px;--tabbar:36px;--chatbar:50px;
 }
 html,body,#app{height:100%;overflow:hidden}
 body{background:var(--bg);color:var(--tx);font-family:'Inter',system-ui,sans-serif;font-size:13px}
@@ -26,74 +27,160 @@ select,input,textarea{font-family:inherit}
 ::-webkit-scrollbar-track{background:var(--bg2)}
 ::-webkit-scrollbar-thumb{background:var(--bg4);border-radius:2px}
 
-#login{position:fixed;inset:0;background:var(--bg);display:flex;align-items:center;justify-content:center;z-index:200}
+/* ── LOGIN ── */
+#login{position:fixed;inset:0;background:var(--bg);display:flex;align-items:center;justify-content:center;z-index:9000}
 .lcard{background:var(--bg2);border:1px solid var(--br);border-radius:12px;padding:44px 40px;width:360px;box-shadow:0 8px 40px rgba(0,0,0,.6)}
 .lword{font-size:2rem;font-weight:800;text-align:center;letter-spacing:-.02em}
 .lword span{color:var(--grn2)}
 .ltag{font-size:.65rem;color:var(--tx2);text-align:center;text-transform:uppercase;letter-spacing:.1em;margin:4px 0 24px}
 .lerr{display:none;color:#f87171;font-size:.72rem;margin-top:12px;padding:8px 10px;background:rgba(248,113,113,.1);border-radius:6px;border:1px solid rgba(248,113,113,.3);text-align:center}
+.btn-dev{display:block;width:100%;margin-top:12px;padding:10px;background:var(--bg3);border:1px solid var(--br);border-radius:6px;color:var(--tx2);font-size:.75rem;text-align:center}
+.btn-dev:hover{border-color:var(--grn);color:var(--tx)}
 
-#app{display:none;flex-direction:column}
+/* ── APP SHELL ── */
+#app{display:none;flex-direction:column;height:100%}
 #app.vis{display:flex}
 
-#topbar{height:48px;background:var(--bg2);border-bottom:1px solid var(--br);display:flex;align-items:center;padding:0 14px;gap:10px;flex-shrink:0;z-index:20}
-.tb-logo{font-size:1.05rem;font-weight:800;letter-spacing:-.02em;flex-shrink:0}
+/* ── TOPBAR ── */
+#topbar{height:var(--topbar);background:var(--bg2);border-bottom:1px solid var(--br);display:flex;align-items:center;padding:0 14px;gap:8px;flex-shrink:0;z-index:20}
+.tb-logo{font-size:1.05rem;font-weight:800;letter-spacing:-.02em;flex-shrink:0;white-space:nowrap}
 .tb-logo span{color:var(--grn2)}
 .tb-sep{width:1px;height:18px;background:var(--br);flex-shrink:0}
-.tb-sel{background:var(--bg3);border:1px solid var(--br);border-radius:6px;padding:4px 8px;color:var(--tx);font-size:.72rem;outline:none;appearance:none;cursor:pointer}
+.tb-sel{background:var(--bg3);border:1px solid var(--br);border-radius:6px;padding:4px 7px;color:var(--tx);font-size:.72rem;outline:none;appearance:none;cursor:pointer}
 .tb-sel:focus{border-color:var(--grn)}
 #cand-input{background:var(--bg3);border:1px solid var(--br);border-radius:6px;padding:4px 8px;color:var(--tx);font-size:.72rem;outline:none;width:140px}
 #cand-input:focus{border-color:var(--grn)}
 .tb-right{margin-left:auto;display:flex;align-items:center;gap:8px;flex-shrink:0}
-.mpill{display:flex;align-items:center;gap:4px;padding:2px 8px;border-radius:10px;border:1px solid var(--br);font-size:.6rem;color:var(--tx2);white-space:nowrap}
-.mdot{width:6px;height:6px;border-radius:50%}
-.mdot.grn{background:#22c55e}
-.mdot.yel{background:#f59e0b}
-.mdot.gry{background:#475569}
-.countdown{font-size:.62rem;font-weight:700;background:#431407;color:var(--org);border:1px solid rgba(249,115,22,.4);border-radius:10px;padding:2px 8px;white-space:nowrap}
-.upill{display:flex;align-items:center;gap:6px;background:var(--bg3);border:1px solid var(--br);border-radius:16px;padding:2px 8px 2px 2px}
-.uav{width:22px;height:22px;border-radius:50%;background:linear-gradient(135deg,var(--grn),var(--blu));display:flex;align-items:center;justify-content:center;font-size:.56rem;font-weight:700;color:#fff}
-.unm{font-size:.72rem;font-weight:500}
+.src-dots{display:flex;align-items:center;gap:4px}
+.sdot{width:7px;height:7px;border-radius:50%;cursor:default}
+.sdot.grn{background:#22c55e}
+.sdot.yel{background:#f59e0b}
+.sdot.red{background:var(--red)}
+.sdot.gry{background:#475569}
+.uav{width:26px;height:26px;border-radius:50%;background:linear-gradient(135deg,var(--grn),var(--blu));display:flex;align-items:center;justify-content:center;font-size:.6rem;font-weight:700;color:#fff;flex-shrink:0}
 .btn-out{background:transparent;border:1px solid var(--br);border-radius:6px;padding:3px 8px;font-size:.65rem;color:var(--tx2)}
 .btn-out:hover{border-color:var(--red);color:var(--red)}
+.countdown{font-size:.6rem;font-weight:700;background:#431407;color:var(--org);border:1px solid rgba(249,115,22,.4);border-radius:10px;padding:2px 7px;white-space:nowrap}
 
-#main{display:flex;flex:1;overflow:hidden;min-height:0}
+/* ── TAB BAR ── */
+#tabbar{height:var(--tabbar);background:var(--bg2);border-bottom:1px solid var(--br);display:flex;flex-shrink:0;z-index:15}
+.tab{flex:1;display:flex;align-items:center;justify-content:center;gap:4px;font-size:.65rem;font-weight:600;color:var(--tx3);cursor:pointer;border-bottom:2px solid transparent;transition:all .15s;user-select:none;white-space:nowrap;padding:0 2px}
+.tab:hover{color:var(--tx);background:var(--bg3)}
+.tab.active{color:#fff;border-bottom-color:var(--grn2);background:var(--bg3)}
+.tab-badge{font-size:.5rem;background:var(--bg4);color:var(--tx2);border-radius:4px;padding:1px 4px;font-weight:500}
 
-#map-col{width:56%;position:relative;display:flex;flex-direction:column;background:var(--bg)}
-#map-toolbar{display:flex;align-items:center;gap:5px;padding:6px 10px;background:var(--bg2);border-bottom:1px solid var(--br);flex-shrink:0;flex-wrap:wrap}
-.level-btn{padding:3px 8px;font-size:.62rem;border:1px solid var(--br);border-radius:4px;background:transparent;color:var(--tx2);cursor:pointer;transition:all .15s}
-.level-btn:hover{color:var(--tx);border-color:var(--bg4)}
-.level-btn.active{background:var(--grn);color:#000;border-color:var(--grn)}
-.level-btn.disabled{opacity:.35;cursor:not-allowed}
-.tb-sep2{width:1px;height:14px;background:var(--br);flex-shrink:0}
-.layer-btn{padding:3px 8px;font-size:.6rem;border:1px solid var(--br);border-radius:4px;background:transparent;color:var(--tx3);cursor:pointer;transition:all .15s}
-.layer-btn:hover{color:var(--tx2);border-color:var(--bg4)}
-.layer-btn.active{background:var(--bg3);color:var(--grn2);border-color:var(--grn)}
+/* ── CONTENT AREA ── */
+#content{flex:1;overflow:hidden;position:relative;min-height:0}
+.tab-panel{display:none;height:100%;overflow:hidden;position:absolute;inset:0}
+.tab-panel.active{display:flex;flex-direction:column}
+
+/* ── SHARED PANEL STYLES ── */
+.panel-scroll{flex:1;overflow-y:auto;padding:14px;min-height:0}
+.kpi-row{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:14px}
+.kpi-row-4{grid-template-columns:repeat(4,1fr)}
+.kpi{background:var(--bg2);border:1px solid var(--br);border-radius:8px;padding:10px 13px}
+.kpi-val{font-size:1.4rem;font-weight:800;font-family:'JetBrains Mono',monospace;line-height:1.1}
+.kpi-lbl{font-size:.6rem;color:var(--tx3);margin-top:3px;text-transform:uppercase;letter-spacing:.05em}
+.kpi-delta{font-size:.62rem;margin-top:2px}
+.up{color:#22c55e}.dn{color:var(--red)}.neu{color:var(--tx2)}
+.shdr{font-size:.62rem;font-weight:700;color:var(--tx2);text-transform:uppercase;letter-spacing:.08em;margin:14px 0 7px;display:flex;align-items:center;gap:6px}
+.empty{color:var(--tx3);font-size:.7rem;text-align:center;padding:20px}
+.bar-row{display:flex;align-items:center;gap:8px;margin-bottom:5px}
+.bar-lbl{font-size:.63rem;color:var(--tx2);width:110px;flex-shrink:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.bar-track{flex:1;height:10px;background:var(--bg4);border-radius:5px;overflow:hidden}
+.bar-fill{height:100%;border-radius:5px;transition:width .5s}
+.bar-pct{font-size:.63rem;font-family:monospace;color:var(--tx);width:38px;text-align:right;flex-shrink:0}
+.kv-row{display:flex;justify-content:space-between;padding:4px 0;border-bottom:1px solid var(--br);font-size:.7rem}
+.kv-lbl{color:var(--tx2)}
+.kv-val{color:var(--tx);font-weight:600}
+.adv-row{display:flex;align-items:center;gap:8px;padding:5px 0;border-bottom:1px solid var(--br)}
+.adv-nm{font-size:.7rem;color:var(--tx);flex:1}
+.adv-pct{font-size:.75rem;font-weight:700;font-family:monospace;color:var(--org)}
+.prob-wrap{margin-bottom:10px}
+.prob-lbl{font-size:.65rem;color:var(--tx2);margin-bottom:3px;display:flex;justify-content:space-between}
+.prob-track{height:12px;background:var(--bg4);border-radius:6px;overflow:hidden}
+.prob-fill{height:100%;border-radius:6px;transition:width .6s}
+.shap-row{display:flex;align-items:center;gap:8px;padding:4px 0;border-bottom:1px solid var(--br)}
+.shap-nm{font-size:.66rem;color:var(--tx);flex:1}
+.shap-bar-wrap{width:90px;height:6px;background:var(--bg4);border-radius:3px;overflow:hidden;flex-shrink:0}
+.shap-bar-fill{height:100%;border-radius:3px}
+.shap-val{font-size:.66rem;font-family:monospace;font-weight:700;width:52px;text-align:right;flex-shrink:0}
+.pill-row{display:flex;gap:5px;flex-wrap:wrap;margin-bottom:10px}
+.pill{padding:3px 10px;font-size:.62rem;border:1px solid var(--br);border-radius:12px;background:transparent;color:var(--tx2);cursor:pointer}
+.pill.active{background:var(--bg3);color:var(--grn2);border-color:var(--grn)}
+.pill:hover:not(.active){color:var(--tx)}
+.tag{font-size:.55rem;padding:1px 5px;border-radius:8px;font-weight:600;display:inline-block}
+.tag-grn{background:#2ea04322;color:#3fb950}
+.tag-blu{background:#1f6feb22;color:#58a6ff}
+.tag-org{background:#f9731622;color:#fb923c}
+.tag-red{background:#da363322;color:#f87171}
+canvas{display:block}
+
+/* ── MAP TAB ── */
+#tab-mapa{position:relative}
 #leaflet-map{flex:1;min-height:0;background:var(--bg)}
-#map-breadcrumb{padding:4px 10px;font-size:.63rem;color:var(--tx2);background:var(--bg2);border-top:1px solid var(--br);flex-shrink:0;min-height:22px}
-#map-breadcrumb span{color:var(--grn2);cursor:pointer}
-#map-breadcrumb span:hover{text-decoration:underline}
+#map-overlay-tl{position:absolute;top:10px;left:10px;z-index:500;display:flex;flex-direction:column;gap:5px}
+#map-overlay-tr{position:absolute;top:10px;right:10px;z-index:500;display:flex;gap:4px;flex-wrap:wrap;max-width:220px;justify-content:flex-end}
+#map-overlay-bl{position:absolute;bottom:70px;left:10px;z-index:500}
+#map-overlay-br{position:absolute;bottom:10px;right:10px;z-index:500}
+.map-zoom-group{display:flex;flex-direction:column;gap:3px}
+.map-btn{padding:4px 9px;font-size:.6rem;border:1px solid var(--br);border-radius:4px;background:var(--bg2);color:var(--tx2);cursor:pointer;transition:all .15s}
+.map-btn:hover{color:var(--tx);border-color:var(--bg4)}
+.map-btn.active{background:var(--grn);color:#000;border-color:var(--grn);font-weight:600}
+.map-crumb{font-size:.62rem;color:var(--tx2);background:var(--bg2);border:1px solid var(--br);border-radius:4px;padding:3px 8px;white-space:nowrap}
+.map-crumb span{color:var(--grn2);cursor:pointer}
+.map-crumb span:hover{text-decoration:underline}
+.layer-chip{padding:3px 8px;font-size:.6rem;border:1px solid var(--br);border-radius:4px;background:var(--bg2);color:var(--tx3);cursor:pointer;transition:all .15s}
+.layer-chip:hover{color:var(--tx2)}
+.layer-chip.active{background:var(--bg3);color:var(--grn2);border-color:var(--grn)}
+#map-legend{background:var(--bg2);border:1px solid var(--br);border-radius:6px;padding:7px 10px;min-width:120px;font-size:.65rem;pointer-events:none;box-shadow:0 2px 8px rgba(0,0,0,.4)}
 
-#intel-col{width:44%;display:flex;flex-direction:column;background:var(--bg2);border-left:1px solid var(--br);min-height:0}
-#tab-bar{display:flex;flex-wrap:wrap;background:var(--bg3);border-bottom:1px solid var(--br);flex-shrink:0}
-.tab{flex:1 1 33.33%;padding:7px 4px;font-size:.57rem;font-weight:600;color:var(--tx3);cursor:pointer;text-align:center;border-bottom:2px solid transparent;transition:all .15s;user-select:none;letter-spacing:.01em;white-space:nowrap}
-.tab:hover{color:var(--tx);background:var(--bg4)}
-.tab.active{color:var(--grn2);border-bottom-color:var(--grn);background:var(--bg2)}
-#panels{flex:1;overflow:hidden;position:relative;min-height:0}
-.panel{display:none;height:100%;overflow-y:auto;padding:12px}
-.panel.active{display:block}
+/* ── RESULTS TAB layout ── */
+.results-grid{display:grid;grid-template-columns:55% 45%;gap:12px;flex:1;min-height:0;overflow:hidden}
+.chart-panel{background:var(--bg2);border:1px solid var(--br);border-radius:8px;padding:12px;overflow:hidden;display:flex;flex-direction:column;min-height:0}
+.chart-title{font-size:.65rem;font-weight:700;color:var(--tx2);text-transform:uppercase;letter-spacing:.07em;margin-bottom:8px;flex-shrink:0}
+.chart-wrap{flex:1;position:relative;min-height:0}
+.table-wrap{overflow-y:auto;flex:1;min-height:0}
+table.data{width:100%;border-collapse:collapse;font-size:.7rem}
+table.data th{padding:5px 7px;color:var(--tx2);text-align:left;border-bottom:1px solid var(--br);font-weight:600;font-size:.62rem;text-transform:uppercase;letter-spacing:.05em;position:sticky;top:0;background:var(--bg2)}
+table.data td{padding:4px 7px;border-bottom:1px solid rgba(48,54,61,.5)}
+table.data tr:hover td{background:var(--bg3)}
+.badge-eleito{background:#2ea04322;color:#3fb950;font-size:.55rem;padding:1px 5px;border-radius:4px;font-weight:600}
+.badge-partido{font-size:.6rem;padding:1px 5px;border-radius:3px;font-weight:600;color:#fff}
 
-#chat-section{height:210px;flex-shrink:0;border-top:1px solid var(--br);display:flex;flex-direction:column}
-#chat-hdr{padding:6px 10px;border-bottom:1px solid var(--br);display:flex;align-items:center;gap:8px;font-size:.65rem;font-weight:600;flex-shrink:0}
-.ai-dot{width:6px;height:6px;border-radius:50%;background:var(--grn2);animation:pulse 2s infinite;flex-shrink:0}
+/* ── ELEITORADO 2x2 grid ── */
+.chart-2x2{display:grid;grid-template-columns:1fr 1fr;grid-template-rows:1fr 1fr;gap:10px;flex:1;min-height:0}
+
+/* ── DIGITAL sub-tabs ── */
+.dig-section{display:none}
+.dig-section.active{display:block}
+
+/* ── RANKING tab ── */
+.ranking-layout{display:grid;grid-template-columns:60% 40%;gap:12px;flex:1;min-height:0;overflow:hidden}
+
+/* ── CHAT BAR ── */
+#chat-bar{height:var(--chatbar);background:var(--bg2);border-top:1px solid var(--br);display:flex;align-items:center;gap:8px;padding:0 12px;flex-shrink:0;z-index:50}
+#chat-dot{font-size:.9rem;color:#22c55e;animation:pulse 2s infinite}
 @keyframes pulse{0%,100%{opacity:1}50%{opacity:.35}}
-#chat-msgs{flex:1;overflow-y:auto;padding:8px 10px;display:flex;flex-direction:column;gap:6px;min-height:0}
+#chat-in{flex:1;background:var(--bg3);border:1px solid var(--br);border-radius:6px;padding:6px 10px;color:var(--tx);font-size:.75rem;resize:none;outline:none;height:32px;line-height:1.2}
+#chat-in:focus{border-color:var(--grn)}
+#chat-btn,#chat-expand{background:var(--grn);color:#fff;border:none;border-radius:6px;padding:5px 12px;font-size:.8rem;flex-shrink:0}
+#chat-expand{background:var(--bg3);border:1px solid var(--br);color:var(--tx2);font-size:.7rem}
+#chat-btn:hover{opacity:.85}
+#chat-btn:disabled{opacity:.4;cursor:not-allowed}
+
+/* ── CHAT PANEL ── */
+#chat-panel{position:fixed;bottom:var(--chatbar);left:0;right:0;height:350px;background:var(--bg2);border-top:1px solid var(--br);z-index:100;display:none;flex-direction:column}
+#chat-panel.open{display:flex}
+#chat-phdr{display:flex;align-items:center;gap:8px;padding:7px 12px;border-bottom:1px solid var(--br);flex-shrink:0;font-size:.65rem;font-weight:600}
+.ai-dot{width:6px;height:6px;border-radius:50%;background:var(--grn2);animation:pulse 2s infinite}
+#chat-msgs{flex:1;overflow-y:auto;padding:8px 12px;display:flex;flex-direction:column;gap:6px}
 .msg-ai,.msg-u{display:flex;gap:6px}
 .msg-u{flex-direction:row-reverse}
-.mav2{width:20px;height:20px;border-radius:50%;flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:.52rem;font-weight:700}
-.mav2.ai{background:linear-gradient(135deg,var(--grn),var(--blu));color:#fff}
-.mav2.u{background:var(--bg4);border:1px solid var(--br);color:var(--tx2)}
-.mb{padding:7px 10px;font-size:.68rem;line-height:1.5;color:var(--tx);max-width:88%}
+.mav{width:20px;height:20px;border-radius:50%;flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:.52rem;font-weight:700}
+.mav.ai{background:linear-gradient(135deg,var(--grn),var(--blu));color:#fff}
+.mav.u{background:var(--bg4);border:1px solid var(--br);color:var(--tx2)}
+.mb{padding:7px 10px;font-size:.68rem;line-height:1.5;color:var(--tx);max-width:90%}
 .msg-ai .mb{background:var(--bg3);border-radius:0 8px 8px 8px;border:1px solid var(--br)}
 .msg-u .mb{background:#1f6feb33;border-radius:8px 0 8px 8px;border:1px solid #1f6feb55;margin-left:auto}
 .typing-dots{display:flex;gap:3px;padding:8px 10px;background:var(--bg3);border-radius:0 8px 8px 8px;border:1px solid var(--br);width:fit-content}
@@ -101,72 +188,16 @@ select,input,textarea{font-family:inherit}
 .typing-dots span:nth-child(2){animation-delay:.2s}
 .typing-dots span:nth-child(3){animation-delay:.4s}
 @keyframes blink{0%,60%,100%{transform:translateY(0)}30%{transform:translateY(-4px)}}
-#chat-cin-row{display:flex;gap:6px;padding:6px 8px;border-top:1px solid var(--br);flex-shrink:0}
-#chat-cin{flex:1;background:var(--bg3);border:1px solid var(--br);border-radius:6px;padding:6px 10px;color:var(--tx);font-size:.72rem;resize:none;outline:none;height:32px;line-height:1.3}
-#chat-cin:focus{border-color:var(--grn)}
-#chat-send{background:var(--grn);color:#fff;border:none;border-radius:6px;padding:6px 12px;font-size:.75rem;flex-shrink:0}
-#chat-send:hover{opacity:.85}
-#chat-send:disabled{opacity:.4;cursor:not-allowed}
-
-.kpi-row{display:grid;grid-template-columns:repeat(2,1fr);gap:8px;margin-bottom:10px}
-.kpi{background:var(--bg3);border:1px solid var(--br);border-radius:8px;padding:10px 12px}
-.kpi-val{font-size:1.4rem;font-weight:800;font-family:'JetBrains Mono',monospace;color:var(--tx);line-height:1.1}
-.kpi-lbl{font-size:.6rem;color:var(--tx3);margin-top:3px}
-.kpi-delta{font-size:.62rem;margin-top:2px}
-.up{color:#22c55e}.dn{color:var(--red)}.neu{color:var(--tx2)}
-.section-hdr{font-size:.65rem;font-weight:700;color:var(--tx2);text-transform:uppercase;letter-spacing:.08em;margin:12px 0 6px;display:flex;align-items:center;gap:6px}
-.bar-row{display:flex;align-items:center;gap:8px;margin-bottom:5px}
-.bar-lbl{font-size:.63rem;color:var(--tx2);width:90px;flex-shrink:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.bar-track{flex:1;height:10px;background:var(--bg4);border-radius:5px;overflow:hidden}
-.bar-fill{height:100%;border-radius:5px;transition:width .5s}
-.bar-pct{font-size:.63rem;font-family:monospace;color:var(--tx);width:36px;text-align:right;flex-shrink:0}
-.empty{color:var(--tx3);font-size:.7rem;text-align:center;padding:20px}
-.tag{font-size:.55rem;padding:1px 6px;border-radius:8px;font-weight:600;display:inline-block}
-.tag-tse{background:#1f6feb22;color:#58a6ff}
-.tag-ibge{background:#2ea04322;color:#3fb950}
-.tag-poll{background:#f9731622;color:#fb923c}
-.mun-row{display:flex;align-items:center;gap:8px;padding:5px 0;border-bottom:1px solid var(--br)}
-.mun-pos{font-size:.6rem;color:var(--tx3);width:16px;flex-shrink:0}
-.mun-nm{font-size:.68rem;color:var(--tx);flex:1}
-.mun-pct{font-size:.72rem;font-weight:700;font-family:monospace}
-.cov-row{display:flex;align-items:center;gap:8px;margin-bottom:10px}
-.cov-track{flex:1;height:8px;background:var(--bg4);border-radius:4px;overflow:hidden}
-.cov-fill{height:100%;border-radius:4px;background:var(--grn);transition:width .5s}
-.cov-txt{font-size:.65rem;font-family:monospace;color:var(--tx2);width:36px;text-align:right;flex-shrink:0}
-.zone-kpi-row{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:10px}
-.zone-kpi{background:var(--bg3);border:1px solid var(--br);border-radius:8px;padding:8px 10px;text-align:center}
-.zone-kpi-val{font-size:1.1rem;font-weight:800;font-family:'JetBrains Mono',monospace}
-.zone-kpi-lbl{font-size:.55rem;color:var(--tx3);margin-top:2px;text-transform:uppercase;letter-spacing:.06em}
-.pill-tabs{display:flex;gap:4px;margin-bottom:10px;flex-wrap:wrap}
-.pill-tab{padding:3px 10px;font-size:.6rem;border:1px solid var(--br);border-radius:12px;background:transparent;color:var(--tx2);cursor:pointer}
-.pill-tab.active{background:var(--bg3);color:var(--grn2);border-color:var(--grn)}
-.pill-tab:hover:not(.active){color:var(--tx)}
-.adv-row{display:flex;align-items:center;gap:8px;padding:6px 0;border-bottom:1px solid var(--br)}
-.adv-nm{font-size:.7rem;color:var(--tx);flex:1}
-.adv-pct{font-size:.75rem;font-weight:700;font-family:monospace;color:var(--org)}
-.prob-bar-wrap{margin-bottom:12px}
-.prob-lbl{font-size:.65rem;color:var(--tx2);margin-bottom:4px;display:flex;justify-content:space-between}
-.prob-track{height:12px;background:var(--bg4);border-radius:6px;overflow:hidden}
-.prob-fill{height:100%;border-radius:6px;transition:width .6s}
-.shap-row{display:flex;align-items:center;gap:8px;padding:4px 0;border-bottom:1px solid var(--br)}
-.shap-nm{font-size:.66rem;color:var(--tx);flex:1}
-.shap-val{font-size:.66rem;font-family:monospace;font-weight:700;width:48px;text-align:right}
-.shap-bar{flex:1;height:6px;background:var(--bg4);border-radius:3px;overflow:hidden}
-.shap-fill{height:100%;border-radius:3px}
-.kv-row{display:flex;justify-content:space-between;padding:4px 0;border-bottom:1px solid var(--br);font-size:.7rem}
-.kv-lbl{color:var(--tx2)}
-.kv-val{color:var(--tx);font-weight:600}
-.dig-sub{display:none}
-.dig-sub.active{display:block}
-canvas{display:block}
-#map-legend{position:absolute;bottom:60px;right:8px;background:var(--bg2);border:1px solid var(--br);border-radius:6px;padding:7px 10px;z-index:10;min-width:120px;font-size:.65rem;pointer-events:none;box-shadow:0 2px 8px rgba(0,0,0,.4)}
+#chat-status-dot{font-size:.6rem;margin-left:auto}
+#chat-reconnect{display:none;cursor:pointer;color:var(--org);font-size:.65rem;margin-left:4px}
 </style>
 </head>
 <body>
 
+<!-- LOGIN -->
 <div id="login">
   <div class="lcard">
-    <div class="lword">SP<span>E</span>PE</div>
+    <div class="lword"><span>SP</span>EPE</div>
     <div class="ltag">Inteligência Eleitoral &middot; IA</div>
     <div id="g_id_onload"
       data-client_id="1055426323388-j97gohht800s7v447f2v8fg6lskacv37.apps.googleusercontent.com"
@@ -174,24 +205,29 @@ canvas{display:block}
       data-auto_prompt="true">
     </div>
     <div class="g_id_signin" data-type="standard" data-theme="filled_black" data-size="large" data-text="signin_with" data-shape="rectangular" data-logo_alignment="left" style="margin-top:16px"></div>
+    <button class="btn-dev" onclick="devLogin()">Entrar sem login (dev)</button>
     <p class="lerr" id="login-error"></p>
   </div>
 </div>
 
+<!-- APP -->
 <div id="app">
+
+  <!-- TOPBAR -->
   <nav id="topbar">
-    <div class="tb-logo">SP<span>E</span>PE</div>
+    <div class="tb-logo"><span>SP</span>EPE</div>
     <div class="tb-sep"></div>
     <input id="cand-input" type="text" placeholder="Candidato..." list="cand-list" autocomplete="off" oninput="applyFilters()">
     <datalist id="cand-list"></datalist>
     <select class="tb-sel" id="f-cargo" onchange="applyFilters()">
-      <option>Governador</option>
-      <option>Presidente</option>
-      <option>Senador</option>
-      <option>Dep. Federal</option>
-      <option>Dep. Estadual</option>
+      <option value="presidente">Presidente</option>
+      <option value="governador" selected>Governador</option>
+      <option value="senador">Senador</option>
+      <option value="dep federal">Dep. Federal</option>
+      <option value="dep estadual">Dep. Estadual</option>
     </select>
     <select class="tb-sel" id="f-uf" onchange="applyFilters()">
+      <option value="BR">BR</option>
       <option value="AC">AC</option><option value="AL">AL</option><option value="AM">AM</option>
       <option value="AP">AP</option><option value="BA">BA</option><option value="CE">CE</option>
       <option value="DF">DF</option><option value="ES">ES</option><option value="GO">GO</option>
@@ -203,286 +239,269 @@ canvas{display:block}
       <option value="SE">SE</option><option value="SP" selected>SP</option><option value="TO">TO</option>
     </select>
     <select class="tb-sel" id="f-ano" onchange="applyFilters()">
-      <option>2026</option><option selected>2022</option><option>2018</option>
+      <option value="2026">2026</option>
+      <option value="2022" selected>2022</option>
+      <option value="2018">2018</option>
     </select>
     <div class="tb-right">
-      <div class="mpill" id="pill-m1" title="M1 — Modelo baseline">
-        <span class="mdot gry" id="m1-dot"></span>
-        <span id="m1-lbl">M1 &mdash;</span>
+      <div class="src-dots" title="Status das fontes de dados">
+        <div class="sdot grn" title="TSE"></div>
+        <div class="sdot grn" title="IBGE"></div>
+        <div class="sdot yel" title="Social"></div>
+        <div class="sdot gry" title="Polls"></div>
+        <div class="sdot gry" title="GDELT"></div>
       </div>
-      <div class="mpill" id="pill-m2" title="M2 — Modelo preditivo">
-        <span class="mdot gry" id="m2-dot"></span>
-        <span id="m2-lbl">M2 &mdash;</span>
-      </div>
-      <span class="countdown" id="countdown-el">&#8987; &hellip; dias</span>
-      <div class="upill">
-        <div class="uav" id="uav">?</div>
-        <span class="unm" id="unm">...</span>
-      </div>
+      <span class="countdown" id="countdown-el">&#8987; ...</span>
+      <div class="uav" id="uav">?</div>
       <button class="btn-out" onclick="doLogout()">Sair</button>
     </div>
   </nav>
 
-  <div id="main">
-    <div id="map-col">
-      <div id="map-toolbar">
-        <button class="level-btn active" data-level="uf" onclick="setMapLevel('uf')">&#127757; UF</button>
-        <button class="level-btn" data-level="nacional" onclick="setMapLevel('nacional')">&#127758; Nacional</button>
-        <button class="level-btn" data-level="regiao" onclick="setMapLevel('regiao')">&#128205; Regi&#227;o</button>
-        <button class="level-btn" data-level="municipio" onclick="setMapLevel('municipio')">&#127968; Mun</button>
-        <div class="tb-sep2"></div>
-        <button class="layer-btn active" data-layer="electoral" onclick="setMapLayer('electoral')">&#127942; Eleit</button>
-        <button class="layer-btn" data-layer="economic" onclick="setMapLayer('economic')">&#128202; IBGE</button>
-        <button class="layer-btn" data-layer="health" onclick="setMapLayer('health')">&#127973; Sa&#250;de</button>
-        <button class="layer-btn" data-layer="security" onclick="setMapLayer('security')">&#128737; Seg</button>
-        <button class="layer-btn" data-layer="poll" onclick="setMapLayer('poll')">&#128203; Pesq</button>
-        <button class="layer-btn" data-layer="pred" onclick="setMapLayer('pred')">&#128302; Pred</button>
-        <button id="btn-heat" onclick="toggleHeatmap()" style="padding:3px 8px;font-size:.6rem;border:1px solid var(--br);border-radius:4px;background:transparent;color:var(--tx3);cursor:pointer;margin-left:4px">&#127777; Calor</button>
-      </div>
-      <div id="leaflet-map" style="position:relative">
-        <div id="map-legend"></div>
-      </div>
-      <div id="map-breadcrumb"><span onclick="resetMap()">Brasil</span></div>
-    </div>
-
-    <div id="intel-col">
-      <div id="tab-bar">
-        <div class="tab active" data-tab="base" onclick="switchTab('base')">&#128202; Base Eleit</div>
-        <div class="tab" data-tab="territorio" onclick="switchTab('territorio')">&#128506; Territ&#243;rio</div>
-        <div class="tab" data-tab="eleitorado" onclick="switchTab('eleitorado')">&#128101; Eleitorado</div>
-        <div class="tab" data-tab="pesquisas" onclick="switchTab('pesquisas')">&#128203; Pesquisas</div>
-        <div class="tab" data-tab="adversarios" onclick="switchTab('adversarios')">&#127919; Advers&#225;rios</div>
-        <div class="tab" data-tab="parcerias" onclick="switchTab('parcerias')">&#129309; Parcerias</div>
-        <div class="tab" data-tab="digital" onclick="switchTab('digital')">&#128241; Digital</div>
-        <div class="tab" data-tab="previsao" onclick="switchTab('previsao')">&#128302; Previs&#227;o</div>
-        <div class="tab" id="tab-ranking" data-tab="ranking" onclick="switchTab('ranking')">&#127942; Ranking</div>
-      </div>
-
-      <div id="panels">
-        <!-- BASE -->
-        <div class="panel active" id="panel-base">
-          <div class="kpi-row">
-            <div class="kpi">
-              <div class="kpi-val" id="kpi-votos">&mdash;</div>
-              <div class="kpi-lbl">Votos 2022 (1T)</div>
-            </div>
-            <div class="kpi">
-              <div class="kpi-val" id="kpi-pct">&mdash;</div>
-              <div class="kpi-lbl">% dos v&#225;lidos</div>
-              <div class="kpi-delta" id="kpi-delta"></div>
-            </div>
-            <div class="kpi">
-              <div class="kpi-val" id="kpi-mun">&mdash;</div>
-              <div class="kpi-lbl">Munic&#237;pios vencidos</div>
-            </div>
-            <div class="kpi">
-              <div class="kpi-val" id="kpi-meta">&mdash;</div>
-              <div class="kpi-lbl">Meta 2026</div>
-            </div>
-          </div>
-          <div class="section-hdr">Cobertura</div>
-          <div class="cov-row">
-            <div class="cov-track"><div class="cov-fill" id="cov-bar" style="width:0%"></div></div>
-            <div class="cov-txt" id="cov-pct">0%</div>
-          </div>
-          <div class="section-hdr"><span class="tag tag-tse">TSE</span> Top Munic&#237;pios</div>
-          <div id="top-mun-list"><div class="empty">Carregando...</div></div>
-          <div class="section-hdr">Evolu&#231;&#227;o Hist&#243;rica</div>
-          <div style="height:80px;position:relative"><canvas id="chart-evo"></canvas></div>
-        </div>
-
-        <!-- TERRITORIO -->
-        <div class="panel" id="panel-territorio">
-          <div class="zone-kpi-row">
-            <div class="zone-kpi">
-              <div class="zone-kpi-val" style="color:#22c55e" id="zon-fort">&mdash;</div>
-              <div class="zone-kpi-lbl">Fortalezas &#8805;45%</div>
-            </div>
-            <div class="zone-kpi">
-              <div class="zone-kpi-val" style="color:var(--org)" id="zon-comp">&mdash;</div>
-              <div class="zone-kpi-lbl">Competitivos 25-45%</div>
-            </div>
-            <div class="zone-kpi">
-              <div class="zone-kpi-val" style="color:var(--red)" id="zon-risco">&mdash;</div>
-              <div class="zone-kpi-lbl">Em Risco &lt;25%</div>
-            </div>
-          </div>
-          <div class="section-hdr">Onde Focar &mdash; Zonas Competitivas</div>
-          <div id="comp-list"><div class="empty">Carregando...</div></div>
-          <div class="section-hdr">Fortalezas</div>
-          <div id="fort-list"><div class="empty">Carregando...</div></div>
-        </div>
-
-        <!-- ELEITORADO -->
-        <div class="panel" id="panel-eleitorado">
-          <div class="kpi-row">
-            <div class="kpi" style="grid-column:1/-1">
-              <div class="kpi-val" id="eleit-total">&mdash;</div>
-              <div class="kpi-lbl">Eleitores registrados</div>
-            </div>
-          </div>
-          <div class="section-hdr">G&#234;nero</div>
-          <div id="gen-rows"><div class="empty">Carregando...</div></div>
-          <div class="section-hdr">Faixa Et&#225;ria</div>
-          <div id="age-rows"><div class="empty">Carregando...</div></div>
-          <div class="section-hdr">Escolaridade</div>
-          <div id="edu-rows"><div class="empty">Carregando...</div></div>
-        </div>
-
-        <!-- PESQUISAS -->
-        <div class="panel" id="panel-pesquisas">
-          <div class="kpi-row">
-            <div class="kpi">
-              <div class="kpi-val" id="poll-avg">&mdash;</div>
-              <div class="kpi-lbl">M&#233;dia pesquisas</div>
-            </div>
-            <div class="kpi">
-              <div class="kpi-val" id="poll-n">&mdash;</div>
-              <div class="kpi-lbl">Pesquisas registradas</div>
-            </div>
-          </div>
-          <div class="section-hdr">Tracking de inten&#231;&#227;o</div>
-          <div style="height:100px;position:relative"><canvas id="chart-tracking"></canvas></div>
-          <div class="section-hdr">&#218;ltimas Pesquisas</div>
-          <div id="poll-list"><div class="empty">Carregando...</div></div>
-          <div class="section-hdr">Por Instituto</div>
-          <div id="poll-inst"><div class="empty"></div></div>
-        </div>
-
-        <!-- ADVERSARIOS -->
-        <div class="panel" id="panel-adversarios">
-          <div class="section-hdr">Principais Advers&#225;rios</div>
-          <div id="adv-list"><div class="empty">Carregando...</div></div>
-          <div class="section-hdr">An&#225;lise de Vulnerabilidade</div>
-          <div id="adv-vuln">
-            <div class="kv-row"><span class="kv-lbl">Em risco</span><span class="kv-val" id="adv-risco">&mdash;</span></div>
-            <div class="kv-row"><span class="kv-lbl">Munic&#237;pios seguros</span><span class="kv-val" id="adv-seguros">&mdash;</span></div>
-            <div class="kv-row"><span class="kv-lbl">Zona competitiva</span><span class="kv-val" id="adv-zona">&mdash;</span></div>
-          </div>
-          <div class="section-hdr">Onde Focar</div>
-          <div id="adv-foco"><div class="empty"></div></div>
-        </div>
-
-        <!-- PARCERIAS -->
-        <div class="panel" id="panel-parcerias">
-          <p style="font-size:.65rem;color:var(--tx2);margin-bottom:10px;line-height:1.5">Candidatos cujos eleitores t&#234;m potencial de migrar para sua base.</p>
-          <div class="section-hdr">Alian&#231;as Identificadas</div>
-          <div id="ali-list"><div class="empty">Carregando...</div></div>
-          <div class="section-hdr">Oportunidades de Parceria</div>
-          <div id="parc-list"><div class="empty">Carregando...</div></div>
-          <div class="section-hdr">Perfil de Alian&#231;a</div>
-          <div style="height:80px;position:relative"><canvas id="chart-parc"></canvas></div>
-        </div>
-
-        <!-- DIGITAL -->
-        <div class="panel" id="panel-digital">
-          <div class="pill-tabs">
-            <button class="pill-tab active" onclick="switchDig('social',this)">Social</button>
-            <button class="pill-tab" onclick="switchDig('meta',this)">Meta Ads</button>
-            <button class="pill-tab" onclick="switchDig('trends',this)">Trends</button>
-            <button class="pill-tab" onclick="switchDig('gdelt',this)">GDELT</button>
-          </div>
-          <div class="dig-sub active" id="dig-social">
-            <div class="kpi-row">
-              <div class="kpi">
-                <div class="kpi-val" id="dig-sent">&mdash;</div>
-                <div class="kpi-lbl">Score de Sentimento</div>
-              </div>
-              <div class="kpi">
-                <div class="kpi-val" id="dig-vol">&mdash;</div>
-                <div class="kpi-lbl">Volume de men&#231;&#245;es</div>
-              </div>
-            </div>
-            <div class="section-hdr">Por Plataforma</div>
-            <div id="dig-platforms"><div class="empty">Carregando...</div></div>
-          </div>
-          <div class="dig-sub" id="dig-meta">
-            <div class="section-hdr">Invest. Publicidade</div>
-            <div style="height:80px;position:relative"><canvas id="chart-meta-spend"></canvas></div>
-            <div class="section-hdr">Candidatos no Radar</div>
-            <div id="meta-cands"><div class="empty">Carregando...</div></div>
-          </div>
-          <div class="dig-sub" id="dig-trends">
-            <div class="section-hdr">Interesse de Busca (Google)</div>
-            <div style="height:80px;position:relative"><canvas id="chart-trends"></canvas></div>
-          </div>
-          <div class="dig-sub" id="dig-gdelt">
-            <div class="section-hdr">Eventos GDELT</div>
-            <div id="gdelt-list"><div class="empty">Carregando...</div></div>
-          </div>
-        </div>
-
-        <!-- PREVISAO -->
-        <div class="panel" id="panel-previsao">
-          <div class="section-hdr">Modelos Preditivos</div>
-          <div id="prev-m1" class="prob-bar-wrap">
-            <div class="prob-lbl"><span>M1 (Baseline)</span><span id="prev-m1-pct">&mdash;</span></div>
-            <div class="prob-track"><div class="prob-fill" id="prev-m1-bar" style="width:0%;background:var(--grn)"></div></div>
-          </div>
-          <div id="prev-m2" class="prob-bar-wrap">
-            <div class="prob-lbl"><span>M2 (Preditivo)</span><span id="prev-m2-pct">&mdash;</span></div>
-            <div class="prob-track"><div class="prob-fill" id="prev-m2-bar" style="width:0%;background:var(--blu)"></div></div>
-          </div>
-          <div class="section-hdr">Cen&#225;rios</div>
-          <div style="display:flex;gap:6px;margin-bottom:10px">
-            <button class="pill-tab" onclick="setScenario('otimista',this)">Otimista</button>
-            <button class="pill-tab active" onclick="setScenario('base',this)">Base</button>
-            <button class="pill-tab" onclick="setScenario('pessimista',this)">Pessimista</button>
-          </div>
-          <div class="section-hdr">Candidatos</div>
-          <div id="prev-cands"><div class="empty">Carregando...</div></div>
-          <div class="section-hdr">SHAP &mdash; Fatores Principais</div>
-          <div id="shap-list"><div class="empty">Carregando...</div></div>
-        </div>
-
-        <!-- RANKING -->
-        <div id="panel-ranking" class="panel" style="display:none">
-          <div class="p-title" style="font-size:.7rem;font-weight:700;color:var(--tx2);margin-bottom:10px">Ranking Eleitos &mdash; <span id="rank-title">Selecione cargo e ano</span></div>
-          <div id="rank-table-wrap" style="overflow-y:auto;max-height:calc(100% - 80px)">
-            <table id="rank-table" style="width:100%;border-collapse:collapse;font-size:.7rem">
-              <thead><tr style="border-bottom:1px solid var(--br)">
-                <th style="text-align:left;padding:4px 6px;color:var(--tx2)">#</th>
-                <th style="text-align:left;padding:4px 6px;color:var(--tx2)">Candidato</th>
-                <th style="text-align:left;padding:4px 6px;color:var(--tx2)">Partido</th>
-                <th style="text-align:right;padding:4px 6px;color:var(--tx2)">Votos</th>
-                <th style="text-align:right;padding:4px 6px;color:var(--tx2)">%</th>
-              </tr></thead>
-              <tbody id="rank-tbody"></tbody>
-            </table>
-          </div>
-          <canvas id="chart-partidos" style="margin-top:12px;max-height:140px"></canvas>
-        </div>
-      </div>
-
-      <div id="chat-section">
-        <div id="chat-hdr">
-          <span class="ai-dot"></span>
-          <span>SPEPE AI</span>
-          <span style="font-size:.58rem;color:var(--tx3);margin-left:4px;font-family:'JetBrains Mono',monospace">claude-sonnet-4-6</span>
-          <span id="chat-status" style="font-size:.6rem;color:var(--tx3);margin-left:auto">&#9679;</span>
-          <span id="chat-reconnect" style="display:none;cursor:pointer;color:var(--org);font-size:.65rem;margin-left:4px" onclick="initChat()">&#10227;</span>
-        </div>
-        <div id="chat-msgs"></div>
-        <div id="chat-cin-row">
-          <textarea id="chat-cin" placeholder="Pergunte sobre o candidato, UF, pesquisas..." rows="1"
-            onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();sendMsg()}"></textarea>
-          <button id="chat-send" onclick="sendMsg()">&#9658;</button>
-        </div>
-      </div>
-    </div>
+  <!-- TAB BAR -->
+  <div id="tabbar">
+    <div class="tab active" data-tab="mapa" onclick="switchTab('mapa')">&#128506; Mapa</div>
+    <div class="tab" data-tab="resultados" onclick="switchTab('resultados')">&#128202; Resultados</div>
+    <div class="tab" data-tab="eleitorado" onclick="switchTab('eleitorado')">&#128101; Eleitorado <span class="tab-badge">2026</span></div>
+    <div class="tab" data-tab="digital" onclick="switchTab('digital')">&#128241; Digital <span class="tab-badge">2026</span></div>
+    <div class="tab" data-tab="ranking" onclick="switchTab('ranking')">&#127942; Ranking</div>
+    <div class="tab" data-tab="previsao" onclick="switchTab('previsao')">&#128302; Previs&#227;o <span class="tab-badge">2026</span></div>
   </div>
-</div>
+
+  <!-- CONTENT -->
+  <div id="content">
+
+    <!-- TAB: MAPA -->
+    <div class="tab-panel active" id="tab-mapa">
+      <div id="leaflet-map" style="flex:1;position:relative">
+        <div id="map-overlay-tl">
+          <div class="map-crumb" id="map-breadcrumb"><span onclick="resetMap()">Brasil</span></div>
+          <div class="map-zoom-group">
+            <button class="map-btn active" data-level="uf" onclick="setMapLevel('uf')">&#127757; UF</button>
+            <button class="map-btn" data-level="nacional" onclick="setMapLevel('nacional')">&#127758; Nacional</button>
+            <button class="map-btn" data-level="regiao" onclick="setMapLevel('regiao')">&#128205; Regi&#227;o</button>
+            <button class="map-btn" data-level="municipio" onclick="setMapLevel('municipio')">&#127968; Mun.</button>
+          </div>
+        </div>
+        <div id="map-overlay-tr">
+          <button class="layer-chip active" data-layer="electoral" onclick="swapLayer('electoral')">&#127942; Eleit.</button>
+          <button class="layer-chip" data-layer="economic" onclick="swapLayer('economic')">&#128202; IBGE</button>
+          <button class="layer-chip" data-layer="health" onclick="swapLayer('health')">&#127973; Sa&#250;de</button>
+          <button class="layer-chip" data-layer="security" onclick="swapLayer('security')">&#128737; Seg.</button>
+          <button class="layer-chip" data-layer="poll" onclick="swapLayer('poll')">&#128203; Pesq.</button>
+          <button class="layer-chip" data-layer="pred" onclick="swapLayer('pred')">&#128302; Pred.</button>
+        </div>
+        <div id="map-overlay-bl">
+          <button class="map-btn" id="btn-heat" onclick="toggleHeatmap()">&#127777; Mapa de Calor</button>
+        </div>
+        <div id="map-overlay-br">
+          <div id="map-legend"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- TAB: RESULTADOS -->
+    <div class="tab-panel" id="tab-resultados">
+      <div class="panel-scroll">
+        <div class="kpi-row" id="res-kpis">
+          <div class="kpi"><div class="kpi-val" id="res-votos">&mdash;</div><div class="kpi-lbl">Total de votos</div></div>
+          <div class="kpi"><div class="kpi-val" id="res-lider">&mdash;</div><div class="kpi-lbl">Candidato l&#237;der</div><div class="kpi-delta" id="res-pct"></div></div>
+          <div class="kpi"><div class="kpi-val" id="res-comp">&mdash;</div><div class="kpi-lbl">Comparecimento</div></div>
+        </div>
+        <div class="results-grid" style="height:calc(100vh - var(--topbar) - var(--tabbar) - var(--chatbar) - 130px)">
+          <div class="chart-panel">
+            <div class="chart-title">Votos por candidato</div>
+            <div class="chart-wrap"><canvas id="chart-resultados"></canvas></div>
+          </div>
+          <div class="chart-panel">
+            <div class="chart-title" id="rank-sub-title">Candidatos &mdash; 1&#186; turno</div>
+            <div class="table-wrap">
+              <table class="data">
+                <thead><tr>
+                  <th>#</th><th>Candidato</th><th>Partido</th><th style="text-align:right">Votos</th>
+                  <th style="text-align:right">%</th><th>Sit.</th>
+                </tr></thead>
+                <tbody id="res-tbody"></tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- TAB: ELEITORADO -->
+    <div class="tab-panel" id="tab-eleitorado">
+      <div class="panel-scroll">
+        <div style="display:flex;align-items:center;gap:8px;margin-bottom:12px">
+          <span style="font-size:.7rem;font-weight:700;color:var(--tx2)">Perfil do Eleitorado</span>
+          <span class="tag tag-grn">&#128197; Dados 2026</span>
+        </div>
+        <div class="kpi-row kpi-row-4">
+          <div class="kpi"><div class="kpi-val" id="el-total">&mdash;</div><div class="kpi-lbl">Total eleitores</div></div>
+          <div class="kpi"><div class="kpi-val" id="el-fem">&mdash;</div><div class="kpi-lbl">% mulheres</div></div>
+          <div class="kpi"><div class="kpi-val" id="el-jov">&mdash;</div><div class="kpi-lbl">% jovens 16-24</div></div>
+          <div class="kpi"><div class="kpi-val" id="el-sup">&mdash;</div><div class="kpi-lbl">% ens. superior</div></div>
+        </div>
+        <div class="chart-2x2" style="height:calc(100vh - var(--topbar) - var(--tabbar) - var(--chatbar) - 140px)">
+          <div class="chart-panel"><div class="chart-title">G&#234;nero</div><div class="chart-wrap"><canvas id="chart-genero"></canvas></div></div>
+          <div class="chart-panel"><div class="chart-title">Faixa Et&#225;ria</div><div class="chart-wrap"><canvas id="chart-idade"></canvas></div></div>
+          <div class="chart-panel"><div class="chart-title">Escolaridade</div><div class="chart-wrap"><canvas id="chart-edu"></canvas></div></div>
+          <div class="chart-panel"><div class="chart-title">Evolu&#231;&#227;o 2018 → 2022</div><div class="chart-wrap"><canvas id="chart-evolucao"></canvas></div></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- TAB: DIGITAL -->
+    <div class="tab-panel" id="tab-digital">
+      <div class="panel-scroll">
+        <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px">
+          <span style="font-size:.7rem;font-weight:700;color:var(--tx2)">Monitor Digital</span>
+          <span class="tag tag-blu">&#128197; Tempo Real</span>
+        </div>
+        <div class="kpi-row kpi-row-4">
+          <div class="kpi"><div class="kpi-val" id="dig-sent">&mdash;</div><div class="kpi-lbl">Sentimento m&#233;dio</div></div>
+          <div class="kpi"><div class="kpi-val" id="dig-vol">&mdash;</div><div class="kpi-lbl">Men&#231;&#245;es (90d)</div></div>
+          <div class="kpi"><div class="kpi-val" id="dig-top">&mdash;</div><div class="kpi-lbl">Mais mencionado</div></div>
+          <div class="kpi"><div class="kpi-val" id="dig-trend">&mdash;</div><div class="kpi-lbl">Tend&#234;ncia</div></div>
+        </div>
+        <div class="pill-row">
+          <button class="pill active" onclick="switchDig('social',this)">Social</button>
+          <button class="pill" onclick="switchDig('meta',this)">Meta Ads</button>
+          <button class="pill" onclick="switchDig('trends',this)">Google Trends</button>
+          <button class="pill" onclick="switchDig('gdelt',this)">GDELT</button>
+        </div>
+        <div class="dig-section active" id="dig-social">
+          <div class="results-grid" style="height:calc(100vh - var(--topbar) - var(--tabbar) - var(--chatbar) - 200px)">
+            <div class="chart-panel"><div class="chart-title">Sentimento por candidato</div><div class="chart-wrap"><canvas id="chart-sent-cand"></canvas></div></div>
+            <div class="chart-panel"><div class="chart-title">Volume de men&#231;&#245;es semanal</div><div class="chart-wrap"><canvas id="chart-vol-week"></canvas></div></div>
+          </div>
+        </div>
+        <div class="dig-section" id="dig-meta">
+          <div class="chart-panel" style="height:calc(100vh - var(--topbar) - var(--tabbar) - var(--chatbar) - 200px)">
+            <div class="chart-title">Investimento em publicidade (Meta)</div>
+            <div class="chart-wrap"><canvas id="chart-meta-spend"></canvas></div>
+          </div>
+        </div>
+        <div class="dig-section" id="dig-trends">
+          <div class="chart-panel" style="height:calc(100vh - var(--topbar) - var(--tabbar) - var(--chatbar) - 200px)">
+            <div class="chart-title">Interesse de busca (Google Trends)</div>
+            <div class="chart-wrap"><canvas id="chart-trends"></canvas></div>
+          </div>
+        </div>
+        <div class="dig-section" id="dig-gdelt">
+          <div class="shdr">Eventos GDELT Recentes</div>
+          <div id="gdelt-list"><div class="empty">Carregando...</div></div>
+        </div>
+        <div id="dig-no-tokens" style="display:none;background:var(--bg2);border:1px solid var(--br);border-radius:8px;padding:20px;text-align:center;color:var(--tx2);font-size:.75rem">
+          Monitor social em configura&#231;&#227;o &mdash; dados de RSS dispon&#237;veis em breve.
+        </div>
+      </div>
+    </div>
+
+    <!-- TAB: RANKING -->
+    <div class="tab-panel" id="tab-ranking">
+      <div class="panel-scroll">
+        <div class="ranking-layout" style="height:calc(100vh - var(--topbar) - var(--tabbar) - var(--chatbar) - 30px)">
+          <div class="chart-panel">
+            <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;flex-shrink:0">
+              <span class="chart-title" style="margin:0" id="rank-title">Ranking &mdash; Governador 2022</span>
+              <div style="margin-left:auto;display:flex;gap:5px">
+                <button class="pill active" id="rank-t1" onclick="loadRankingTurno(1,this)">1&#186; turno</button>
+                <button class="pill" id="rank-t2" onclick="loadRankingTurno(2,this)">2&#186; turno</button>
+              </div>
+            </div>
+            <div class="table-wrap">
+              <table class="data">
+                <thead><tr>
+                  <th onclick="rankSort('pos')" style="cursor:pointer"># &#8597;</th>
+                  <th onclick="rankSort('nm')" style="cursor:pointer">Candidato &#8597;</th>
+                  <th>Partido</th>
+                  <th onclick="rankSort('uf')" style="cursor:pointer">UF &#8597;</th>
+                  <th onclick="rankSort('votos')" style="cursor:pointer;text-align:right">Votos &#8597;</th>
+                  <th onclick="rankSort('pct')" style="cursor:pointer;text-align:right">% &#8597;</th>
+                  <th>Sit.</th>
+                </tr></thead>
+                <tbody id="rank-tbody"></tbody>
+              </table>
+            </div>
+          </div>
+          <div style="display:flex;flex-direction:column;gap:10px;overflow:hidden">
+            <div class="chart-panel" style="flex:1">
+              <div class="chart-title">Cadeiras por Partido</div>
+              <div class="chart-wrap"><canvas id="chart-partidos"></canvas></div>
+            </div>
+            <div class="chart-panel" style="flex:1" id="rank-regiao-panel">
+              <div class="chart-title">Distribui&#231;&#227;o Regional</div>
+              <div class="chart-wrap"><canvas id="chart-rank-regiao"></canvas></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- TAB: PREVISAO -->
+    <div class="tab-panel" id="tab-previsao">
+      <div class="panel-scroll">
+        <div style="display:flex;align-items:center;gap:8px;margin-bottom:12px">
+          <span style="font-size:.7rem;font-weight:700;color:var(--tx2)">Modelo Preditivo</span>
+          <span class="tag tag-org">&#128197; 2026</span>
+          <div class="pill-row" style="margin:0 0 0 auto">
+            <button class="pill" onclick="setScenario('otimista',this)">+ Otimista</button>
+            <button class="pill active" onclick="setScenario('base',this)">Base</button>
+            <button class="pill" onclick="setScenario('pessimista',this)">&minus; Pessimista</button>
+          </div>
+        </div>
+        <div class="results-grid" style="height:calc(100vh - var(--topbar) - var(--tabbar) - var(--chatbar) - 100px)">
+          <div class="chart-panel">
+            <div class="chart-title">Probabilidade de vit&#243;ria (%)</div>
+            <div id="prev-cands"><div class="empty">Carregando...</div></div>
+          </div>
+          <div class="chart-panel">
+            <div class="chart-title">SHAP &mdash; Fatores explicativos</div>
+            <div id="shap-list"><div class="empty">Carregando...</div></div>
+          </div>
+        </div>
+        <div id="prev-no-data" style="display:none;padding:40px;text-align:center;color:var(--tx2);font-size:.8rem">
+          Modelo Bayesiano em treinamento &mdash; dispon&#237;vel ap&#243;s coleta de dados 2026.
+        </div>
+      </div>
+    </div>
+
+  </div><!-- /content -->
+
+  <!-- CHAT BAR -->
+  <div id="chat-bar">
+    <div id="chat-dot">&#9679;</div>
+    <textarea id="chat-in" placeholder="Pergunte sobre resultados, candidatos, tend&#234;ncias..." rows="1"
+      onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();sendChat()}"></textarea>
+    <button id="chat-btn" onclick="sendChat()">&#9658;</button>
+    <button id="chat-expand" onclick="toggleChatPanel()" title="Ver conversa">&#9776;</button>
+  </div>
+
+  <!-- CHAT PANEL (slides up) -->
+  <div id="chat-panel">
+    <div id="chat-phdr">
+      <span class="ai-dot"></span>
+      <span>SPEPE AI</span>
+      <span style="font-size:.58rem;color:var(--tx3);margin-left:4px;font-family:'JetBrains Mono',monospace">claude-sonnet-4-6</span>
+      <span id="chat-status-dot" style="color:var(--tx3)">&#9679;</span>
+      <span id="chat-reconnect" onclick="initChat()">&#10227; reconectar</span>
+      <button onclick="toggleChatPanel()" style="background:transparent;border:none;color:var(--tx2);font-size:.8rem;margin-left:6px">&#10005;</button>
+    </div>
+    <div id="chat-msgs"></div>
+  </div>
+
+</div><!-- /app -->
 
 <script>
+// ── CONSTANTS ──────────────────────────────────────────────────────────────
 const PARTIDO_COR = {
-  'PT':'#ef4444','PL':'#1565c0','MDB':'#f59e0b','PSDB':'#00bcd4',
-  'Rep':'#7c3aed','PDT':'#f97316','PP':'#06b6d4','PSD':'#84cc16',
-  'União':'#8b5cf6','PSB':'#ec4899','PSOL':'#ff6b35',
+  'PT':'#ef4444','PL':'#3b82f6','UNIAO':'#f59e0b','UNIÃO':'#f59e0b','PP':'#a78bfa',
+  'REPUBLICANOS':'#f97316','MDB':'#10b981','PSD':'#0ea5e9','PSDB':'#6366f1',
+  'PDT':'#d97706','PSOL':'#dc2626','AVANTE':'#059669','SOLIDARIEDADE':'#0284c7',
+  'PROS':'#7c3aed','DC':'#b45309','PMN':'#92400e','AGIR':'#065f46','PRD':'#1d4ed8',
+  'PODE':'#7e22ce','NOVO':'#f59e0b','PSB':'#b91c1c','PV':'#16a34a',
+  'REDE':'#0891b2','CIDADANIA':'#ea580c'
 };
-function _candidateColor(name){
-  let h=0; for(let i=0;i<(name||'').length;i++) h=(h*31+name.charCodeAt(i))&0xffff;
-  return `hsl(${h%360},65%,48%)`;
-}
 const IBGE_GEO = {
   nacional: ()=>'https://servicodados.ibge.gov.br/api/v3/malhas/paises/BR?resolucao=1&formato=application/vnd.geo+json',
   regiao:   ()=>'/static/geo_regiao.geojson',
@@ -490,765 +509,846 @@ const IBGE_GEO = {
   municipio:(uf)=>`/static/geo_mun_${(uf||'SP').toUpperCase()}.geojson`,
 };
 
-let _cargo = 'Governador';
-let _uf = 'SP';
-let _ano = '2022';
-let _candidato = '';
-let _mapLevel = 'uf';
-let _mapCtx = {};
-let _mapData = {};
-let _geoLayer = null;
-let _charts = {};
-let _ws = null;
-let _activeTab = 'base';
-let _activeLayer = 'electoral';
-let _busy = false;
-let _aiBuffer = '';
-let _aiMsgEl = null;
-let _idToken = null;
+// ── STATE ──────────────────────────────────────────────────────────────────
+let _uf = 'SP', _cargo = 'governador', _ano = 2022, _candidato = '';
+let _activeTab = 'mapa';
+let _mapLevel = 'uf', _mapCtx = {uf:'SP'}, _activeLayer = 'electoral';
+let _mapData = {}, _geoLayer = null, _heatLayer = null;
+let _charts = {}, _ws = null, _idToken = null;
+let _busy = false, _aiBuffer = '', _aiMsgEl = null;
+let _rankTurno = 1, _rankData = [], _rankSortCol = 'votos', _rankSortAsc = false;
+let _scenario = 'base';
 const _nativeFetch = window.fetch.bind(window);
+let gMap = null;
 
-function authHeaders(){ return _idToken ? {'Authorization':'Bearer '+_idToken} : {}; }
-async function apiFetch(url, opts={}){
-  const r = await _nativeFetch(url, {...opts, headers:{...authHeaders(),...(opts.headers||{})}});
-  if(r.status===401){ doLogout(); return null; }
-  return r;
-}
-async function api(path){
-  try{
-    const r = await apiFetch(path);
-    if(!r||!r.ok) return null;
+// ── HELPERS ────────────────────────────────────────────────────────────────
+async function api(url) {
+  try {
+    const headers = _idToken ? {'Authorization':'Bearer '+_idToken} : {};
+    const r = await _nativeFetch(url, {headers});
+    if (r.status === 401) { doLogout(); return null; }
+    if (!r.ok) return null;
     return await r.json();
-  }catch{ return null; }
+  } catch(e) { console.warn('API:', url, e); return null; }
+}
+function _fmt(n) {
+  if (n == null) return '—';
+  if (n >= 1e6) return (n/1e6).toFixed(1)+'M';
+  if (n >= 1e3) return (n/1e3).toFixed(0)+'k';
+  return String(n);
+}
+function _set(id, v) { const el = document.getElementById(id); if (el && v != null) el.textContent = v; }
+function _esc(s) { return (s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+function _candidateColor(name) {
+  let h = 0;
+  for (let i = 0; i < (name||'').length; i++) h = (h*31 + name.charCodeAt(i)) & 0xffff;
+  return `hsl(${h%360},65%,48%)`;
 }
 
-async function handleGoogleCredential(response){
+function mkChart(id, type, labels, datasets, opts={}) {
+  if (_charts[id]) { _charts[id].destroy(); delete _charts[id]; }
+  const ctx = document.getElementById(id);
+  if (!ctx) return;
+  const isFlat = datasets.length && !datasets[0].data;
+  const finalDatasets = isFlat ? [{
+    data: datasets,
+    backgroundColor: opts.colors || '#2ea043',
+    borderColor: opts.colors || '#2ea043',
+    borderWidth: 1.5,
+    fill: false,
+    tension: .35,
+    pointRadius: 2
+  }] : datasets;
+  _charts[id] = new Chart(ctx, {
+    type,
+    data: {labels, datasets: finalDatasets},
+    options: {
+      animation: {duration:350},
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: {legend: {display: finalDatasets.length > 1, labels:{color:'#8d96a0',font:{size:10}}}},
+      scales: ['pie','doughnut'].includes(type) ? {} : {
+        x: {grid:{color:'#21262d'}, ticks:{color:'#8d96a0',font:{size:9}}},
+        y: {grid:{color:'#21262d'}, ticks:{color:'#8d96a0',font:{size:9}}}
+      },
+      ...opts
+    }
+  });
+}
+
+function renderBars(containerId, items, color) {
+  const el = document.getElementById(containerId);
+  if (!el) return;
+  const max = Math.max(...items.map(i => i.pct||i.val||0), 1);
+  el.innerHTML = items.map(i => {
+    const v = i.pct||i.val||0;
+    const lbl = i.label||i.nm||i.name||'—';
+    return `<div class="bar-row">
+      <div class="bar-lbl" title="${_esc(lbl)}">${_esc(lbl)}</div>
+      <div class="bar-track"><div class="bar-fill" style="width:${(v/max*100).toFixed(0)}%;background:${color||'#2ea043'}"></div></div>
+      <div class="bar-pct">${typeof v==='number'?v.toFixed(1)+'%':v}</div>
+    </div>`;
+  }).join('') || '<div class="empty">Sem dados</div>';
+}
+
+// ── AUTH ───────────────────────────────────────────────────────────────────
+async function handleGoogleCredential(response) {
   const token = response.credential;
   const errEl = document.getElementById('login-error');
   errEl.style.display = 'none';
-  try{
-    const r = await _nativeFetch('/api/auth/me',{headers:{'Authorization':'Bearer '+token}});
-    if(!r.ok){
+  try {
+    const r = await _nativeFetch('/api/auth/me', {headers:{'Authorization':'Bearer '+token}});
+    if (!r.ok) {
       const b = await r.json().catch(()=>({}));
       errEl.textContent = b.detail||'Acesso não autorizado.';
       errEl.style.display = 'block';
       return;
     }
-  }catch(e){
+  } catch(e) {
     errEl.textContent = 'Erro de conexão. Tente novamente.';
     errEl.style.display = 'block';
     return;
   }
   _idToken = token;
-  const payload = JSON.parse(atob(_idToken.split('.')[1]));
-  const name = payload.name||payload.email||'Usuário';
-  document.getElementById('unm').textContent = name.split(' ')[0];
-  document.getElementById('uav').textContent = name.split(' ').map(w=>w[0]).join('').slice(0,2).toUpperCase();
+  _bootFromToken(token);
+}
+
+function devLogin() {
+  _idToken = null;
+  _bootApp('Dev', 'DV');
+}
+
+function _bootFromToken(token) {
+  try {
+    const p = JSON.parse(atob(token.split('.')[1]));
+    const name = p.name || p.email || 'Usuário';
+    const initials = name.split(' ').map(w=>w[0]).join('').slice(0,2).toUpperCase();
+    _bootApp(name, initials);
+  } catch(e) { _bootApp('Usuário','U'); }
+}
+
+function _bootApp(name, initials) {
+  _set('uav', initials);
   document.getElementById('login').style.display = 'none';
   document.getElementById('app').classList.add('vis');
   _initCountdown();
-  _loadModelStatus();
   loadCandidatoList();
+  initChat();
   setTimeout(initMap, 200);
 }
-function doLogout(){
+
+function doLogout() {
   _idToken = null;
   document.getElementById('app').classList.remove('vis');
   document.getElementById('login').style.display = 'flex';
 }
 
-function _initCountdown(){
+function _initCountdown() {
   const el = document.getElementById('countdown-el');
-  const target = new Date('2026-10-04');
-  const diff = Math.ceil((target - new Date())/(1000*60*60*24));
-  if(el && diff>0) el.textContent = `⏱ ${diff} dias · 1ºT`;
+  const diff = Math.ceil((new Date('2026-10-04') - new Date()) / (1000*60*60*24));
+  if (el && diff > 0) el.textContent = `⏱ ${diff}d · 1ºT`;
 }
 
-async function _loadModelStatus(){
-  const d = await api(`/api/previsao?uf=${_uf}&cargo=${encodeURIComponent(_cargo)}&ano=2026`);
-  if(!d) return;
-  const m1 = d.m1||{};
-  const m2 = d.m2||{};
-  const m1pct = m1.prob_vitoria!=null ? Math.round(m1.prob_vitoria*100)+'%' : '—';
-  const m2pct = m2.prob_vitoria!=null ? Math.round(m2.prob_vitoria*100)+'%' : '—';
-  document.getElementById('m1-lbl').textContent = 'M1 '+m1pct;
-  document.getElementById('m2-lbl').textContent = 'M2 '+m2pct;
-  const dot1 = document.getElementById('m1-dot');
-  const dot2 = document.getElementById('m2-dot');
-  if(dot1){ const p=m1.prob_vitoria||0; dot1.className='mdot '+(p>0.5?'grn':p>0.3?'yel':'gry'); }
-  if(dot2){ const p=m2.prob_vitoria||0; dot2.className='mdot '+(p>0.5?'grn':p>0.3?'yel':'gry'); }
-}
-
-function applyFilters(){
-  _cargo = document.getElementById('f-cargo').value;
-  _uf = document.getElementById('f-uf').value;
-  _ano = document.getElementById('f-ano').value;
+// ── FILTERS ────────────────────────────────────────────────────────────────
+function applyFilters() {
+  _cargo     = document.getElementById('f-cargo').value;
+  _uf        = document.getElementById('f-uf').value;
+  _ano       = parseInt(document.getElementById('f-ano').value, 10);
   _candidato = document.getElementById('cand-input').value.trim();
-  _mapCtx = {uf:_uf};
-  _mapLevel = 'uf';
-  _updateLevelButtons();
-  reloadMap();
+  _mapCtx    = {uf: _uf === 'BR' ? null : _uf};
+  _mapLevel  = 'uf';
   loadCandidatoList();
-  switchTab(_activeTab);
+  loadTab(_activeTab);
+  if (_activeTab === 'mapa') reloadMap();
 }
 
-function switchTab(tab){
-  _activeTab = tab;
-  document.querySelectorAll('.tab').forEach(t=>t.classList.toggle('active',t.dataset.tab===tab));
-  document.querySelectorAll('.panel').forEach(p=>p.classList.toggle('active',p.id==='panel-'+tab));
-  const loaders = {
-    base:_loadBase, territorio:_loadTerritorio, eleitorado:_loadEleitorado,
-    pesquisas:_loadPesquisas, adversarios:_loadAdversarios, parcerias:_loadParcerias,
-    digital:_loadDigital, previsao:_loadPrevisao, ranking:_loadRanking
-  };
-  if(loaders[tab]) loaders[tab]();
-}
-
-function switchDig(sec, btn){
-  document.querySelectorAll('.dig-sub').forEach(d=>d.classList.remove('active'));
-  document.querySelectorAll('.pill-tab').forEach(b=>{ if(['Social','Meta Ads','Trends','GDELT'].some(t=>b.textContent.includes(t))) b.classList.remove('active'); });
-  document.getElementById('dig-'+sec).classList.add('active');
-  btn.classList.add('active');
-}
-
-function setScenario(sc, btn){
-  document.querySelectorAll('#panel-previsao .pill-tabs .pill-tab').forEach(b=>b.classList.remove('active'));
-  btn.classList.add('active');
-  _loadPrevisao(sc);
-}
-
-function renderBars(containerId, items, color='#2ea043'){
-  const el = document.getElementById(containerId);
-  if(!el) return;
-  const max = Math.max(...items.map(i=>i.pct??i.val??0), 1);
-  el.innerHTML = items.map(i=>{
-    const v = i.pct??i.val??0;
-    const lbl = i.label||i.nm||i.name||'—';
-    return `<div class="bar-row">
-      <div class="bar-lbl" title="${lbl}">${lbl}</div>
-      <div class="bar-track"><div class="bar-fill" style="width:${(v/max*100).toFixed(0)}%;background:${color}"></div></div>
-      <div class="bar-pct">${typeof v==='number'?v.toFixed(1)+'%':v}</div>
-    </div>`;
-  }).join('')||'<div class="empty">Sem dados</div>';
-}
-
-function mkChart(id, type, labels, data, color='#2ea043', opts={}){
-  if(_charts[id]){ _charts[id].destroy(); delete _charts[id]; }
-  const ctx = document.getElementById(id);
-  if(!ctx) return;
-  _charts[id] = new Chart(ctx, {
-    type, data:{labels, datasets:[{data, backgroundColor:color, borderColor:color, borderWidth:1.5, fill:false, tension:.4, pointRadius:2}]},
-    options:{animation:{duration:400}, responsive:true, maintainAspectRatio:false,
-      plugins:{legend:{display:false}},
-      scales:{x:{grid:{color:'#30363d'},ticks:{color:'#8d96a0',font:{size:9}}},
-              y:{grid:{color:'#30363d'},ticks:{color:'#8d96a0',font:{size:9}}}},
-      ...opts}
-  });
-}
-
-function _fmt(n){ if(n==null) return '—'; if(n>=1e6) return (n/1e6).toFixed(1)+'M'; if(n>=1e3) return (n/1e3).toFixed(0)+'k'; return String(n); }
-function _set(id,v){ const el=document.getElementById(id); if(el&&v!=null) el.textContent=v; }
-
-async function _loadBase(){
-  const [mapRes, res22, res18] = await Promise.all([
-    api(`/api/mapa/municipio?cargo=${encodeURIComponent(_cargo)}&uf=${_uf}&ano=${_ano}&turno=1`),
-    api(`/api/resultados/${encodeURIComponent(_cargo)}?uf=${_uf}&ano=2022&turno=1`),
-    api(`/api/resultados/${encodeURIComponent(_cargo)}?uf=${_uf}&ano=2018&turno=1`),
-  ]);
-  const feats = mapRes?.features||[];
-  const cands = (res22||[]).slice(0,6);
-  const cand22 = _candidato ? cands.find(c=>(c.nm||'').toLowerCase().includes(_candidato.toLowerCase())) : cands[0];
-  const votos = cand22?.total_votos||cand22?.votos||0;
-  const pct22 = cand22?.pct||0;
-  const cands18 = (res18||[]);
-  const cand18 = _candidato ? cands18.find(c=>(c.nm||'').toLowerCase().includes(_candidato.toLowerCase())) : cands18[0];
-  const pct18 = cand18?.pct||0;
-  const delta = pct22 - pct18;
-  _set('kpi-votos', _fmt(votos));
-  _set('kpi-pct', pct22.toFixed(1)+'%');
-  _set('kpi-meta', (Math.ceil(pct22/5)*5+5).toFixed(0)+'%');
-  const dEl = document.getElementById('kpi-delta');
-  if(dEl){ dEl.textContent = (delta>=0?'▲':'▼')+Math.abs(delta).toFixed(1)+'pp vs 2018'; dEl.className='kpi-delta '+(delta>=0?'up':'dn'); }
-  const vencidos = feats.filter(f=>f.lider===cand22?.nm||f.pct>33).length;
-  _set('kpi-mun', vencidos||'—');
-  const covPct = feats.length>0 ? Math.round(feats.filter(f=>f.pct>0).length/feats.length*100) : 0;
-  const covBar = document.getElementById('cov-bar');
-  if(covBar) covBar.style.width=covPct+'%';
-  _set('cov-pct', covPct+'%');
-  const sorted = [...feats].sort((a,b)=>(b.pct||0)-(a.pct||0)).slice(0,8);
-  const munEl = document.getElementById('top-mun-list');
-  if(munEl){
-    munEl.innerHTML = sorted.map((f,i)=>`<div class="mun-row">
-      <div class="mun-pos">${i+1}</div>
-      <div class="mun-nm">${f.label||f.id||'—'}</div>
-      <div class="mun-pct" style="color:${f.pct>=45?'#22c55e':f.pct>=25?'var(--org)':'var(--red)'}">${(f.pct||0).toFixed(1)}%</div>
-    </div>`).join('')||'<div class="empty">Sem dados</div>';
-  }
-  const labels22 = cands.map(c=>c.nm?.split(' ')[0]||'?');
-  const data22 = cands.map(c=>c.pct||0);
-  mkChart('chart-evo','bar',labels22,data22,cands.map((_,i)=>i===0?'#2ea043':'#30363d'));
-}
-
-async function _loadTerritorio(){
-  const d = await api(`/api/mapa/municipio?cargo=${encodeURIComponent(_cargo)}&uf=${_uf}&ano=${_ano}&turno=1`);
-  const feats = d?.features||[];
-  const fort = feats.filter(f=>(f.pct||0)>=45);
-  const comp = feats.filter(f=>(f.pct||0)>=25&&(f.pct||0)<45);
-  const risco = feats.filter(f=>(f.pct||0)<25);
-  _set('zon-fort', fort.length);
-  _set('zon-comp', comp.length);
-  _set('zon-risco', risco.length);
-  const compEl = document.getElementById('comp-list');
-  if(compEl){
-    compEl.innerHTML = comp.slice(0,10).map((f,i)=>`<div class="mun-row">
-      <div class="mun-pos">${i+1}</div>
-      <div class="mun-nm">${f.label||f.id||'—'}</div>
-      <div class="mun-pct" style="color:var(--org)">${(f.pct||0).toFixed(1)}%</div>
-    </div>`).join('')||'<div class="empty">Nenhum município competitivo</div>';
-  }
-  const fortEl = document.getElementById('fort-list');
-  if(fortEl){
-    fortEl.innerHTML = fort.slice(0,8).map((f,i)=>`<div class="mun-row">
-      <div class="mun-pos">${i+1}</div>
-      <div class="mun-nm">${f.label||f.id||'—'}</div>
-      <div class="mun-pct" style="color:#22c55e">${(f.pct||0).toFixed(1)}%</div>
-    </div>`).join('')||'<div class="empty">Sem fortalezas identificadas</div>';
-  }
-}
-
-async function _loadEleitorado(){
-  const d = await api(`/api/perfis?uf=${_uf}&ano=${_ano}`);
-  if(!d){ document.getElementById('gen-rows').innerHTML='<div class="empty">Sem dados</div>'; return; }
-  const total = d.total_eleitores||d.total||0;
-  _set('eleit-total', total>0?_fmt(total)+'eleitores':'—');
-  const gen = (d.genero||[]).map(g=>({label:g.ds_genero||g.label||'?', pct:parseFloat(g.pct||g.val||0)}));
-  renderBars('gen-rows', gen, '#1f6feb');
-  const age = (d.faixa_etaria||[]).map(a=>({label:a.ds_faixa||a.label||'?', pct:parseFloat(a.pct||a.val||0)}));
-  renderBars('age-rows', age, '#2ea043');
-  const edu = (d.escolaridade||[]).map(e=>({label:e.ds_grau||e.label||'?', pct:parseFloat(e.pct||e.val||0)}));
-  renderBars('edu-rows', edu, '#f97316');
-}
-
-async function _loadPesquisas(){
-  const cdCargo = {Governador:3,Presidente:1,Senador:5,'Dep. Federal':6,'Dep. Estadual':7}[_cargo]||3;
-  const d = await api(`/api/pesquisas/intencao?uf=${_uf}&cd_cargo=${cdCargo}&ano=${_ano}`);
-  const series = d?.series||[];
-  if(series.length){
-    const labels = series.map(s=>s.data_pesquisa||s.dt||'');
-    const mainCand = _candidato||'';
-    const dataMain = series.map(s=>{
-      const c = mainCand
-        ? (s.candidatos||[]).find(c=>(c.nm||'').toLowerCase().includes(mainCand.toLowerCase()))
-        : (s.candidatos||[])[0];
-      return c?.intencao_ponderada||c?.pct||0;
-    });
-    mkChart('chart-tracking','line',labels,dataMain,'#2ea043');
-    const allCands = {};
-    series.forEach(s=>(s.candidatos||[]).forEach(c=>{ if(c.nm) allCands[c.nm]=(allCands[c.nm]||0)+1; }));
-    const lastSerie = series[series.length-1]||{};
-    const lastCands = (lastSerie.candidatos||[]).slice(0,5);
-    const pollEl = document.getElementById('poll-list');
-    if(pollEl){
-      pollEl.innerHTML = lastCands.map(c=>`<div class="adv-row">
-        <div class="adv-nm">${c.nm||'—'}</div>
-        <div class="adv-pct" style="color:var(--grn2)">${(c.intencao_ponderada||c.pct||0).toFixed(1)}%</div>
-      </div>`).join('')||'<div class="empty">Sem dados</div>';
-    }
-    _set('poll-avg', dataMain.length?(dataMain.reduce((a,b)=>a+b,0)/dataMain.length).toFixed(1)+'%':'—');
-    _set('poll-n', String(series.length));
-    const institutes = {};
-    series.forEach(s=>{ if(s.instituto) institutes[s.instituto]=(institutes[s.instituto]||0)+1; });
-    const instEl = document.getElementById('poll-inst');
-    if(instEl){
-      instEl.innerHTML = Object.entries(institutes).slice(0,5).map(([nm,cnt])=>`<div class="kv-row">
-        <span class="kv-lbl">${nm}</span><span class="kv-val">${cnt} pesq.</span>
-      </div>`).join('')||'';
-    }
-  } else {
-    document.getElementById('poll-list').innerHTML='<div class="empty">Sem pesquisas disponíveis</div>';
-  }
-}
-
-async function _loadAdversarios(){
-  const d = await api(`/api/adversarios?uf=${_uf}&cargo=${encodeURIComponent(_cargo)}&ano=${_ano}`);
-  const advs = d?.adversarios||[];
-  const advEl = document.getElementById('adv-list');
-  if(advEl){
-    advEl.innerHTML = advs.slice(0,6).map(a=>`<div class="adv-row">
-      <div class="adv-nm">${a.nm||a.nome||'—'}<span class="tag tag-tse" style="margin-left:6px">${a.partido||''}</span></div>
-      <div class="adv-pct">${(a.pct||0).toFixed(1)}%</div>
-    </div>`).join('')||'<div class="empty">Sem dados</div>';
-  }
-  const mapRes = await api(`/api/mapa/municipio?cargo=${encodeURIComponent(_cargo)}&uf=${_uf}&ano=${_ano}&turno=1`);
-  const feats = mapRes?.features||[];
-  _set('adv-risco', feats.filter(f=>(f.pct||0)<25).length+' mun.');
-  _set('adv-seguros', feats.filter(f=>(f.pct||0)>=45).length+' mun.');
-  _set('adv-zona', feats.filter(f=>(f.pct||0)>=25&&(f.pct||0)<45).length+' mun.');
-  const focoEl = document.getElementById('adv-foco');
-  if(focoEl){
-    const comp = feats.filter(f=>(f.pct||0)>=25&&(f.pct||0)<45).sort((a,b)=>(b.total_votos||0)-(a.total_votos||0)).slice(0,5);
-    focoEl.innerHTML = comp.map((f,i)=>`<div class="mun-row">
-      <div class="mun-pos">${i+1}</div>
-      <div class="mun-nm">${f.label||'—'}</div>
-      <div class="mun-pct" style="color:var(--org)">${(f.pct||0).toFixed(1)}%</div>
-    </div>`).join('')||'<div class="empty">Sem dados</div>';
-  }
-}
-
-async function _loadParcerias(){
-  const d = await api(`/api/aliancas?uf=${_uf}&cargo=${encodeURIComponent(_cargo)}`);
-  const ali = d?.aliancas||d||[];
-  const aliEl = document.getElementById('ali-list');
-  if(aliEl){
-    aliEl.innerHTML = (Array.isArray(ali)?ali:[]).slice(0,5).map(a=>`<div class="adv-row">
-      <div class="adv-nm">${a.nm||a.nome||'—'}</div>
-      <div class="adv-pct" style="color:var(--grn2)">${(a.compatibilidade||a.score||0).toFixed(0)}%</div>
-    </div>`).join('')||'<div class="empty">Sem dados de aliança</div>';
-  }
-  const parcEl = document.getElementById('parc-list');
-  if(parcEl){
-    const opps = Array.isArray(ali)?ali.slice(5,10):[];
-    parcEl.innerHTML = opps.map(a=>`<div class="adv-row">
-      <div class="adv-nm">${a.nm||a.nome||'—'}</div>
-      <div class="adv-pct" style="color:var(--tx2)">${(a.votos_migravel||0).toLocaleString('pt-BR')}</div>
-    </div>`).join('')||'<div class="empty">Nenhuma oportunidade adicional</div>';
-  }
-  if(Array.isArray(ali)&&ali.length){
-    const labels = ali.slice(0,6).map(a=>a.nm?.split(' ')[0]||'?');
-    const data = ali.slice(0,6).map(a=>a.compatibilidade||a.score||0);
-    mkChart('chart-parc','bar',labels,data,'#1f6feb');
-  }
-}
-
-async function _loadDigital(){
-  const [sentD, metaD, trendsD, gdeltD] = await Promise.all([
-    api(`/api/social/sentimento?uf=${_uf}&ano=${_ano}`),
-    api(`/api/digital/meta?uf=${_uf}&ano=${_ano}`),
-    api(`/api/social/trends?uf=${_uf}&ano=${_ano}`),
-    api(`/api/gdelt_eventos?uf=${_uf}&ano=${_ano}`),
-  ]);
-  const sent = sentD?.score??sentD?.sentimento_score??null;
-  _set('dig-sent', sent!=null?sent.toFixed(2):'—');
-  _set('dig-vol', sentD?.volume!=null?_fmt(sentD.volume):'—');
-  const plats = sentD?.plataformas||[];
-  renderBars('dig-platforms', plats.map(p=>({label:p.plataforma||p.nm||'?',pct:p.score??p.pct??0})), '#7c3aed');
-  const metaList = metaD?.candidatos||metaD?.data||[];
-  if(metaList.length){
-    const labels = metaList.slice(0,6).map(m=>m.nm?.split(' ')[0]||m.candidato?.split(' ')[0]||'?');
-    const data = metaList.slice(0,6).map(m=>m.gasto||m.spend||0);
-    mkChart('chart-meta-spend','bar',labels,data,'#7c3aed');
-  }
-  const metaEl = document.getElementById('meta-cands');
-  if(metaEl){
-    metaEl.innerHTML = metaList.slice(0,5).map(m=>`<div class="adv-row">
-      <div class="adv-nm">${m.nm||m.candidato||'—'}</div>
-      <div class="adv-pct" style="color:#a78bfa">R$ ${_fmt(m.gasto||m.spend||0)}</div>
-    </div>`).join('')||'<div class="empty">Sem dados Meta Ads</div>';
-  }
-  const trendsData = trendsD?.data||trendsD?.series||[];
-  if(trendsData.length){
-    const labels = trendsData.map(t=>t.dt||t.data||'');
-    const data = trendsData.map(t=>t.val||t.interesse||0);
-    mkChart('chart-trends','line',labels,data,'#f59e0b');
-  }
-  const gdeltItems = gdeltD?.eventos||gdeltD?.data||[];
-  const gdeltEl = document.getElementById('gdelt-list');
-  if(gdeltEl){
-    gdeltEl.innerHTML = gdeltItems.slice(0,8).map(e=>`<div class="kv-row">
-      <span class="kv-lbl" style="flex:1">${e.titulo||e.title||e.tema||'—'}</span>
-      <span class="kv-val" style="font-size:.6rem;color:var(--tx3)">${e.dt||e.data||''}</span>
-    </div>`).join('')||'<div class="empty">Sem eventos GDELT</div>';
-  }
-}
-
-async function _loadPrevisao(scenario='base'){
-  const d = await api(`/api/previsao?uf=${_uf}&cargo=${encodeURIComponent(_cargo)}&ano=2026`);
-  if(!d){ document.getElementById('prev-cands').innerHTML='<div class="empty">Modelo não disponível</div>'; return; }
-  const m1 = d.m1||{}; const m2 = d.m2||{};
-  const scMult = {otimista:1.15, base:1, pessimista:0.85}[scenario]||1;
-  const m1pct = Math.min(100,Math.round((m1.prob_vitoria||0)*100*scMult));
-  const m2pct = Math.min(100,Math.round((m2.prob_vitoria||0)*100*scMult));
-  _set('prev-m1-pct', m1pct+'%');
-  _set('prev-m2-pct', m2pct+'%');
-  const m1bar = document.getElementById('prev-m1-bar');
-  const m2bar = document.getElementById('prev-m2-bar');
-  if(m1bar) m1bar.style.width=m1pct+'%';
-  if(m2bar) m2bar.style.width=m2pct+'%';
-  const cands = d.candidatos||[];
-  const candsEl = document.getElementById('prev-cands');
-  if(candsEl){
-    candsEl.innerHTML = cands.slice(0,5).map(c=>{
-      const p = Math.min(100,Math.round((c.prob_vitoria||c.pct||0)*scMult));
-      const col = p>50?'#22c55e':p>30?'var(--org)':'var(--red)';
-      return `<div class="prob-bar-wrap">
-        <div class="prob-lbl"><span>${c.nm||'—'}</span><span style="color:${col}">${p}%</span></div>
-        <div class="prob-track"><div class="prob-fill" style="width:${p}%;background:${col}"></div></div>
-      </div>`;
-    }).join('')||'<div class="empty">Sem dados de candidatos</div>';
-  }
-  const shap = await api(`/api/model/shap?uf=${_uf}&cargo=${encodeURIComponent(_cargo)}`);
-  const shapItems = shap?.features||shap||[];
-  const shapEl = document.getElementById('shap-list');
-  if(shapEl){
-    const maxS = Math.max(...shapItems.map(s=>Math.abs(s.shap||0)),0.001);
-    shapEl.innerHTML = shapItems.slice(0,8).map(s=>{
-      const v = s.shap||0;
-      const pct = Math.abs(v/maxS*100).toFixed(0);
-      const col = v>0?'#22c55e':'var(--red)';
-      return `<div class="shap-row">
-        <div class="shap-nm">${s.feature||'—'}</div>
-        <div class="shap-bar"><div class="shap-fill" style="width:${pct}%;background:${col}"></div></div>
-        <div class="shap-val" style="color:${col}">${v>0?'+':''}${v.toFixed(3)}</div>
-      </div>`;
-    }).join('')||'<div class="empty">SHAP não disponível</div>';
-  }
-}
-
-let gMap = null;
-async function initMap(){
-  if(gMap) return;
-  const el = document.getElementById('leaflet-map');
-  if(!el) return;
-  if(el.offsetHeight<50){ setTimeout(initMap,80); return; }
-  gMap = L.map(el,{zoomControl:true,scrollWheelZoom:true}).setView([-14.235,-51.925],4);
-  L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png',{
-    attribution:'&copy; OpenStreetMap &copy; CARTO',
-    subdomains:'abcd', maxZoom:19
-  }).addTo(gMap);
-  setTimeout(()=>{ gMap.invalidateSize(); reloadMap(); }, 200);
-}
-
-function setMapLevel(level){
-  if(['zona','secao'].includes(level)&&!_mapCtx.uf) return;
-  _mapLevel = level;
-  _updateLevelButtons();
-  reloadMap();
-}
-
-function setMapLayer(layer){
-  _activeLayer = layer;
-  document.querySelectorAll('.layer-btn').forEach(b=>b.classList.toggle('active',b.dataset.layer===layer));
-  reloadMap();
-}
-
-async function reloadMap(){
-  if(!gMap) return;
-  const url = `/api/mapa/${_mapLevel}?cargo=${encodeURIComponent(_cargo)}&ano=${_ano}&turno=1&layer=${_activeLayer}`
-    + (_mapCtx.uf?`&uf=${_mapCtx.uf}`:'')
-    + (_mapCtx.cd_municipio?`&cd_municipio=${_mapCtx.cd_municipio}`:'')
-    + (_candidato?`&candidato=${encodeURIComponent(_candidato)}`:'');
-  const [apiRes, geoRes] = await Promise.all([
-    api(url),
-    _loadGeoJSON(_mapLevel),
-  ]);
-  _mapData = {};
-  (apiRes?.features||[]).forEach(f=>{ _mapData[String(f.ibge_code||f.id||f.label)] = f; });
-  renderGeoJSON(geoRes, 'lider', _activeLayer);
-  _updateBreadcrumb();
-  _updateLevelButtons();
-}
-
-async function _loadGeoJSON(level){
-  const urls = {
-    nacional: IBGE_GEO.nacional(),
-    regiao:   IBGE_GEO.regiao(),
-    uf:       IBGE_GEO.uf(),
-    municipio:IBGE_GEO.municipio(_mapCtx.uf||_uf),
-    zona:     IBGE_GEO.municipio(_mapCtx.uf||_uf),
-  };
-  const url = urls[level];
-  if(!url) return null;
-  try{ const r=await _nativeFetch(url); if(!r.ok) return null; return await r.json(); }catch{ return null; }
-}
-
-function renderGeoJSON(geojsonData, colorBy, layer){
-  if(!gMap) return;
-  if(window._geoLayer){ window._geoLayer.removeFrom(gMap); window._geoLayer=null; }
-  _geoLayer = null;
-  if(!geojsonData) return;
-  const cur = layer;
-  _geoLayer = window._geoLayer = L.geoJSON(geojsonData, {
-    style: function(feat){
-      const props = feat.properties||{};
-      const cod = String(props.codarea||props.CD_MUN||props.CD_UF||props.CD_REGIAO||'');
-      const d = _mapData[cod]||_mapData[cod.slice(0,2)];
-      if(!d) return {fillColor:'#21262d',fillOpacity:0.25,color:'#4b6878',weight:1};
-      let color = '#21262d';
-      if(cur&&cur!=='electoral'){
-        const val = (d.pct||50)/100;
-        if(cur==='security'){ const i=Math.round(val*200+55); color=`rgb(${i},${Math.round(68-val*40)},${Math.round(68-val*40)})`; }
-        else if(cur==='health'){ color=val>0.7?'#00c853':val>0.5?'#66bb6a':val>0.35?'#ffd54f':'#ef9a9a'; }
-        else if(cur==='economic'){ color=val>0.7?'#22c55e':val>0.5?'#c6e400':val>0.35?'#ffd54f':'#ff8f00'; }
-        else if(cur==='poll'){ color=val>0.5?'#1f6feb':val>0.3?'#7c3aed':'#57606a'; }
-        else if(cur==='pred'){ color=val>0.55?'#22c55e':val>0.45?'#f59e0b':'#ef4444'; }
-      } else {
-        color = d.partido?(PARTIDO_COR[d.partido]||_candidateColor(d.lider)):_candidateColor(d.lider);
-      }
-      return {fillColor:color,fillOpacity:0.60,color:'#4b6878',weight:1};
-    },
-    onEachFeature: function(feat, lyr){
-      lyr.on('click', function(ev){
-        const props = feat.properties||{};
-        const cod = props.codarea||props.CD_MUN||props.CD_UF||props.CD_REGIAO||'';
-        const nome = props.nome||props.NM_MUN||props.NM_UF||String(cod);
-        const d = _mapData[String(cod)];
-        if(d) _drillDown(feat,d);
-        L.popup({maxWidth:220}).setLatLng(ev.latlng)
-          .setContent(_buildTooltip(d||{label:nome,lider:'—',pct:0,segundo:'—',pct2:0},cur||'electoral'))
-          .openOn(gMap);
-        if(_activeTab==='base') _loadBase();
-      });
-    }
-  }).addTo(gMap);
-  setTimeout(()=>{ try{ const b=_geoLayer.getBounds(); if(b.isValid()) gMap.fitBounds(b,{padding:[12,12],maxZoom:12,animate:true}); }catch(e){} }, 100);
-  updateLegend(_activeLayer, _mapData);
-}
-
-function _buildTooltip(d, layer){
-  const cor = PARTIDO_COR[d.partido]||'#888';
-  return `<div style="min-width:160px;font-family:Inter,sans-serif">
-    <div style="font-weight:700;font-size:.82rem;margin-bottom:6px">${d.label||d.id||'—'}</div>
-    <div style="display:flex;align-items:center;gap:6px;margin-bottom:4px">
-      <div style="width:8px;height:8px;border-radius:2px;background:${cor};flex-shrink:0"></div>
-      <span style="font-weight:600;font-size:.78rem">${d.lider||'—'}</span>
-      <span style="margin-left:auto;font-family:monospace;color:${cor};font-weight:700">${(d.pct||0).toFixed(1)}%</span>
-    </div>
-    ${d.segundo?`<div style="color:#8d96a0;font-size:.7rem">${d.segundo}: ${(d.pct2||0).toFixed(1)}%</div>`:''}
-    ${d.total_votos?`<div style="color:#57606a;font-size:.65rem;margin-top:2px">${Number(d.total_votos).toLocaleString('pt-BR')} votos</div>`:''}
-    <div style="color:#3d444d;font-size:.6rem;margin-top:5px">Clique para detalhar</div>
-  </div>`;
-}
-
-function _drillDown(feat, d){
-  const next = {nacional:'regiao',regiao:'uf',uf:'municipio',municipio:'zona'}[_mapLevel];
-  if(!next) return;
-  if(_mapLevel==='regiao') _mapCtx.regiao = d.id||d.label;
-  if(_mapLevel==='uf') _mapCtx.uf = d.id;
-  if(_mapLevel==='municipio') _mapCtx.cd_municipio = d.cd_municipio||d.id;
-  _mapLevel = next;
-  _updateLevelButtons();
-  reloadMap();
-}
-
-function _updateBreadcrumb(){
-  const parts = ['<span onclick="resetMap()">Brasil</span>'];
-  if(_mapCtx.regiao) parts.push(`<span onclick="goToLevel('regiao')">${_mapCtx.regiao}</span>`);
-  if(_mapCtx.uf) parts.push(`<span onclick="goToLevel('uf')">${_mapCtx.uf}</span>`);
-  if(_mapCtx.cd_municipio) parts.push(`<span onclick="goToLevel('municipio')">${_mapCtx.cd_municipio}</span>`);
-  document.getElementById('map-breadcrumb').innerHTML = parts.join(' › ');
-}
-
-function resetMap(){
-  _mapCtx = {uf:_uf};
-  _mapLevel = 'uf';
-  if(gMap) gMap.setView([-14.235,-51.925],4);
-  reloadMap();
-}
-
-function goToLevel(level){
-  if(level==='regiao'){ delete _mapCtx.uf; delete _mapCtx.cd_municipio; }
-  if(level==='uf'){ delete _mapCtx.cd_municipio; }
-  _mapLevel = level;
-  _updateLevelButtons();
-  reloadMap();
-}
-
-function _updateLevelButtons(){
-  document.querySelectorAll('.level-btn').forEach(b=>{
-    b.classList.toggle('active', b.dataset.level===_mapLevel);
-  });
-}
-
-async function loadCandidatoList(){
+async function loadCandidatoList() {
   const dl = document.getElementById('cand-list');
-  if(!dl) return;
+  if (!dl) return;
   dl.innerHTML = '';
-  const d = await api(`/api/candidatos?ano=${_ano}&uf=${encodeURIComponent(_uf)}&cargo=${encodeURIComponent(_cargo)}`);
-  (d?.candidatos||[]).forEach(c=>{
+  const d = await api(`/api/candidatos?ano=${_ano}&uf=${_uf}&cargo=${encodeURIComponent(_cargo)}`);
+  (d?.candidatos || []).forEach(c => {
     const opt = document.createElement('option');
     opt.value = c.nm;
-    opt.label = c.pct_t1!=null?`${c.nm} — ${c.pct_t1}%`:c.nm;
+    opt.label = c.pct_t1 != null ? `${c.nm} — ${c.pct_t1}%` : c.nm;
     dl.appendChild(opt);
   });
 }
 
-function initChat(){ _ws=null; _ensureWs(); }
-function _ensureWs(){
-  if(_ws&&_ws.readyState<2) return;
-  const proto = location.protocol==='https:'?'wss':'ws';
-  _ws = new WebSocket(`${proto}://${location.host}/ws/chat`);
-  _ws.onmessage = _onWsMsg;
-  _ws.onopen = ()=>{ const s=document.getElementById('chat-status'); const r=document.getElementById('chat-reconnect'); if(s) s.style.color='#22c55e'; if(r) r.style.display='none'; };
-  _ws.onclose = ()=>{ _ws=null; const s=document.getElementById('chat-status'); const r=document.getElementById('chat-reconnect'); if(s) s.style.color='var(--red)'; if(r) r.style.display=''; };
-  _ws.onerror = ()=>{ const s=document.getElementById('chat-status'); const r=document.getElementById('chat-reconnect'); if(s) s.style.color='var(--org)'; if(r) r.style.display=''; };
+// ── TABS ───────────────────────────────────────────────────────────────────
+function switchTab(tab) {
+  _activeTab = tab;
+  document.querySelectorAll('.tab').forEach(t => t.classList.toggle('active', t.dataset.tab === tab));
+  document.querySelectorAll('.tab-panel').forEach(p => p.classList.toggle('active', p.id === 'tab-'+tab));
+  loadTab(tab);
+  if (tab === 'mapa') setTimeout(()=>{ if(gMap) gMap.invalidateSize(); }, 50);
 }
 
-function _onWsMsg(e){
-  let data;
-  try{ data=JSON.parse(e.data); }catch{ return; }
-  const msgs = document.getElementById('chat-msgs');
-  if(data.type==='welcome'){
-    const d=document.createElement('div'); d.className='msg-ai';
-    d.innerHTML=`<div class="mav2 ai">AI</div><div class="mb">${_esc((data.text||'').replace(/\*\*([^*]+)\*\*/g,'<b>$1</b>'))}</div>`;
-    msgs.appendChild(d); msgs.scrollTop=msgs.scrollHeight;
-    return;
-  }
-  if(data.type==='chunk'){
-    _aiBuffer+=data.text;
-    if(_aiMsgEl) _aiMsgEl.innerHTML=_aiBuffer.replace(/\n/g,'<br>').replace(/\*\*([^*]+)\*\*/g,'<b>$1</b>');
-    msgs.scrollTop=msgs.scrollHeight;
-  } else if(data.type==='done'){
-    if(data.dashboard_update&&typeof window.applyDashboardUpdate==='function'){
-      setTimeout(()=>window.applyDashboardUpdate(data.dashboard_update),300);
-    }
-    _aiBuffer=''; _aiMsgEl=null; _busy=false;
-    document.getElementById('chat-send').disabled=false;
-  } else if(data.type==='error'){
-    console.error('WS chat error:', data.message);
-    if(_aiMsgEl) _aiMsgEl.innerHTML=`<span style="color:var(--red)">${_esc(data.message||'Erro')}</span>`;
-    _busy=false; document.getElementById('chat-send').disabled=false;
-  }
+function loadTab(tab) {
+  const loaders = {
+    mapa:       ()=>{ if(gMap) reloadMap(); else initMap(); },
+    resultados: loadResultados,
+    eleitorado: loadEleitorado,
+    digital:    loadDigital,
+    ranking:    loadRanking,
+    previsao:   ()=>loadPrevisao(_scenario),
+  };
+  if (loaders[tab]) loaders[tab]();
 }
 
-function _esc(s){ return (s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
-
-function _appendMsg(txt, role){
-  const msgs = document.getElementById('chat-msgs');
-  const d = document.createElement('div');
-  d.className = role==='u'?'msg-u':'msg-ai';
-  if(role==='u'){
-    d.innerHTML=`<div class="mav2 u">EU</div><div class="mb">${_esc(txt)}</div>`;
-  } else {
-    const mid='ai-live-'+Date.now();
-    d.innerHTML=`<div class="mav2 ai">AI</div><div class="mb" id="${mid}"></div>`;
-    _aiMsgEl = null;
-    setTimeout(()=>{ _aiMsgEl=document.getElementById(mid); },0);
-  }
-  msgs.appendChild(d);
-  msgs.scrollTop=msgs.scrollHeight;
-  return d;
+// ── MAP ────────────────────────────────────────────────────────────────────
+async function initMap() {
+  if (gMap) return;
+  const el = document.getElementById('leaflet-map');
+  if (!el || el.offsetHeight < 50) { setTimeout(initMap, 100); return; }
+  gMap = L.map(el, {zoomControl:true, scrollWheelZoom:true}).setView([-14.235,-51.925], 4);
+  L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
+    attribution:'&copy; OpenStreetMap &copy; CARTO', subdomains:'abcd', maxZoom:19
+  }).addTo(gMap);
+  setTimeout(()=>{ gMap.invalidateSize(); reloadMap(); }, 200);
 }
 
-function updateLegend(layer, data){
-  const el = document.getElementById('map-legend');
-  if(!el) return;
-  let html = '';
-  if(layer==='electoral'){
-    const seen = {};
-    Object.values(data).forEach(d=>{
-      if(!d.lider) return;
-      const key = d.lider;
-      if(!seen[key]){
-        const cor = (d.partido&&PARTIDO_COR[d.partido])||_candidateColor(d.lider);
-        seen[key] = cor;
+function setMapLevel(level) {
+  _mapLevel = level;
+  document.querySelectorAll('[data-level]').forEach(b => b.classList.toggle('active', b.dataset.level === level));
+  reloadMap();
+}
+
+function swapLayer(layer) {
+  _activeLayer = layer;
+  document.querySelectorAll('.layer-chip').forEach(b => b.classList.toggle('active', b.dataset.layer === layer));
+  reloadMap();
+}
+
+async function reloadMap() {
+  if (!gMap) return;
+  const uf = _mapCtx.uf || _uf;
+  const url = `/api/mapa/${_mapLevel}?cargo=${encodeURIComponent(_cargo)}&ano=${_ano}&turno=1&layer=${_activeLayer}`
+    + (uf ? `&uf=${uf}` : '')
+    + (_candidato ? `&candidato=${encodeURIComponent(_candidato)}` : '');
+  const [apiRes, geoData] = await Promise.all([
+    api(url),
+    _fetchGeoJSON(_mapLevel),
+  ]);
+  _mapData = {};
+  (apiRes?.features || []).forEach(f => {
+    _mapData[String(f.ibge_code || f.id || f.label)] = f;
+  });
+  _renderGeoJSON(geoData);
+  _updateBreadcrumb();
+}
+
+async function _fetchGeoJSON(level) {
+  const urls = {
+    nacional: IBGE_GEO.nacional(),
+    regiao:   IBGE_GEO.regiao(),
+    uf:       IBGE_GEO.uf(),
+    municipio:IBGE_GEO.municipio(_mapCtx.uf || _uf),
+  };
+  const url = urls[level];
+  if (!url) return null;
+  try { const r = await _nativeFetch(url); if (!r.ok) return null; return await r.json(); }
+  catch { return null; }
+}
+
+function _renderGeoJSON(geojsonData) {
+  if (!gMap) return;
+  if (window._geoLayer) { window._geoLayer.removeFrom(gMap); window._geoLayer = null; }
+  _geoLayer = null;
+  if (!geojsonData) return;
+  const layer = _activeLayer;
+  _geoLayer = window._geoLayer = L.geoJSON(geojsonData, {
+    style(feat) {
+      const props = feat.properties || {};
+      const cod = String(props.codarea || props.CD_MUN || props.CD_UF || props.CD_REGIAO || '');
+      const d = _mapData[cod] || _mapData[cod.slice(0,2)];
+      if (!d) return {fillColor:'#21262d', fillOpacity:0.25, color:'#4b6878', weight:1};
+      let color = '#21262d';
+      if (layer && layer !== 'electoral') {
+        const val = (d.pct || 50) / 100;
+        if (layer === 'security')  { const i = Math.round(val*200+55); color = `rgb(${i},${Math.round(68-val*40)},${Math.round(68-val*40)})`; }
+        else if (layer === 'health')   { color = val>0.7?'#00c853':val>0.5?'#66bb6a':val>0.35?'#ffd54f':'#ef9a9a'; }
+        else if (layer === 'economic') { color = val>0.7?'#22c55e':val>0.5?'#c6e400':val>0.35?'#ffd54f':'#ff8f00'; }
+        else if (layer === 'poll')     { color = val>0.5?'#1f6feb':val>0.3?'#7c3aed':'#57606a'; }
+        else if (layer === 'pred')     { color = val>0.55?'#22c55e':val>0.45?'#f59e0b':'#ef4444'; }
+      } else {
+        color = d.partido ? (PARTIDO_COR[d.partido] || _candidateColor(d.lider)) : _candidateColor(d.lider);
       }
+      return {fillColor:color, fillOpacity:0.60, color:'#4b6878', weight:1};
+    },
+    onEachFeature(feat, lyr) {
+      lyr.on('click', ev => {
+        const props = feat.properties || {};
+        const cod = props.codarea || props.CD_MUN || props.CD_UF || props.CD_REGIAO || '';
+        const nome = props.nome || props.NM_MUN || props.NM_UF || String(cod);
+        const d = _mapData[String(cod)];
+        if (d) _drillDown(feat, d);
+        L.popup({maxWidth:220}).setLatLng(ev.latlng)
+          .setContent(_buildTooltip(d || {label:nome, lider:'—', pct:0}))
+          .openOn(gMap);
+      });
+    }
+  }).addTo(gMap);
+  setTimeout(()=>{
+    try { const b = _geoLayer.getBounds(); if(b.isValid()) gMap.fitBounds(b,{padding:[12,12],maxZoom:12,animate:true}); } catch(e){}
+  }, 100);
+  _updateLegend();
+}
+
+function _buildTooltip(d) {
+  const cor = (d.partido && PARTIDO_COR[d.partido]) || '#888';
+  return `<div style="min-width:160px;font-family:Inter,sans-serif">
+    <div style="font-weight:700;font-size:.82rem;margin-bottom:6px">${_esc(d.label||d.id||'—')}</div>
+    <div style="display:flex;align-items:center;gap:6px;margin-bottom:4px">
+      <div style="width:8px;height:8px;border-radius:2px;background:${cor};flex-shrink:0"></div>
+      <span style="font-weight:600;font-size:.78rem">${_esc(d.lider||'—')}</span>
+      <span style="margin-left:auto;font-family:monospace;color:${cor};font-weight:700">${(d.pct||0).toFixed(1)}%</span>
+    </div>
+    ${d.segundo ? `<div style="color:#8d96a0;font-size:.7rem">${_esc(d.segundo)}: ${(d.pct2||0).toFixed(1)}%</div>` : ''}
+    ${d.total_votos ? `<div style="color:#57606a;font-size:.65rem;margin-top:2px">${Number(d.total_votos).toLocaleString('pt-BR')} votos</div>` : ''}
+    <div style="color:#3d444d;font-size:.6rem;margin-top:5px">Clique para detalhar</div>
+  </div>`;
+}
+
+function _drillDown(feat, d) {
+  const next = {nacional:'regiao', regiao:'uf', uf:'municipio', municipio:'municipio'}[_mapLevel];
+  if (!next || next === _mapLevel) return;
+  if (_mapLevel === 'regiao') _mapCtx.regiao = d.id || d.label;
+  if (_mapLevel === 'uf')     _mapCtx.uf = d.id;
+  if (_mapLevel === 'municipio') _mapCtx.cd_municipio = d.cd_municipio || d.id;
+  _mapLevel = next;
+  document.querySelectorAll('[data-level]').forEach(b => b.classList.toggle('active', b.dataset.level === _mapLevel));
+  reloadMap();
+}
+
+function _updateBreadcrumb() {
+  const parts = ['<span onclick="resetMap()">Brasil</span>'];
+  if (_mapCtx.regiao) parts.push(`<span onclick="goLevel('regiao')">${_esc(_mapCtx.regiao)}</span>`);
+  if (_mapCtx.uf)     parts.push(`<span onclick="goLevel('uf')">${_esc(_mapCtx.uf)}</span>`);
+  document.getElementById('map-breadcrumb').innerHTML = parts.join(' › ');
+}
+
+function resetMap() {
+  _mapCtx = {uf: _uf === 'BR' ? null : _uf};
+  _mapLevel = 'uf';
+  document.querySelectorAll('[data-level]').forEach(b => b.classList.toggle('active', b.dataset.level === 'uf'));
+  if (gMap) gMap.setView([-14.235,-51.925], 4);
+  reloadMap();
+}
+
+function goLevel(level) {
+  if (level === 'regiao') { delete _mapCtx.uf; delete _mapCtx.cd_municipio; }
+  if (level === 'uf') { delete _mapCtx.cd_municipio; }
+  _mapLevel = level;
+  document.querySelectorAll('[data-level]').forEach(b => b.classList.toggle('active', b.dataset.level === level));
+  reloadMap();
+}
+
+function toggleHeatmap() {
+  const btn = document.getElementById('btn-heat');
+  if (_heatLayer) { gMap.removeLayer(_heatLayer); _heatLayer = null; if(btn) btn.style.background=''; return; }
+  const pts = [];
+  if (window._geoLayer) {
+    window._geoLayer.eachLayer(lyr => {
+      try {
+        const center = lyr.getBounds().getCenter();
+        const props = (lyr.feature && lyr.feature.properties) || {};
+        const cod = String(props.codarea || props.CD_MUN || props.CD_UF || '');
+        const d = _mapData[cod] || _mapData[cod.slice(0,2)];
+        pts.push([center.lat, center.lng, d ? Math.min(Math.max((d.pct||50)/100,0),1) : 0.5]);
+      } catch(e) {}
+    });
+  }
+  if (pts.length) {
+    _heatLayer = L.heatLayer(pts, {radius:25, blur:15, maxZoom:10}).addTo(gMap);
+    if (btn) btn.style.background = 'var(--org)';
+  }
+}
+
+function _updateLegend() {
+  const el = document.getElementById('map-legend');
+  if (!el) return;
+  if (_activeLayer === 'electoral') {
+    const seen = {};
+    Object.values(_mapData).forEach(d => {
+      if (!d.lider || seen[d.lider]) return;
+      seen[d.lider] = (d.partido && PARTIDO_COR[d.partido]) || _candidateColor(d.lider);
     });
     const entries = Object.entries(seen).slice(0,8);
-    if(!entries.length){ el.style.display='none'; return; }
-    el.style.display='block';
-    html = '<div style="font-weight:600;color:var(--tx2);margin-bottom:5px;text-transform:uppercase;letter-spacing:.06em">Líderes</div>'
-      + entries.map(([nm,cor])=>`<div style="display:flex;align-items:center;gap:5px;margin-bottom:3px"><span style="color:${cor};font-size:.9rem;line-height:1">&#9679;</span><span style="color:var(--tx);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:90px">${nm.split(' ')[0]}</span></div>`).join('');
+    if (!entries.length) { el.style.display='none'; return; }
+    el.style.display = 'block';
+    el.innerHTML = '<div style="font-weight:600;color:var(--tx2);margin-bottom:5px;font-size:.6rem;text-transform:uppercase;letter-spacing:.06em">L&#237;deres</div>'
+      + entries.map(([nm,cor]) => `<div style="display:flex;align-items:center;gap:5px;margin-bottom:3px"><span style="color:${cor};font-size:.85rem;line-height:1">&#9679;</span><span style="color:var(--tx);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:90px;font-size:.62rem">${_esc(nm.split(' ')[0])}</span></div>`).join('');
   } else {
     const stops = {
-      security:[['Alto','rgb(255,68,68)'],['Médio','rgb(180,48,48)'],['Baixo','rgb(55,55,68)']],
+      security:[['Alto','rgb(255,68,68)'],['Médio','rgb(180,48,48)'],['Baixo','#373744']],
       health:[['Alto','#00c853'],['Médio','#ffd54f'],['Baixo','#ef9a9a']],
       economic:[['Alto','#22c55e'],['Médio','#ffd54f'],['Baixo','#ff8f00']],
       poll:[['Alto','#1f6feb'],['Médio','#7c3aed'],['Baixo','#57606a']],
       pred:[['Favorável','#22c55e'],['Incerto','#f59e0b'],['Desfavorável','#ef4444']],
-    }[layer]||[];
-    if(!stops.length){ el.style.display='none'; return; }
-    el.style.display='block';
-    html = stops.map(([lbl,cor])=>`<div style="display:flex;align-items:center;gap:5px;margin-bottom:3px"><span style="width:10px;height:10px;border-radius:2px;background:${cor};flex-shrink:0;display:inline-block"></span><span style="color:var(--tx2)">${lbl}</span></div>`).join('');
+    }[_activeLayer] || [];
+    if (!stops.length) { el.style.display='none'; return; }
+    el.style.display = 'block';
+    el.innerHTML = stops.map(([lbl,cor]) => `<div style="display:flex;align-items:center;gap:5px;margin-bottom:3px"><span style="width:10px;height:10px;border-radius:2px;background:${cor};flex-shrink:0;display:inline-block"></span><span style="color:var(--tx2);font-size:.62rem">${_esc(lbl)}</span></div>`).join('');
   }
-  el.innerHTML = html;
 }
 
-let _heatLayer = null;
-function toggleHeatmap(){
-  const btn = document.getElementById('btn-heat');
-  if(_heatLayer){ gMap.removeLayer(_heatLayer); _heatLayer=null; if(btn) btn.style.background=''; return; }
-  const pts=[];
-  if(window._geoLayer){
-    window._geoLayer.eachLayer(lyr=>{
-      try{
-        const center=lyr.getBounds().getCenter();
-        const props=lyr.feature&&lyr.feature.properties||{};
-        const cod=String(props.codarea||props.CD_MUN||props.CD_UF||'');
-        const d=_mapData[cod]||_mapData[cod.slice(0,2)];
-        const intensity=d?Math.min(Math.max((d.pct||50)/100,0),1):0.5;
-        pts.push([center.lat,center.lng,intensity]);
-      }catch(e){}
-    });
+// ── RESULTADOS ─────────────────────────────────────────────────────────────
+async function loadResultados() {
+  const [res, map] = await Promise.all([
+    api(`/api/resultados/${encodeURIComponent(_cargo)}?uf=${_uf}&ano=${_ano}&turno=1`),
+    api(`/api/mapa/uf?cargo=${encodeURIComponent(_cargo)}&ano=${_ano}&turno=1&uf=${_uf}`),
+  ]);
+  const cands = res?.candidatos || res?.data || (Array.isArray(res) ? res : []);
+  const leader = cands[0] || {};
+  const totalVotos = cands.reduce((s,c) => s+(c.votos||c.total_votos||0), 0);
+  _set('res-votos', _fmt(totalVotos));
+  _set('res-lider', (leader.nm||'—').split(' ')[0]);
+  _set('res-pct', leader.pct ? leader.pct.toFixed(1)+'%' : '—');
+  _set('res-comp', map?.comparecimento ? map.comparecimento.toFixed(1)+'%' : '—');
+  _set('rank-sub-title', `Candidatos — ${_cargo} ${_ano}`);
+
+  // Bar chart
+  const top8 = cands.slice(0, 8);
+  mkChart('chart-resultados', 'bar',
+    top8.map(c => (c.nm||'?').split(' ')[0]),
+    top8.map(c => c.pct||0),
+    {colors: top8.map(c => PARTIDO_COR[c.sg_partido||c.partido] || _candidateColor(c.nm))}
+  );
+
+  // Table
+  const tbody = document.getElementById('res-tbody');
+  if (tbody) {
+    tbody.innerHTML = cands.slice(0,30).map((c,i) => {
+      const party = c.sg_partido||c.partido||'—';
+      const cor = PARTIDO_COR[party] || '#555';
+      const votos = c.votos||c.total_votos||0;
+      const pct = c.pct||0;
+      const eleito = c.ds_sit_cand_tot?.includes('ELEITO') || c.eleito;
+      return `<tr>
+        <td style="color:var(--tx2)">${i+1}</td>
+        <td style="font-weight:500">${_esc(c.nm||'—')}</td>
+        <td><span class="badge-partido" style="background:${cor}">${_esc(party)}</span></td>
+        <td style="text-align:right;font-family:monospace">${_fmt(votos)}</td>
+        <td style="text-align:right;color:var(--grn2)">${pct?pct.toFixed(1)+'%':'—'}</td>
+        <td>${eleito?'<span class="badge-eleito">Eleito</span>':'—'}</td>
+      </tr>`;
+    }).join('') || '<tr><td colspan="6" class="empty">Sem dados</td></tr>';
   }
-  if(pts.length){ _heatLayer=L.heatLayer(pts,{radius:25,blur:15,maxZoom:10}).addTo(gMap); if(btn) btn.style.background='var(--org)'; }
 }
 
-async function _loadRanking(){
-  document.getElementById('rank-title').textContent = `${_cargo} ${_ano} — ${_uf==='BR'?'Brasil':_uf}`;
-  const tbody = document.getElementById('rank-tbody');
-  tbody.innerHTML = '<tr><td colspan="5" style="text-align:center;padding:16px;color:var(--tx2)">Carregando...</td></tr>';
-  let cands = [];
-  try {
-    const d = await api(`/api/resultados/${encodeURIComponent(_cargo)}?ano=${_ano}&uf=${encodeURIComponent(_uf)}&turno=1&limit=50`);
-    cands = d?.candidatos || d?.data || (Array.isArray(d)?d:[]);
-  } catch(e) {}
-  if(!cands.length) {
-    const d = await api(`/api/candidatos?ano=${_ano}&uf=${encodeURIComponent(_uf)}&cargo=${encodeURIComponent(_cargo)}&limit=100`);
-    cands = d?.candidatos || [];
-  }
-  if(!cands.length){
-    tbody.innerHTML = '<tr><td colspan="5" style="text-align:center;padding:16px;color:var(--tx2)">Sem dados para este filtro</td></tr>';
+// ── ELEITORADO ─────────────────────────────────────────────────────────────
+async function loadEleitorado() {
+  const d = await api(`/api/perfis?uf=${_uf}&ano=2026`);
+  if (!d) {
+    ['el-total','el-fem','el-jov','el-sup'].forEach(id => _set(id,'—'));
     return;
   }
-  cands = cands.sort((a,b)=>(b.votos||b.qt_votos||b.total_votos||0)-(a.votos||a.qt_votos||a.total_votos||0));
-  tbody.innerHTML = cands.slice(0,50).map((c,i)=>{
-    const party = c.sg_partido||c.partido||'—';
-    const cor = PARTIDO_COR[party]||'#888';
-    const votos = c.votos||c.qt_votos||c.total_votos||0;
-    const pct = c.pct_t1||c.pct||0;
-    const rowBg = i%2===0?'transparent':'rgba(255,255,255,.02)';
-    return `<tr style="background:${rowBg};border-bottom:1px solid rgba(48,54,61,.5)">
-      <td style="padding:4px 6px;color:var(--tx2)">${i+1}</td>
-      <td style="padding:4px 6px;font-weight:500">${c.nm||c.candidato||'—'}</td>
-      <td style="padding:4px 6px"><span style="background:${cor};color:#fff;padding:1px 5px;border-radius:3px;font-size:.6rem">${party}</span></td>
-      <td style="padding:4px 6px;text-align:right;font-family:monospace">${_fmt(votos)}</td>
-      <td style="padding:4px 6px;text-align:right;color:var(--grn2)">${pct?pct.toFixed(1)+'%':'—'}</td>
-    </tr>`;
-  }).join('');
-  const byParty = {};
-  cands.forEach(c=>{ const p=c.sg_partido||c.partido||'?'; byParty[p]=(byParty[p]||0)+1; });
-  const sorted = Object.entries(byParty).sort((a,b)=>b[1]-a[1]).slice(0,10);
-  mkChart('chart-partidos','bar',sorted.map(p=>p[0]),sorted.map(p=>p[1]),'#238636');
+  const total = d.total_eleitores || d.total || 0;
+  _set('el-total', total > 0 ? _fmt(total) : '—');
+  const gen = d.genero || [];
+  const femRow = gen.find(g => (g.ds_genero||g.label||'').toUpperCase().includes('FEMIN'));
+  _set('el-fem', femRow ? parseFloat(femRow.pct||0).toFixed(1)+'%' : '—');
+  const age = d.faixa_etaria || [];
+  const jovRows = age.filter(a => {
+    const lbl = (a.ds_faixa||a.label||'').toLowerCase();
+    return lbl.includes('16') || lbl.includes('17') || lbl.includes('18') || lbl.includes('20') || lbl.includes('21') || lbl.includes('24');
+  });
+  const jovPct = jovRows.reduce((s,a) => s+parseFloat(a.pct||0), 0);
+  _set('el-jov', jovPct > 0 ? jovPct.toFixed(1)+'%' : '—');
+  const edu = d.escolaridade || [];
+  const supRow = edu.find(e => (e.ds_grau||e.label||'').toLowerCase().includes('superior'));
+  _set('el-sup', supRow ? parseFloat(supRow.pct||0).toFixed(1)+'%' : '—');
+
+  // Charts
+  if (gen.length) {
+    mkChart('chart-genero','doughnut',
+      gen.map(g=>g.ds_genero||g.label||'?'),
+      gen.map(g=>parseFloat(g.pct||0)),
+      {colors:['#1f6feb','#ec4899','#8d96a0']}
+    );
+  }
+  if (age.length) {
+    mkChart('chart-idade','bar',
+      age.map(a=>a.ds_faixa||a.label||'?'),
+      age.map(a=>parseFloat(a.pct||0)),
+      {colors:'#2ea043'}
+    );
+  }
+  if (edu.length) {
+    mkChart('chart-edu','bar',
+      edu.map(e=>e.ds_grau||e.label||'?'),
+      edu.map(e=>parseFloat(e.pct||0)),
+      {colors:'#f97316', indexAxis:'y'}
+    );
+  }
+  // Evolution placeholder
+  mkChart('chart-evolucao','line',['2018','2022'],[0,0],{colors:'#6366f1'});
 }
 
-function sendMsg(){
-  if(_busy) return;
-  const el=document.getElementById('chat-cin');
-  const t=el.value.trim(); if(!t) return;
-  el.value='';
-  _appendMsg(t,'u');
-  _busy=true; document.getElementById('chat-send').disabled=true;
-  _aiBuffer=''; _aiMsgEl=null;
-  const msgs=document.getElementById('chat-msgs');
-  const ti=document.createElement('div'); ti.id='ti-typing'; ti.className='msg-ai';
-  ti.innerHTML='<div class="mav2 ai">AI</div><div class="typing-dots"><span></span><span></span><span></span></div>';
-  msgs.appendChild(ti); msgs.scrollTop=msgs.scrollHeight;
-  _ensureWs();
-  const ctx = {cargo:_cargo, uf:_uf, ano:_ano, candidato:_candidato, tab:_activeTab};
-  const doSend=()=>{
-    const tiEl=document.getElementById('ti-typing'); if(tiEl) tiEl.remove();
-    _appendMsg('','ai');
-    _ws.send(JSON.stringify({type:'message',text:t,context:ctx}));
-  };
-  if(_ws&&_ws.readyState===1) doSend();
-  else if(_ws&&_ws.readyState===0){ const f=()=>{ _ws.removeEventListener('open',f); doSend(); }; _ws.addEventListener('open',f); }
-  else{
-    const tiEl=document.getElementById('ti-typing'); if(tiEl) tiEl.remove();
-    _appendMsg('Serviço de chat indisponível no momento.','ai');
-    if(_aiMsgEl) _aiMsgEl.textContent='Serviço de chat indisponível no momento.';
-    _busy=false; document.getElementById('chat-send').disabled=false;
+// ── DIGITAL ────────────────────────────────────────────────────────────────
+async function loadDigital() {
+  const [sentD, metaD, trendsD, gdeltD] = await Promise.all([
+    api(`/api/social/sentimento?uf=${_uf}`),
+    api(`/api/digital/meta?uf=${_uf}`),
+    api(`/api/social/trends?uf=${_uf}`),
+    api(`/api/gdelt_eventos?uf=${_uf}`),
+  ]);
+  const noTokens = sentD?.status === 'sem_tokens';
+  document.getElementById('dig-no-tokens').style.display = noTokens ? 'block' : 'none';
+
+  const score = sentD?.score ?? sentD?.sentimento_score ?? null;
+  _set('dig-sent', score != null ? score.toFixed(2) : '—');
+  _set('dig-vol', sentD?.volume != null ? _fmt(sentD.volume) : '—');
+  const topCand = (sentD?.candidatos||[])[0];
+  _set('dig-top', topCand ? (topCand.nm||'—').split(' ')[0] : '—');
+  _set('dig-trend', sentD?.tendencia || '—');
+
+  // Sentimento por candidato
+  const cands = sentD?.candidatos || [];
+  if (cands.length) {
+    mkChart('chart-sent-cand','bar',
+      cands.slice(0,8).map(c=>(c.nm||'?').split(' ')[0]),
+      cands.slice(0,8).map(c=>c.score||c.sentimento||0),
+      {colors: cands.slice(0,8).map(c=>c.score>=0?'#22c55e':'#ef4444')}
+    );
+  }
+
+  // Volume semanal
+  const volSeries = sentD?.series || [];
+  if (volSeries.length) {
+    mkChart('chart-vol-week','line',
+      volSeries.map(s=>s.dt||s.data||''),
+      volSeries.map(s=>s.volume||s.val||0),
+      {colors:'#7c3aed'}
+    );
+  }
+
+  // Meta
+  const metaList = metaD?.candidatos || metaD?.data || [];
+  if (metaList.length) {
+    mkChart('chart-meta-spend','bar',
+      metaList.slice(0,8).map(m=>(m.nm||m.candidato||'?').split(' ')[0]),
+      metaList.slice(0,8).map(m=>m.gasto||m.spend||0),
+      {colors:'#a78bfa'}
+    );
+  }
+
+  // Trends
+  const trendsData = trendsD?.data || trendsD?.series || [];
+  if (trendsData.length) {
+    mkChart('chart-trends','line',
+      trendsData.map(t=>t.dt||t.data||''),
+      trendsData.map(t=>t.val||t.interesse||0),
+      {colors:'#f59e0b'}
+    );
+  }
+
+  // GDELT
+  const gdeltItems = gdeltD?.eventos || gdeltD?.data || [];
+  const gdeltEl = document.getElementById('gdelt-list');
+  if (gdeltEl) {
+    gdeltEl.innerHTML = gdeltItems.slice(0,10).map(e => `<div class="kv-row">
+      <span class="kv-lbl" style="flex:1">${_esc(e.titulo||e.title||e.tema||'—')}</span>
+      <span class="kv-val" style="font-size:.6rem;color:var(--tx3)">${_esc(e.dt||e.data||'')}</span>
+    </div>`).join('') || '<div class="empty">Sem eventos GDELT</div>';
   }
 }
+
+function switchDig(sec, btn) {
+  document.querySelectorAll('.dig-section').forEach(d => d.classList.remove('active'));
+  document.querySelectorAll('#tab-digital .pill').forEach(b => b.classList.remove('active'));
+  document.getElementById('dig-'+sec).classList.add('active');
+  btn.classList.add('active');
+}
+
+// ── RANKING ────────────────────────────────────────────────────────────────
+async function loadRanking() {
+  _set('rank-title', `Ranking — ${_cargo} ${_ano}`);
+  const tbody = document.getElementById('rank-tbody');
+  if (tbody) tbody.innerHTML = '<tr><td colspan="7" class="empty">Carregando...</td></tr>';
+  const d = await api(`/api/resultados/${encodeURIComponent(_cargo)}?ano=${_ano}&uf=${_uf}&turno=${_rankTurno}&limit=100`);
+  _rankData = d?.candidatos || d?.data || (Array.isArray(d) ? d : []);
+  if (!_rankData.length) {
+    const d2 = await api(`/api/candidatos?ano=${_ano}&uf=${_uf}&cargo=${encodeURIComponent(_cargo)}&limit=100`);
+    _rankData = d2?.candidatos || [];
+  }
+  _renderRankTable();
+}
+
+function loadRankingTurno(turno, btn) {
+  _rankTurno = turno;
+  document.querySelectorAll('#tab-ranking .pill').forEach(b => b.classList.remove('active'));
+  if (btn) btn.classList.add('active');
+  loadRanking();
+}
+
+function rankSort(col) {
+  if (_rankSortCol === col) _rankSortAsc = !_rankSortAsc;
+  else { _rankSortCol = col; _rankSortAsc = false; }
+  _renderRankTable();
+}
+
+function _renderRankTable() {
+  const tbody = document.getElementById('rank-tbody');
+  if (!tbody) return;
+  const sorted = [..._rankData].sort((a,b) => {
+    let av, bv;
+    if (_rankSortCol === 'votos') { av = a.votos||a.total_votos||0; bv = b.votos||b.total_votos||0; }
+    else if (_rankSortCol === 'pct') { av = a.pct||0; bv = b.pct||0; }
+    else if (_rankSortCol === 'nm') { av = a.nm||''; bv = b.nm||''; return _rankSortAsc ? av.localeCompare(bv) : bv.localeCompare(av); }
+    else if (_rankSortCol === 'uf') { av = a.sg_uf||''; bv = b.sg_uf||''; return _rankSortAsc ? av.localeCompare(bv) : bv.localeCompare(av); }
+    else { av = 0; bv = 0; }
+    return _rankSortAsc ? av-bv : bv-av;
+  });
+  tbody.innerHTML = sorted.slice(0,100).map((c,i) => {
+    const party = c.sg_partido||c.partido||'—';
+    const cor = PARTIDO_COR[party] || '#555';
+    const votos = c.votos||c.total_votos||0;
+    const pct = c.pct||c.pct_t1||0;
+    const eleito = c.ds_sit_cand_tot?.includes('ELEITO') || c.eleito;
+    return `<tr>
+      <td style="color:var(--tx2)">${i+1}</td>
+      <td style="font-weight:500">${_esc(c.nm||'—')}</td>
+      <td><span class="badge-partido" style="background:${cor}">${_esc(party)}</span></td>
+      <td>${_esc(c.sg_uf||_uf)}</td>
+      <td style="text-align:right;font-family:monospace">${_fmt(votos)}</td>
+      <td style="text-align:right;color:var(--grn2)">${pct?pct.toFixed(1)+'%':'—'}</td>
+      <td>${eleito?'<span class="badge-eleito">Eleito</span>':'—'}</td>
+    </tr>`;
+  }).join('') || '<tr><td colspan="7" class="empty">Sem dados</td></tr>';
+
+  // Party chart
+  const byParty = {};
+  _rankData.forEach(c => { const p = c.sg_partido||c.partido||'?'; byParty[p]=(byParty[p]||0)+1; });
+  const topP = Object.entries(byParty).sort((a,b)=>b[1]-a[1]).slice(0,10);
+  mkChart('chart-partidos','bar',
+    topP.map(p=>p[0]), topP.map(p=>p[1]),
+    {colors: topP.map(p=>PARTIDO_COR[p[0]]||'#21262d')}
+  );
+
+  // Regional distribution if BR
+  const regPanel = document.getElementById('rank-regiao-panel');
+  if (regPanel) regPanel.style.display = _uf === 'BR' ? 'flex' : 'none';
+  if (_uf === 'BR') {
+    const byRegiao = {};
+    _rankData.forEach(c => {
+      const uf = c.sg_uf||'?';
+      const reg = {AC:'N',AM:'N',AP:'N',PA:'N',RO:'N',RR:'N',TO:'N',
+                   AL:'NE',BA:'NE',CE:'NE',MA:'NE',PB:'NE',PE:'NE',PI:'NE',RN:'NE',SE:'NE',
+                   DF:'CO',GO:'CO',MS:'CO',MT:'CO',
+                   ES:'SE',MG:'SE',RJ:'SE',SP:'SE',
+                   PR:'S',RS:'S',SC:'S'}[uf]||'?';
+      byRegiao[reg]=(byRegiao[reg]||0)+1;
+    });
+    const regs = Object.entries(byRegiao).sort((a,b)=>b[1]-a[1]);
+    mkChart('chart-rank-regiao','bar',regs.map(r=>r[0]),regs.map(r=>r[1]),{colors:'#0ea5e9'});
+  }
+}
+
+// ── PREVISAO ───────────────────────────────────────────────────────────────
+function setScenario(sc, btn) {
+  _scenario = sc;
+  document.querySelectorAll('#tab-previsao .pill').forEach(b => b.classList.remove('active'));
+  if (btn) btn.classList.add('active');
+  loadPrevisao(sc);
+}
+
+async function loadPrevisao(scenario='base') {
+  const noData = document.getElementById('prev-no-data');
+  const d = await api(`/api/previsao?uf=${_uf}&cargo=${encodeURIComponent(_cargo)}&ano=2026`);
+  if (!d || (!d.candidatos?.length && !d.m1 && !d.m2)) {
+    if (noData) noData.style.display = 'block';
+    document.getElementById('prev-cands').innerHTML = '';
+    document.getElementById('shap-list').innerHTML = '';
+    return;
+  }
+  if (noData) noData.style.display = 'none';
+  const scMult = {otimista:1.15, base:1, pessimista:0.85}[scenario] || 1;
+  const cands = d.candidatos || [];
+  const prevEl = document.getElementById('prev-cands');
+  if (prevEl) {
+    prevEl.innerHTML = cands.slice(0,8).map(c => {
+      const p = Math.min(100, Math.round((c.prob_vitoria||c.pct||0)*100*scMult));
+      const col = p>50?'#22c55e':p>30?'var(--org)':'var(--red)';
+      return `<div class="prob-wrap">
+        <div class="prob-lbl"><span>${_esc(c.nm||'—')}</span><span style="color:${col};font-weight:700">${p}%</span></div>
+        <div class="prob-track"><div class="prob-fill" style="width:${p}%;background:${col}"></div></div>
+      </div>`;
+    }).join('') || '<div class="empty">Sem candidatos no modelo</div>';
+  }
+
+  const shap = await api(`/api/model/shap?uf=${_uf}&cargo=${encodeURIComponent(_cargo)}`);
+  const shapItems = shap?.features || shap || [];
+  const shapEl = document.getElementById('shap-list');
+  if (shapEl) {
+    const maxS = Math.max(...shapItems.map(s=>Math.abs(s.shap||0)), 0.001);
+    shapEl.innerHTML = shapItems.slice(0,8).map(s => {
+      const v = s.shap||0;
+      const pct = Math.abs(v/maxS*100).toFixed(0);
+      const col = v>0?'#22c55e':'var(--red)';
+      return `<div class="shap-row">
+        <div class="shap-nm">${_esc(s.feature||'—')}</div>
+        <div class="shap-bar-wrap"><div class="shap-bar-fill" style="width:${pct}%;background:${col}"></div></div>
+        <div class="shap-val" style="color:${col}">${v>0?'+':''}${v.toFixed(3)}</div>
+      </div>`;
+    }).join('') || '<div class="empty">SHAP não disponível</div>';
+  }
+}
+
+// ── CHAT ───────────────────────────────────────────────────────────────────
+function toggleChatPanel() {
+  document.getElementById('chat-panel').classList.toggle('open');
+}
+
+function initChat() {
+  if (_ws && _ws.readyState < 2) return;
+  const proto = location.protocol === 'https:' ? 'wss' : 'ws';
+  _ws = new WebSocket(`${proto}://${location.host}/ws/chat`);
+  _ws.onopen = () => {
+    const dot = document.getElementById('chat-dot');
+    const sdot = document.getElementById('chat-status-dot');
+    const rec = document.getElementById('chat-reconnect');
+    if (dot) dot.style.color = '#22c55e';
+    if (sdot) sdot.style.color = '#22c55e';
+    if (rec) rec.style.display = 'none';
+  };
+  _ws.onclose = () => {
+    _ws = null;
+    const dot = document.getElementById('chat-dot');
+    const sdot = document.getElementById('chat-status-dot');
+    const rec = document.getElementById('chat-reconnect');
+    if (dot) dot.style.color = 'var(--red)';
+    if (sdot) sdot.style.color = 'var(--red)';
+    if (rec) rec.style.display = 'inline';
+  };
+  _ws.onerror = () => {
+    const dot = document.getElementById('chat-dot');
+    if (dot) dot.style.color = 'var(--org)';
+  };
+  _ws.onmessage = _onWsMsg;
+}
+
+function _ensureWs() {
+  if (!_ws || _ws.readyState >= 2) initChat();
+}
+
+function _onWsMsg(e) {
+  let data;
+  try { data = JSON.parse(e.data); } catch { return; }
+  const msgs = document.getElementById('chat-msgs');
+  if (data.type === 'welcome') {
+    const d = document.createElement('div');
+    d.className = 'msg-ai';
+    d.innerHTML = `<div class="mav ai">AI</div><div class="mb">${_esc(data.text||'').replace(/\*\*([^*]+)\*\*/g,'<b>$1</b>')}</div>`;
+    msgs.appendChild(d);
+    msgs.scrollTop = msgs.scrollHeight;
+    document.getElementById('chat-panel').classList.add('open');
+    return;
+  }
+  if (data.type === 'chunk') {
+    _aiBuffer += data.text;
+    if (_aiMsgEl) _aiMsgEl.innerHTML = _aiBuffer.replace(/\n/g,'<br>').replace(/\*\*([^*]+)\*\*/g,'<b>$1</b>');
+    msgs.scrollTop = msgs.scrollHeight;
+  } else if (data.type === 'done') {
+    if (data.dashboard_update && typeof window.applyDashboardUpdate === 'function') {
+      setTimeout(() => window.applyDashboardUpdate(data.dashboard_update), 300);
+    }
+    _aiBuffer = ''; _aiMsgEl = null; _busy = false;
+    const btn = document.getElementById('chat-btn');
+    if (btn) btn.disabled = false;
+  } else if (data.type === 'error') {
+    if (_aiMsgEl) _aiMsgEl.innerHTML = `<span style="color:var(--red)">${_esc(data.message||'Erro')}</span>`;
+    _busy = false;
+    const btn = document.getElementById('chat-btn');
+    if (btn) btn.disabled = false;
+  }
+}
+
+function _appendChatMsg(txt, role) {
+  const msgs = document.getElementById('chat-msgs');
+  const d = document.createElement('div');
+  d.className = role === 'u' ? 'msg-u' : 'msg-ai';
+  if (role === 'u') {
+    d.innerHTML = `<div class="mav u">EU</div><div class="mb">${_esc(txt)}</div>`;
+  } else {
+    const mid = 'ai-live-' + Date.now();
+    d.innerHTML = `<div class="mav ai">AI</div><div class="mb" id="${mid}"></div>`;
+    setTimeout(() => { _aiMsgEl = document.getElementById(mid); }, 0);
+  }
+  msgs.appendChild(d);
+  msgs.scrollTop = msgs.scrollHeight;
+}
+
+function sendChat() {
+  if (_busy) return;
+  const el = document.getElementById('chat-in');
+  const t = el.value.trim();
+  if (!t) return;
+  el.value = '';
+  // Open panel
+  document.getElementById('chat-panel').classList.add('open');
+  _appendChatMsg(t, 'u');
+  _busy = true;
+  const btn = document.getElementById('chat-btn');
+  if (btn) btn.disabled = true;
+  _aiBuffer = ''; _aiMsgEl = null;
+  // Typing indicator
+  const msgs = document.getElementById('chat-msgs');
+  const ti = document.createElement('div');
+  ti.id = 'ti-typing'; ti.className = 'msg-ai';
+  ti.innerHTML = '<div class="mav ai">AI</div><div class="typing-dots"><span></span><span></span><span></span></div>';
+  msgs.appendChild(ti); msgs.scrollTop = msgs.scrollHeight;
+  _ensureWs();
+  const ctx = {cargo:_cargo, uf:_uf, ano:_ano, candidato:_candidato, tab:_activeTab};
+  const doSend = () => {
+    const tiEl = document.getElementById('ti-typing');
+    if (tiEl) tiEl.remove();
+    _appendChatMsg('', 'ai');
+    _ws.send(JSON.stringify({type:'message', text:t, context:ctx}));
+  };
+  if (_ws && _ws.readyState === 1) doSend();
+  else if (_ws && _ws.readyState === 0) {
+    const f = () => { _ws.removeEventListener('open',f); doSend(); };
+    _ws.addEventListener('open', f);
+  } else {
+    const tiEl = document.getElementById('ti-typing');
+    if (tiEl) tiEl.remove();
+    _appendChatMsg('Serviço de chat indisponível no momento.', 'ai');
+    if (_aiMsgEl) _aiMsgEl.textContent = 'Serviço de chat indisponível no momento.';
+    _busy = false;
+    if (btn) btn.disabled = false;
+  }
+}
+
+// ── DASHBOARD UPDATE (called by WS handler) ────────────────────────────────
+window.applyDashboardUpdate = function(update) {
+  if (!update) return;
+  if (update.set_filter) {
+    const f = update.set_filter;
+    if (f.uf)       { _uf = f.uf;       const el=document.getElementById('f-uf');    if(el) el.value=_uf; }
+    if (f.cargo)    { _cargo = f.cargo;  const el=document.getElementById('f-cargo'); if(el) el.value=_cargo; }
+    if (f.ano)      { _ano = f.ano;      const el=document.getElementById('f-ano');   if(el) el.value=_ano; }
+    if (f.candidato){ _candidato=f.candidato; const el=document.getElementById('cand-input'); if(el) el.value=_candidato; }
+    loadTab(_activeTab);
+    if (_activeTab === 'mapa') reloadMap();
+  }
+  if (update.set_layer && _activeTab === 'mapa') swapLayer(update.set_layer);
+  if (update.zoom_to && gMap) gMap.setView([update.zoom_to.lat, update.zoom_to.lng], update.zoom_to.zoom||8);
+  if (update.switch_tab) switchTab(update.switch_tab);
+  if (update.highlight && _activeTab === 'mapa' && window._geoLayer) {
+    // Briefly flash matching layers
+    const targets = Array.isArray(update.highlight) ? update.highlight : [update.highlight];
+    window._geoLayer.eachLayer(lyr => {
+      const props = (lyr.feature && lyr.feature.properties) || {};
+      const nm = (props.nome||props.NM_MUN||props.NM_UF||'').toLowerCase();
+      if (targets.some(t => nm.includes(t.toLowerCase()))) {
+        lyr.setStyle({weight:3, color:'#f59e0b'});
+        setTimeout(() => lyr.setStyle({weight:1, color:'#4b6878'}), 2500);
+      }
+    });
+  }
+};
 </script>
 </body>
 </html>
