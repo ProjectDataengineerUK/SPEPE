@@ -135,13 +135,13 @@ async def emit_structured_intent(user_input: str, agent_text: str) -> dict[str, 
     return await loop.run_in_executor(None, _extract_intent_sync, user_input, agent_text)
 
 
-def _build_anthropic_client() -> anthropic.Anthropic | anthropic.AnthropicVertex:
+def _build_anthropic_client() -> anthropic.AsyncAnthropic | anthropic.AsyncAnthropicVertex:
     if settings.use_vertex_claude:
-        return anthropic.AnthropicVertex(
+        return anthropic.AsyncAnthropicVertex(
             project_id=settings.gcp_project_id or "spepe-prod",
             region=settings.vertex_claude_location,
         )
-    return anthropic.Anthropic(api_key=settings.anthropic_api_key)
+    return anthropic.AsyncAnthropic(api_key=settings.anthropic_api_key)
 
 
 _SYSTEM = """\
@@ -297,7 +297,7 @@ class Supervisor:
                 yield warn + "\n\n"
 
             messages = self._build_messages(state, current_input, hop)
-            response = self._client.messages.create(  # type: ignore[call-overload]
+            response = await self._client.messages.create(  # type: ignore[call-overload]
                 model=_MODEL,
                 max_tokens=512,
                 system=_SYSTEM.format(budget=BUDGET_USD, used=state.total_cost_usd),
