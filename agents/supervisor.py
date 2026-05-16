@@ -32,6 +32,7 @@ logger = logging.getLogger("spepe.agents.supervisor")
 
 # Vertex AI uses different model IDs than the direct Anthropic API.
 # claude-sonnet-4-6 (direct) → claude-sonnet-4-5@20251001 (Vertex)
+# Fallback: claude-3-5-sonnet-v2@20241022 (confirmed available in us-east5)
 _MODEL_DIRECT = "claude-sonnet-4-6"
 _MODEL_VERTEX = "claude-sonnet-4-5@20251001"
 _MODEL = _MODEL_VERTEX if settings.use_vertex_claude else _MODEL_DIRECT

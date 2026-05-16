@@ -264,6 +264,7 @@ table.data tr:hover td{background:var(--bg3)}
     <div class="tab" data-tab="eleitorado" onclick="switchTab('eleitorado')">&#128101; Eleitorado <span class="tab-badge">2026</span></div>
     <div class="tab" data-tab="digital" onclick="switchTab('digital')">&#128241; Digital <span class="tab-badge">2026</span></div>
     <div class="tab" data-tab="ranking" onclick="switchTab('ranking')">&#127942; Ranking</div>
+    <div class="tab" data-tab="comparativo" onclick="switchTab('comparativo');loadComparativo()">&#9878; Comparativo</div>
     <div class="tab" data-tab="previsao" onclick="switchTab('previsao')">&#128302; Previs&#227;o <span class="tab-badge">2026</span></div>
   </div>
 
@@ -434,6 +435,87 @@ table.data tr:hover td{background:var(--bg3)}
               <div class="chart-wrap"><canvas id="chart-rank-regiao"></canvas></div>
             </div>
           </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- TAB: COMPARATIVO 2018 × 2022 -->
+    <div class="tab-panel" id="tab-comparativo">
+      <div class="panel-scroll">
+        <!-- filtros -->
+        <div style="display:flex;align-items:center;gap:10px;margin-bottom:12px;flex-wrap:wrap">
+          <span style="font-size:.7rem;font-weight:700;color:var(--tx2)">Comparativo Hist&#243;rico</span>
+          <span class="tag tag-grn">2018 &#215; 2022</span>
+          <div style="display:flex;align-items:center;gap:6px;margin-left:auto;flex-wrap:wrap">
+            <label style="font-size:.65rem;color:var(--tx2)">UF</label>
+            <select id="cmp2-uf" style="font-size:.67rem;padding:3px 7px;background:var(--bg3);border:1px solid var(--br);border-radius:5px;color:var(--tx)">
+              <option>SP</option><option>MG</option><option>RJ</option><option>BA</option>
+              <option>RS</option><option>PR</option><option>PE</option><option>CE</option>
+              <option>GO</option><option>PA</option><option>SC</option><option>MA</option>
+              <option>PB</option><option>ES</option><option>AM</option><option>MT</option>
+              <option>MS</option><option>RN</option><option>AL</option><option>SE</option>
+              <option>PI</option><option>DF</option><option>TO</option><option>RO</option>
+              <option>AC</option><option>AP</option><option>RR</option>
+            </select>
+            <label style="font-size:.65rem;color:var(--tx2)">Cargo</label>
+            <select id="cmp2-cargo" style="font-size:.67rem;padding:3px 7px;background:var(--bg3);border:1px solid var(--br);border-radius:5px;color:var(--tx)">
+              <option value="Deputado Federal">Deputado Federal</option>
+              <option value="Deputado Estadual">Deputado Estadual</option>
+              <option value="Senador">Senador</option>
+              <option value="Governador">Governador</option>
+            </select>
+            <div style="display:flex;gap:4px">
+              <button class="pill active" id="cmp2v-cands" onclick="cmp2SetView('candidatos',this)" style="font-size:.63rem">Candidatos</button>
+              <button class="pill" id="cmp2v-partidos" onclick="cmp2SetView('partidos',this)" style="font-size:.63rem">Partidos</button>
+            </div>
+            <button onclick="loadComparativo()" style="padding:3px 12px;font-size:.65rem;background:var(--grn2);color:#fff;border:none;border-radius:5px;cursor:pointer">Buscar</button>
+          </div>
+        </div>
+
+        <!-- KPIs resumo -->
+        <div class="kpi-row kpi-row-4" id="cmp2-kpis" style="margin-bottom:10px">
+          <div class="kpi"><div class="kpi-val" id="cmp2-tot18">&mdash;</div><div class="kpi-lbl">Total votos 2018</div></div>
+          <div class="kpi"><div class="kpi-val" id="cmp2-tot22">&mdash;</div><div class="kpi-lbl">Total votos 2022</div></div>
+          <div class="kpi"><div class="kpi-val" id="cmp2-lider22">&mdash;</div><div class="kpi-lbl">Mais votado 2022</div></div>
+          <div class="kpi"><div class="kpi-val" id="cmp2-cnt">&mdash;</div><div class="kpi-lbl">Candidatos</div></div>
+        </div>
+
+        <!-- tabelas -->
+        <div style="height:calc(100vh - var(--topbar) - var(--tabbar) - var(--chatbar) - 170px);overflow-y:auto;border:1px solid var(--br);border-radius:8px;background:var(--bg2)">
+          <div class="empty" id="cmp2-empty" style="padding:40px;text-align:center">Selecione UF e cargo e clique em Buscar</div>
+
+          <!-- candidatos -->
+          <table class="data" id="cmp2-table-cands" style="display:none">
+            <thead><tr>
+              <th>#</th>
+              <th onclick="cmp2Sort('nm')" style="cursor:pointer">Candidato &#8597;</th>
+              <th onclick="cmp2Sort('partido')" style="cursor:pointer">Partido &#8597;</th>
+              <th onclick="cmp2Sort('votos18')" style="cursor:pointer;text-align:right;color:#6b7fc4">Votos 2018 &#8597;</th>
+              <th onclick="cmp2Sort('rank18')" style="cursor:pointer;text-align:right;color:#6b7fc4">Rank 2018 &#8597;</th>
+              <th onclick="cmp2Sort('votos22')" style="cursor:pointer;text-align:right;color:#4ade80">Votos 2022 &#8597;</th>
+              <th onclick="cmp2Sort('rank22')" style="cursor:pointer;text-align:right;color:#4ade80">Rank 2022 &#8597;</th>
+              <th onclick="cmp2Sort('delta')" style="cursor:pointer;text-align:right">&#916; Votos &#8597;</th>
+              <th onclick="cmp2Sort('deltarank')" style="cursor:pointer;text-align:right">&#916; Rank &#8597;</th>
+            </tr></thead>
+            <tbody id="cmp2-tbody-cands"></tbody>
+          </table>
+
+          <!-- partidos -->
+          <table class="data" id="cmp2-table-partidos" style="display:none">
+            <thead><tr>
+              <th>#</th>
+              <th onclick="cmp2Sort('partido')" style="cursor:pointer">Partido &#8597;</th>
+              <th onclick="cmp2Sort('votos18')" style="cursor:pointer;text-align:right;color:#6b7fc4">Votos 2018 &#8597;</th>
+              <th style="text-align:right;color:#6b7fc4">% 2018</th>
+              <th style="text-align:right;color:#6b7fc4">Rank 2018</th>
+              <th onclick="cmp2Sort('votos22')" style="cursor:pointer;text-align:right;color:#4ade80">Votos 2022 &#8597;</th>
+              <th style="text-align:right;color:#4ade80">% 2022</th>
+              <th style="text-align:right;color:#4ade80">Rank 2022</th>
+              <th onclick="cmp2Sort('delta')" style="cursor:pointer;text-align:right">&#916; Votos &#8597;</th>
+              <th style="text-align:right">Cands 2022</th>
+            </tr></thead>
+            <tbody id="cmp2-tbody-partidos"></tbody>
+          </table>
         </div>
       </div>
     </div>
@@ -686,12 +768,13 @@ function switchTab(tab) {
 
 function loadTab(tab) {
   const loaders = {
-    mapa:       ()=>{ if(gMap) reloadMap(); else initMap(); },
-    resultados: loadResultados,
-    eleitorado: loadEleitorado,
-    digital:    loadDigital,
-    ranking:    loadRanking,
-    previsao:   ()=>loadPrevisao(_scenario),
+    mapa:        ()=>{ if(gMap) reloadMap(); else initMap(); },
+    resultados:  loadResultados,
+    eleitorado:  loadEleitorado,
+    digital:     loadDigital,
+    ranking:     loadRanking,
+    comparativo: loadComparativo,
+    previsao:    ()=>loadPrevisao(_scenario),
   };
   if (loaders[tab]) loaders[tab]();
 }
@@ -1318,6 +1401,121 @@ function sendChat() {
     if (_aiMsgEl) _aiMsgEl.textContent = 'Serviço de chat indisponível no momento.';
     _busy = false;
     if (btn) btn.disabled = false;
+  }
+}
+
+// ── COMPARATIVO 2018 × 2022 ────────────────────────────────────────────────
+let _cmp2View = 'candidatos';
+let _cmp2Data = [];
+let _cmp2SortCol = 'votos22', _cmp2SortAsc = false;
+
+function cmp2SetView(v, btn) {
+  _cmp2View = v;
+  document.querySelectorAll('[id^="cmp2v-"]').forEach(b => b.classList.remove('active'));
+  if (btn) btn.classList.add('active');
+  _cmp2Render();
+}
+
+function cmp2Sort(col) {
+  if (_cmp2SortCol === col) _cmp2SortAsc = !_cmp2SortAsc;
+  else { _cmp2SortCol = col; _cmp2SortAsc = false; }
+  _cmp2Render();
+}
+
+async function loadComparativo() {
+  const uf = (document.getElementById('cmp2-uf') || {}).value || 'SP';
+  const cargo = (document.getElementById('cmp2-cargo') || {}).value || 'Deputado Federal';
+  document.getElementById('cmp2-empty').style.display = 'block';
+  document.getElementById('cmp2-empty').textContent = 'Carregando...';
+  document.getElementById('cmp2-table-cands').style.display = 'none';
+  document.getElementById('cmp2-table-partidos').style.display = 'none';
+
+  const endpoint = _cmp2View === 'candidatos' ? 'candidatos' : 'partidos';
+  const d = await api(`/api/comparativo/${endpoint}?uf=${encodeURIComponent(uf)}&cargo=${encodeURIComponent(cargo)}&limit=200`);
+  if (!d || d.status === 'error') {
+    document.getElementById('cmp2-empty').textContent = d?.error || 'Erro ao carregar dados';
+    return;
+  }
+  _cmp2Data = d[endpoint] || [];
+  document.getElementById('cmp2-empty').style.display = 'none';
+
+  if (_cmp2View === 'candidatos') {
+    const tot18 = _cmp2Data.reduce((s,r)=>s+r.votos_2018,0);
+    const tot22 = _cmp2Data.reduce((s,r)=>s+r.votos_2022,0);
+    const lider = _cmp2Data.find(r=>r.votos_2022>0);
+    _set('cmp2-tot18', _fmt(tot18));
+    _set('cmp2-tot22', _fmt(tot22));
+    _set('cmp2-lider22', lider ? lider.nm_candidato.split(' ').slice(0,2).join(' ') : '—');
+    _set('cmp2-cnt', String(_cmp2Data.length));
+  } else {
+    const tot18 = _cmp2Data.reduce((s,r)=>s+r.votos_2018,0);
+    const tot22 = _cmp2Data.reduce((s,r)=>s+r.votos_2022,0);
+    _set('cmp2-tot18', _fmt(tot18));
+    _set('cmp2-tot22', _fmt(tot22));
+    _set('cmp2-lider22', (_cmp2Data[0]||{}).sg_partido || '—');
+    _set('cmp2-cnt', String(_cmp2Data.length) + ' partidos');
+  }
+  _cmp2Render();
+}
+
+function _cmp2Render() {
+  if (!_cmp2Data.length) return;
+  const data = [..._cmp2Data];
+  const colMap = {nm:'nm_candidato',partido:'sg_partido',votos18:'votos_2018',votos22:'votos_2022',
+    rank18:'rank_2018',rank22:'rank_2022',delta:'delta_votos',deltarank:'delta_rank',pct18:'pct_2018',pct22:'pct_2022'};
+  const col = colMap[_cmp2SortCol] || 'votos_2022';
+  data.sort((a,b) => {
+    const av = a[col] ?? (_cmp2SortAsc ? Infinity : -Infinity);
+    const bv = b[col] ?? (_cmp2SortAsc ? Infinity : -Infinity);
+    return _cmp2SortAsc ? (av > bv ? 1 : -1) : (av < bv ? 1 : -1);
+  });
+
+  if (_cmp2View === 'candidatos') {
+    document.getElementById('cmp2-table-cands').style.display = '';
+    document.getElementById('cmp2-table-partidos').style.display = 'none';
+    const tbody = document.getElementById('cmp2-tbody-cands');
+    tbody.innerHTML = data.map((r,i) => {
+      const dv = r.delta_votos;
+      const dr = r.delta_rank;
+      const dvCls = dv > 0 ? 'color:#4ade80' : dv < 0 ? 'color:#f87171' : '';
+      const drCls = dr > 0 ? 'color:#4ade80' : dr < 0 ? 'color:#f87171' : '';
+      const dvStr = dv > 0 ? '+'+_fmt(dv) : dv < 0 ? _fmt(dv) : '—';
+      const drStr = dr != null ? (dr > 0 ? '&#9650;'+Math.abs(dr) : dr < 0 ? '&#9660;'+Math.abs(dr) : '=') : '—';
+      const cor = PARTIDO_COR[r.sg_partido] || '#64748b';
+      return `<tr>
+        <td>${i+1}</td>
+        <td style="max-width:140px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${_esc(r.nm_candidato)}</td>
+        <td><span style="background:${cor}22;color:${cor};border-radius:3px;padding:1px 5px;font-size:.6rem;font-weight:600">${_esc(r.sg_partido)}</span></td>
+        <td style="text-align:right;color:#93c5fd">${r.votos_2018 ? _fmt(r.votos_2018) : '—'}</td>
+        <td style="text-align:right;color:#93c5fd">${r.rank_2018 != null ? '#'+r.rank_2018 : '—'}</td>
+        <td style="text-align:right;color:#4ade80;font-weight:600">${r.votos_2022 ? _fmt(r.votos_2022) : '—'}</td>
+        <td style="text-align:right;color:#4ade80">${r.rank_2022 != null ? '#'+r.rank_2022 : '—'}</td>
+        <td style="text-align:right;${dvCls}">${dvStr}</td>
+        <td style="text-align:right;${drCls}">${drStr}</td>
+      </tr>`;
+    }).join('');
+  } else {
+    document.getElementById('cmp2-table-cands').style.display = 'none';
+    document.getElementById('cmp2-table-partidos').style.display = '';
+    const tbody = document.getElementById('cmp2-tbody-partidos');
+    tbody.innerHTML = data.map((r,i) => {
+      const dv = r.delta_votos;
+      const dvCls = dv > 0 ? 'color:#4ade80' : dv < 0 ? 'color:#f87171' : '';
+      const dvStr = dv > 0 ? '+'+_fmt(dv) : dv < 0 ? _fmt(dv) : '—';
+      const cor = PARTIDO_COR[r.sg_partido] || '#64748b';
+      return `<tr>
+        <td>${i+1}</td>
+        <td><span style="background:${cor}22;color:${cor};border-radius:3px;padding:1px 6px;font-size:.62rem;font-weight:700">${_esc(r.sg_partido)}</span></td>
+        <td style="text-align:right;color:#93c5fd">${r.votos_2018 ? _fmt(r.votos_2018) : '—'}</td>
+        <td style="text-align:right;color:#93c5fd">${r.pct_2018 ? r.pct_2018.toFixed(1)+'%' : '—'}</td>
+        <td style="text-align:right;color:#93c5fd">${r.rank_2018 != null ? '#'+r.rank_2018 : '—'}</td>
+        <td style="text-align:right;color:#4ade80;font-weight:600">${r.votos_2022 ? _fmt(r.votos_2022) : '—'}</td>
+        <td style="text-align:right;color:#4ade80">${r.pct_2022 ? r.pct_2022.toFixed(1)+'%' : '—'}</td>
+        <td style="text-align:right;color:#4ade80">${r.rank_2022 != null ? '#'+r.rank_2022 : '—'}</td>
+        <td style="text-align:right;${dvCls}">${dvStr}</td>
+        <td style="text-align:right">${r.cands_2022 != null ? r.cands_2022 : '—'}</td>
+      </tr>`;
+    }).join('');
   }
 }
 
