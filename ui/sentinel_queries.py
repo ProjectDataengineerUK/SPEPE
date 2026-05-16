@@ -156,7 +156,7 @@ def query_gold_storage() -> list[dict[str, Any]]:
     FROM `{_PROJECT}.{_GOLD}.__TABLES__`
     WHERE type = 1
     """
-    found: dict[str, dict[str, Any]] = {r["table_name"]: dict(r) for r in _bq().query(sql).result()}
+    found: dict[str, dict[str, Any]] = {r["table_name"]: dict(r) for r in _bq().query(sql).result(timeout=30)}
     out: list[dict[str, Any]] = []
     for name in GOLD_TABLES:
         meta = found.get(name)
@@ -201,7 +201,7 @@ def query_silver_storage() -> list[dict[str, Any]]:
     ORDER BY table_name
     """
     out: list[dict[str, Any]] = []
-    for r in _bq().query(sql).result():
+    for r in _bq().query(sql).result(timeout=30):
         rc = int(r["total_rows"] or 0)
         fh = float(r["freshness_hours"]) if r["freshness_hours"] is not None else None
         out.append(
@@ -224,7 +224,7 @@ def query_views_existence() -> list[dict[str, Any]]:
     SELECT table_id AS table_name FROM `{_PROJECT}.{_GOLD}.__TABLES__`
     WHERE type = 2
     """
-    found = {r["table_name"] for r in _bq().query(sql).result()}
+    found = {r["table_name"] for r in _bq().query(sql).result(timeout=30)}
     out: list[dict[str, Any]] = []
     for v in SEMANTIC_VIEWS:
         present = v in found
@@ -568,7 +568,7 @@ def query_costs() -> dict[str, Any]:
           AND job_type = 'QUERY' AND state = 'DONE'
         GROUP BY day ORDER BY day DESC
         """
-        bq_rows = [dict(r) for r in _bq().query(sql).result()]
+        bq_rows = [dict(r) for r in _bq().query(sql).result(timeout=30)]
     except Exception as exc:
         logger.warning("BQ JOBS_BY_PROJECT query failed: %s", exc)
 
