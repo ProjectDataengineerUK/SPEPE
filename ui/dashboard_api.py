@@ -3865,9 +3865,7 @@ async def get_social_sentimento(
             where_clauses = ["data_referencia >= DATE_SUB(CURRENT_DATE(), INTERVAL 12 WEEK)"]
             # sg_uf is often empty in social data — only filter when it has real values
             if uf and uf.upper() != "BR":
-                where_clauses.append(
-                    "(sg_uf = @uf OR sg_uf IS NULL OR sg_uf = '')"
-                )
+                where_clauses.append("(sg_uf = @uf OR sg_uf IS NULL OR sg_uf = '')")
                 params.append(bigquery.ScalarQueryParameter("uf", "STRING", uf.upper()))
             where_sql = " AND ".join(where_clauses)
             query = f"""
