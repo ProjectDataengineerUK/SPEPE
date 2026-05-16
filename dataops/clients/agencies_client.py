@@ -1,25 +1,19 @@
-"""Agencies client — scraping de agências de pesquisa como fontes secundárias.
+"""Poder360 poll aggregator — única fonte secundária de pesquisas eleitorais.
 
-Hierarquia de confiança:
-  TSE PesqEle PDF (Gemini Flash) + match agência → 0.95
-  TSE PesqEle PDF (Gemini Flash) sozinho         → 0.85
-  Agência direta (Datafolha, Quaest)              → 0.90
-  Agência direta (Ipespe, Paraná, CNT)            → 0.85–0.88
-  Atlas Político scraping                         → 0.75
-  Poder360 scraping                               → 0.70
-  TSE PDF pdfplumber                              → 0.70
-  TSE PDF falhou / estimativa                     → 0.30
+Substitui scraping individual por agência (Datafolha/Quaest/Ipespe/Paraná/CNT).
+O Poder360 já valida e consolida dados de todos os institutos em uma fonte única.
 
-Uso:
-  df_tse = fetch_pesqele_csv(year) → enrich_with_pdfs(df_tse)
-  df_validated = cross_validate_with_agencies(df_tse, year, cargo)
+record_confidence_score = 0.82  (curado + validado pelo Poder360)
 
-URLs atualizadas (2026-05):
-  Quaest     → /relatorios-dc5902a407f4f271a324451899baf0f0/ (slug oculto)
-  Ipespe     → ipespe.org.br (domínio novo; SSL bypass)
-  Paraná     → paranapesquisas.com.br (ASCII, sem ã)
-  CNT/MDA    → static.poder360.com.br (PDFs hospedados pelo Poder360)
-  Atlas      → atlasintel.org/polls/general-release-polls (domínio novo)
+Estratégias em ordem:
+  1. WordPress REST API     /wp-json/wp/v2/posts?categories=<slug>&year=Y
+  2. Categoria HTML         /pesquisas-eleitorais/ ou /poder-pesquisas/
+  3. Agregador HTML         /agregador-de-pesquisas/ (__NEXT_DATA__ + tabelas)
+  4. Artigos individuais    parse de cada artigo encontrado
+
+Thresholds de cross-validation (TSE vs. Poder360):
+  ≤ 2 pp → confidence boost para 0.95
+  > 5 pp → confidence rebaixado para 0.70
 """
 
 from __future__ import annotations
@@ -27,16 +21,11 @@ from __future__ import annotations
 import json
 import logging
 import re
-import tempfile
 import time
-import warnings
-from concurrent.futures import ThreadPoolExecutor
-from pathlib import Path
 from typing import Any
 
 import pandas as pd
 import requests
-import urllib3
 from tenacity import (
     retry,
     retry_if_exception_type,
@@ -46,10 +35,6 @@ from tenacity import (
 
 logger = logging.getLogger("spepe.clients.agencies")
 
-# Suppress only the InsecureRequestWarning that comes from verify=False calls (Ipespe)
-urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
-warnings.filterwarnings("ignore", message="Unverified HTTPS request")
-
 _SESSION = requests.Session()
 _SESSION.headers.update(
     {
@@ -58,44 +43,14 @@ _SESSION.headers.update(
     }
 )
 
-_DATAFOLHA_BASE = "https://datafolha.folha.uol.com.br/eleicoes/"
-
-# Quaest: /pesquisas-eleitorais/ retorna 404; usar a listagem de relatórios (slug fixo)
-# e também tentar a tag /categoria/pesquisas-eleitorais/
-_QUAEST_URLS = [
-    "https://quaest.com.br/relatorios-dc5902a407f4f271a324451899baf0f0/",
-    "https://quaest.com.br/categoria/pesquisas-eleitorais/",
-    "https://quaest.com.br/tag/pesquisa-eleitoral/",
-    "https://quaest.com.br/",
-]
-
-# Ipespe: domínio migrou de ipespe.com.br para ipespe.org.br
-# SSL certificado inválido no domínio antigo → verify=False + domínio novo
-_IPESPE_URLS = [
-    "https://ipespe.org.br/pesquisas/",
-    "https://ipespe.org.br/tags/eleicoes-2026/",
-    "https://ipespe.org.br/",
-    "https://www.ipespe.com.br/pesquisas/",  # fallback legado (verify=False)
-]
-
-# Paraná Pesquisas: domínio é ASCII puro (sem ã) — paranapesquisas.com.br
-_PARANA_URLS = [
-    "https://paranapesquisas.com.br/pesquisas/",
-    "https://www.paranapesquisas.com.br/pesquisas/",
-    "https://paranapesquisas.com.br/",
-    "https://www.paranapesquisas.com.br/",
-]
-
-# CNT/MDA: os PDFs são hospedados em static.poder360.com.br
-# O cnt.org.br não publica PDFs eleitorais diretamente
-_CNT_URLS = [
-    "https://www.poder360.com.br/poder-pesquisas/leia-as-ultimas-pesquisas-eleitorais-para-presidente/",
-    "https://cnt.org.br/pesquisas",
-    "https://cnt.org.br/pesquisas-transporte",
-]
-_CNT_PDF_STATIC_BASE = "https://static.poder360.com.br"
-
+_PODER360_BASE = "https://www.poder360.com.br"
 _SCRAPE_SLEEP = 0.5
+_CONFIDENCE = 0.82
+
+_MATCH_THRESHOLD_PP = 2.0
+_DIVERGENCE_THRESHOLD_PP = 5.0
+_CONFIDENCE_MATCH = 0.95
+_CONFIDENCE_DIVERGE = 0.70
 
 _CANONICAL_COLUMNS: list[str] = [
     "poll_id",
@@ -116,29 +71,91 @@ _CANONICAL_COLUMNS: list[str] = [
     "ano",
 ]
 
-# Cross-validation thresholds (percentage points)
-_MATCH_THRESHOLD_PP = 2.0
-_DIVERGENCE_THRESHOLD_PP = 5.0
+# Palavras que indicam fragmento de frase (não nome de candidato)
+_SENTENCE_WORDS = frozenset(
+    {
+        "que",
+        "com",
+        "por",
+        "para",
+        "são",
+        "tem",
+        "foi",
+        "uma",
+        "ante",
+        "entre",
+        "contra",
+        "sobre",
+        "como",
+        "mais",
+        "quando",
+        "ainda",
+        "apenas",
+        "tendo",
+        "ficou",
+        "marca",
+        "lidera",
+        "segundo",
+    }
+)
 
-_CONFIDENCE_MATCH = 0.95
-_CONFIDENCE_DIVERGE = 0.70
-_CONFIDENCE_DATAFOLHA = 0.90
-_CONFIDENCE_QUAEST = 0.90
-_CONFIDENCE_IPESPE = 0.88
-_CONFIDENCE_IPESPE_FAIL = 0.30
-_CONFIDENCE_PARANA = 0.85
-_CONFIDENCE_CNT = 0.85
+# Listagem de páginas candidatas a conter pesquisas no Poder360
+_LISTING_URLS = [
+    f"{_PODER360_BASE}/pesquisas-eleitorais/",
+    f"{_PODER360_BASE}/poder-pesquisas/leia-as-ultimas-pesquisas-eleitorais-para-presidente/",
+    f"{_PODER360_BASE}/agregador-de-pesquisas/",
+    f"{_PODER360_BASE}/pesquisas/",
+]
+
+# WP REST API endpoints para custom post types / categorias
+_WP_API_PATTERNS = [
+    "/wp-json/wp/v2/pesquisas?per_page=50&orderby=date&order=desc&year={year}",
+    "/wp-json/wp/v2/posts?per_page=50&orderby=date&order=desc&year={year}&categories_slug=pesquisas-eleitorais",
+    "/wp-json/wp/v2/posts?per_page=50&orderby=date&order=desc&year={year}&tags_slug=pesquisa-eleitoral",
+    "/wp-json/poder360/v1/pesquisas?ano={year}&cargo={cargo}",
+    "/wp-json/poder360/v1/agregador?ano={year}&cargo={cargo}",
+]
 
 
-# ── Utilities ──────────────────────────────────────────────────────────────────
-
-
-def _normalize_col(col: str) -> str:
-    return re.sub(r"[^a-z0-9_]", "_", col.strip().lower())
+# ── Utilities ─────────────────────────────────────────────────────────────────
 
 
 def _empty_canonical() -> pd.DataFrame:
     return pd.DataFrame(columns=_CANONICAL_COLUMNS)
+
+
+def _is_valid_candidate(name: str) -> bool:
+    """Rejeita fragmentos de frase; aceita nomes de candidatos reais."""
+    if not name or len(name) < 2 or len(name) > 40:
+        return False
+    if name.count(" ") > 4:
+        return False
+    # "Ã" nunca aparece em texto UTF-8 correto — é artefato de mojibake
+    if "Ã" in name:
+        return False
+    words = set(name.lower().split())
+    if words & _SENTENCE_WORDS:
+        return False
+    return True
+
+
+def _normalize_name(name: str | None) -> str:
+    if not name:
+        return ""
+    return re.sub(r"\s+", " ", name.strip().lower())
+
+
+@retry(
+    retry=retry_if_exception_type((requests.Timeout, requests.ConnectionError)),
+    stop=stop_after_attempt(3),
+    wait=wait_exponential(min=2, max=30),
+)
+def _fetch(url: str, accept_json: bool = False) -> requests.Response:
+    headers = {"Accept": "application/json"} if accept_json else {}
+    resp = _SESSION.get(url, timeout=30, allow_redirects=True, headers=headers)
+    resp.raise_for_status()
+    resp.encoding = "utf-8"
+    return resp
 
 
 def _coerce_numeric(df: pd.DataFrame, cols: list[str]) -> pd.DataFrame:
@@ -151,511 +168,351 @@ def _coerce_numeric(df: pd.DataFrame, cols: list[str]) -> pd.DataFrame:
     return df
 
 
-def _normalize_instituto(name: str | None) -> str:
-    if not name:
-        return ""
-    return re.sub(r"\s+", " ", name.strip().lower())
+# ── HTML table parser ─────────────────────────────────────────────────────────
 
 
-# ── Datafolha ─────────────────────────────────────────────────────────────────
-
-
-@retry(
-    retry=retry_if_exception_type((requests.Timeout, requests.ConnectionError)),
-    stop=stop_after_attempt(3),
-    wait=wait_exponential(min=2, max=30),
-)
-def _fetch_datafolha_page(url: str) -> requests.Response:
-    resp = _SESSION.get(url, timeout=30)
-    resp.raise_for_status()
-    return resp
-
-
-def _datafolha_parse_poll_page(soup: Any, poll_url: str, year: int, cargo: str) -> list[dict]:
-    """Extract voting intention rows from a single Datafolha poll page."""
+def _parse_tables_from_soup(
+    soup: Any,
+    year: int,
+    cargo: str,
+    instituto: str | None = None,
+    data_fim: str | None = None,
+) -> list[dict]:
+    """Extract poll rows from HTML tables in a BeautifulSoup object."""
     rows: list[dict] = []
-
-    base: dict = {
-        "poll_id": None,
-        "instituto": "datafolha",
-        "uf": "BR",
-        "cd_cargo": cargo,
-        "metodologia": None,
-        "tipo_pesquisa": "estimulada",
-        "fonte": "datafolha",
-        "record_confidence_score": _CONFIDENCE_DATAFOLHA,
-        "ano": year,
-        "data_pesquisa_inicio": None,
-        "data_pesquisa_fim": None,
-        "n_entrevistados": None,
-        "margem_erro": None,
-        "rejeicao_pct": None,
-    }
-
-    # Extract poll date from meta or title
-    date_tag = soup.find("time") or soup.find(class_=re.compile(r"date|data"))
-    if date_tag:
-        base["data_pesquisa_fim"] = date_tag.get("datetime") or date_tag.get_text(strip=True)
-
-    # Extract methodology / sample size from body text
-    body_text = soup.get_text(" ", strip=True)
-    n_match = re.search(r"(\d[\d.]+)\s*entrevistados?", body_text, re.IGNORECASE)
-    if n_match:
-        base["n_entrevistados"] = float(n_match.group(1).replace(".", ""))
-
-    margem_match = re.search(r"margem.*?(\d[\d,]+)\s*pontos?", body_text, re.IGNORECASE)
-    if margem_match:
-        base["margem_erro"] = float(margem_match.group(1).replace(",", "."))
-
-    # Strategy 1: look for structured HTML tables with candidato + % columns
     for table in soup.find_all("table"):
         headers = [th.get_text(strip=True).lower() for th in table.find_all("th")]
         if not headers:
-            # Some Datafolha tables use <td> in first row as headers
             first_row = table.find("tr")
             if first_row:
                 headers = [td.get_text(strip=True).lower() for td in first_row.find_all("td")]
 
-        candidato_idx = next(
-            (i for i, h in enumerate(headers) if "candidato" in h or "nome" in h), None
-        )
+        cand_idx = next((i for i, h in enumerate(headers) if "candidato" in h or "nome" in h), None)
         pct_idx = next(
             (i for i, h in enumerate(headers) if "%" in h or "inten" in h or "estimul" in h),
             None,
         )
-        rejeicao_idx = next((i for i, h in enumerate(headers) if "rejei" in h), None)
+        rej_idx = next((i for i, h in enumerate(headers) if "rejei" in h), None)
+        inst_idx = next(
+            (i for i, h in enumerate(headers) if "institu" in h or "empresa" in h), None
+        )
 
-        if candidato_idx is None or pct_idx is None:
+        if cand_idx is None or pct_idx is None:
             continue
 
         for tr in table.find_all("tr")[1:]:
             cells = [td.get_text(strip=True) for td in tr.find_all("td")]
-            if len(cells) <= max(candidato_idx, pct_idx):
+            if len(cells) <= max(cand_idx, pct_idx):
                 continue
-            candidato = cells[candidato_idx].strip()
-            if not candidato:
+
+            candidato = cells[cand_idx].strip()
+            if not _is_valid_candidate(candidato):
                 continue
+
             pct_raw = cells[pct_idx].replace(",", ".").replace("%", "").strip()
             try:
                 intencao = float(pct_raw)
             except ValueError:
                 continue
+            if not 0 < intencao <= 100:
+                continue
+
             rejeicao = None
-            if rejeicao_idx is not None and len(cells) > rejeicao_idx:
+            if rej_idx is not None and len(cells) > rej_idx:
                 try:
-                    rejeicao = float(cells[rejeicao_idx].replace(",", ".").replace("%", "").strip())
+                    rejeicao = float(cells[rej_idx].replace(",", ".").replace("%", "").strip())
                 except ValueError:
                     pass
-            rows.append(
-                {
-                    **base,
-                    "candidato": candidato,
-                    "intencao_pct": intencao,
-                    "rejeicao_pct": rejeicao,
-                }
-            )
 
-    # Strategy 2: look for inline data patterns like "Candidato X: 35%"
-    if not rows:
-        for match in re.finditer(
-            r"([A-ZÁÉÍÓÚÃÕÂÊÔÀÜ][^\n:]{2,40})[\s:]+(\d{1,3}(?:[.,]\d)?)\s*%",
-            body_text,
-        ):
-            candidato = match.group(1).strip()
-            if len(candidato) < 3 or any(
-                skip in candidato.lower()
-                for skip in ("brancos", "nulos", "ns", "nr", "total", "outros")
-            ):
-                continue
-            try:
-                intencao = float(match.group(2).replace(",", "."))
-            except ValueError:
-                continue
-            rows.append(
-                {
-                    **base,
-                    "candidato": candidato,
-                    "intencao_pct": intencao,
-                }
-            )
+            inst = instituto
+            if inst_idx is not None and len(cells) > inst_idx:
+                inst = cells[inst_idx].strip() or instituto
 
-    return rows
-
-
-def _datafolha_find_poll_links(soup: Any, year: int, cargo: str) -> list[str]:
-    """Return URLs of individual poll pages from the Datafolha listing page."""
-    links: list[str] = []
-    cargo_keywords = {
-        "presidente": ["presidente", "presidencial"],
-        "governador": ["governador", "governatorial"],
-        "senador": ["senador"],
-    }
-    keywords = cargo_keywords.get(cargo.lower(), ["presidente"])
-
-    for a in soup.find_all("a", href=True):
-        href = a["href"]
-        text = (a.get_text(strip=True) + " " + href).lower()
-        if str(year) not in text and str(year) not in href:
-            continue
-        if not any(kw in text for kw in keywords):
-            continue
-        if not href.startswith("http"):
-            href = "https://datafolha.folha.uol.com.br" + href
-        if href not in links:
-            links.append(href)
-
-    return links[:20]  # cap at 20 poll pages per run
-
-
-def scrape_datafolha(year: int, cargo: str = "presidente") -> pd.DataFrame:
-    """Scrape voting intention data from Datafolha public website.
-
-    Fetches the elections index page, discovers poll links for the given
-    year/cargo, then visits each to extract voting intention tables.
-    record_confidence_score = 0.90.
-
-    Returns an empty DataFrame on any scraping failure.
-    """
-    try:
-        from bs4 import BeautifulSoup
-    except ImportError:
-        logger.error("beautifulsoup4 não instalado — scrape_datafolha desabilitado")
-        return _empty_canonical()
-
-    try:
-        resp = _fetch_datafolha_page(_DATAFOLHA_BASE)
-    except Exception as exc:
-        logger.warning("Datafolha: falha ao buscar índice: %s", exc)
-        return _empty_canonical()
-
-    soup = BeautifulSoup(resp.text, "html.parser")
-    poll_urls = _datafolha_find_poll_links(soup, year, cargo)
-
-    if not poll_urls:
-        logger.warning(
-            "Datafolha: nenhum link de pesquisa encontrado para ano=%d cargo=%s", year, cargo
-        )
-        return _empty_canonical()
-
-    all_rows: list[dict] = []
-    for url in poll_urls:
-        try:
-            resp_poll = _fetch_datafolha_page(url)
-            poll_soup = BeautifulSoup(resp_poll.text, "html.parser")
-            poll_rows = _datafolha_parse_poll_page(poll_soup, url, year, cargo)
-            all_rows.extend(poll_rows)
-        except Exception as exc:
-            logger.warning("Datafolha: falha ao parsear %s: %s", url, exc)
-
-    if not all_rows:
-        logger.warning(
-            "Datafolha: scraping retornou DataFrame vazio para ano=%d cargo=%s", year, cargo
-        )
-        return _empty_canonical()
-
-    df = pd.DataFrame(all_rows)
-    df["data_pesquisa_inicio"] = pd.to_datetime(df["data_pesquisa_inicio"], errors="coerce")
-    df["data_pesquisa_fim"] = pd.to_datetime(df["data_pesquisa_fim"], errors="coerce")
-    df = _coerce_numeric(df, ["intencao_pct", "rejeicao_pct", "n_entrevistados", "margem_erro"])
-
-    # Deduplicate by (candidato, data_pesquisa_fim)
-    if "candidato" in df.columns and "data_pesquisa_fim" in df.columns:
-        df = df.drop_duplicates(subset=["candidato", "data_pesquisa_fim"])
-
-    logger.info("Datafolha: %d linhas scrapeadas para ano=%d cargo=%s", len(df), year, cargo)
-    return df[_CANONICAL_COLUMNS].copy() if set(_CANONICAL_COLUMNS).issubset(df.columns) else df
-
-
-# ── Quaest ────────────────────────────────────────────────────────────────────
-
-
-@retry(
-    retry=retry_if_exception_type((requests.Timeout, requests.ConnectionError)),
-    stop=stop_after_attempt(3),
-    wait=wait_exponential(min=2, max=30),
-)
-def _fetch_quaest_page(url: str) -> requests.Response:
-    resp = _SESSION.get(url, timeout=30, allow_redirects=True)
-    resp.raise_for_status()
-    return resp
-
-
-def _quaest_parse_next_data(soup: Any, year: int, cargo: str) -> list[dict]:
-    """Strategy 1: parse __NEXT_DATA__ JSON (Quaest is Next.js)."""
-    tag = soup.find("script", {"id": "__NEXT_DATA__"})
-    if not tag:
-        return []
-    try:
-        next_data = json.loads(tag.string or "")
-    except (json.JSONDecodeError, AttributeError):
-        return []
-
-    page_props = next_data.get("props", {}).get("pageProps", {})
-    pesquisas_raw = (
-        page_props.get("pesquisas")
-        or page_props.get("polls")
-        or page_props.get("data", {}).get("pesquisas", [])
-        or page_props.get("results", [])
-        or []
-    )
-
-    if not pesquisas_raw or not isinstance(pesquisas_raw, list):
-        # Try deeper nesting
-        for key, val in page_props.items():
-            if isinstance(val, dict):
-                nested = val.get("pesquisas") or val.get("polls") or []
-                if nested and isinstance(nested, list):
-                    pesquisas_raw = nested
-                    break
-
-    rows: list[dict] = []
-    for p in pesquisas_raw:
-        if not isinstance(p, dict):
-            continue
-        data_fim = p.get("data_fim") or p.get("dataFim") or p.get("end_date") or p.get("date")
-        data_ini = p.get("data_inicio") or p.get("dataInicio") or p.get("start_date")
-
-        # Filter by year
-        if data_fim and str(year) not in str(data_fim) and str(year) not in str(data_ini or ""):
-            continue
-
-        base: dict = {
-            "poll_id": p.get("id") or p.get("registro") or p.get("slug"),
-            "instituto": "quaest",
-            "data_pesquisa_inicio": data_ini,
-            "data_pesquisa_fim": data_fim,
-            "uf": p.get("uf") or p.get("estado", "BR"),
-            "cd_cargo": cargo,
-            "n_entrevistados": p.get("n_entrevistados") or p.get("amostra") or p.get("sample"),
-            "margem_erro": p.get("margem_erro") or p.get("margin"),
-            "metodologia": p.get("metodologia") or p.get("method"),
-            "tipo_pesquisa": "estimulada",
-            "fonte": "quaest",
-            "record_confidence_score": _CONFIDENCE_QUAEST,
-            "ano": year,
-            "rejeicao_pct": None,
-        }
-
-        candidatos = (
-            p.get("candidatos")
-            or p.get("resultados")
-            or p.get("candidates")
-            or p.get("results")
-            or []
-        )
-        if candidatos:
-            for c in candidatos:
-                rows.append(
-                    {
-                        **base,
-                        "candidato": c.get("nome") or c.get("candidato") or c.get("name"),
-                        "intencao_pct": c.get("intencao_pct")
-                        or c.get("intencao")
-                        or c.get("percentual")
-                        or c.get("value"),
-                        "rejeicao_pct": c.get("rejeicao") or c.get("rejection"),
-                    }
-                )
-        else:
-            rows.append({**base, "candidato": None, "intencao_pct": None})
-
-    return rows
-
-
-def _quaest_parse_inline_json(soup: Any, year: int, cargo: str) -> list[dict]:
-    """Strategy 2: look for inline window.__STATE__ or similar JSON blobs."""
-    _PATTERNS = [
-        re.compile(
-            r"window\.__(?:INITIAL_STATE|DATA|APP_STATE|REDUX_STATE)__\s*=\s*(\{.*?\});", re.DOTALL
-        ),
-        re.compile(r"var\s+(?:initialData|pesquisasData|pollsData)\s*=\s*(\[.*?\]);", re.DOTALL),
-    ]
-    for script in soup.find_all("script"):
-        text = script.string or ""
-        for pattern in _PATTERNS:
-            m = pattern.search(text)
-            if not m:
-                continue
-            try:
-                blob = json.loads(m.group(1))
-            except json.JSONDecodeError:
-                continue
-            pesquisas_raw = (
-                blob.get("pesquisas")
-                or blob.get("polls")
-                or (blob if isinstance(blob, list) else None)
-                or []
-            )
-            if not pesquisas_raw:
-                continue
-            rows: list[dict] = []
-            for p in pesquisas_raw:
-                if not isinstance(p, dict):
-                    continue
-                data_fim = p.get("data_fim") or p.get("dataFim") or p.get("date")
-                if data_fim and str(year) not in str(data_fim):
-                    continue
-                base: dict = {
-                    "poll_id": p.get("id") or p.get("registro"),
-                    "instituto": "quaest",
-                    "data_pesquisa_inicio": p.get("data_inicio") or p.get("dataInicio"),
-                    "data_pesquisa_fim": data_fim,
-                    "uf": p.get("uf", "BR"),
-                    "cd_cargo": cargo,
-                    "n_entrevistados": p.get("n_entrevistados") or p.get("amostra"),
-                    "margem_erro": p.get("margem_erro"),
-                    "metodologia": p.get("metodologia"),
-                    "tipo_pesquisa": "estimulada",
-                    "fonte": "quaest",
-                    "record_confidence_score": _CONFIDENCE_QUAEST,
-                    "ano": year,
-                    "rejeicao_pct": None,
-                }
-                for c in p.get("candidatos") or p.get("resultados") or []:
-                    rows.append(
-                        {
-                            **base,
-                            "candidato": c.get("nome") or c.get("candidato"),
-                            "intencao_pct": c.get("intencao_pct")
-                            or c.get("intencao")
-                            or c.get("percentual"),
-                            "rejeicao_pct": c.get("rejeicao"),
-                        }
-                    )
-            if rows:
-                return rows
-    return []
-
-
-def _quaest_parse_html_tables(soup: Any, year: int, cargo: str) -> list[dict]:
-    """Strategy 3: raw HTML table fallback."""
-    rows: list[dict] = []
-    for table in soup.find_all("table"):
-        headers = [th.get_text(strip=True).lower() for th in table.find_all("th")]
-        if not headers:
-            first_row = table.find("tr")
-            if first_row:
-                headers = [td.get_text(strip=True).lower() for td in first_row.find_all("td")]
-
-        candidato_idx = next(
-            (i for i, h in enumerate(headers) if "candidato" in h or "nome" in h), None
-        )
-        pct_idx = next(
-            (i for i, h in enumerate(headers) if "%" in h or "inten" in h or "estimul" in h),
-            None,
-        )
-        if candidato_idx is None or pct_idx is None:
-            continue
-
-        for tr in table.find_all("tr")[1:]:
-            cells = [td.get_text(strip=True) for td in tr.find_all("td")]
-            if len(cells) <= max(candidato_idx, pct_idx):
-                continue
-            candidato = cells[candidato_idx].strip()
-            if not candidato:
-                continue
-            pct_raw = cells[pct_idx].replace(",", ".").replace("%", "").strip()
-            try:
-                intencao = float(pct_raw)
-            except ValueError:
-                continue
             rows.append(
                 {
                     "poll_id": None,
-                    "instituto": "quaest",
+                    "instituto": inst,
                     "candidato": candidato,
                     "intencao_pct": intencao,
-                    "rejeicao_pct": None,
+                    "rejeicao_pct": rejeicao,
                     "data_pesquisa_inicio": None,
-                    "data_pesquisa_fim": None,
+                    "data_pesquisa_fim": data_fim,
                     "uf": "BR",
                     "cd_cargo": cargo,
                     "n_entrevistados": None,
                     "margem_erro": None,
                     "metodologia": None,
                     "tipo_pesquisa": "estimulada",
-                    "fonte": "quaest",
-                    "record_confidence_score": _CONFIDENCE_QUAEST,
+                    "fonte": "poder360",
+                    "record_confidence_score": _CONFIDENCE,
                     "ano": year,
                 }
             )
+
     return rows
 
 
-def scrape_quaest(year: int, cargo: str = "presidente") -> pd.DataFrame:
-    """Scrape voting intention data from Quaest public website.
+# ── WP REST API ───────────────────────────────────────────────────────────────
 
-    Tenta múltiplas URLs de listagem pois /pesquisas-eleitorais/ retornou 404 em 2026.
-    Para cada URL encontrada, tenta três estratégias em ordem:
-      1. Parse __NEXT_DATA__ JSON (site é Next.js)
-      2. Look for inline JS data blobs
-      3. Parse HTML tables + links de artigos individuais
 
-    record_confidence_score = 0.90.
-    Returns an empty DataFrame on any scraping failure.
+def _fetch_wp_api(year: int, cargo: str) -> list[dict]:
+    """Try Poder360 WordPress REST API endpoints — return raw JSON posts list."""
+    for pattern in _WP_API_PATTERNS:
+        url = _PODER360_BASE + pattern.format(year=year, cargo=cargo)
+        try:
+            resp = _fetch(url, accept_json=True)
+            data = resp.json()
+            if isinstance(data, list) and data:
+                logger.debug("Poder360 WP API funcionou: %s (%d posts)", url, len(data))
+                return data
+            if isinstance(data, dict) and (data.get("posts") or data.get("pesquisas")):
+                posts = data.get("posts") or data.get("pesquisas") or []
+                if posts:
+                    return posts
+        except requests.HTTPError as exc:
+            if exc.response is not None and exc.response.status_code in (404, 403):
+                logger.debug("Poder360 WP API: %s → %d", url, exc.response.status_code)
+            else:
+                logger.debug("Poder360 WP API erro em %s: %s", url, exc)
+        except Exception as exc:
+            logger.debug("Poder360 WP API: %s → %s", url, exc)
+
+    return []
+
+
+def _parse_wp_posts(posts: list[dict], year: int, cargo: str) -> list[dict]:
+    """Extract poll rows from WordPress REST API post objects."""
+    try:
+        from bs4 import BeautifulSoup
+    except ImportError:
+        return []
+
+    rows: list[dict] = []
+    year_str = str(year)
+    cargo_keywords = {
+        "presidente": ["president", "presiden"],
+        "governador": ["governad"],
+        "senador": ["senador"],
+    }
+    kws = cargo_keywords.get(cargo.lower(), ["president"])
+
+    for post in posts:
+        if not isinstance(post, dict):
+            continue
+
+        title = (post.get("title", {}).get("rendered") or "").lower()
+        if year_str not in title and year_str not in str(post.get("date", "")):
+            continue
+        if not any(kw in title for kw in kws):
+            continue
+
+        content_html = post.get("content", {}).get("rendered") or ""
+        data_fim = post.get("date") or post.get("modified")
+        instituto = None
+
+        # Try to extract instituto from title
+        for inst in ("datafolha", "quaest", "ipespe", "paraná", "parana", "cnt", "mda", "atlas"):
+            if inst in title:
+                instituto = inst
+                break
+
+        soup = BeautifulSoup(content_html, "html.parser")
+        post_rows = _parse_tables_from_soup(soup, year, cargo, instituto, data_fim)
+        rows.extend(post_rows)
+
+    return rows
+
+
+# ── HTML listing + article scraping ───────────────────────────────────────────
+
+
+def _find_article_links(soup: Any, year: int, cargo: str) -> list[str]:
+    """Find individual poll article links from a listing page."""
+    cargo_keywords = {
+        "presidente": ["presidente", "presidenci", "eleicao", "eleição"],
+        "governador": ["governador", "governo"],
+        "senador": ["senador"],
+    }
+    kws = cargo_keywords.get(cargo.lower(), ["presidente"])
+    year_str = str(year)
+    links: list[str] = []
+
+    for a in soup.find_all("a", href=True):
+        href: str = a["href"]
+        text = (a.get_text(strip=True) + " " + href).lower()
+        if year_str not in text and year_str not in href:
+            continue
+        if not any(kw in text for kw in kws):
+            continue
+        if not href.startswith("http"):
+            href = _PODER360_BASE + href
+        if href not in links and "poder360.com.br" in href:
+            links.append(href)
+
+    return links[:20]
+
+
+def _scrape_article(url: str, year: int, cargo: str) -> list[dict]:
+    """Fetch a single Poder360 article and extract poll table rows."""
+    try:
+        from bs4 import BeautifulSoup
+    except ImportError:
+        return []
+
+    try:
+        resp = _fetch(url)
+        soup = BeautifulSoup(resp.text, "html.parser")
+
+        # Extract institute from <title> or <h1>
+        titulo = soup.find("title")
+        title_text = titulo.get_text(strip=True).lower() if titulo else ""
+        instituto = None
+        for inst in ("datafolha", "quaest", "ipespe", "paraná", "parana", "cnt", "mda", "atlas"):
+            if inst in title_text:
+                instituto = inst
+                break
+
+        # Extract date from <time> or meta
+        data_fim = None
+        time_tag = soup.find("time")
+        if time_tag:
+            data_fim = time_tag.get("datetime") or time_tag.get_text(strip=True)
+
+        return _parse_tables_from_soup(soup, year, cargo, instituto, data_fim)
+    except Exception as exc:
+        logger.debug("Poder360 artigo %s: %s", url, exc)
+        return []
+
+
+def _parse_next_data(soup: Any, year: int, cargo: str) -> list[dict]:
+    """Try __NEXT_DATA__ JSON embedded in page (Next.js)."""
+    tag = soup.find("script", {"id": "__NEXT_DATA__"})
+    if not tag:
+        return []
+    try:
+        data = json.loads(tag.string or "")
+    except (json.JSONDecodeError, AttributeError):
+        return []
+
+    page_props = data.get("props", {}).get("pageProps", {})
+    polls_raw = (
+        page_props.get("polls")
+        or page_props.get("pesquisas")
+        or page_props.get("data", {}).get("pesquisas", [])
+        or []
+    )
+    if not polls_raw or not isinstance(polls_raw, list):
+        return []
+
+    rows: list[dict] = []
+    for p in polls_raw:
+        if not isinstance(p, dict):
+            continue
+        data_fim = p.get("data_fim") or p.get("dataFim") or p.get("date")
+        if data_fim and str(year) not in str(data_fim):
+            continue
+        base = {
+            "poll_id": p.get("id") or p.get("registro"),
+            "instituto": p.get("instituto") or p.get("institute"),
+            "data_pesquisa_inicio": p.get("data_inicio") or p.get("dataInicio"),
+            "data_pesquisa_fim": data_fim,
+            "n_entrevistados": p.get("n_entrevistados") or p.get("amostra"),
+            "margem_erro": p.get("margem_erro"),
+            "uf": p.get("uf", "BR"),
+            "cd_cargo": cargo,
+            "metodologia": None,
+            "tipo_pesquisa": "estimulada",
+            "fonte": "poder360",
+            "record_confidence_score": _CONFIDENCE,
+            "ano": year,
+        }
+        for c in p.get("candidatos") or p.get("resultados") or []:
+            candidato = c.get("nome") or c.get("candidato") or c.get("name") or ""
+            if not _is_valid_candidate(candidato):
+                continue
+            try:
+                intencao = float(
+                    str(c.get("intencao_pct") or c.get("intencao") or 0).replace(",", ".")
+                )
+            except (ValueError, TypeError):
+                continue
+            rows.append(
+                {
+                    **base,
+                    "candidato": candidato,
+                    "intencao_pct": intencao,
+                    "rejeicao_pct": c.get("rejeicao"),
+                }
+            )
+
+    return rows
+
+
+# ── Main aggregator function ──────────────────────────────────────────────────
+
+
+def fetch_poder360_aggregator(year: int, cargo: str = "presidente") -> pd.DataFrame:
+    """Fetch poll data from Poder360 aggregator.
+
+    Tries in order:
+      1. WordPress REST API (structured JSON)
+      2. Listing page HTML → article links → parse each article
+      3. Aggregator page HTML (__NEXT_DATA__ + tables)
+
+    Returns DataFrame with _CANONICAL_COLUMNS schema.
+    record_confidence_score = 0.82.
+    Returns empty DataFrame on complete failure.
     """
     try:
         from bs4 import BeautifulSoup
     except ImportError:
-        logger.error("beautifulsoup4 não instalado — scrape_quaest desabilitado")
+        logger.error("beautifulsoup4 não instalado — fetch_poder360_aggregator desabilitado")
         return _empty_canonical()
 
-    soup = None
-    for url in _QUAEST_URLS:
-        try:
-            resp = _fetch_quaest_page(url)
-            soup = BeautifulSoup(resp.text, "html.parser")
-            logger.debug("Quaest: página carregada de %s", url)
-            break
-        except Exception as exc:
-            logger.debug("Quaest: falha em %s: %s", url, exc)
+    rows: list[dict] = []
 
-    if soup is None:
-        logger.warning("Quaest: todas as URLs falharam para ano=%d cargo=%s", year, cargo)
-        return _empty_canonical()
+    # ── Strategy 1: WP REST API ───────────────────────────────────────────────
+    posts = _fetch_wp_api(year, cargo)
+    if posts:
+        rows = _parse_wp_posts(posts, year, cargo)
+        if rows:
+            logger.debug("Poder360: WP REST API → %d linhas", len(rows))
 
-    rows = (
-        _quaest_parse_next_data(soup, year, cargo)
-        or _quaest_parse_inline_json(soup, year, cargo)
-        or _quaest_parse_html_tables(soup, year, cargo)
-    )
-
-    # Strategy 4: follow article links matching year + cargo keyword and parse each page
+    # ── Strategy 2: listing page → individual articles ────────────────────────
     if not rows:
-        year_str = str(year)
-        cargo_keywords = {
-            "presidente": ["presidente", "presidenci", "eleic"],
-            "governador": ["governador", "governo"],
-            "senador": ["senador"],
-        }
-        kws = cargo_keywords.get(cargo.lower(), ["eleic"])
         article_links: list[str] = []
-        for a in soup.find_all("a", href=True):
-            href: str = a["href"]
-            text = (a.get_text(strip=True) + " " + href).lower()
-            if year_str in text and any(kw in text for kw in kws):
-                if not href.startswith("http"):
-                    href = "https://quaest.com.br" + href
-                if href not in article_links:
-                    article_links.append(href)
-        for link in article_links[:10]:
+        for listing_url in _LISTING_URLS[:2]:  # só as páginas de listagem
             try:
-                time.sleep(_SCRAPE_SLEEP)
-                r = _fetch_quaest_page(link)
-                page_soup = BeautifulSoup(r.text, "html.parser")
-                page_rows = (
-                    _quaest_parse_next_data(page_soup, year, cargo)
-                    or _quaest_parse_inline_json(page_soup, year, cargo)
-                    or _quaest_parse_html_tables(page_soup, year, cargo)
-                )
-                rows.extend(page_rows)
+                resp = _fetch(listing_url)
+                soup = BeautifulSoup(resp.text, "html.parser")
+                found = _find_article_links(soup, year, cargo)
+                article_links.extend(lnk for lnk in found if lnk not in article_links)
+                if article_links:
+                    break
             except Exception as exc:
-                logger.debug("Quaest: falha em artigo %s: %s", link, exc)
+                logger.debug("Poder360 listing %s: %s", listing_url, exc)
+
+        for url in article_links[:15]:
+            time.sleep(_SCRAPE_SLEEP)
+            rows.extend(_scrape_article(url, year, cargo))
+
+        if rows:
+            logger.debug("Poder360: artigos → %d linhas", len(rows))
+
+    # ── Strategy 3: aggregator page (__NEXT_DATA__ + tables) ─────────────────
+    if not rows:
+        try:
+            agg_url = f"{_PODER360_BASE}/agregador-de-pesquisas/?cargo={cargo}&ano={year}"
+            resp = _fetch(agg_url)
+            soup = BeautifulSoup(resp.text, "html.parser")
+            rows = _parse_next_data(soup, year, cargo) or _parse_tables_from_soup(soup, year, cargo)
+            if rows:
+                logger.debug("Poder360: agregador page → %d linhas", len(rows))
+        except Exception as exc:
+            logger.debug("Poder360 agregador page: %s", exc)
 
     if not rows:
-        logger.warning(
-            "Quaest: scraping retornou DataFrame vazio para ano=%d cargo=%s", year, cargo
-        )
+        logger.warning("fetch_poder360_aggregator: sem dados para ano=%d cargo=%s", year, cargo)
         return _empty_canonical()
 
     df = pd.DataFrame(rows)
@@ -663,681 +520,75 @@ def scrape_quaest(year: int, cargo: str = "presidente") -> pd.DataFrame:
     df["data_pesquisa_fim"] = pd.to_datetime(df["data_pesquisa_fim"], errors="coerce")
     df = _coerce_numeric(df, ["intencao_pct", "rejeicao_pct", "n_entrevistados", "margem_erro"])
 
-    # Filter to target year when dates resolved
     if "data_pesquisa_fim" in df.columns:
         year_mask = df["data_pesquisa_fim"].dt.year == year
         if year_mask.any():
             df = df[year_mask | df["data_pesquisa_fim"].isna()]
 
-    logger.info("Quaest: %d linhas scrapeadas para ano=%d cargo=%s", len(df), year, cargo)
-    return df[_CANONICAL_COLUMNS].copy() if set(_CANONICAL_COLUMNS).issubset(df.columns) else df
+    logger.info("Poder360 agregador: %d linhas para ano=%d cargo=%s", len(df), year, cargo)
 
+    if set(_CANONICAL_COLUMNS).issubset(df.columns):
+        return df[_CANONICAL_COLUMNS].copy()
+    # Add missing columns with None
+    for col in _CANONICAL_COLUMNS:
+        if col not in df.columns:
+            df[col] = None
+    return df[_CANONICAL_COLUMNS].copy()
 
-# ── PDF table extractor (shared by Ipespe + CNT) ─────────────────────────────
 
-
-def _extract_pdf_tables_raw(pdf_bytes: bytes) -> list[dict]:
-    """Extract candidato/intencao_pct rows from a PDF using pdfplumber.
-
-    Returns list of raw dicts with keys ``candidato`` and ``intencao_pct``.
-    Returns empty list on any failure, including missing pdfplumber.
-    """
-    try:
-        import pdfplumber
-    except ImportError:
-        logger.warning("pdfplumber não instalado — extração de PDF desabilitada")
-        return []
-
-    rows: list[dict] = []
-    with tempfile.NamedTemporaryFile(suffix=".pdf", delete=False) as tmp:
-        tmp.write(pdf_bytes)
-        tmp_path = tmp.name
-
-    try:
-        with pdfplumber.open(tmp_path) as pdf:
-            for page in pdf.pages:
-                for table in page.extract_tables() or []:
-                    if not table or len(table) < 2:
-                        continue
-                    header = [str(c or "").lower() for c in table[0]]
-                    candidato_idx = next(
-                        (i for i, h in enumerate(header) if "candidato" in h or "nome" in h), None
-                    )
-                    intencao_idx = next(
-                        (i for i, h in enumerate(header) if "inten" in h or "%" in h), None
-                    )
-                    if candidato_idx is None or intencao_idx is None:
-                        continue
-                    for row in table[1:]:
-                        if not row or len(row) <= max(candidato_idx, intencao_idx):
-                            continue
-                        candidato = str(row[candidato_idx] or "").strip()
-                        if not candidato:
-                            continue
-                        raw = (
-                            str(row[intencao_idx] or "").replace(",", ".").replace("%", "").strip()
-                        )
-                        try:
-                            intencao = float(raw)
-                        except ValueError:
-                            intencao = None
-                        rows.append({"candidato": candidato, "intencao_pct": intencao})
-    except Exception as exc:
-        logger.debug("pdfplumber erro: %s", exc)
-    finally:
-        Path(tmp_path).unlink(missing_ok=True)
-
-    return rows
-
-
-# ── Ipespe ────────────────────────────────────────────────────────────────────
-
-
-def _fetch_ipespe_page(url: str) -> requests.Response:
-    """Fetch an Ipespe page, trying first with SSL verification, then without.
-
-    O domínio legado ipespe.com.br tem certificado inválido; o novo ipespe.org.br
-    funciona com SSL normal. Tenta verify=True primeiro, cai para verify=False se
-    SSLError for levantado (suprimindo InsecureRequestWarning via urllib3).
-    """
-    try:
-        resp = _SESSION.get(url, timeout=30, allow_redirects=True)
-        resp.raise_for_status()
-        return resp
-    except requests.exceptions.SSLError:
-        logger.debug("Ipespe: SSL error em %s — tentando verify=False", url)
-        resp = _SESSION.get(url, timeout=30, verify=False, allow_redirects=True)
-        resp.raise_for_status()
-        return resp
-
-
-def scrape_ipespe(year: int, cargo: str = "presidente") -> pd.DataFrame:
-    """Scrape Ipespe via listagem de PDFs → extração com pdfplumber.
-
-    O domínio migrou de ipespe.com.br para ipespe.org.br em 2024/2025.
-    Tenta múltiplas URLs de listagem em ordem, com fallback de SSL.
-
-    Linhas onde pdfplumber não extrai tabelas preservam metadados com
-    intencao_pct=None e record_confidence_score=0.30 para rastreabilidade.
-    Returns an empty DataFrame on any listing failure.
-    """
-    try:
-        from bs4 import BeautifulSoup
-    except ImportError:
-        logger.error("beautifulsoup4 não instalado — scrape_ipespe desabilitado")
-        return _empty_canonical()
-
-    soup = None
-    base_url = "https://ipespe.org.br"
-    for url in _IPESPE_URLS:
-        try:
-            resp = _fetch_ipespe_page(url)
-            soup = BeautifulSoup(resp.text, "html.parser")
-            # Determine base URL from the URL that succeeded
-            if "ipespe.org.br" in url:
-                base_url = "https://ipespe.org.br"
-            else:
-                base_url = "https://www.ipespe.com.br"
-            logger.debug("Ipespe: listagem carregada de %s", url)
-            break
-        except Exception as exc:
-            logger.debug("Ipespe: falha em %s: %s", url, exc)
-
-    if soup is None:
-        logger.warning("Ipespe: todas as URLs falharam para ano=%d", year)
-        return _empty_canonical()
-
-    year_str = str(year)
-
-    pdf_links: list[str] = []
-    for a in soup.find_all("a", href=True):
-        href: str = a["href"]
-        text = a.get_text(strip=True) + href
-        if href.lower().endswith(".pdf") and year_str in text:
-            if not href.startswith("http"):
-                href = base_url + href
-            if href not in pdf_links:
-                pdf_links.append(href)
-
-    # Also follow article/post links and look for PDFs inside each
-    if not pdf_links:
-        article_links: list[str] = []
-        for a in soup.find_all("a", href=True):
-            href = a["href"]
-            text = (a.get_text(strip=True) + " " + href).lower()
-            if year_str in text and ("pesquisa" in text or "pulso" in text or "eleic" in text):
-                if not href.startswith("http"):
-                    href = base_url + href
-                if href not in article_links and base_url.split("//")[1].split("/")[0] in href:
-                    article_links.append(href)
-        for link in article_links[:10]:
-            try:
-                time.sleep(_SCRAPE_SLEEP)
-                r = _fetch_ipespe_page(link)
-                page_soup = BeautifulSoup(r.text, "html.parser")
-                for a in page_soup.find_all("a", href=True):
-                    h = a["href"]
-                    if h.lower().endswith(".pdf"):
-                        if not h.startswith("http"):
-                            h = base_url + h
-                        if h not in pdf_links:
-                            pdf_links.append(h)
-            except Exception as exc:
-                logger.debug("Ipespe: falha em artigo %s: %s", link, exc)
-
-    pdf_links = pdf_links[:10]
-
-    if not pdf_links:
-        logger.warning("Ipespe: nenhum PDF encontrado para ano=%d", year)
-        return _empty_canonical()
-
-    all_rows: list[dict] = []
-    for pdf_url in pdf_links:
-        try:
-            time.sleep(_SCRAPE_SLEEP)
-            r = _fetch_ipespe_page(pdf_url)  # handles SSL fallback internally
-            pdf_rows = _extract_pdf_tables_raw(r.content)
-            if pdf_rows:
-                for row in pdf_rows:
-                    all_rows.append(
-                        {
-                            "poll_id": None,
-                            "instituto": "ipespe",
-                            "candidato": row["candidato"],
-                            "intencao_pct": row["intencao_pct"],
-                            "rejeicao_pct": None,
-                            "data_pesquisa_inicio": None,
-                            "data_pesquisa_fim": None,
-                            "uf": "BR",
-                            "cd_cargo": cargo,
-                            "n_entrevistados": None,
-                            "margem_erro": None,
-                            "metodologia": None,
-                            "tipo_pesquisa": "estimulada",
-                            "fonte": "ipespe",
-                            "record_confidence_score": _CONFIDENCE_IPESPE,
-                            "ano": year,
-                        }
-                    )
-            else:
-                # Preserve failure row for audit
-                all_rows.append(
-                    {
-                        "poll_id": None,
-                        "instituto": "ipespe",
-                        "candidato": None,
-                        "intencao_pct": None,
-                        "rejeicao_pct": None,
-                        "data_pesquisa_inicio": None,
-                        "data_pesquisa_fim": None,
-                        "uf": "BR",
-                        "cd_cargo": cargo,
-                        "n_entrevistados": None,
-                        "margem_erro": None,
-                        "metodologia": None,
-                        "tipo_pesquisa": None,
-                        "fonte": "ipespe",
-                        "record_confidence_score": _CONFIDENCE_IPESPE_FAIL,
-                        "ano": year,
-                    }
-                )
-                logger.debug("Ipespe: pdfplumber sem tabelas em %s", pdf_url)
-        except Exception as exc:
-            logger.debug("Ipespe: falha ao processar %s: %s", pdf_url, exc)
-
-    if not all_rows:
-        logger.warning("Ipespe: nenhum dado extraído para ano=%d cargo=%s", year, cargo)
-        return _empty_canonical()
-
-    df = pd.DataFrame(all_rows)
-    df["data_pesquisa_inicio"] = pd.to_datetime(df["data_pesquisa_inicio"], errors="coerce")
-    df["data_pesquisa_fim"] = pd.to_datetime(df["data_pesquisa_fim"], errors="coerce")
-    df = _coerce_numeric(df, ["intencao_pct", "rejeicao_pct", "n_entrevistados", "margem_erro"])
-    logger.info("Ipespe: %d linhas para ano=%d cargo=%s", len(df), year, cargo)
-    return df[_CANONICAL_COLUMNS].copy() if set(_CANONICAL_COLUMNS).issubset(df.columns) else df
-
-
-# ── Paraná Pesquisas ──────────────────────────────────────────────────────────
-
-
-def _try_fetch(urls: list[str]) -> requests.Response | None:
-    """Try multiple URLs in order; return first successful response or None."""
-    for url in urls:
-        try:
-            resp = _SESSION.get(url, timeout=30)
-            resp.raise_for_status()
-            return resp
-        except Exception as exc:
-            logger.debug("_try_fetch: %s falhou: %s", url, exc)
-    return None
-
-
-def _parse_html_tables_generic(
-    soup: Any,
-    year: int,
-    fonte: str,
-    instituto: str,
-    cargo: str,
-    confidence: float,
-) -> list[dict]:
-    rows: list[dict] = []
-    for table in soup.find_all("table"):
-        headers = [th.get_text(strip=True).lower() for th in table.find_all("th")]
-        if not headers:
-            first_row = table.find("tr")
-            if first_row:
-                headers = [td.get_text(strip=True).lower() for td in first_row.find_all("td")]
-        candidato_idx = next(
-            (i for i, h in enumerate(headers) if "candidato" in h or "nome" in h), None
-        )
-        pct_idx = next(
-            (i for i, h in enumerate(headers) if "%" in h or "inten" in h or "voto" in h), None
-        )
-        rejeicao_idx = next((i for i, h in enumerate(headers) if "rejei" in h), None)
-        if candidato_idx is None or pct_idx is None:
-            continue
-        for tr in table.find_all("tr")[1:]:
-            cells = [td.get_text(strip=True) for td in tr.find_all("td")]
-            if len(cells) <= max(candidato_idx, pct_idx):
-                continue
-            candidato = cells[candidato_idx].strip()
-            if not candidato:
-                continue
-            pct_raw = cells[pct_idx].replace(",", ".").replace("%", "").strip()
-            try:
-                intencao = float(pct_raw)
-            except ValueError:
-                continue
-            rejeicao = None
-            if rejeicao_idx is not None and len(cells) > rejeicao_idx:
-                try:
-                    rejeicao = float(cells[rejeicao_idx].replace(",", ".").replace("%", "").strip())
-                except ValueError:
-                    pass
-            rows.append(
-                {
-                    "poll_id": None,
-                    "instituto": instituto,
-                    "candidato": candidato,
-                    "intencao_pct": intencao,
-                    "rejeicao_pct": rejeicao,
-                    "data_pesquisa_inicio": None,
-                    "data_pesquisa_fim": None,
-                    "uf": "BR",
-                    "cd_cargo": cargo,
-                    "n_entrevistados": None,
-                    "margem_erro": None,
-                    "metodologia": None,
-                    "tipo_pesquisa": "estimulada",
-                    "fonte": fonte,
-                    "record_confidence_score": confidence,
-                    "ano": year,
-                }
-            )
-    return rows
-
-
-def scrape_parana_pesquisas(year: int, cargo: str = "presidente") -> pd.DataFrame:
-    """Scrape Paraná Pesquisas via tabelas HTML; tenta múltiplas URLs.
-
-    Domínio correto em 2026: paranapesquisas.com.br (ASCII, sem ã).
-    record_confidence_score = 0.85.
-    Returns an empty DataFrame on any scraping failure.
-    """
-    try:
-        from bs4 import BeautifulSoup
-    except ImportError:
-        logger.error("beautifulsoup4 não instalado — scrape_parana_pesquisas desabilitado")
-        return _empty_canonical()
-
-    resp = _try_fetch(_PARANA_URLS)
-    if resp is None:
-        logger.warning("Paraná Pesquisas: todas as URLs falharam para ano=%d", year)
-        return _empty_canonical()
-
-    soup = BeautifulSoup(resp.text, "html.parser")
-    rows = _parse_html_tables_generic(
-        soup, year, "parana_pesquisas", "parana_pesquisas", cargo, _CONFIDENCE_PARANA
-    )
-
-    year_str = str(year)
-    article_links: list[str] = []
-    for a in soup.find_all("a", href=True):
-        href: str = a["href"]
-        text = a.get_text(strip=True) + href
-        if year_str in text and ("pesquisa" in text.lower() or "elei" in text.lower()):
-            if not href.startswith("http"):
-                # Use ASCII domain (without ã) for relative URL construction
-                href = "https://paranapesquisas.com.br" + href
-            if href not in article_links:
-                article_links.append(href)
-
-    for link in article_links[:10]:
-        try:
-            time.sleep(_SCRAPE_SLEEP)
-            r = _SESSION.get(link, timeout=30, allow_redirects=True)
-            r.raise_for_status()
-            page_soup = BeautifulSoup(r.text, "html.parser")
-            rows.extend(
-                _parse_html_tables_generic(
-                    page_soup,
-                    year,
-                    "parana_pesquisas",
-                    "parana_pesquisas",
-                    cargo,
-                    _CONFIDENCE_PARANA,
-                )
-            )
-        except Exception as exc:
-            logger.debug("Paraná Pesquisas: falha em %s: %s", link, exc)
-
-    if not rows:
-        logger.warning(
-            "Paraná Pesquisas: scraping retornou DataFrame vazio para ano=%d cargo=%s", year, cargo
-        )
-        return _empty_canonical()
-
-    df = pd.DataFrame(rows)
-    df["data_pesquisa_inicio"] = pd.to_datetime(df["data_pesquisa_inicio"], errors="coerce")
-    df["data_pesquisa_fim"] = pd.to_datetime(df["data_pesquisa_fim"], errors="coerce")
-    df = _coerce_numeric(df, ["intencao_pct", "rejeicao_pct", "n_entrevistados", "margem_erro"])
-    logger.info("Paraná Pesquisas: %d linhas para ano=%d cargo=%s", len(df), year, cargo)
-    return df[_CANONICAL_COLUMNS].copy() if set(_CANONICAL_COLUMNS).issubset(df.columns) else df
-
-
-# ── CNT/MDA ───────────────────────────────────────────────────────────────────
-
-
-@retry(
-    retry=retry_if_exception_type((requests.Timeout, requests.ConnectionError)),
-    stop=stop_after_attempt(3),
-    wait=wait_exponential(min=2, max=30),
-)
-def _fetch_cnt_page(url: str) -> requests.Response:
-    resp = _SESSION.get(url, timeout=30)
-    resp.raise_for_status()
-    return resp
-
-
-def _collect_cnt_pdf_links(soup: Any, year: int) -> list[str]:
-    """Extract CNT/MDA PDF links from a BeautifulSoup page.
-
-    Os PDFs da CNT/MDA são hospedados em static.poder360.com.br (não em cnt.org.br).
-    Padrão de nome: CNT-MDA-*-{year}*.pdf ou CNT-MDA-*ELEICOES-{year}*.pdf
-    """
-    year_str = str(year)
-    pdf_links: list[str] = []
-    cnt_pattern = re.compile(r"cnt.{0,5}mda", re.IGNORECASE)
-
-    for a in soup.find_all("a", href=True):
-        href: str = a["href"]
-        text = a.get_text(strip=True) + " " + href
-        is_pdf = href.lower().endswith(".pdf")
-        is_cnt = cnt_pattern.search(text) or cnt_pattern.search(href)
-        has_year = year_str in text or year_str in href
-
-        if is_pdf and (is_cnt or has_year):
-            if not href.startswith("http"):
-                # Poder360 hosts on static.poder360.com.br; relative links go to poder360.com.br
-                href = "https://www.poder360.com.br" + href
-            if href not in pdf_links:
-                pdf_links.append(href)
-
-    return pdf_links
-
-
-def scrape_cnt_mda(year: int, cargo: str = "presidente") -> pd.DataFrame:
-    """Scrape CNT/MDA via listagem de PDFs → extração com pdfplumber.
-
-    Os PDFs da CNT/MDA não estão em cnt.org.br mas em static.poder360.com.br.
-    A estratégia é:
-      1. Buscar a página de pesquisas do Poder360 que lista todas as CNT/MDA
-      2. Tentar também cnt.org.br como fallback
-      3. Construir URLs diretas de PDFs com padrão de nomes conhecido
-
-    record_confidence_score = 0.85.
-    Returns an empty DataFrame on any listing or download failure.
-    """
-    try:
-        from bs4 import BeautifulSoup
-    except ImportError:
-        logger.error("beautifulsoup4 não instalado — scrape_cnt_mda desabilitado")
-        return _empty_canonical()
-
-    pdf_links: list[str] = []
-
-    # Strategy 1: scrape pages that list CNT/MDA PDFs
-    for url in _CNT_URLS:
-        try:
-            resp = _fetch_cnt_page(url)
-            soup = BeautifulSoup(resp.text, "html.parser")
-            found = _collect_cnt_pdf_links(soup, year)
-            pdf_links.extend(lnk for lnk in found if lnk not in pdf_links)
-            if pdf_links:
-                break
-        except Exception as exc:
-            logger.debug("CNT/MDA: %s falhou: %s", url, exc)
-
-    # Strategy 2: try known static URL patterns on poder360 CDN
-    # Pattern: https://static.poder360.com.br/{year}/MM/CNT-MDA-MES-{year}-ELEICOES-{year}.pdf
-    if not pdf_links:
-        _MONTH_MAP = {
-            1: "JANEIRO",
-            2: "FEVEREIRO",
-            3: "MARCO",
-            4: "ABRIL",
-            5: "MAIO",
-            6: "JUNHO",
-            7: "JULHO",
-            8: "AGOSTO",
-            9: "SETEMBRO",
-            10: "OUTUBRO",
-            11: "NOVEMBRO",
-            12: "DEZEMBRO",
-        }
-        import datetime
-
-        current_month = datetime.date.today().month
-        current_year = datetime.date.today().year
-        # Only try months up to current month for current year
-        months_to_try = range(1, (current_month + 1) if year == current_year else 13)
-        for month in months_to_try:
-            month_name = _MONTH_MAP[month]
-            month_num = f"{month:02d}"
-            candidate_urls = [
-                f"{_CNT_PDF_STATIC_BASE}/{year}/{month_num}/CNT-MDA-{month_name}-{year}-ELEICOES-{year}.pdf",
-                f"{_CNT_PDF_STATIC_BASE}/{year}/{month_num}/CNT-MDA-{month_name}-{year}.pdf",
-            ]
-            for candidate in candidate_urls:
-                if candidate not in pdf_links:
-                    pdf_links.append(candidate)
-
-    pdf_links = pdf_links[:12]
-
-    if not pdf_links:
-        logger.warning("CNT/MDA: nenhum PDF encontrado para ano=%d", year)
-        return _empty_canonical()
-
-    all_rows: list[dict] = []
-    for pdf_url in pdf_links:
-        try:
-            time.sleep(_SCRAPE_SLEEP)
-            r = _fetch_cnt_page(pdf_url)
-            # Skip non-PDF responses (e.g., HTML 404 pages served as 200)
-            if "application/pdf" not in r.headers.get("Content-Type", "") and len(r.content) < 1024:
-                logger.debug("CNT/MDA: resposta não-PDF em %s — pulando", pdf_url)
-                continue
-            pdf_rows = _extract_pdf_tables_raw(r.content)
-            for row in pdf_rows:
-                all_rows.append(
-                    {
-                        "poll_id": None,
-                        "instituto": "cnt_mda",
-                        "candidato": row["candidato"],
-                        "intencao_pct": row["intencao_pct"],
-                        "rejeicao_pct": None,
-                        "data_pesquisa_inicio": None,
-                        "data_pesquisa_fim": None,
-                        "uf": "BR",
-                        "cd_cargo": cargo,
-                        "n_entrevistados": None,
-                        "margem_erro": None,
-                        "metodologia": None,
-                        "tipo_pesquisa": "estimulada",
-                        "fonte": "cnt_mda",
-                        "record_confidence_score": _CONFIDENCE_CNT,
-                        "ano": year,
-                    }
-                )
-            if not pdf_rows:
-                logger.debug("CNT/MDA: pdfplumber sem tabelas em %s", pdf_url)
-        except requests.HTTPError as exc:
-            if exc.response is not None and exc.response.status_code == 404:
-                logger.debug("CNT/MDA: PDF não encontrado (404): %s", pdf_url)
-            else:
-                logger.debug("CNT/MDA: HTTP error em %s: %s", pdf_url, exc)
-        except Exception as exc:
-            logger.debug("CNT/MDA: falha ao processar %s: %s", pdf_url, exc)
-
-    if not all_rows:
-        logger.warning("CNT/MDA: nenhum dado extraído para ano=%d cargo=%s", year, cargo)
-        return _empty_canonical()
-
-    df = pd.DataFrame(all_rows)
-    df["data_pesquisa_inicio"] = pd.to_datetime(df["data_pesquisa_inicio"], errors="coerce")
-    df["data_pesquisa_fim"] = pd.to_datetime(df["data_pesquisa_fim"], errors="coerce")
-    df = _coerce_numeric(df, ["intencao_pct", "rejeicao_pct", "n_entrevistados", "margem_erro"])
-    logger.info("CNT/MDA: %d linhas para ano=%d cargo=%s", len(df), year, cargo)
-    return df[_CANONICAL_COLUMNS].copy() if set(_CANONICAL_COLUMNS).issubset(df.columns) else df
-
-
-# ── fetch_all_agencies ────────────────────────────────────────────────────────
+# ── Public interface (mantém compatibilidade com pesquisas_ingest_job.py) ─────
 
 
 def fetch_all_agencies(year: int, cargo: str = "presidente") -> pd.DataFrame:
-    """Concatena Datafolha, Quaest, Ipespe, Paraná Pesquisas e CNT/MDA.
+    """Fetch poll data from Poder360 aggregator (substitui 5 scrapers individuais).
 
-    Runs all five scrapers in parallel via ThreadPoolExecutor (max_workers=5).
-    Deduplicates by (poll_id, candidato, fonte) when poll_id is available,
-    falling back to (instituto, candidato, data_pesquisa_fim).
+    Retorna DataFrame com schema canonical. record_confidence_score = 0.82.
     """
-    _SCRAPERS: dict[str, Any] = {
-        "datafolha": scrape_datafolha,
-        "quaest": scrape_quaest,
-        "ipespe": scrape_ipespe,
-        "parana_pesquisas": scrape_parana_pesquisas,
-        "cnt_mda": scrape_cnt_mda,
-    }
-
-    futures_map: dict = {}
-    with ThreadPoolExecutor(max_workers=5, thread_name_prefix="agency") as executor:
-        for source, fn in _SCRAPERS.items():
-            futures_map[executor.submit(fn, year, cargo)] = source
-
-    frames: list[pd.DataFrame] = []
-    for future, source in futures_map.items():
-        try:
-            df = future.result()
-            if not df.empty:
-                frames.append(df)
-        except Exception as exc:
-            logger.warning("fetch_all_agencies: %s falhou: %s", source, exc)
-
-    if not frames:
-        logger.warning(
-            "fetch_all_agencies: nenhuma agência retornou dados para ano=%d cargo=%s", year, cargo
-        )
-        return _empty_canonical()
-
-    df_combined = pd.concat(frames, ignore_index=True)
-
-    if "poll_id" in df_combined.columns and df_combined["poll_id"].notna().any():
-        df_combined = df_combined.drop_duplicates(subset=["poll_id", "candidato", "fonte"])
-    elif "data_pesquisa_fim" in df_combined.columns:
-        df_combined = df_combined.drop_duplicates(
-            subset=["instituto", "candidato", "data_pesquisa_fim"]
-        )
-
-    logger.info(
-        "fetch_all_agencies: %d linhas combinadas (5 agências) para ano=%d cargo=%s",
-        len(df_combined),
-        year,
-        cargo,
-    )
-    return df_combined
-
-
-# ── cross_validate_with_agencies ──────────────────────────────────────────────
+    return fetch_poder360_aggregator(year, cargo)
 
 
 def cross_validate_with_agencies(df_tse: pd.DataFrame, year: int, cargo: str) -> pd.DataFrame:
-    """Cross-validate TSE poll data against agency sites.
+    """Cross-validate TSE poll data against Poder360 aggregator.
 
-    When TSE PDF extraction matches agency site within 2pp:
-    → boost record_confidence_score to 0.95
-    When divergence > 5pp:
-    → log warning, keep TSE value, set confidence to 0.70
-
-    Matching key: (instituto_normalized, candidato_normalized, date_window).
-    Date window: agency date within ±3 days of TSE date (handles publication lag).
-
-    Args:
-        df_tse: DataFrame from fetch_pesqele_csv + enrich_with_pdfs.
-        year: Election year — passed to agency scrapers.
-        cargo: Cargo string ("presidente", "governador", etc.).
-
-    Returns:
-        df_tse copy with record_confidence_score updated per match result.
+    Matching key: (instituto_normalized, candidato_normalized) within ±3-day window.
+    ≤ 2 pp → boost confidence to 0.95
+    > 5 pp → degrade confidence to 0.70
     """
     if df_tse.empty:
         return df_tse
-
     if "intencao_pct" not in df_tse.columns or "record_confidence_score" not in df_tse.columns:
-        logger.warning("cross_validate_with_agencies: colunas obrigatórias ausentes em df_tse")
+        logger.warning("cross_validate: colunas obrigatórias ausentes em df_tse")
         return df_tse
 
-    # Fetch agency data in parallel
-    df_agencies = _fetch_agencies_parallel(year, cargo)
-    if df_agencies.empty:
-        logger.info("cross_validate_with_agencies: sem dados de agências — df_tse inalterado")
+    df_ref = fetch_poder360_aggregator(year, cargo)
+    if df_ref.empty:
+        logger.info("cross_validate: Poder360 sem dados — df_tse inalterado")
         return df_tse
 
-    df_out = df_tse.copy()
-
-    # Build agency lookup: (instituto_norm, candidato_norm) → list of (data_fim, intencao_pct)
-    agency_lookup: dict[tuple[str, str], list[tuple[Any, float]]] = {}
-    for _, row in df_agencies.iterrows():
+    # Build lookup: (instituto_norm, candidato_norm) → [(data_fim, intencao_pct)]
+    lookup: dict[tuple[str, str], list[tuple[Any, float]]] = {}
+    for _, row in df_ref.iterrows():
         if pd.isna(row.get("intencao_pct")):
             continue
-        key = (
-            _normalize_instituto(row.get("instituto")),
-            _normalize_candidato(row.get("candidato")),
-        )
-        agency_lookup.setdefault(key, []).append(
+        key = (_normalize_name(row.get("instituto")), _normalize_name(row.get("candidato")))
+        lookup.setdefault(key, []).append(
             (row.get("data_pesquisa_fim"), float(row["intencao_pct"]))
         )
 
-    matched = 0
-    boosted = 0
-    degraded = 0
+    df_out = df_tse.copy()
+    matched = boosted = degraded = 0
 
     for idx, tse_row in df_out.iterrows():
         if pd.isna(tse_row.get("intencao_pct")):
             continue
-
-        key = (
-            _normalize_instituto(tse_row.get("instituto")),
-            _normalize_candidato(tse_row.get("candidato")),
-        )
-
-        agency_entries = agency_lookup.get(key)
-        if not agency_entries:
+        key = (_normalize_name(tse_row.get("instituto")), _normalize_name(tse_row.get("candidato")))
+        entries = lookup.get(key)
+        if not entries:
             continue
 
         tse_pct = float(tse_row["intencao_pct"])
         tse_date = tse_row.get("data_pesquisa_fim")
-
-        best_diff = _find_best_match(agency_entries, tse_pct, tse_date)
+        best_diff = _best_match_diff(entries, tse_pct, tse_date)
         if best_diff is None:
             continue
 
@@ -1346,21 +597,18 @@ def cross_validate_with_agencies(df_tse: pd.DataFrame, year: int, cargo: str) ->
             df_out.at[idx, "record_confidence_score"] = _CONFIDENCE_MATCH
             boosted += 1
         elif best_diff > _DIVERGENCE_THRESHOLD_PP:
+            df_out.at[idx, "record_confidence_score"] = _CONFIDENCE_DIVERGE
+            degraded += 1
             logger.warning(
-                "cross_validate: divergência %.1fpp para instituto=%s candidato=%s data=%s "
-                "(TSE=%.1f%%) — confidence rebaixado para %.2f",
+                "cross_validate: divergência %.1fpp — %s/%s (TSE=%.1f%%)",
                 best_diff,
                 tse_row.get("instituto"),
                 tse_row.get("candidato"),
-                tse_date,
                 tse_pct,
-                _CONFIDENCE_DIVERGE,
             )
-            df_out.at[idx, "record_confidence_score"] = _CONFIDENCE_DIVERGE
-            degraded += 1
 
     logger.info(
-        "cross_validate_with_agencies: %d matches — %d boostados (→0.95), %d rebaixados (→0.70)",
+        "cross_validate: %d matches — %d boost (→0.95), %d rebaixados (→0.70)",
         matched,
         boosted,
         degraded,
@@ -1368,67 +616,20 @@ def cross_validate_with_agencies(df_tse: pd.DataFrame, year: int, cargo: str) ->
     return df_out
 
 
-def _fetch_agencies_parallel(year: int, cargo: str) -> pd.DataFrame:
-    """Run all five agency scrapers in parallel; return combined DataFrame."""
-    _SCRAPERS: dict[str, Any] = {
-        "datafolha": scrape_datafolha,
-        "quaest": scrape_quaest,
-        "ipespe": scrape_ipespe,
-        "parana_pesquisas": scrape_parana_pesquisas,
-        "cnt_mda": scrape_cnt_mda,
-    }
-    results: list[pd.DataFrame] = []
-
-    with ThreadPoolExecutor(max_workers=5, thread_name_prefix="xval") as executor:
-        futures = {executor.submit(fn, year, cargo): source for source, fn in _SCRAPERS.items()}
-        for future, source in futures.items():
-            try:
-                df = future.result()
-                if not df.empty:
-                    results.append(df)
-            except Exception as exc:
-                logger.warning("_fetch_agencies_parallel: %s falhou: %s", source, exc)
-
-    if not results:
-        return _empty_canonical()
-    return pd.concat(results, ignore_index=True)
-
-
-def _normalize_candidato(name: str | None) -> str:
-    if not name:
-        return ""
-    # Normalize to first + last word for fuzzy matching across sources
-    name = re.sub(r"\s+", " ", name.strip().lower())
-    parts = name.split()
-    if len(parts) >= 2:
-        return f"{parts[0]} {parts[-1]}"
-    return name
-
-
-def _find_best_match(
-    agency_entries: list[tuple[Any, float]],
-    tse_pct: float,
-    tse_date: Any,
+def _best_match_diff(
+    entries: list[tuple[Any, float]], tse_pct: float, tse_date: Any
 ) -> float | None:
-    """Return the smallest absolute difference found within ±3-day date window.
-
-    If tse_date is NaT/None, falls back to any entry regardless of date.
-    Returns None if no entries qualify.
-    """
+    """Return smallest |tse_pct - ref_pct| within ±3-day date window."""
     best: float | None = None
-
-    for agency_date, agency_pct in agency_entries:
+    for ref_date, ref_pct in entries:
         if tse_date is not None and not pd.isna(tse_date):
-            if agency_date is not None and not pd.isna(agency_date):
+            if ref_date is not None and not pd.isna(ref_date):
                 try:
-                    delta = abs((pd.Timestamp(tse_date) - pd.Timestamp(agency_date)).days)
-                    if delta > 3:
+                    if abs((pd.Timestamp(tse_date) - pd.Timestamp(ref_date)).days) > 3:
                         continue
                 except Exception:
-                    pass  # date parse failure — accept the entry anyway
-
-        diff = abs(tse_pct - agency_pct)
+                    pass
+        diff = abs(tse_pct - ref_pct)
         if best is None or diff < best:
             best = diff
-
     return best
