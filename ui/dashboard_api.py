@@ -6592,25 +6592,31 @@ async def get_comparativo_candidatos(
         GROUP BY nm_candidato, ano_eleicao
     """
 
-    cfg = bigquery.QueryJobConfig(query_parameters=params)
+    cfg_gold = bigquery.QueryJobConfig(query_parameters=params)
+    cfg_silver = bigquery.QueryJobConfig(query_parameters=params)
+
     try:
-        gold_task = asyncio.to_thread(
-            lambda: list(client.query(gold_query, job_config=cfg).result())
+        gold_rows = await asyncio.to_thread(
+            lambda: list(client.query(gold_query, job_config=cfg_gold).result())
         )
-        silver_task = asyncio.to_thread(
-            lambda: list(client.query(silver_query, job_config=cfg).result())
-        )
-        gold_rows, silver_rows = await asyncio.gather(gold_task, silver_task)
     except Exception as exc:
-        logger.error("comparativo BQ erro: %s", exc, exc_info=True)
+        logger.error("comparativo gold BQ erro: %s", exc, exc_info=True)
         return JSONResponse(
             {"status": "error", "error": str(exc), "candidatos": []}, status_code=500
         )
 
-    # Build situacao lookup: {(nm_candidato, ano_eleicao): ds_situacao}
+    # Silver (ds_situacao) é opcional — falha não bloqueia o endpoint
     sit_map: dict[tuple, str] = {}
-    for r in silver_rows:
-        sit_map[(r["nm_candidato"], int(r["ano_eleicao"]))] = r["ds_situacao"] or ""
+    silver_ok = True
+    try:
+        silver_rows = await asyncio.to_thread(
+            lambda: list(client.query(silver_query, job_config=cfg_silver).result())
+        )
+        for r in silver_rows:
+            sit_map[(r["nm_candidato"], int(r["ano_eleicao"]))] = r["ds_situacao"] or ""
+    except Exception as exc:
+        logger.warning("comparativo silver sit_map indisponivel: %s", exc)
+        silver_ok = False
 
     candidatos = []
     for r in gold_rows:
@@ -6650,6 +6656,7 @@ async def get_comparativo_candidatos(
             "anos": [2018, 2022],
             "total": len(candidatos),
             "candidatos": candidatos,
+            "situacao_disponivel": silver_ok,
         }
     )
 

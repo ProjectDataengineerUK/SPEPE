@@ -1489,10 +1489,23 @@ async function loadComparativo() {
 
   const d = await api(url);
   if (!d || d.status === 'error') {
-    if (empty) empty.textContent = d?.error || 'Erro ao carregar dados';
+    if (empty) { empty.style.display = 'block'; empty.textContent = d?.error || 'Erro ao carregar dados — verifique a conexão com BigQuery'; }
+    return;
+  }
+  if (d.status === 'bigquery_disabled') {
+    if (empty) { empty.style.display = 'block'; empty.textContent = 'BigQuery não configurado — dados disponíveis apenas em produção'; }
     return;
   }
   _cmp2Data = d[key] || [];
+  // Situação (eleito/não eleito) depende de dados Silver — avisa se indisponível
+  if (!d.situacao_disponivel && _cmp2Sit !== 'todos') {
+    if (empty) { empty.style.display = 'block'; empty.textContent = 'Filtro de situação indisponível — dados Silver ainda não carregados'; }
+    return;
+  }
+  if (!_cmp2Data.length) {
+    if (empty) { empty.style.display = 'block'; empty.textContent = 'Nenhum resultado para este filtro'; }
+    return;
+  }
   if (empty) empty.style.display = 'none';
 
   const tot18 = _cmp2Data.reduce((s,r)=>s+r.votos_2018,0);
