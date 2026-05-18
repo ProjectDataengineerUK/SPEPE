@@ -59,7 +59,8 @@ def build_electoral_dataset(
       pct_votos_historico, is_new_candidate,
       media_intencao_voto_uf, n_pesquisas, poll_missing,
       sg_partido,
-      populacao_total, renda_per_capita, taxa_alfabetizacao, taxa_analfabetismo
+      populacao_total, renda_per_capita, taxa_alfabetizacao, taxa_analfabetismo,
+      is_incumbent_int, trocou_partido_int
     """
     split_filters = {
         "all": "(v.ano_eleicao IN (2018, 2022))",
@@ -73,12 +74,15 @@ def build_electoral_dataset(
     project_id = project_id or os.environ.get("GCP_PROJECT_ID", "spepe-prod")
     client = bigquery.Client(project=project_id)
 
-    # Detect whether dim_candidato and pesquisas_* exist
+    # Detect whether dim_incumbencia, dim_candidato and pesquisas_* exist
+    _has_incumbencia = _table_exists(client, project_id, "spepe_mlops", "dim_incumbencia")
     _has_dim_candidato = _table_exists(client, project_id, "spepe_silver", "dim_candidato")
     _has_pesquisas = _table_exists(
         client, project_id, "spepe_silver", "pesquisas_2018"
     ) or _table_exists(client, project_id, "spepe_silver", "pesquisas_2022")
 
+    if not _has_incumbencia:
+        logger.warning("dim_incumbencia not found — is_incumbent_int will be 0 for all rows")
     if not _has_dim_candidato:
         logger.warning("dim_candidato not found — sg_partido will be DESCONHECIDO for all rows")
     if not _has_pesquisas:
@@ -96,6 +100,23 @@ def build_electoral_dataset(
         if _has_dim_candidato
         else ""
     )
+
+    if _has_incumbencia:
+        incumbencia_join = f"""
+    LEFT JOIN `{project_id}.spepe_mlops.dim_incumbencia` inc
+           ON  inc.nm_candidato = v.candidato
+           AND inc.sg_uf        = v.sg_uf
+           AND inc.cd_cargo     = v.cd_cargo
+           AND inc.ano_eleicao  = v.ano_eleicao
+    """
+        incumbencia_cols = """
+        COALESCE(CAST(inc.is_incumbent AS INT64), 0)    AS is_incumbent_int,
+        COALESCE(CAST(inc.trocou_partido AS INT64), 0)  AS trocou_partido_int"""
+    else:
+        incumbencia_join = ""
+        incumbencia_cols = """
+        0   AS is_incumbent_int,
+        0   AS trocou_partido_int"""
 
     pesquisas_cte = (
         f"""
@@ -212,7 +233,10 @@ def build_electoral_dataset(
         COALESCE(i.populacao_total,    0)     AS populacao_total,
         COALESCE(i.renda_per_capita,   1000)  AS renda_per_capita,
         COALESCE(i.taxa_alfabetizacao, 50.0)  AS taxa_alfabetizacao,
-        COALESCE(i.taxa_analfabetismo, 10.0)  AS taxa_analfabetismo
+        COALESCE(i.taxa_analfabetismo, 10.0)  AS taxa_analfabetismo,
+
+        -- Incumbency features
+        {incumbencia_cols}
 
     FROM votos_pct v
     LEFT JOIN historical_lag h
@@ -223,6 +247,7 @@ def build_electoral_dataset(
     {pesquisas_join}
     {dim_cand_join}
     LEFT JOIN ibge i ON i.cd_municipio_ibge = v.cd_municipio_ibge
+    {incumbencia_join}
 
     WHERE {year_filter}
       AND v.pct_votos BETWEEN 0.0001 AND 0.9999

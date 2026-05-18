@@ -8,6 +8,8 @@ from pathlib import Path
 
 import pandas as pd
 
+from dataops.features.incumbencia_features import compute_incumbencia_sql
+
 logger = logging.getLogger("spepe.dataops.gold")
 
 LOCAL_GOLD_DIR = Path(os.environ.get("DATA_DIR", "data")) / "gold"
@@ -16,12 +18,20 @@ _BQ_SILVER_DATASET = os.environ.get("BIGQUERY_DATASET_SILVER", "spepe_silver")
 _GCP_PROJECT = os.environ.get("GCP_PROJECT_ID", "")
 
 
+def _get_dim_regiao_rj_sql(gold: str) -> str:
+    from dataops.clients.rj_territorio_client import get_dim_regiao_rj_sql
+
+    project_id, gold_dataset = gold.split(".", 1)
+    return get_dim_regiao_rj_sql(project_id, gold_dataset)
+
+
 def _build_gold_via_bigquery_sql() -> dict:
     """Build all Gold tables using BigQuery SQL — no data movement to Python."""
     from google.cloud import bigquery
 
     client = bigquery.Client(project=_GCP_PROJECT)
     _BQ_GOLD_DATASET = os.environ.get("BIGQUERY_DATASET_GOLD", "spepe_gold")
+    _BQ_MLOPS_DATASET = os.environ.get("BIGQUERY_DATASET_MLOPS", "spepe_mlops")
     silver_wc = f"`{_GCP_PROJECT}.{_BQ_SILVER_DATASET}.tse_*`"
     gold = f"{_GCP_PROJECT}.{_BQ_GOLD_DATASET}"
     silver = f"{_GCP_PROJECT}.{_BQ_SILVER_DATASET}"
@@ -726,6 +736,58 @@ def _build_gold_via_bigquery_sql() -> dict:
                 SAFE_CAST(nr_zona AS INT64),
                 SAFE_CAST(nr_local_votacao AS INT64)
         """,
+        "fact_abstencao_secao": f"""
+            CREATE OR REPLACE TABLE `{gold}.fact_abstencao_secao` AS
+            WITH votos_secao AS (
+                SELECT
+                    sg_uf, cd_municipio, nm_municipio, nr_zona, nr_secao,
+                    cd_cargo, nr_turno, ano_eleicao,
+                    SUM(total_votos) AS total_votos_secao
+                FROM `{gold}.fact_secao_eleicao`
+                GROUP BY sg_uf, cd_municipio, nm_municipio, nr_zona, nr_secao,
+                         cd_cargo, nr_turno, ano_eleicao
+            ),
+            aptos AS (
+                SELECT
+                    sg_uf,
+                    SAFE_CAST(cd_municipio AS INT64) AS cd_municipio,
+                    SAFE_CAST(nr_zona AS INT64)      AS nr_zona,
+                    SAFE_CAST(nr_secao AS INT64)     AS nr_secao,
+                    MAX(SAFE_CAST(qt_aptos AS INT64)) AS qt_aptos
+                FROM `{silver}.tse_locais_*`
+                WHERE qt_aptos IS NOT NULL
+                GROUP BY sg_uf, cd_municipio, nr_zona, nr_secao
+            )
+            SELECT
+                v.sg_uf,
+                v.cd_municipio,
+                v.nm_municipio,
+                v.nr_zona,
+                v.nr_secao,
+                v.cd_cargo,
+                v.nr_turno,
+                v.ano_eleicao,
+                a.qt_aptos,
+                v.total_votos_secao,
+                SAFE_DIVIDE(
+                    a.qt_aptos - v.total_votos_secao,
+                    a.qt_aptos
+                )                           AS taxa_abstencao,
+                CURRENT_TIMESTAMP()         AS ingested_at
+            FROM votos_secao v
+            LEFT JOIN aptos a
+                USING (sg_uf, cd_municipio, nr_zona, nr_secao)
+            WHERE a.qt_aptos IS NOT NULL
+              AND a.qt_aptos > 0
+        """,
+        # ── RJ region dimension ───────────────────────────────────────────────
+        "dim_regiao_rj": _get_dim_regiao_rj_sql(gold),
+        # ── Incumbency dimension (spepe_mlops — not Gold) ─────────────────────
+        "dim_incumbencia": compute_incumbencia_sql(
+            project_id=_GCP_PROJECT,
+            silver_dataset=_BQ_SILVER_DATASET,
+            gold_dataset=_BQ_GOLD_DATASET,
+        ),
     }
 
     # Tables that may have no Silver source yet — skip without failing the job
@@ -750,20 +812,31 @@ def _build_gold_via_bigquery_sql() -> dict:
         "fact_votacoes_parlamentar",
         "fact_perfil_eleitorado",
         "fact_locais_votacao",
+        "fact_abstencao_secao",
+        "dim_regiao_rj",
+        "dim_incumbencia",
     }
+
+    # Tables that live in spepe_mlops instead of spepe_gold
+    _MLOPS_TABLES = {"dim_incumbencia"}
 
     results = {}
     for table_name, sql in sqls.items():
+        dataset_path = (
+            f"{_GCP_PROJECT}.{_BQ_MLOPS_DATASET}"
+            if table_name in _MLOPS_TABLES
+            else gold
+        )
         try:
-            client.query(f"DROP TABLE IF EXISTS `{gold}.{table_name}`").result()
+            client.query(f"DROP TABLE IF EXISTS `{dataset_path}.{table_name}`").result()
             job = client.query(sql)
             job.result()
             row_count = (
-                client.query(f"SELECT COUNT(*) FROM `{gold}.{table_name}`")
+                client.query(f"SELECT COUNT(*) FROM `{dataset_path}.{table_name}`")
                 .to_dataframe(create_bqstorage_client=False)
                 .iloc[0, 0]
             )
-            results[table_name] = {"path": f"{gold}.{table_name}", "rows": int(row_count)}
+            results[table_name] = {"path": f"{dataset_path}.{table_name}", "rows": int(row_count)}
             logger.info("Gold BQ SQL: %s (%d rows)", table_name, row_count)
         except Exception as exc:
             if table_name in _OPTIONAL:

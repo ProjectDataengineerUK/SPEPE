@@ -24,6 +24,12 @@ IBGE_COL_ALIASES: dict[str, str] = {
 }
 
 
+# Incumbency features — computed from tse_candidaturas via dim_incumbencia
+INCUMBENCY_FEATURE_COLS = [
+    "is_incumbent_int",   # 1 if candidate held the same office in the prior election
+    "trocou_partido_int", # 1 if candidate switched party since the prior election
+]
+
 # Dynamic external features — available when social tokens are configured
 DYNAMIC_FEATURE_COLS = [
     "sentimento_score",  # social media sentiment [-1, 1]
@@ -38,7 +44,7 @@ DYNAMIC_FEATURE_COLS = [
 POLL_DELTA_COL = "delta_poll"
 
 # All features used in M2 (full electoral model)
-ELECTORAL_M2_COLS = IBGE_DEMOGRAPHIC_COLS + [
+ELECTORAL_M2_COLS = IBGE_DEMOGRAPHIC_COLS + INCUMBENCY_FEATURE_COLS + [
     "pct_votos_historico",
     "media_intencao_voto_uf",
 ]

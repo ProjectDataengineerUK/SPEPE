@@ -35,6 +35,7 @@ _COL_MAP_LOCAIS: dict[str, str] = {
     "NR_CEP": "nr_cep",
     "NR_LATITUDE": "nr_latitude",
     "NR_LONGITUDE": "nr_longitude",
+    "QT_APTOS": "qt_aptos",
 }
 
 # Raw TSE column → canonical lowercase name
@@ -290,7 +291,7 @@ def download_eleitorado_locais(uf: str) -> str:
                                     chunk[col].str.replace(",", ".", regex=False),
                                     errors="coerce",
                                 )
-                        for col in ("cd_municipio", "nr_zona", "nr_secao", "nr_local_votacao"):
+                        for col in ("cd_municipio", "nr_zona", "nr_secao", "nr_local_votacao", "qt_aptos"):
                             if col in chunk.columns:
                                 chunk[col] = pd.to_numeric(chunk[col], errors="coerce")
                         if "sg_uf" in chunk.columns:
