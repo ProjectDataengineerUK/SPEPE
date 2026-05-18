@@ -6495,6 +6495,136 @@ def _is_eleito(ds: str | None) -> bool:
     return "ELEITO" in ds_up and "NÃO" not in ds_up and "NAO" not in ds_up
 
 
+_INVALIDOS_NOMES = {
+    "VOTO BRANCO", "VOTO NULO", "VOTO EM BRANCO", "#NULO#", "#NULO", "NULO", "BRANCO"
+}
+
+
+def _comparativo_from_silver_local(
+    uf: str,
+    cd_cargo: int,
+    turno: int,
+    situacao: str,
+    limit: int,
+) -> tuple[list[dict], bool]:
+    """
+    Monta comparativo 2018×2022 a partir de arquivos Silver locais (parquet).
+    Retorna (candidatos, situacao_disponivel).
+    """
+    frames: list[pd.DataFrame] = []
+    for f in sorted(_LOCAL_SILVER_DIR.glob("tse_*.parquet")):
+        try:
+            df = pd.read_parquet(f)
+            frames.append(df)
+        except Exception:
+            continue
+    if not frames:
+        return [], False
+
+    df = pd.concat(frames, ignore_index=True)
+    df.columns = [c.lower() for c in df.columns]
+
+    # normalise column names
+    col_map = {"sg_uf": "sg_uf", "cd_cargo": "cd_cargo", "nr_turno": "nr_turno",
+               "ano_eleicao": "ano_eleicao", "nm_candidato": "nm_candidato",
+               "sg_partido": "sg_partido", "total_votos": "total_votos",
+               "qt_votos_nominais": "total_votos", "ds_situacao": "ds_situacao",
+               "ds_sit_cand_tot": "ds_situacao"}
+    df = df.rename(columns={k: v for k, v in col_map.items() if k in df.columns})
+
+    needed = {"sg_uf", "cd_cargo", "nr_turno", "ano_eleicao", "nm_candidato", "total_votos"}
+    if not needed.issubset(df.columns):
+        return [], False
+
+    # filter
+    mask = (
+        (df["sg_uf"].str.upper() == uf.upper())
+        & (df["cd_cargo"].astype(str) == str(cd_cargo))
+        & (df["nr_turno"].astype(str) == str(turno))
+        & (df["ano_eleicao"].isin([2018, 2022]))
+        & (df["nm_candidato"].notna())
+        & (~df["nm_candidato"].str.upper().str.strip().isin(_INVALIDOS_NOMES))
+        & (~df["nm_candidato"].str.startswith("#", na=False))
+    )
+    df = df[mask].copy()
+    if df.empty:
+        return [], False
+
+    sit_disponivel = "ds_situacao" in df.columns
+    if "ds_situacao" not in df.columns:
+        df["ds_situacao"] = ""
+    if "sg_partido" not in df.columns:
+        df["sg_partido"] = ""
+
+    df["total_votos"] = pd.to_numeric(df["total_votos"], errors="coerce").fillna(0)
+    df["ano_eleicao"] = pd.to_numeric(df["ano_eleicao"], errors="coerce").astype(int)
+
+    grp = (
+        df.groupby(["nm_candidato", "sg_partido", "ano_eleicao", "ds_situacao"])
+        .agg(votos=("total_votos", "sum"))
+        .reset_index()
+    )
+
+    # pivot
+    pivot = grp.groupby("nm_candidato").agg(
+        sg_partido=("sg_partido", "last"),
+        votos_2018=("votos", lambda s: s[grp.loc[s.index, "ano_eleicao"] == 2018].sum()),
+        votos_2022=("votos", lambda s: s[grp.loc[s.index, "ano_eleicao"] == 2022].sum()),
+        ds_sit_2018=("ds_situacao", lambda s: next(
+            (v for v, a in zip(s, grp.loc[s.index, "ano_eleicao"]) if a == 2018 and v), "")),
+        ds_sit_2022=("ds_situacao", lambda s: next(
+            (v for v, a in zip(s, grp.loc[s.index, "ano_eleicao"]) if a == 2022 and v), "")),
+    ).reset_index()
+
+    tot18 = pivot["votos_2018"].sum() or 1
+    tot22 = pivot["votos_2022"].sum() or 1
+    pivot["pct_2018"] = (pivot["votos_2018"] / tot18 * 100).round(2)
+    pivot["pct_2022"] = (pivot["votos_2022"] / tot22 * 100).round(2)
+    pivot["delta_votos"] = pivot["votos_2022"] - pivot["votos_2018"]
+    pivot = pivot.sort_values("votos_2022", ascending=False).reset_index(drop=True)
+    pivot["rank_2022"] = (pivot["votos_2022"] > 0).cumsum().where(pivot["votos_2022"] > 0)
+    pivot18 = pivot.sort_values("votos_2018", ascending=False).reset_index(drop=True)
+    pivot["rank_2018"] = None
+    for i, nm in enumerate(pivot18["nm_candidato"]):
+        if pivot18.iloc[i]["votos_2018"] > 0:
+            pivot.loc[pivot["nm_candidato"] == nm, "rank_2018"] = i + 1
+
+    pivot["delta_rank"] = pivot.apply(
+        lambda r: (int(r["rank_2018"]) - int(r["rank_2022"]))
+        if pd.notna(r["rank_2018"]) and pd.notna(r["rank_2022"]) else None,
+        axis=1,
+    )
+
+    candidatos = []
+    for _, r in pivot.iterrows():
+        ds18 = r.get("ds_sit_2018") or ""
+        ds22 = r.get("ds_sit_2022") or ""
+        if situacao == "eleito" and not (_is_eleito(ds18) or _is_eleito(ds22)):
+            continue
+        if situacao == "nao_eleito" and (_is_eleito(ds18) or _is_eleito(ds22)):
+            continue
+        candidatos.append({
+            "nm_candidato": r["nm_candidato"],
+            "sg_partido": r.get("sg_partido") or "",
+            "votos_2018": int(r["votos_2018"]),
+            "votos_2022": int(r["votos_2022"]),
+            "pct_2018": float(r["pct_2018"]),
+            "pct_2022": float(r["pct_2022"]),
+            "rank_2018": int(r["rank_2018"]) if pd.notna(r.get("rank_2018")) else None,
+            "rank_2022": int(r["rank_2022"]) if pd.notna(r.get("rank_2022")) else None,
+            "delta_votos": int(r["delta_votos"]),
+            "delta_rank": int(r["delta_rank"]) if pd.notna(r.get("delta_rank")) else None,
+            "ds_situacao_2018": ds18,
+            "ds_situacao_2022": ds22,
+            "eleito_2018": _is_eleito(ds18),
+            "eleito_2022": _is_eleito(ds22),
+        })
+        if len(candidatos) >= limit:
+            break
+
+    return candidatos, sit_disponivel
+
+
 @app.get("/api/comparativo/candidatos")
 async def get_comparativo_candidatos(
     uf: str = Query("SP"),
@@ -6505,160 +6635,168 @@ async def get_comparativo_candidatos(
 ) -> JSONResponse:
     """
     Ranking comparativo 2018 × 2022 por candidato/UF/cargo.
-    situacao: todos | eleito | nao_eleito
+    situacao: todos | eleito | nao_eleito — depende de ds_situacao no Silver.
     Exclui votos em branco e nulos automaticamente.
+    Fallback: Silver local (parquet) quando BigQuery indisponível.
     """
-    if not (settings.gcp_project_id and os.environ.get("USE_BIGQUERY", "").lower() == "true"):
-        return JSONResponse({"status": "bigquery_disabled", "candidatos": [], "anos": [2018, 2022]})
-
-    from google.cloud import bigquery
-
-    client = bigquery.Client(project=settings.gcp_project_id)
     cd_cargo = _cargo_to_cd(cargo, 6)
-    gold = f"{settings.gcp_project_id}.{settings.bigquery_dataset_gold}"
-    silver = f"{settings.gcp_project_id}.{settings.bigquery_dataset_silver}"
-    params = [
-        bigquery.ScalarQueryParameter("uf", "STRING", uf.upper()),
-        bigquery.ScalarQueryParameter("cd_cargo", "INT64", cd_cargo),
-        bigquery.ScalarQueryParameter("turno", "INT64", turno),
-    ]
 
-    gold_query = f"""
-        WITH base AS (
-            SELECT
-                nm_candidato,
-                sg_partido,
-                ano_eleicao,
-                SUM(total_votos) AS votos
-            FROM `{gold}.fact_municipio_candidato_eleicao`
-            WHERE sg_uf    = @uf
-              AND cd_cargo = @cd_cargo
-              AND nr_turno = @turno
-              AND ano_eleicao IN (2018, 2022)
-              AND {_FILTER_INVALIDOS}
-            GROUP BY nm_candidato, sg_partido, ano_eleicao
-        ),
-        ranked AS (
-            SELECT
-                nm_candidato, sg_partido, ano_eleicao, votos,
-                ROUND(votos / NULLIF(SUM(votos) OVER (PARTITION BY ano_eleicao), 0) * 100, 2) AS pct,
-                RANK() OVER (PARTITION BY ano_eleicao ORDER BY votos DESC) AS ranking
-            FROM base
-        ),
-        pivoted AS (
-            SELECT
-                nm_candidato,
-                MAX(sg_partido)                             AS sg_partido,
-                MAX(IF(ano_eleicao=2018, votos,   NULL))   AS votos_2018,
-                MAX(IF(ano_eleicao=2022, votos,   NULL))   AS votos_2022,
-                MAX(IF(ano_eleicao=2018, pct,     NULL))   AS pct_2018,
-                MAX(IF(ano_eleicao=2022, pct,     NULL))   AS pct_2022,
-                MAX(IF(ano_eleicao=2018, ranking, NULL))   AS rank_2018,
-                MAX(IF(ano_eleicao=2022, ranking, NULL))   AS rank_2022
-            FROM ranked
-            GROUP BY nm_candidato
-        )
-        SELECT
-            nm_candidato,
-            sg_partido,
-            COALESCE(votos_2018, 0)                            AS votos_2018,
-            COALESCE(votos_2022, 0)                            AS votos_2022,
-            COALESCE(pct_2018,   0.0)                          AS pct_2018,
-            COALESCE(pct_2022,   0.0)                          AS pct_2022,
-            rank_2018,
-            rank_2022,
-            COALESCE(votos_2022,0) - COALESCE(votos_2018,0)   AS delta_votos,
-            IF(rank_2022 IS NOT NULL AND rank_2018 IS NOT NULL,
-               rank_2018 - rank_2022, NULL)                    AS delta_rank
-        FROM pivoted
-        ORDER BY COALESCE(votos_2022, votos_2018) DESC
-        LIMIT {min(limit, 500)}
-    """
+    # ── BigQuery path ─────────────────────────────────────────────────────────
+    use_bq = bool(settings.gcp_project_id and os.environ.get("USE_BIGQUERY", "").lower() == "true")
+    if use_bq:
+        try:
+            from google.cloud import bigquery
 
-    # Silver query for ds_situacao — works before Gold rebuild too
-    silver_query = f"""
-        SELECT
-            nm_candidato,
-            ano_eleicao,
-            ANY_VALUE(ds_situacao) AS ds_situacao
-        FROM `{silver}.tse_*`
-        WHERE sg_uf    = @uf
-          AND cd_cargo = @cd_cargo
-          AND nr_turno = @turno
-          AND ano_eleicao IN (2018, 2022)
-          AND nm_candidato IS NOT NULL
-          AND UPPER(TRIM(nm_candidato)) NOT IN
-              ('VOTO BRANCO','VOTO NULO','VOTO EM BRANCO','#NULO#','#NULO','NULO','BRANCO')
-        GROUP BY nm_candidato, ano_eleicao
-    """
+            client = bigquery.Client(project=settings.gcp_project_id)
+            gold = f"{settings.gcp_project_id}.{settings.bigquery_dataset_gold}"
+            silver = f"{settings.gcp_project_id}.{settings.bigquery_dataset_silver}"
+            params = [
+                bigquery.ScalarQueryParameter("uf", "STRING", uf.upper()),
+                bigquery.ScalarQueryParameter("cd_cargo", "INT64", cd_cargo),
+                bigquery.ScalarQueryParameter("turno", "INT64", turno),
+            ]
 
-    cfg_gold = bigquery.QueryJobConfig(query_parameters=params)
-    cfg_silver = bigquery.QueryJobConfig(query_parameters=params)
+            gold_query = f"""
+                WITH base AS (
+                    SELECT nm_candidato, sg_partido, ano_eleicao,
+                           SUM(total_votos) AS votos
+                    FROM `{gold}.fact_municipio_candidato_eleicao`
+                    WHERE sg_uf    = @uf
+                      AND cd_cargo = @cd_cargo
+                      AND nr_turno = @turno
+                      AND ano_eleicao IN (2018, 2022)
+                      AND {_FILTER_INVALIDOS}
+                    GROUP BY nm_candidato, sg_partido, ano_eleicao
+                ),
+                ranked AS (
+                    SELECT nm_candidato, sg_partido, ano_eleicao, votos,
+                        ROUND(votos / NULLIF(SUM(votos) OVER (PARTITION BY ano_eleicao), 0) * 100, 2) AS pct,
+                        RANK() OVER (PARTITION BY ano_eleicao ORDER BY votos DESC) AS ranking
+                    FROM base
+                ),
+                pivoted AS (
+                    SELECT nm_candidato,
+                        MAX(sg_partido)                           AS sg_partido,
+                        MAX(IF(ano_eleicao=2018, votos,   NULL)) AS votos_2018,
+                        MAX(IF(ano_eleicao=2022, votos,   NULL)) AS votos_2022,
+                        MAX(IF(ano_eleicao=2018, pct,     NULL)) AS pct_2018,
+                        MAX(IF(ano_eleicao=2022, pct,     NULL)) AS pct_2022,
+                        MAX(IF(ano_eleicao=2018, ranking, NULL)) AS rank_2018,
+                        MAX(IF(ano_eleicao=2022, ranking, NULL)) AS rank_2022
+                    FROM ranked GROUP BY nm_candidato
+                )
+                SELECT nm_candidato, sg_partido,
+                    COALESCE(votos_2018, 0)                          AS votos_2018,
+                    COALESCE(votos_2022, 0)                          AS votos_2022,
+                    COALESCE(pct_2018,   0.0)                        AS pct_2018,
+                    COALESCE(pct_2022,   0.0)                        AS pct_2022,
+                    rank_2018, rank_2022,
+                    COALESCE(votos_2022,0) - COALESCE(votos_2018,0) AS delta_votos,
+                    IF(rank_2022 IS NOT NULL AND rank_2018 IS NOT NULL,
+                       rank_2018 - rank_2022, NULL)                  AS delta_rank
+                FROM pivoted
+                ORDER BY COALESCE(votos_2022, votos_2018) DESC
+                LIMIT {min(limit, 500)}
+            """
 
-    try:
-        gold_rows = await asyncio.to_thread(
-            lambda: list(client.query(gold_query, job_config=cfg_gold).result())
-        )
-    except Exception as exc:
-        logger.error("comparativo gold BQ erro: %s", exc, exc_info=True)
-        return JSONResponse(
-            {"status": "error", "error": str(exc), "candidatos": []}, status_code=500
-        )
+            silver_query = f"""
+                SELECT nm_candidato, ano_eleicao,
+                       ANY_VALUE(ds_situacao) AS ds_situacao
+                FROM `{silver}.tse_*`
+                WHERE sg_uf    = @uf
+                  AND cd_cargo = @cd_cargo
+                  AND nr_turno = @turno
+                  AND ano_eleicao IN (2018, 2022)
+                  AND nm_candidato IS NOT NULL
+                  AND UPPER(TRIM(nm_candidato)) NOT IN
+                      ('VOTO BRANCO','VOTO NULO','VOTO EM BRANCO','#NULO#','#NULO','NULO','BRANCO')
+                GROUP BY nm_candidato, ano_eleicao
+            """
 
-    # Silver (ds_situacao) é opcional — falha não bloqueia o endpoint
-    sit_map: dict[tuple, str] = {}
-    silver_ok = True
-    try:
-        silver_rows = await asyncio.to_thread(
-            lambda: list(client.query(silver_query, job_config=cfg_silver).result())
-        )
-        for r in silver_rows:
-            sit_map[(r["nm_candidato"], int(r["ano_eleicao"]))] = r["ds_situacao"] or ""
-    except Exception as exc:
-        logger.warning("comparativo silver sit_map indisponivel: %s", exc)
-        silver_ok = False
+            cfg_gold = bigquery.QueryJobConfig(query_parameters=params)
+            cfg_silver = bigquery.QueryJobConfig(query_parameters=params)
 
-    candidatos = []
-    for r in gold_rows:
-        nm = r["nm_candidato"] or ""
-        ds18 = sit_map.get((nm, 2018), "")
-        ds22 = sit_map.get((nm, 2022), "")
-        # situacao filter
-        if situacao == "eleito" and not (_is_eleito(ds18) or _is_eleito(ds22)):
-            continue
-        if situacao == "nao_eleito" and (_is_eleito(ds18) or _is_eleito(ds22)):
-            continue
-        candidatos.append(
-            {
-                "nm_candidato": nm,
-                "sg_partido": r["sg_partido"] or "",
-                "votos_2018": int(r["votos_2018"] or 0),
-                "votos_2022": int(r["votos_2022"] or 0),
-                "pct_2018": float(r["pct_2018"] or 0.0),
-                "pct_2022": float(r["pct_2022"] or 0.0),
-                "rank_2018": int(r["rank_2018"]) if r["rank_2018"] else None,
-                "rank_2022": int(r["rank_2022"]) if r["rank_2022"] else None,
-                "delta_votos": int(r["delta_votos"] or 0),
-                "delta_rank": int(r["delta_rank"]) if r["delta_rank"] else None,
-                "ds_situacao_2018": ds18,
-                "ds_situacao_2022": ds22,
-                "eleito_2018": _is_eleito(ds18),
-                "eleito_2022": _is_eleito(ds22),
-            }
-        )
+            gold_rows = await asyncio.to_thread(
+                lambda: list(client.query(gold_query, job_config=cfg_gold).result())
+            )
 
-    return JSONResponse(
-        {
-            "status": "ok",
-            "uf": uf.upper(),
-            "cargo": cargo,
-            "turno": turno,
-            "anos": [2018, 2022],
-            "total": len(candidatos),
-            "candidatos": candidatos,
-            "situacao_disponivel": silver_ok,
-        }
+            sit_map: dict[tuple, str] = {}
+            silver_ok = True
+            try:
+                silver_rows = await asyncio.to_thread(
+                    lambda: list(client.query(silver_query, job_config=cfg_silver).result())
+                )
+                for r in silver_rows:
+                    sit_map[(r["nm_candidato"], int(r["ano_eleicao"]))] = r["ds_situacao"] or ""
+            except Exception as exc:
+                logger.warning("comparativo silver sit_map indisponivel: %s", exc)
+                silver_ok = False
+
+            candidatos = []
+            for r in gold_rows:
+                nm = r["nm_candidato"] or ""
+                ds18 = sit_map.get((nm, 2018), "")
+                ds22 = sit_map.get((nm, 2022), "")
+                if situacao == "eleito" and not (_is_eleito(ds18) or _is_eleito(ds22)):
+                    continue
+                if situacao == "nao_eleito" and (_is_eleito(ds18) or _is_eleito(ds22)):
+                    continue
+                candidatos.append({
+                    "nm_candidato": nm,
+                    "sg_partido": r["sg_partido"] or "",
+                    "votos_2018": int(r["votos_2018"] or 0),
+                    "votos_2022": int(r["votos_2022"] or 0),
+                    "pct_2018": float(r["pct_2018"] or 0.0),
+                    "pct_2022": float(r["pct_2022"] or 0.0),
+                    "rank_2018": int(r["rank_2018"]) if r["rank_2018"] else None,
+                    "rank_2022": int(r["rank_2022"]) if r["rank_2022"] else None,
+                    "delta_votos": int(r["delta_votos"] or 0),
+                    "delta_rank": int(r["delta_rank"]) if r["delta_rank"] else None,
+                    "ds_situacao_2018": ds18,
+                    "ds_situacao_2022": ds22,
+                    "eleito_2018": _is_eleito(ds18),
+                    "eleito_2022": _is_eleito(ds22),
+                })
+
+            return JSONResponse({
+                "status": "ok",
+                "uf": uf.upper(), "cargo": cargo, "turno": turno,
+                "anos": [2018, 2022], "total": len(candidatos),
+                "candidatos": candidatos,
+                "situacao_disponivel": silver_ok,
+                "fonte": "bigquery",
+            })
+
+        except Exception as exc:
+            logger.warning("comparativo BQ falhou, tentando Silver local: %s", exc)
+            # fall through to local path
+
+    # ── Local Silver parquet fallback ────────────────────────────────────────
+    candidatos, sit_disponivel = await asyncio.to_thread(
+        _comparativo_from_silver_local, uf, cd_cargo, turno, situacao, min(limit, 500)
     )
+    if not candidatos and situacao != "todos":
+        # retry sem filtro para confirmar se há dados no Silver local
+        all_cands, _ = await asyncio.to_thread(
+            _comparativo_from_silver_local, uf, cd_cargo, turno, "todos", 1
+        )
+        if not all_cands:
+            return JSONResponse({
+                "status": "sem_dados",
+                "candidatos": [], "anos": [2018, 2022],
+                "situacao_disponivel": False,
+                "fonte": "local",
+                "msg": "Sem dados Silver locais para esta UF/cargo — execute o job tse_ingest primeiro",
+            })
+
+    return JSONResponse({
+        "status": "ok",
+        "uf": uf.upper(), "cargo": cargo, "turno": turno,
+        "anos": [2018, 2022], "total": len(candidatos),
+        "candidatos": candidatos,
+        "situacao_disponivel": sit_disponivel,
+        "fonte": "local",
+    })
 
 
 # Federações eleitorais 2022 (TSE não expõe via resultados — lookup estático)

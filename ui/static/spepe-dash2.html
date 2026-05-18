@@ -1488,18 +1488,22 @@ async function loadComparativo() {
   }
 
   const d = await api(url);
-  if (!d || d.status === 'error') {
-    if (empty) { empty.style.display = 'block'; empty.textContent = d?.error || 'Erro ao carregar dados — verifique a conexão com BigQuery'; }
+  if (!d) {
+    if (empty) { empty.style.display = 'block'; empty.textContent = 'Erro de rede — servidor indisponível'; }
     return;
   }
-  if (d.status === 'bigquery_disabled') {
-    if (empty) { empty.style.display = 'block'; empty.textContent = 'BigQuery não configurado — dados disponíveis apenas em produção'; }
+  if (d.status === 'sem_dados') {
+    if (empty) { empty.style.display = 'block'; empty.textContent = d.msg || 'Sem dados para esta UF/cargo — execute o job tse_ingest primeiro'; }
+    return;
+  }
+  if (d.status === 'error' || d.status === 'bigquery_disabled') {
+    if (empty) { empty.style.display = 'block'; empty.textContent = d.error || 'Dados indisponível — BigQuery não configurado ou ingestão pendente'; }
     return;
   }
   _cmp2Data = d[key] || [];
-  // Situação (eleito/não eleito) depende de dados Silver — avisa se indisponível
+  // Situação (eleito/não eleito) depende de ds_situacao no Silver
   if (!d.situacao_disponivel && _cmp2Sit !== 'todos') {
-    if (empty) { empty.style.display = 'block'; empty.textContent = 'Filtro de situação indisponível — dados Silver ainda não carregados'; }
+    if (empty) { empty.style.display = 'block'; empty.textContent = 'Filtro eleito/não-eleito indisponível — ds_situacao ausente nos dados Silver locais'; }
     return;
   }
   if (!_cmp2Data.length) {
