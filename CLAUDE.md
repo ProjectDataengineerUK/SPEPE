@@ -3,9 +3,10 @@
 **Sistema de Perfilamento do Eleitorado e Previsão Eleitoral**
 Análise eleitoral brasileira via multi-agentes LLM com arquitetura Medallion no GCP.
 
-**Estado atual:** v1.1 — 21 clientes de dados implementados; 17 prontos para modelo (14 Bronze→Silver→Gold + 3 parciais)
-**Próximo:** Sprint 1 Modelo Bayesiano (começa quarta 2026-05-15); Completar 3 fontes parciais (Polls/GDELT/BlueSky) seg-ter
+**Estado atual:** v1.2 — 22 clientes de dados + 28 jobs implementados; modelo PyMC 2-arquiteturas codificado, aguardando execução em GCP
+**Próximo:** Executar `spepe-pymc-train` + `spepe-pymc-electoral-train` em Cloud Run (requer GCP); release tag v1.2.0
 **Decisão FINAL (2026-05-12):** Usar 17 fontes para modelo (não 13 ou 14) para máxima riqueza de features
+**Última feature (2026-05-18):** Comparativo 2018×2022 com filtros eleito/não-eleito + federações partidárias
 
 ---
 
@@ -62,7 +63,7 @@ GCP — região principal: southamerica-east1 (LGPD)
 
 ```
 agents/
-  supervisor.py          # Claude Sonnet — roteador principal, DOMA loop
+  supervisor.py          # Claude Sonnet (AsyncAnthropic) — roteador principal, DOMA loop
   gemini_agent.py        # Wrapper Gemini via Vertex AI
   loader.py              # Carrega registry/*.md e instancia GeminiAgents
   tools.py               # run_dataops_job — executa Cloud Run Jobs
@@ -79,45 +80,93 @@ dataops/
   silver_transformer.py  # Bronze → Silver (normaliza, join TSE+IBGE, DQ)
   gold_builder.py        # Silver → Gold (fatos agregados)
   depara_municipios.py   # Join TSE código ↔ IBGE código
-  clients/
+  clients/               # 22 clientes implementados
     tse_client.py        # Download TSE (zips TSE) + normalize_columns()
     ibge_client.py       # SIDRA API + Localidades API
     digital_client.py    # pytrends (Google Trends) + Meta Graph API
-  jobs/
-    tse_ingest_job.py    # Cloud Run Job: TSE → Bronze
-    ibge_sync_job.py     # Cloud Run Job: IBGE → Bronze
-    digital_ingest_job.py # Cloud Run Job: Trends + Meta → Bronze
-    silver_transform_job.py
-    gold_build_job.py
+    social_client.py     # Twitter/X, Facebook, BlueSky, GDELT, RSS
+    polls_client.py      # Poder360 aggregator (substituiu 5 scrapers individuais)
+    cadunico_client.py   # CadÚnico + Bolsa Família (Portal Transparência)
+    emendas_client.py    # Emendas parlamentares (Portal Transparência)
+    sancoes_client.py    # CEIS + CNEP + CEAF + CEPIM (Portal Transparência)
+    datasus_client.py    # PySUS FTP integration
+    cetic_client.py / dieese_client.py / seguranca_client.py
+    camara_senado_client.py / tse_perfil_client.py / tse_candidaturas_client.py
+    gdelt_client.py / bluesky_client.py / bacen_client.py / reddit_client.py
+    candidato_2026_client.py / news_rss_client.py / agencies_client.py
+  jobs/                  # 28 jobs implementados
+    tse_ingest_job.py / ibge_sync_job.py / digital_ingest_job.py
+    silver_transform_job.py / gold_build_job.py
+    polls_ingest_job.py / gdelt_ingest_job.py / bluesky_ingest_job.py
+    social_ingest_job.py / pesquisas_ingest_job.py / sentiment_geocode_job.py
+    cadunico_ingest_job.py / emendas_ingest_job.py / sancoes_ingest_job.py
+    datasus_ingest_job.py / cetic_ingest_job.py / dieese_ingest_job.py
+    security_ingest_job.py / camara_senado_ingest_job.py / endividamento_ingest_job.py
+    tse_perfil_ingest_job.py / tse_candidaturas_ingest_job.py / tse_locais_ingest_job.py
+    reddit_ingest_job.py / candidatos_discovery_job.py / agencies_ingest_job.py
+    dim_territorio_sync_job.py / drift_check_job.py / retrain_trigger_job.py
 
 ui/
   chainlit_app.py        # Entry point Chainlit — monta FastAPI + importa dashboard_api
-  dashboard_api.py       # FastAPI routes: /dash /api/* /ws/chat
+  dashboard_api.py       # FastAPI — 71 rotas, 6834 linhas; /dash /api/* /ws/chat
+  sentinel_queries.py    # Queries BQ paralelas para painel Sentinel
+  sentinel_pubsub.py     # SSE stream para admin Sentinel
   static/
-    spepe-app.html       # Dashboard HTML (Chart.js, multi-cargo, chat↔sync)
+    spepe-app.html       # Dashboard principal (Chart.js, Leaflet, chat↔sync)
+    spepe-dash2.html     # Dashboard profissional v2 (redesign completo)
+    spepe-prototype.html # Protótipo mapa-cêntrico (referência)
+    admin.html           # Painel Admin + Sentinel real-time
+    geo_uf.geojson / geo_regiao.geojson / geo_mun_{UF}.geojson (27 UFs)
 
 mlops/
-  vertex_pipeline.py     # KFP pipeline (usa kfp — não kfp.v2)
-  pymc_model.py          # Modelo Bayesiano PyMC
+  FEATURE_SPEC.md        # Especificação das features (3 blocos: estrutural/eleitoral/externo)
+  model_card.md          # Model card MVP v1.0
+  pymc_model.py          # Modelo bootstrap (baseline)
+  pymc_electoral_model.py # Modelo hierárquico eleitoral (features completas)
+  pymc_train.py          # Job M1: baseline demográfico (4 features IBGE)
+  pymc_electoral_train.py # Job M2: eleitoral completo (histórico+polls+IBGE) — Brier gate < 0.18
   shap_explainer.py      # SHAP explainability
   poll_aggregator.py     # Agrega pesquisas eleitorais
+  shared_schema.py       # Schema compartilhado entre jobs MLOps
+  vertex_pipeline.py     # KFP pipeline (usa kfp — não kfp.v2)
+  prediction_store.py    # BigQuery fact_predictions + deferred eval
   components/
-    train_bootstrap.py
-    evaluate.py
-    hptuning.py          # Vertex AI HyperparameterTuningJob
-    promote.py
+    train_bootstrap.py / evaluate.py / hptuning.py / promote.py
   deployment/
     canary_manager.py    # Cloud Run traffic split 10% challenger
     auto_rollback.py     # Reverte se Brier score degradar
   monitoring/
     drift_monitor.py     # JS divergence — publica Pub/Sub se > 0.10
     bias_monitor.py      # Métricas por sg_uf e quintil de renda
-    pubsub_publisher.py
-  prediction_store.py    # BigQuery fact_predictions + deferred eval
+    drift_config.yaml / alerts.yaml
   eval/
-    eval_runner.py       # Gate de qualidade LLM contra golden_dataset.jsonl
-    metrics.py
-    golden_dataset.jsonl
+    eval_runner.py       # Gate qualidade LLM contra golden_dataset.jsonl
+    electoral_dataset_builder.py / training_dataset_builder.py
+    metrics.py / golden_dataset.jsonl
+  tracing/               # Cloud Trace integration
+
+sentinel/                # Monitoramento operacional em tempo real (NOVO — não estava no v1.1)
+  main.py / orchestrator.py / genai_interpreter.py
+  watchers/              # DataOpsWatcher, MLOpsWatcher, InfraWatcher, SocialWatcher
+  analysts/              # AnomalyDetector, PatternDetector
+  crews/                 # Observadores, Analisadores, Interpretadores, Despachantes
+  events/ / kb/ / dispatch/
+
+judge/                   # Auditor independente de modelo (NOVO — não estava no v1.1)
+  ml_judge.py            # Parecer: Aprovado / Aprovado com ressalvas / Reprovado
+  promotion_gate.py      # Bloqueia promoção se MLJudge rejeitar
+  fairness_auditor.py    # Auditoria de equidade por UF/quintil
+  independent_backtester.py / technical_report.py / judge_config.yaml
+
+llmops/                  # LLM registry loader (NOVO)
+  registry_loader.py
+
+memory_store/            # Memória de sessão persistente (NOVO)
+  memory_manager.py / session_memory.py / retriever.py / memory_types.py
+
+archetype/               # Clustering HDBSCAN + UMAP para perfis eleitorais
+  clustering.py / pipeline.py / features.py / labels.py
+  reduction.py / visualizer.py / cards.py / cache.py
 
 security/
   secret_manager.py      # ENV → Secret Manager com cache
@@ -125,17 +174,11 @@ security/
   iap_config.yaml
 
 hooks/
-  cost_guard_hook.py     # Bloqueia se budget esgotado
-  dlp_hook.py            # Mascaramento CPF/CNPJ/telefone
-  rate_limit_hook.py
-  security_hook.py
-  audit_hook.py
-  output_compressor_hook.py
-  context_budget_hook.py
+  cost_guard_hook.py / dlp_hook.py / rate_limit_hook.py
+  security_hook.py / audit_hook.py / output_compressor_hook.py / context_budget_hook.py
 
-archetype/               # Clustering HDBSCAN + UMAP para perfis eleitorais
-infra/terraform/         # IaC completo — ver seção Terraform abaixo
-tests/
+infra/terraform/         # IaC completo — 25 arquivos .tf — ver seção Terraform abaixo
+tests/                   # 223 arquivos .py de teste
 ```
 
 ---
@@ -227,39 +270,52 @@ Use o modelo adequado à complexidade da tarefa para otimizar custo e qualidade.
 |---|---|---|---|
 | 2026-04-24 | Criar seção de seleção de modelo | Sonnet 4.6 | ✅ OK |
 | 2026-05-12 | Auditoria 21 fontes de dados | Haiku 4.5 | ✅ Decisão: 17 fontes para modelo |
+| 2026-05-18 | Auditoria completa + atualização CLAUDE.md v1.2 | Sonnet 4.6 | ✅ 22 clientes / 28 jobs / Sprint 1 codificado |
 
 ---
 
-## Auditoria de Fontes de Dados — 21 Clientes Implementados
+## Auditoria de Fontes de Dados — 22 Clientes / 28 Jobs Implementados
 
-**Data:** 2026-05-12
-**Achado:** 21 clientes de dados (não 13 como documentado)
-**Decisão:** Usar **17 fontes prontas** (14 completas + 3 parciais em +3 dias) para modelo Bayesiano
+**Atualizado:** 2026-05-18
+**Achado original (2026-05-12):** 21 clientes (não 13). Hoje: 22 clientes + 28 jobs.
+**Decisão:** Usar **17 fontes** para modelo Bayesiano (14 completas + Polls/GDELT/BlueSky)
 
-### Status das 21 Fontes
+### Status das 22 Fontes
 
-✅ **14 Pronto Agora (Bronze→Silver→Gold)**
-- TSE (Pesquisas, Candidaturas, Perfil)
+✅ **17 Prontas para Modelo (Bronze→Silver→Gold + job)**
+- TSE (resultados, candidaturas, perfil, locais)
 - IBGE, DATASUS, CadÚnico, Emendas, Sanções
 - Segurança, Digital, Câmara/Senado, Dieese, CETIC, Social
+- **Polls** — job `polls_ingest_job.py` implementado (Poder360 aggregator, substituiu 5 scrapers)
+- **GDELT** — job `gdelt_ingest_job.py` implementado
+- **BlueSky** — job `bluesky_ingest_job.py` implementado
 
-🟡 **3 Parcial (+3 dias para completar)**
-- Polls (Atlas/institutos) — Silver OK, falta job
-- GDELT (eventos globais) — Silver OK, falta job
-- BlueSky (rede social) — Silver OK, falta job
+🔴 **4 Não usar no modelo agora (clientes existem mas pipeline incompleto)**
+- Agencies — client existe, job existe, dados instáveis
+- Reddit — client + job implementados, uso opcional
+- News RSS — client existe, integrado ao social_client
+- BACEN — client (`bacen_client.py`) existe, sem job dedicado
 
-🔴 **4 Incompleto (não usar agora)**
-- Agencies, Reddit, News RSS, BACEN
+### Sprint 1 Modelo Bayesiano — Estado 2026-05-18
 
-### Timeline Modelo
+**Código:** ✅ Completo — 2 jobs Cloud Run configurados no CI/CD
+**Execução em prod:** ⏳ Aguardando — não rodou ainda (requer GCP ativo)
 
-| Dia | Ação | Fontes |
-|-----|------|--------|
-| Seg-Ter (12-13 mai) | Rodar 3 jobs Polls/GDELT/BlueSky | 17 |
-| Qua (14 mai) | Gold-build com 17 fontes | 17 |
-| Qui (15 mai) | Sprint 1 modelo começa | 17 ✅ |
+| Job Cloud Run | Módulo | Descrição | Gate |
+|--------------|--------|-----------|------|
+| `spepe-pymc-train` | `mlops.pymc_train` | M1: baseline demográfico (4 features IBGE) | — |
+| `spepe-pymc-electoral-train` | `mlops.pymc_electoral_train` | M2: eleitoral completo (histórico+polls+IBGE) | Brier OOS < 0.18 |
 
-Ver [Auditoria Completa](../memory/audit_21_data_sources.md) para detalhes.
+**Features M2** (especificadas em `mlops/FEATURE_SPEC.md`):
+- Bloco 1 Estrutural: `log_populacao`, `log_renda`, `taxa_alfabetizacao`
+- Bloco 2 Eleitoral: `pct_votos_historico` (~30% impacto), `media_intencao_voto`, `delta_poll`
+- Bloco 3 Externo: `sentimento_score`, `tendencia_busca`, `gdelt_intensidade`, `reputacao_score`
+
+**Para executar** (requer GCP):
+```bash
+gcloud run jobs execute spepe-pymc-train --project spepe-dev --region southamerica-east1
+gcloud run jobs execute spepe-pymc-electoral-train --project spepe-dev --region southamerica-east1
+```
 
 ---
 
@@ -330,14 +386,20 @@ html_path = os.path.expanduser("~/.agent/diagrams/spepe-app.html")
 |---------|----------|
 | `main.tf` | Provider, backend GCS (`prefix = "spepe"`) |
 | `variables.tf` | `project_id`, `region`, `vertex_region`, `environment`, `app_image`, `wif_pool_id`, `github_repo` |
+| `apis.tf` | Habilita APIs GCP necessárias |
+| `iam.tf` | Service accounts + IAM bindings globais |
 | `gcs.tf` | Bucket `spepe_data` — Bronze layer |
 | `bigquery.tf` | Datasets Silver + Gold + tabelas fact |
 | `bigquery_mlops.tf` | Dataset MLOps — model_evaluations, bias_metrics, fact_predictions |
 | `cloud_run.tf` | Serviço principal Chainlit/FastAPI |
 | `cloud_run_canary.tf` | Traffic split para challenger |
-| `cloud_run_jobs.tf` | 19 Cloud Run Jobs — tse_ingest, ibge_sync, digital_ingest, social_ingest, pesquisas_ingest, security_ingest, datasus_ingest, dieese_ingest, cetic_ingest, tse_perfil_ingest, tse_candidaturas_ingest, reddit_ingest, camara_senado_ingest, endividamento_ingest, cadunico_ingest, emendas_ingest, sancoes_ingest, silver_transform, gold_build |
-| `secrets.tf` | Secret Manager: ANTHROPIC_API_KEY, META_APP_TOKEN, YOUTUBE_API_KEY + IAM |
+| `cloud_run_jobs.tf` | Cloud Run Jobs (tse_ingest, ibge_sync, digital_ingest, social_ingest, pesquisas_ingest, polls_ingest, gdelt_ingest, bluesky_ingest, security_ingest, datasus_ingest, dieese_ingest, cetic_ingest, tse_perfil_ingest, tse_candidaturas_ingest, reddit_ingest, camara_senado_ingest, endividamento_ingest, cadunico_ingest, emendas_ingest, sancoes_ingest, dim_territorio_sync, silver_transform, gold_build + pymc-train + pymc-electoral-train) |
+| `cloud_scheduler.tf` | Cloud Scheduler — agendamento automático dos jobs |
+| `scheduler.tf` | Schedules adicionais (retrain, drift check) |
+| `domain_mapping.tf` | Custom domain www.spepe.com.br + SSL cert |
+| `secrets.tf` | Secret Manager: ANTHROPIC_API_KEY, META_APP_TOKEN, YOUTUBE_API_KEY, TRANSPARENCIA_API_KEY + IAM |
 | `artifact_registry.tf` | Repositório Docker `spepe` + IAM |
+| `iap.tf` | Identity-Aware Proxy config (provisionado via Terraform) |
 | `pubsub.tf` | Topic `drift-detected` para auto-retrain loop |
 | `eventarc.tf` | Trigger Pub/Sub → Cloud Run Job retrain |
 | `firestore.tf` | Coleção `spepe_sessions` — memória de sessão |
@@ -368,10 +430,11 @@ terraform apply [mesmas vars]
 
 | Workflow | Trigger | O que faz |
 |----------|---------|-----------|
-| `ci.yml` | PR / push | Lint, testes, eval LLM, security scan |
-| `deploy.yml` | Push main | Build → Artifact Registry → deploy staging → smoke test → prod |
-| `ml_pipeline.yml` | Schedule / manual | Compila e submete pipeline Vertex AI |
-| `canary_deploy.yml` | Manual | Canary 10% → avalia → promove ou rollback |
+| `ci.yml` | PR / push | Lint (ruff), testes, eval LLM, pip-audit |
+| `deploy.yml` | Push main | Build → Artifact Registry → deploy staging → smoke test → prod; atualiza todos os Cloud Run Jobs |
+| `ml_pipeline.yml` | Schedule / manual | Compila e submete pipeline Vertex AI; executa spepe-pymc-train + spepe-pymc-electoral-train |
+| `canary_deploy.yml` | Manual | Canary 10% → avalia Brier → promove ou rollback |
+| `security.yml` | Schedule / push | TruffleHog secret scan + security audit |
 
 Todos usam Workload Identity Federation — sem chaves SA em secrets.
 
@@ -574,44 +637,53 @@ Chaves-mestras: `cod_municipio_ibge`, `uf`, `ano_eleitoral`, `data_referencia`
 
 ---
 
-## Pendências v1.1 — Estado 2026-05-06
+## Pendências v1.2 — Estado 2026-05-18
 
-### 🔴 **Bloqueia Deploy**
-- [x] ANTHROPIC_API_KEY exposta revogada em console.anthropic.com (2026-04-26)
-- [x] CI/CD verde no GitHub — Docker build + Cloud Run deploy confirmado (2026-04-26)
-- [x] Routing chainlit_app.py corrigido — custom routes antes do SPA catch-all (2026-04-26)
+### 🔴 **Bloqueia modelo / Sprint 1**
+- [ ] Executar `spepe-pymc-train` em Cloud Run — requer GCP ativo
+- [ ] Executar `spepe-pymc-electoral-train` em Cloud Run — requer GCP ativo
+- [ ] Preencher métricas no `mlops/model_card.md` (Brier, Accuracy, MAE) após 1ª execução
+- [ ] Release tag v1.2.0 → push
 
 ### 🟠 **Valida Funcionalidade**
 - [ ] Pipeline end-to-end: ingerir **todas 27 UFs** 2022 (todas as fontes) — requer GCP
-- [x] Testes passando: 172 pytest + eval_runner (0.995 score) + security scan (2026-05-04)
-- [x] Compilar Vertex AI pipeline KFP 2.x — output/ml_pipeline.yaml gerado (2026-04-26)
-- [x] Semantic layer completo: 8/8 views BigQuery (2026-05-04)
-- [x] Dashboard API: column bugs corrigidos + local Silver fallbacks para 4 tabs (2026-05-04)
-- [x] Gold BQ SQL: todas as fact tables com colunas Silver reais (2026-05-04)
-- [x] CadÚnico/BF Bronze 4 anos: 2018/2022/2024/2025 em spepe-prod (2026-05-06)
-- [x] Silver transferencias_sociais: rodando (2026-05-06)
-- [x] Gold fact_transferencias_sociais: definido em gold_builder.py (2026-05-06)
-- [x] Silver + Gold emendas parlamentares: transform_emendas_to_silver() implementado + wired no job
-- [x] Silver + Gold sanções CEIS+CNEP: transform_sancoes_to_silver() implementado + wired no job
-- [ ] Rodar spepe-emendas-ingest (anos 2018/2022/2025) — aguarda CI build
-- [ ] Rodar spepe-sancoes-ingest (snapshot histórico) — aguarda CI build
-- [ ] **Módulo Redes Sociais**: Twitter/X sentiment, YouTube, TikTok — principal pendência v1.2
+- [ ] Rodar spepe-emendas-ingest (anos 2018/2022/2025) — requer GCP
+- [ ] Rodar spepe-sancoes-ingest (snapshot histórico) — requer GCP
+- [x] Testes: 223 arquivos de teste implementados (pytest requer env com dependências)
+- [x] Compilar Vertex AI pipeline KFP 2.x — output/spepe-ml-pipeline.yaml gerado
+- [x] Semantic layer: views BigQuery implementadas
+- [x] Dashboard API: 71 rotas, fallbacks Silver locais, comparativo 2018×2022 (2026-05-18)
+- [x] Gold BQ SQL: todas as fact tables com colunas Silver reais
+- [x] CadÚnico/BF Bronze + Silver + Gold: transferencias_sociais completo
+- [x] Silver + Gold emendas parlamentares: transform_emendas_to_silver() wired
+- [x] Silver + Gold sanções CEIS+CNEP+CEAF+CEPIM: transform_sancoes_to_silver() wired
+- [x] Jobs Polls/GDELT/BlueSky: jobs implementados (polls_ingest, gdelt_ingest, bluesky_ingest)
+- [x] Polls: refatorado para Poder360 aggregator (substituiu 5 scrapers instáveis)
+- [x] Supervisor: corrigido para AsyncAnthropic (desbloqueou event loop Chainlit)
+- [x] Dashboard: comparativo 2018×2022 com filtros eleito/não-eleito + federações
 
 ### 🟡 **Produção Segura**
-- [x] TRANSPARENCIA_API_KEY em Secret Manager + cadunico/emendas/sancoes clients (2026-05-06)
-- [ ] Secrets: META_APP_TOKEN, YOUTUBE_API_KEY — requer GCP (quando Social for implementado)
-- [ ] Provisionar IAP via Terraform — requer GCP
+- [x] TRANSPARENCIA_API_KEY em Secret Manager + clients cadunico/emendas/sancoes
+- [x] Terraform: IAP configurado (`iap.tf`), domain mapping (`domain_mapping.tf`), Cloud Scheduler
+- [x] Autenticação Google Sign-In no dashboard externo
+- [ ] META_APP_TOKEN, YOUTUBE_API_KEY — requer GCP (quando Social fase 2 for prioridade)
 - [x] Validar imports: nenhuma referência a `mcp_servers.*` em agentes/dataops
 
 ### 🟢 **Infraestrutura**
-- [x] 19 Cloud Run Jobs no Terraform + deploy.yml (2026-05-06)
+- [x] 25 arquivos Terraform + Cloud Scheduler para todos os jobs
+- [x] 5 GitHub Actions workflows (ci, deploy, ml_pipeline, canary_deploy, security)
+- [x] Jobs CI/CD: deploy.yml atualiza pymc-train + pymc-electoral-train automaticamente
 - [x] README Quick Start — seção existe com variáveis mínimas locais
-- [ ] Release tag v1.1.0 → push
+
+### 📝 **Módulos novos não documentados no v1.1**
+- [x] `sentinel/` — crews (Observadores/Analisadores/Interpretadores/Despachantes), watchers por domínio
+- [x] `judge/` — MLJudge independente, PromotionGate, FairnessAuditor, IndependentBacktester
+- [x] `llmops/` — registry_loader
+- [x] `memory_store/` — memória de sessão persistente (MemoryManager, SessionMemory, Retriever)
 
 ---
 
-## Pendências Conhecidas — Documento
+## Pendências Conhecidas — Histórico
 
-Para referência histórica:
-- [ ] IAP não provisionado — para quando Cloud Run for protegido com autenticação
-- [ ] `drift_config.yaml` — existe em mlops/monitoring/, já resolvido
+- `drift_config.yaml` — existe em mlops/monitoring/, já resolvido
+- `mcp_servers/` — diretório existe mas só contém `__init__.py`; ignorar

@@ -2,6 +2,8 @@ FROM python:3.12-slim AS builder
 
 WORKDIR /build
 
+RUN apt-get update && apt-get upgrade -y && rm -rf /var/lib/apt/lists/*
+
 RUN pip install --no-cache-dir uv
 
 RUN python -m venv /opt/venv
@@ -14,6 +16,10 @@ RUN uv pip install --no-cache -r requirements-app.txt
 FROM python:3.12-slim
 
 WORKDIR /app
+
+RUN apt-get update && apt-get upgrade -y \
+    && apt-get install -y --no-install-recommends curl \
+    && rm -rf /var/lib/apt/lists/*
 
 RUN useradd -m -u 1000 spepe
 
