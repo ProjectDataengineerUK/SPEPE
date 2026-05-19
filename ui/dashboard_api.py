@@ -7470,16 +7470,21 @@ async def get_comparativo_partidos(
 
     cfg = bigquery.QueryJobConfig(query_parameters=params)
     try:
-        gold_task = asyncio.to_thread(
+        gold_rows = await asyncio.to_thread(
             lambda: list(client.query(gold_query, job_config=cfg).result())
         )
-        nm_task = asyncio.to_thread(lambda: list(client.query(nm_query, job_config=cfg).result()))
-        gold_rows, nm_rows = await asyncio.gather(gold_task, nm_task)
     except Exception as exc:
         logger.error("comparativo partidos BQ erro: %s", exc, exc_info=True)
         return JSONResponse({"status": "error", "error": str(exc), "partidos": []}, status_code=500)
 
-    nm_map = {r["sg_partido"]: r["nm_partido"] for r in nm_rows if r["sg_partido"]}
+    nm_map: dict[str, str] = {}
+    try:
+        nm_rows = await asyncio.to_thread(
+            lambda: list(client.query(nm_query, job_config=cfg).result())
+        )
+        nm_map = {r["sg_partido"]: r["nm_partido"] for r in nm_rows if r["sg_partido"]}
+    except Exception as exc:
+        logger.warning("partidos nm_partido Silver indisponivel: %s", exc)
 
     partidos_raw = [
         {
