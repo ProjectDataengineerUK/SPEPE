@@ -38,7 +38,7 @@ locals {
 
   # Env vars adicionais por job (além das compartilhadas)
   job_extra_env = {
-    tse_ingest       = {}
+    tse_ingest       = { TSE_ANOS = "2018,2022" }
     ibge_sync        = {}
     security_ingest  = {}
     datasus_ingest   = {}

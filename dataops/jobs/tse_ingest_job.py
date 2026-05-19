@@ -119,8 +119,20 @@ if __name__ == "__main__":
 
     parser = argparse.ArgumentParser(description="TSE ingest job")
     parser.add_argument("--uf", default=os.environ.get("DEFAULT_UF", "SP"))
-    parser.add_argument("--year", type=int, default=int(os.environ.get("DEFAULT_ANO", "2022")))
+    parser.add_argument("--year", type=int, default=None, help="Ano único (compat)")
+    parser.add_argument(
+        "--years",
+        default=os.environ.get("TSE_ANOS", os.environ.get("DEFAULT_ANO", "2022")),
+        help="Anos separados por vírgula: 2018,2022",
+    )
     args = parser.parse_args()
+
+    if args.year is not None:
+        years = [args.year]
+    else:
+        years = [int(y.strip()) for y in args.years.split(",") if y.strip()]
+
     ufs = _ALL_UFS if args.uf.upper() == "ALL" else [args.uf.upper()]
     for uf in ufs:
-        main(uf, args.year)
+        for year in years:
+            main(uf, year)
