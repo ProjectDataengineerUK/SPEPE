@@ -1798,13 +1798,8 @@ async function loadComparativo() {
     document.querySelectorAll('[id^="cmp2s-"]').forEach(b => b.classList.toggle('active', b.id === 'cmp2s-todos'));
   }
 
-  // unified banner: exemplo ou ds_situacao ausente
-  const banMsg = isExemplo
-    ? 'Comparativo RJ exemplo — execute python scripts/seed_silver.py para dados reais'
-    : !_cmp2SitAvail
-      ? 'ds_situacao ausente no Silver local — filtros Eleito/Não Eleito desabilitados. Execute python scripts/seed_silver.py'
-      : null;
-  _updateDemoBanner('comparativo', banMsg);
+  // unified banner: só quando dado é de exemplo (ds_situacao ausente é autoexplicado pelos botões)
+  _updateDemoBanner('comparativo', isExemplo ? 'Comparativo RJ exemplo — execute python scripts/seed_silver.py para dados reais' : null);
 
   if (!_cmp2Data.length) {
     if (empty) { empty.style.display = 'block'; empty.textContent = 'Nenhum resultado — ajuste os filtros ou execute python scripts/seed_silver.py'; }
