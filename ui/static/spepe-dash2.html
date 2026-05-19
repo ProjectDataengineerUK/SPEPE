@@ -482,6 +482,7 @@ table.data tr:hover td{background:var(--bg3)}
               <input type="checkbox" id="cmp2-fed-chk" onchange="loadComparativo()" style="cursor:pointer"> Agrupar Federa&#231;&#245;es
             </label>
             <button onclick="loadComparativo()" style="padding:3px 12px;font-size:.65rem;background:var(--grn2);color:#fff;border:none;border-radius:5px;cursor:pointer">Buscar</button>
+            <button onclick="cmp2ToggleMapa()" id="cmp2-mapa-btn" style="padding:3px 10px;font-size:.65rem;background:var(--bg3);border:1px solid var(--br);border-radius:5px;cursor:pointer;color:var(--tx2)">&#128506; Mapa</button>
           </div>
         </div>
 
@@ -516,6 +517,17 @@ table.data tr:hover td{background:var(--bg3)}
         <!-- aviso situacao indisponivel -->
         <div id="cmp2-sit-warn" style="display:none;padding:4px 10px;margin-bottom:6px;background:#f59e0b18;border:1px solid #f59e0b44;border-radius:5px;font-size:.62rem;color:#f59e0b">
           &#9888; Situação (eleito/não eleito) indisponível nos dados locais &mdash; filtro desabilitado, exibindo todos.
+        </div>
+
+        <!-- mapa comparativo -->
+        <div id="cmp2-mapa-panel" style="display:none;margin-bottom:10px;border:1px solid var(--br);border-radius:8px;overflow:hidden">
+          <div style="padding:6px 12px;background:var(--bg3);border-bottom:1px solid var(--br);display:flex;align-items:center;gap:8px">
+            <span style="font-size:.65rem;font-weight:700;color:var(--tx2)">&#128506; Mapa — Vencedor por Munic&#237;pio</span>
+            <span style="font-size:.58rem;color:var(--tx3)">2022 vs 2018</span>
+            <div id="cmp2-mapa-legend" style="display:flex;gap:6px;margin-left:auto;flex-wrap:wrap;font-size:.55rem;color:var(--tx3)"></div>
+          </div>
+          <div id="cmp2-leaflet" style="height:340px"></div>
+          <div id="cmp2-mapa-tooltip" style="display:none;position:absolute;pointer-events:none;background:var(--bg2);border:1px solid var(--br);border-radius:6px;padding:6px 10px;font-size:.62rem;z-index:9999;max-width:220px"></div>
         </div>
 
         <!-- tabelas -->
@@ -1465,6 +1477,9 @@ let _cmp2Filter = '';
 let _cmp2Selected = new Set();
 let _cmp2SitAvail = false;
 let _cmp2CompareChart = null;
+let _cmp2MapaVisible = false;
+let _cmp2MapaLayer = null;
+let _cmp2MapaMap = null;
 
 function cmp2SetView(v, btn) {
   _cmp2View = v;
@@ -1554,6 +1569,115 @@ function cmp2HideCompare() {
   const panel = document.getElementById('cmp2-compare-panel');
   if (panel) panel.style.display = 'none';
   if (_cmp2CompareChart) { _cmp2CompareChart.destroy(); _cmp2CompareChart = null; }
+}
+
+// ── MAPA COMPARATIVO ────────────────────────────────────────────────────────
+function cmp2ToggleMapa() {
+  _cmp2MapaVisible = !_cmp2MapaVisible;
+  const panel = document.getElementById('cmp2-mapa-panel');
+  const btn   = document.getElementById('cmp2-mapa-btn');
+  if (panel) panel.style.display = _cmp2MapaVisible ? '' : 'none';
+  if (btn) btn.style.background = _cmp2MapaVisible ? 'var(--grn2)' : 'var(--bg3)';
+  if (btn) btn.style.color = _cmp2MapaVisible ? '#fff' : 'var(--tx2)';
+  if (_cmp2MapaVisible) _cmp2LoadMapa();
+}
+
+async function _cmp2LoadMapa() {
+  const uf = (document.getElementById('cmp2-uf') || {}).value || 'SP';
+  const cargo = (document.getElementById('cmp2-cargo') || {}).value || 'Deputado Federal';
+  const mapDiv = document.getElementById('cmp2-leaflet');
+  if (!mapDiv) return;
+
+  // init Leaflet once per UF change
+  if (!_cmp2MapaMap) {
+    _cmp2MapaMap = L.map(mapDiv, { zoomControl: true, scrollWheelZoom: false }).setView([-15, -47], 4);
+    L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_nolabels/{z}/{x}/{y}{r}.png', {
+      attribution: '© CartoDB', subdomains: 'abcd', maxZoom: 14
+    }).addTo(_cmp2MapaMap);
+  }
+
+  // fetch geojson + mapa data in parallel
+  const [geo, mapaD] = await Promise.all([
+    fetch(`/static/geo_mun_${uf.toUpperCase()}.geojson`).then(r => r.ok ? r.json() : null).catch(() => null),
+    api(`/api/comparativo/mapa?uf=${encodeURIComponent(uf)}&cargo=${encodeURIComponent(cargo)}&turno=1`),
+  ]);
+
+  if (!geo || !mapaD || !mapaD.municipios) {
+    mapDiv.innerHTML = '<div style="padding:40px;text-align:center;color:var(--tx3);font-size:.7rem">Dados do mapa indispon&#237;veis — execute tse_ingest primeiro</div>';
+    return;
+  }
+
+  // normalise: remove accents, uppercase
+  const _normStr = s => (s||'').normalize('NFD').replace(/[̀-ͯ]/g,'').toUpperCase().trim();
+  const munMap = {};
+  for (const m of mapaD.municipios) {
+    munMap[_normStr(m.nm_municipio)] = m;
+  }
+
+  if (_cmp2MapaLayer) { _cmp2MapaLayer.remove(); _cmp2MapaLayer = null; }
+
+  const partidoCores = {...PARTIDO_COR};
+  const _partidoCor = p => partidoCores[p] || '#64748b';
+
+  const tooltip = document.getElementById('cmp2-mapa-tooltip');
+  _cmp2MapaLayer = L.geoJSON(geo, {
+    style: feat => {
+      const nm = _normStr(feat.properties.name || feat.properties.description || '');
+      const d = munMap[nm];
+      const cor = d ? _partidoCor(d.sg_partido_2022) : '#1e293b';
+      return { fillColor: cor, fillOpacity: d ? 0.75 : 0.2, color: '#0f172a', weight: 0.5 };
+    },
+    onEachFeature: (feat, layer) => {
+      const nm = _normStr(feat.properties.name || '');
+      const d = munMap[nm];
+      layer.on({
+        mouseover: e => {
+          layer.setStyle({ fillOpacity: 1, weight: 2, color: '#fff' });
+          if (tooltip) {
+            const cor22 = d ? _partidoCor(d.sg_partido_2022) : '#64748b';
+            tooltip.innerHTML = d
+              ? `<div style="font-weight:700;margin-bottom:3px">${feat.properties.name}</div>
+                 <div>&#10003; 2022: <span style="color:${cor22};font-weight:600">${d.nm_vencedor_2022||'—'}</span> <span style="color:${cor22}">(${d.sg_partido_2022||'—'})</span> ${d.pct_2022 ? d.pct_2022.toFixed(1)+'%' : ''}</div>
+                 <div style="color:var(--tx3)">&#10003; 2018: ${d.nm_vencedor_2018||'—'} (${d.sg_partido_2018||'—'}) ${d.pct_2018 ? d.pct_2018.toFixed(1)+'%' : ''}</div>
+                 ${d.mudou_lider ? '<div style="color:#f59e0b;font-size:.57rem">&#9650; Mudou lider</div>' : ''}
+                 ${d.mudou_partido ? '<div style="color:#f87171;font-size:.57rem">&#9650; Mudou partido</div>' : ''}`
+              : `<div style="font-weight:700">${feat.properties.name}</div><div style="color:var(--tx3)">Sem dados</div>`;
+            tooltip.style.display = 'block';
+          }
+        },
+        mousemove: e => {
+          if (tooltip) {
+            tooltip.style.left = (e.originalEvent.clientX + 12) + 'px';
+            tooltip.style.top  = (e.originalEvent.clientY - 10) + 'px';
+          }
+        },
+        mouseout: () => {
+          _cmp2MapaLayer.resetStyle(layer);
+          if (tooltip) tooltip.style.display = 'none';
+        },
+      });
+    }
+  }).addTo(_cmp2MapaMap);
+
+  // fit bounds
+  try { _cmp2MapaMap.fitBounds(_cmp2MapaLayer.getBounds(), { padding: [10, 10] }); } catch(e) {}
+
+  // legenda top partidos
+  const legDiv = document.getElementById('cmp2-mapa-legend');
+  if (legDiv) {
+    const contagem = {};
+    for (const m of mapaD.municipios) {
+      const p = m.sg_partido_2022 || '?';
+      contagem[p] = (contagem[p] || 0) + 1;
+    }
+    const top = Object.entries(contagem).sort((a,b)=>b[1]-a[1]).slice(0,6);
+    legDiv.innerHTML = top.map(([p,n]) => {
+      const cor = _partidoCor(p);
+      return `<span style="display:flex;align-items:center;gap:3px"><span style="width:8px;height:8px;border-radius:2px;background:${cor};display:inline-block"></span>${p} (${n})</span>`;
+    }).join('');
+  }
+
+  setTimeout(() => _cmp2MapaMap.invalidateSize(), 100);
 }
 
 function cmp2Sort(col) {

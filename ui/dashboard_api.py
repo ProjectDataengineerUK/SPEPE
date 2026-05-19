@@ -6802,6 +6802,119 @@ async def get_comparativo_candidatos(
     })
 
 
+@app.get("/api/comparativo/mapa")
+async def get_comparativo_mapa(
+    uf: str = Query("SP"),
+    cargo: str = Query("Deputado Federal"),
+    turno: int = Query(1),
+) -> JSONResponse:
+    """
+    Vencedor por município para comparativo 2018 × 2022.
+    Retorna lista de municípios com candidato/partido líder em cada ano.
+    Chave de join com geojson: nm_municipio (normalizado uppercase).
+    """
+    import pandas as pd
+    import unicodedata
+
+    def _norm(s: str) -> str:
+        s = unicodedata.normalize("NFD", s.upper())
+        return "".join(c for c in s if unicodedata.category(c) != "Mn")
+
+    cd_cargo = _cargo_to_cd(cargo, 6)
+
+    frames: list[pd.DataFrame] = []
+    for f in sorted(_LOCAL_SILVER_DIR.glob("tse_*.parquet")):
+        try:
+            df = pd.read_parquet(f)
+            frames.append(df)
+        except Exception:
+            continue
+
+    if not frames:
+        return JSONResponse({"status": "sem_dados", "municipios": [], "fonte": "local"})
+
+    df = pd.concat(frames, ignore_index=True)
+    df.columns = [c.lower() for c in df.columns]
+
+    col_map = {
+        "qt_votos_nominais": "total_votos",
+        "sg_uf": "sg_uf", "cd_cargo": "cd_cargo", "nr_turno": "nr_turno",
+        "nm_candidato": "nm_candidato", "sg_partido": "sg_partido",
+        "nm_municipio": "nm_municipio", "ano_eleicao": "ano_eleicao",
+    }
+    df = df.rename(columns={k: v for k, v in col_map.items() if k in df.columns})
+    if "total_votos" not in df.columns and "qt_votos_nominais" not in df.columns:
+        votos_col = next((c for c in df.columns if "voto" in c), None)
+        if votos_col:
+            df = df.rename(columns={votos_col: "total_votos"})
+
+    needed = {"sg_uf", "cd_cargo", "nr_turno", "nm_candidato", "nm_municipio", "total_votos", "ano_eleicao"}
+    if not needed.issubset(df.columns):
+        return JSONResponse({"status": "sem_dados", "municipios": [], "fonte": "local",
+                             "msg": f"Colunas insuficientes: {list(df.columns[:10])}"})
+
+    df = df[
+        (df["sg_uf"].str.upper() == uf.upper())
+        & (df["cd_cargo"].astype(str) == str(cd_cargo))
+        & (df["nr_turno"].astype(str) == str(turno))
+        & (df["ano_eleicao"].isin([2018, 2022]))
+        & df["nm_candidato"].notna()
+        & (~df["nm_candidato"].str.upper().str.strip().isin(_INVALIDOS_NOMES))
+        & (~df["nm_candidato"].str.startswith("#", na=False))
+    ].copy()
+
+    if df.empty:
+        return JSONResponse({"status": "sem_dados", "municipios": [], "fonte": "local"})
+
+    df["total_votos"] = pd.to_numeric(df["total_votos"], errors="coerce").fillna(0)
+    if "sg_partido" not in df.columns:
+        df["sg_partido"] = ""
+
+    # vencedor por município × ano
+    grp = (
+        df.groupby(["nm_municipio", "nm_candidato", "sg_partido", "ano_eleicao"])
+        ["total_votos"].sum().reset_index()
+    )
+    grp["rank"] = grp.groupby(["nm_municipio", "ano_eleicao"])["total_votos"].rank(
+        ascending=False, method="first"
+    )
+    liders = grp[grp["rank"] == 1].copy()
+
+    tot = df.groupby(["nm_municipio", "ano_eleicao"])["total_votos"].sum().reset_index(name="total_mun")
+    liders = liders.merge(tot, on=["nm_municipio", "ano_eleicao"], how="left")
+    liders["pct"] = (liders["total_votos"] / liders["total_mun"].replace(0, 1) * 100).round(2)
+    liders["nm_mun_norm"] = liders["nm_municipio"].apply(_norm)
+
+    l22 = liders[liders["ano_eleicao"] == 2022][["nm_mun_norm", "nm_candidato", "sg_partido", "pct", "total_votos"]].rename(
+        columns={"nm_candidato": "nm_vencedor_2022", "sg_partido": "sg_partido_2022",
+                 "pct": "pct_2022", "total_votos": "votos_2022"})
+    l18 = liders[liders["ano_eleicao"] == 2018][["nm_mun_norm", "nm_candidato", "sg_partido", "pct", "total_votos"]].rename(
+        columns={"nm_candidato": "nm_vencedor_2018", "sg_partido": "sg_partido_2018",
+                 "pct": "pct_2018", "total_votos": "votos_2018"})
+
+    merged = l22.merge(l18, on="nm_mun_norm", how="outer")
+    merged["mudou_lider"] = merged["nm_vencedor_2022"] != merged["nm_vencedor_2018"]
+    merged["mudou_partido"] = merged["sg_partido_2022"] != merged["sg_partido_2018"]
+
+    # nome original do município (para o join com geojson)
+    nm_map = liders.drop_duplicates("nm_mun_norm").set_index("nm_mun_norm")["nm_municipio"].to_dict()
+    merged["nm_municipio"] = merged["nm_mun_norm"].map(nm_map)
+
+    municipios = merged.fillna("").to_dict(orient="records")
+    for m in municipios:
+        for k in ("pct_2022", "pct_2018"):
+            try: m[k] = float(m[k])
+            except (ValueError, TypeError): m[k] = 0.0
+        for k in ("votos_2022", "votos_2018"):
+            try: m[k] = int(m[k])
+            except (ValueError, TypeError): m[k] = 0
+
+    return JSONResponse({
+        "status": "ok", "uf": uf.upper(), "cargo": cargo,
+        "municipios": municipios, "total": len(municipios), "fonte": "local",
+    })
+
+
 # Federações eleitorais 2022 (TSE não expõe via resultados — lookup estático)
 _FEDERACOES_2022: dict[str, str] = {
     "PT": "Fed. Brasil da Esperança",
