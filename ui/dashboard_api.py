@@ -1475,16 +1475,66 @@ async def get_resultados(
         except Exception as exc:
             logger.warning("BigQuery resultados falhou: %s", exc)
 
-    return JSONResponse(
-        {
-            "cargo": cargo,
-            "uf": uf,
-            "ano": ano,
-            "turno": turno,
-            "candidatos": [],
-            "fonte": "indisponivel",
-        }
+    data = await asyncio.to_thread(_local_resultados, cargo, uf, ano, turno)
+    return JSONResponse({
+        "cargo": cargo, "uf": uf, "ano": ano, "turno": turno,
+        "candidatos": data,
+        "fonte": "local" if data else "indisponivel",
+    })
+
+
+def _local_resultados(cargo: str, uf: str, ano: int, turno: int) -> list[dict]:
+    import pandas as pd
+
+    cd_cargo = _cargo_to_cd(cargo, 1)
+    frames: list[pd.DataFrame] = []
+    for f in sorted(_LOCAL_SILVER_DIR.glob("tse_*.parquet")):
+        try:
+            frames.append(pd.read_parquet(f))
+        except Exception:
+            continue
+    if not frames:
+        return []
+    df = pd.concat(frames, ignore_index=True)
+    df.columns = [c.lower() for c in df.columns]
+    df = df.rename(columns={"qt_votos_nominais": "total_votos", "ds_sit_cand_tot": "ds_situacao"})
+    needed = {"sg_uf", "cd_cargo", "nr_turno", "nm_candidato", "ano_eleicao", "total_votos"}
+    if not needed.issubset(df.columns):
+        return []
+    mask = (
+        (df["sg_uf"].str.upper() == uf.upper())
+        & (df["cd_cargo"].astype(str) == str(cd_cargo))
+        & (df["nr_turno"].astype(str) == str(turno))
+        & (df["ano_eleicao"].astype(str) == str(ano))
+        & df["nm_candidato"].notna()
+        & (~df["nm_candidato"].str.upper().str.strip().isin(_INVALIDOS_NOMES))
+        & (~df["nm_candidato"].str.startswith("#", na=False))
     )
+    df = df[mask].copy()
+    if df.empty:
+        return []
+    df["total_votos"] = pd.to_numeric(df["total_votos"], errors="coerce").fillna(0)
+    if "sg_partido" not in df.columns:
+        df["sg_partido"] = ""
+    grp = (
+        df.groupby(["nm_candidato", "sg_partido"])
+        .agg(total_votos=("total_votos", "sum"))
+        .reset_index()
+    )
+    total_all = grp["total_votos"].sum() or 1
+    grp["pct"] = (grp["total_votos"] / total_all * 100).round(2)
+    grp = grp.sort_values("total_votos", ascending=False).reset_index(drop=True)
+    return [
+        {
+            "candidato": r["nm_candidato"],
+            "nm_candidato": r["nm_candidato"],
+            "partido": r.get("sg_partido") or "",
+            "total_votos": int(r["total_votos"]),
+            "pct_votos_validos": float(r["pct"]),
+            "pct": float(r["pct"]),
+        }
+        for _, r in grp.iterrows()
+    ]
 
 
 async def _bq_resultados(cargo: str, uf: str, ano: int, turno: int) -> list[dict]:
@@ -2587,9 +2637,56 @@ async def get_perfis(
                     "error": str(exc),
                 }
             )
-    return JSONResponse(
-        {"genero": [], "faixa_etaria": [], "escolaridade": [], "fonte": "indisponivel"}
-    )
+    result = await asyncio.to_thread(_local_perfis, uf, ano)
+    return JSONResponse(result)
+
+
+def _local_perfis(uf: str, ano: int) -> dict:
+    import pandas as pd
+
+    _empty = {"genero": [], "faixa_etaria": [], "escolaridade": [], "fonte": "local_vazio"}
+    frames: list[pd.DataFrame] = []
+    for pattern in [f"tse_perfil_{uf.lower()}*.parquet", "tse_perfil_*.parquet", f"perfil_{uf.lower()}*.parquet"]:
+        for f in sorted(_LOCAL_SILVER_DIR.glob(pattern)):
+            try:
+                frames.append(pd.read_parquet(f))
+            except Exception:
+                continue
+        if frames:
+            break
+    if not frames:
+        return _empty
+    df = pd.concat(frames, ignore_index=True)
+    df.columns = [c.lower() for c in df.columns]
+    if "sg_uf" in df.columns:
+        df = df[df["sg_uf"].str.upper() == uf.upper()]
+    if "ano" in df.columns:
+        df = df[df["ano"].astype(str) == str(ano)]
+    if df.empty:
+        return _empty
+    col_genero = next((c for c in df.columns if "genero" in c), None)
+    col_faixa  = next((c for c in df.columns if "faixa" in c or "idade" in c), None)
+    col_esc    = next((c for c in df.columns if "escolar" in c or "instruc" in c), None)
+    col_qt     = next((c for c in df.columns if "eleitor" in c or ("qt" in c and "voto" not in c)), None) or "qt_eleitores"
+    if col_qt not in df.columns:
+        df[col_qt] = 1
+    df[col_qt] = pd.to_numeric(df[col_qt], errors="coerce").fillna(1)
+    genero, faixa, esc = {}, {}, {}
+    if col_genero:
+        for g, qt in df.groupby(col_genero)[col_qt].sum().items():
+            genero[str(g)] = int(qt)
+    if col_faixa:
+        for fv, qt in df.groupby(col_faixa)[col_qt].sum().items():
+            faixa[str(fv)] = int(qt)
+    if col_esc:
+        for ev, qt in df.groupby(col_esc)[col_qt].sum().items():
+            esc[str(ev)] = int(qt)
+    return {
+        "genero":      [{"label": k, "qt_eleitores": v} for k, v in genero.items()],
+        "faixa_etaria": sorted([{"label": k, "qt_eleitores": v} for k, v in faixa.items()], key=lambda x: x["label"]),
+        "escolaridade": [{"label": k, "qt_eleitores": v} for k, v in esc.items()],
+        "fonte": "local",
+    }
 
 
 async def _bq_perfis(uf: str, ano: int) -> dict:

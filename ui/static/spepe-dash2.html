@@ -1195,10 +1195,14 @@ async function loadDigital() {
   const gdeltItems = gdeltD?.eventos || gdeltD?.data || [];
   const gdeltEl = document.getElementById('gdelt-list');
   if (gdeltEl) {
-    gdeltEl.innerHTML = gdeltItems.slice(0,10).map(e => `<div class="kv-row">
+    const gdeltIsExample = gdeltD?.status === 'fallback' || gdeltD?.fonte === 'estatico' || gdeltD?.fonte === 'exemplo';
+    const gdeltBadge = gdeltIsExample
+      ? `<div style="margin-bottom:.5rem;padding:.3rem .6rem;background:rgba(251,191,36,.12);border:1px solid rgba(251,191,36,.4);border-radius:6px;font-size:.65rem;color:#fbbf24">⚠ Dados de exemplo — GDELT sem BigQuery ativo</div>`
+      : '';
+    gdeltEl.innerHTML = gdeltBadge + (gdeltItems.slice(0,10).map(e => `<div class="kv-row">
       <span class="kv-lbl" style="flex:1">${_esc(e.titulo||e.title||e.tema||'—')}</span>
       <span class="kv-val" style="font-size:.6rem;color:var(--tx3)">${_esc(e.dt||e.data||'')}</span>
-    </div>`).join('') || '<div class="empty">Sem eventos GDELT</div>';
+    </div>`).join('') || '<div class="empty">Sem eventos GDELT</div>');
   }
 }
 
@@ -1304,7 +1308,8 @@ function setScenario(sc, btn) {
 async function loadPrevisao(scenario='base') {
   const noData = document.getElementById('prev-no-data');
   const d = await api(`/api/previsao?uf=${_uf}&cargo=${encodeURIComponent(_cargo)}&ano=2026`);
-  if (!d || (!d.candidatos?.length && !d.m1 && !d.m2)) {
+  const _cands = d?.candidatos || d?.data || [];
+  if (!d || !_cands.length) {
     if (noData) noData.style.display = 'block';
     document.getElementById('prev-cands').innerHTML = '';
     document.getElementById('shap-list').innerHTML = '';
@@ -1312,7 +1317,7 @@ async function loadPrevisao(scenario='base') {
   }
   if (noData) noData.style.display = 'none';
   const scMult = {otimista:1.15, base:1, pessimista:0.85}[scenario] || 1;
-  const cands = d.candidatos || [];
+  const cands = _cands;
   const prevEl = document.getElementById('prev-cands');
   if (prevEl) {
     prevEl.innerHTML = cands.slice(0,8).map(c => {
@@ -1329,8 +1334,12 @@ async function loadPrevisao(scenario='base') {
   const shapItems = shap?.features || shap || [];
   const shapEl = document.getElementById('shap-list');
   if (shapEl) {
+    const isFallback = shap?.status === 'fallback';
+    const fallbackLabel = isFallback
+      ? `<div style="padding:4px 8px;margin-bottom:6px;background:#f59e0b18;border:1px solid #f59e0b44;border-radius:4px;font-size:.58rem;color:#f59e0b">&#9888; Valores estimados (modelo não treinado)</div>`
+      : '';
     const maxS = Math.max(...shapItems.map(s=>Math.abs(s.shap||0)), 0.001);
-    shapEl.innerHTML = shapItems.slice(0,8).map(s => {
+    shapEl.innerHTML = fallbackLabel + (shapItems.slice(0,8).map(s => {
       const v = s.shap||0;
       const pct = Math.abs(v/maxS*100).toFixed(0);
       const col = v>0?'#22c55e':'var(--red)';
@@ -1339,7 +1348,7 @@ async function loadPrevisao(scenario='base') {
         <div class="shap-bar-wrap"><div class="shap-bar-fill" style="width:${pct}%;background:${col}"></div></div>
         <div class="shap-val" style="color:${col}">${v>0?'+':''}${v.toFixed(3)}</div>
       </div>`;
-    }).join('') || '<div class="empty">SHAP não disponível</div>';
+    }).join('') || '<div class="empty">SHAP não disponível</div>');
   }
 }
 
