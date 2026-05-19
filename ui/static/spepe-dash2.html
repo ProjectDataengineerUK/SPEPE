@@ -516,7 +516,7 @@ table.data tr:hover td{background:var(--bg3)}
         </div>
         <!-- aviso situacao indisponivel -->
         <div id="cmp2-sit-warn" style="display:none;padding:4px 10px;margin-bottom:6px;background:#f59e0b18;border:1px solid #f59e0b44;border-radius:5px;font-size:.62rem;color:#f59e0b">
-          &#9888; Situação (eleito/não eleito) indisponível nos dados locais &mdash; filtro desabilitado, exibindo todos.
+          &#9888; Coluna <code style="background:#2d2d2d;padding:1px 3px;border-radius:2px">ds_situacao</code> ausente no Silver local &mdash; exibindo todos. Execute <code style="background:#2d2d2d;padding:1px 3px;border-radius:2px">python scripts/seed_silver.py</code> para ativar o filtro.
         </div>
 
         <!-- mapa comparativo -->
@@ -1725,7 +1725,7 @@ async function loadComparativo() {
 
   let url, key;
   if (_cmp2View === 'candidatos') {
-    url = `/api/comparativo/candidatos?uf=${encodeURIComponent(uf)}&cargo=${encodeURIComponent(cargo)}&limit=300&situacao=${_cmp2Sit}`;
+    url = `/api/comparativo/candidatos?uf=${encodeURIComponent(uf)}&cargo=${encodeURIComponent(cargo)}&limit=500&situacao=todos`;
     key = 'candidatos';
   } else {
     const fed = (document.getElementById('cmp2-fed-chk') || {}).checked ? 'true' : 'false';
