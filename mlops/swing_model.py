@@ -46,19 +46,32 @@ logger = logging.getLogger(__name__)
 # ---------------------------------------------------------------------------
 
 SWING_FEATURE_COLS: list[str] = [
-    "pct_votos_historico",       # baseline — OBRIGATÓRIA
-    "abstencao_2022",            # opcional
-    "regiao_rj",                 # opcional, categórica
-    "log_populacao",             # IBGE
-    "log_renda",                 # IBGE
-    "taxa_alfabetizacao",        # IBGE
-    "is_incumbent_int",          # incumbência
-    "trocou_partido_int",        # incumbência
-    "delta_poll",                # pesquisas
-    "media_intencao_voto_uf",    # pesquisas
+    # baseline
+    "pct_votos_historico",
+    # território
+    "taxa_abstencao",
+    "abstencao_zona_std",
+    "n_zonas",
+    "nm_regiao",
+    # IBGE estrutural
+    "log_populacao",
+    "log_renda",
+    "taxa_alfabetizacao",
+    # incumbência
+    "is_incumbent_int",
+    "trocou_partido_int",
+    # pesquisas
+    "delta_poll",
+    "media_intencao_voto_uf",
+    "media_rejeicao",
+    "delta_rejeicao",
+    # segurança — peso alto no RJ
+    "log_homicidio",
+    # social
+    "pct_beneficiarios_bf",
 ]
 
-_CAT_FEATURE_NAMES: list[str] = ["regiao_rj", "nm_candidato"]
+_CAT_FEATURE_NAMES: list[str] = ["nm_regiao", "nm_candidato"]
 
 _NUM_FEATURE_COLS: list[str] = [
     c for c in SWING_FEATURE_COLS if c not in _CAT_FEATURE_NAMES
@@ -66,18 +79,6 @@ _NUM_FEATURE_COLS: list[str] = [
 
 _MISSING_NUM_FILL: float = 0.0
 _MISSING_CAT_FILL: str = "DESCONHECIDO"
-
-# Regiões RJ para feature categórica
-REGIOES_RJ: dict[str, int] = {
-    "Capital": 0,
-    "Baixada": 1,
-    "Serrana": 2,
-    "Norte": 3,
-    "Noroeste": 4,
-    "Médio Paraíba": 5,
-    "Costa Verde": 6,
-    "Lagos": 7,
-}
 
 
 # ---------------------------------------------------------------------------

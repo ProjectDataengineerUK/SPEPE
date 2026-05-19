@@ -31,6 +31,21 @@ CD_CARGO_NAMES: dict[int, str] = {
 MAJORITARIO_CARGOS = {1, 3, 5, 13}   # → SwingModel
 PROPORCIONAL_CARGOS = {6, 7, 8, 11}  # → DeputadoModel
 
+CARGO_CONFIGS: dict[int, dict] = {
+    1:  {"escopo": "nacional", "n_sim": 5000, "vagas": 1, "turno": 2},
+    3:  {"escopo": "estadual", "n_sim": 5000, "vagas": 1, "turno": 2},
+    5:  {"escopo": "estadual", "n_sim": 3000, "vagas": 3, "turno": 1},
+    6:  {"escopo": "estadual", "n_sim": 2000, "vagas": None, "turno": 1},
+    7:  {"escopo": "estadual", "n_sim": 2000, "vagas": None, "turno": 1},
+    8:  {"escopo": "distrital", "n_sim": 2000, "vagas": None, "turno": 1},
+    11: {"escopo": "municipal", "n_sim": 1000, "vagas": None, "turno": 1},
+    13: {"escopo": "municipal", "n_sim": 3000, "vagas": 1, "turno": 2},
+}
+
+
+def get_cargo_config(cd_cargo: int) -> dict:
+    return CARGO_CONFIGS.get(cd_cargo, {"escopo": "desconhecido", "n_sim": 1000, "vagas": None, "turno": 1})
+
 
 def get_model_type(cd_cargo: int) -> str:
     """Retorna 'swing' | 'deputado' | 'unknown'."""
@@ -91,6 +106,8 @@ def predict(
     """
     cargo_name = CD_CARGO_NAMES.get(cd_cargo, f"cargo_{cd_cargo}")
     model_type = get_model_type(cd_cargo)
+    cargo_cfg = get_cargo_config(cd_cargo)
+    effective_n_sim = cargo_cfg["n_sim"] if n_sim == 1000 else n_sim
 
     model = load_model(cd_cargo, uf, model_dir)
     if model is None:
@@ -99,11 +116,12 @@ def predict(
             "uf": uf,
             "modelo": model_type,
             "candidatos": [],
+            "config": cargo_cfg,
             "erro": f"Modelo não encontrado para cargo={cargo_name} uf={uf}",
         }
 
     if model_type == "swing":
-        mc_df = model.simulate_monte_carlo(df, n_sim=n_sim)
+        mc_df = model.simulate_monte_carlo(df, n_sim=effective_n_sim)
         candidatos = mc_df.rename(
             columns={
                 "swing_mean": "swing_mean",
@@ -112,7 +130,7 @@ def predict(
         ).to_dict(orient="records")
 
     else:
-        mc_df = model.simulate_monte_carlo(df, n_sim=n_sim)
+        mc_df = model.simulate_monte_carlo(df, n_sim=effective_n_sim)
         candidatos = mc_df[
             ["nm_candidato", "sg_partido", "prob_eleicao", "votos_mean", "votos_q05", "votos_q95"]
         ].to_dict(orient="records")
@@ -133,4 +151,5 @@ def predict(
         "uf": uf,
         "modelo": model_type,
         "candidatos": candidatos,
+        "config": cargo_cfg,
     }

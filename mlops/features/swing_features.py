@@ -24,6 +24,10 @@ def build_swing_features(
     df_abstencao: pd.DataFrame | None,
     df_incumbencia: pd.DataFrame | None,
     df_regiao_rj: pd.DataFrame | None,
+    df_zona: pd.DataFrame | None = None,
+    df_seguranca: pd.DataFrame | None = None,
+    df_cadunico: pd.DataFrame | None = None,
+    df_polls: pd.DataFrame | None = None,
 ) -> pd.DataFrame:
     """
     Retorna DataFrame com todas as features para o SwingModel, incluindo:
@@ -78,6 +82,82 @@ def build_swing_features(
         df["taxa_abstencao"] = _NUM_FILL
     else:
         df["taxa_abstencao"] = df["taxa_abstencao"].fillna(_NUM_FILL)
+
+    # --- zona eleitoral (heterogeneidade de abstenção entre zonas) ---
+    if df_zona is not None and not df_zona.empty and "cd_municipio" in df_zona.columns:
+        zona_agg = (
+            df_zona.groupby("cd_municipio")["taxa_abstencao"]
+            .agg(abstencao_zona_std="std", n_zonas="count")
+            .reset_index()
+        )
+        df = df.merge(zona_agg, on="cd_municipio", how="left")
+    for col in ["abstencao_zona_std", "n_zonas"]:
+        if col not in df.columns:
+            df[col] = _NUM_FILL
+        else:
+            df[col] = df[col].fillna(_NUM_FILL)
+
+    # --- segurança (homicídios) ---
+    if df_seguranca is not None and not df_seguranca.empty:
+        seg = df_seguranca.copy()
+        if "cd_municipio_ibge" in seg.columns and "cd_municipio" not in seg.columns:
+            seg = seg.rename(columns={"cd_municipio_ibge": "cd_municipio"})
+        if "taxa_homicidio_100k" in seg.columns:
+            df = df.merge(
+                seg[["cd_municipio", "taxa_homicidio_100k"]],
+                on="cd_municipio",
+                how="left",
+            )
+    if "taxa_homicidio_100k" not in df.columns:
+        df["taxa_homicidio_100k"] = _NUM_FILL
+    else:
+        df["taxa_homicidio_100k"] = df["taxa_homicidio_100k"].fillna(_NUM_FILL)
+    df["log_homicidio"] = np.log1p(df["taxa_homicidio_100k"].clip(lower=0))
+
+    # --- cadunico / bolsa família ---
+    if df_cadunico is not None and not df_cadunico.empty:
+        cad = df_cadunico.copy()
+        if "cd_municipio_ibge" in cad.columns and "cd_municipio" not in cad.columns:
+            cad = cad.rename(columns={"cd_municipio_ibge": "cd_municipio"})
+        if "qtd_beneficiarios_novo_bolsa_familia" in cad.columns:
+            df = df.merge(
+                cad[["cd_municipio", "qtd_beneficiarios_novo_bolsa_familia"]],
+                on="cd_municipio",
+                how="left",
+            )
+    if "qtd_beneficiarios_novo_bolsa_familia" not in df.columns:
+        df["qtd_beneficiarios_novo_bolsa_familia"] = _NUM_FILL
+    else:
+        df["qtd_beneficiarios_novo_bolsa_familia"] = df["qtd_beneficiarios_novo_bolsa_familia"].fillna(_NUM_FILL)
+    populacao = np.where(df["log_populacao"] > 0, np.exp(df["log_populacao"]), 0.0)
+    df["pct_beneficiarios_bf"] = np.where(
+        populacao > 0,
+        df["qtd_beneficiarios_novo_bolsa_familia"] / populacao * 100.0,
+        _NUM_FILL,
+    )
+
+    # --- polls / rejeição ---
+    if (
+        df_polls is not None
+        and not df_polls.empty
+        and {"nm_candidato", "sg_uf", "rejeicao_pct"}.issubset(df_polls.columns)
+    ):
+        polls = df_polls.copy()
+        if "data_pesquisa" in polls.columns:
+            polls = polls.sort_values("data_pesquisa")
+        rej_agg = polls.groupby(["nm_candidato", "sg_uf"]).agg(
+            media_rejeicao=("rejeicao_pct", "mean"),
+            _rej_primeira=("rejeicao_pct", "first"),
+            _rej_ultima=("rejeicao_pct", "last"),
+        ).reset_index()
+        rej_agg["delta_rejeicao"] = rej_agg["_rej_ultima"] - rej_agg["_rej_primeira"]
+        rej_agg = rej_agg.drop(columns=["_rej_primeira", "_rej_ultima"])
+        df = df.merge(rej_agg, on=["nm_candidato", "sg_uf"], how="left")
+    for col in ["media_rejeicao", "delta_rejeicao"]:
+        if col not in df.columns:
+            df[col] = _NUM_FILL
+        else:
+            df[col] = df[col].fillna(_NUM_FILL)
 
     # --- incumbência ---
     if df_incumbencia is not None and not df_incumbencia.empty:
@@ -195,12 +275,57 @@ def build_swing_features_from_bq(
     except Exception:
         df_regiao_rj = None
 
+    try:
+        sql_zona = f"""
+            SELECT cd_municipio, nr_zona, AVG(taxa_abstencao) AS taxa_abstencao
+            FROM `{project_id}.{silver_dataset}.fact_abstencao_secao`
+            WHERE sg_uf = '{uf}'
+            GROUP BY 1, 2
+        """
+        df_zona = client.query(sql_zona).to_dataframe()
+    except Exception:
+        df_zona = None
+
+    try:
+        sql_seg = f"""
+            SELECT cd_municipio_ibge AS cd_municipio, taxa_homicidio_100k
+            FROM `{project_id}.{gold_dataset}.fact_seguranca_municipio`
+            WHERE sg_uf = '{uf}' AND ano = 2022
+        """
+        df_seguranca = client.query(sql_seg).to_dataframe()
+    except Exception:
+        df_seguranca = None
+
+    try:
+        sql_cad = f"""
+            SELECT cd_municipio_ibge AS cd_municipio, qtd_beneficiarios_novo_bolsa_familia
+            FROM `{project_id}.{gold_dataset}.fact_transferencias_sociais`
+            WHERE sg_uf = '{uf}' AND ano = 2022
+        """
+        df_cadunico = client.query(sql_cad).to_dataframe()
+    except Exception:
+        df_cadunico = None
+
+    try:
+        sql_polls = f"""
+            SELECT nm_candidato, sg_uf, rejeicao_pct, data_pesquisa
+            FROM `{project_id}.{silver_dataset}.stg_polls`
+            WHERE sg_uf = '{uf}' AND cd_cargo = {cargo} AND rejeicao_pct IS NOT NULL
+        """
+        df_polls = client.query(sql_polls).to_dataframe()
+    except Exception:
+        df_polls = None
+
     return build_swing_features(
         df_votos=df_votos,
         df_ibge=df_ibge,
         df_abstencao=df_abstencao,
         df_incumbencia=df_incumbencia,
         df_regiao_rj=df_regiao_rj,
+        df_zona=df_zona,
+        df_seguranca=df_seguranca,
+        df_cadunico=df_cadunico,
+        df_polls=df_polls,
     )
 
 
@@ -259,4 +384,8 @@ def build_swing_features_from_local(
         df_abstencao=None,
         df_incumbencia=None,
         df_regiao_rj=None,
+        df_zona=None,
+        df_seguranca=None,
+        df_cadunico=None,
+        df_polls=None,
     )
