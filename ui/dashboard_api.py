@@ -7033,17 +7033,18 @@ async def get_comparativo_candidatos(
 
             client = bigquery.Client(project=settings.gcp_project_id)
             gold = f"{settings.gcp_project_id}.{settings.bigquery_dataset_gold}"
-            silver = f"{settings.gcp_project_id}.{settings.bigquery_dataset_silver}"
             params = [
                 bigquery.ScalarQueryParameter("uf", "STRING", uf.upper()),
                 bigquery.ScalarQueryParameter("cd_cargo", "INT64", cd_cargo),
                 bigquery.ScalarQueryParameter("turno", "INT64", turno),
             ]
 
+            # ds_situacao vem da Gold (ANY_VALUE por município) — não precisa de Silver
             gold_query = f"""
                 WITH base AS (
                     SELECT nm_candidato, sg_partido, ano_eleicao,
-                           SUM(total_votos) AS votos
+                           SUM(total_votos)        AS votos,
+                           ANY_VALUE(ds_situacao)  AS ds_situacao
                     FROM `{gold}.fact_municipio_candidato_eleicao`
                     WHERE sg_uf    = @uf
                       AND cd_cargo = @cd_cargo
@@ -7053,20 +7054,22 @@ async def get_comparativo_candidatos(
                     GROUP BY nm_candidato, sg_partido, ano_eleicao
                 ),
                 ranked AS (
-                    SELECT nm_candidato, sg_partido, ano_eleicao, votos,
+                    SELECT nm_candidato, sg_partido, ano_eleicao, votos, ds_situacao,
                         ROUND(votos / NULLIF(SUM(votos) OVER (PARTITION BY ano_eleicao), 0) * 100, 2) AS pct,
                         RANK() OVER (PARTITION BY ano_eleicao ORDER BY votos DESC) AS ranking
                     FROM base
                 ),
                 pivoted AS (
                     SELECT nm_candidato,
-                        MAX(sg_partido)                           AS sg_partido,
-                        MAX(IF(ano_eleicao=2018, votos,   NULL)) AS votos_2018,
-                        MAX(IF(ano_eleicao=2022, votos,   NULL)) AS votos_2022,
-                        MAX(IF(ano_eleicao=2018, pct,     NULL)) AS pct_2018,
-                        MAX(IF(ano_eleicao=2022, pct,     NULL)) AS pct_2022,
-                        MAX(IF(ano_eleicao=2018, ranking, NULL)) AS rank_2018,
-                        MAX(IF(ano_eleicao=2022, ranking, NULL)) AS rank_2022
+                        MAX(sg_partido)                                AS sg_partido,
+                        MAX(IF(ano_eleicao=2018, votos,        NULL)) AS votos_2018,
+                        MAX(IF(ano_eleicao=2022, votos,        NULL)) AS votos_2022,
+                        MAX(IF(ano_eleicao=2018, pct,          NULL)) AS pct_2018,
+                        MAX(IF(ano_eleicao=2022, pct,          NULL)) AS pct_2022,
+                        MAX(IF(ano_eleicao=2018, ranking,      NULL)) AS rank_2018,
+                        MAX(IF(ano_eleicao=2022, ranking,      NULL)) AS rank_2022,
+                        MAX(IF(ano_eleicao=2018, ds_situacao,  NULL)) AS ds_situacao_2018,
+                        MAX(IF(ano_eleicao=2022, ds_situacao,  NULL)) AS ds_situacao_2022
                     FROM ranked GROUP BY nm_candidato
                 )
                 SELECT nm_candidato, sg_partido,
@@ -7077,63 +7080,28 @@ async def get_comparativo_candidatos(
                     rank_2018, rank_2022,
                     COALESCE(votos_2022,0) - COALESCE(votos_2018,0) AS delta_votos,
                     IF(rank_2022 IS NOT NULL AND rank_2018 IS NOT NULL,
-                       rank_2018 - rank_2022, NULL)                  AS delta_rank
+                       rank_2018 - rank_2022, NULL)                  AS delta_rank,
+                    ds_situacao_2018,
+                    ds_situacao_2022
                 FROM pivoted
                 ORDER BY COALESCE(votos_2022, votos_2018) DESC
                 LIMIT {min(limit, 500)}
             """
 
-            silver_query = f"""
-                SELECT nm_candidato, ano_eleicao,
-                       ANY_VALUE(ds_situacao) AS ds_situacao
-                FROM `{silver}.tse_*`
-                WHERE sg_uf    = @uf
-                  AND cd_cargo = @cd_cargo
-                  AND nr_turno = @turno
-                  AND ano_eleicao IN (2018, 2022)
-                  AND nm_candidato IS NOT NULL
-                  AND UPPER(TRIM(nm_candidato)) NOT IN
-                      ('VOTO BRANCO','VOTO NULO','VOTO EM BRANCO','#NULO#','#NULO','NULO','BRANCO')
-                GROUP BY nm_candidato, ano_eleicao
-            """
-
             cfg_gold = bigquery.QueryJobConfig(query_parameters=params)
-            cfg_silver = bigquery.QueryJobConfig(query_parameters=params)
 
             gold_rows = await asyncio.to_thread(
                 lambda: list(client.query(gold_query, job_config=cfg_gold).result())
             )
 
-            sit_map: dict[tuple, str] = {}
-            silver_ok = True
-            try:
-                silver_rows = await asyncio.to_thread(
-                    lambda: list(client.query(silver_query, job_config=cfg_silver).result())
-                )
-                for r in silver_rows:
-                    sit_map[(r["nm_candidato"], int(r["ano_eleicao"]))] = r["ds_situacao"] or ""
-            except Exception as exc:
-                logger.warning("comparativo silver sit_map indisponivel: %s", exc)
-                # Fallback: derive eleito/não eleito from Gold rank + seats count
-                vagas = _vagas_for_cargo(cd_cargo, uf)
-                if vagas is not None:
-                    for gr in gold_rows:
-                        nm = gr["nm_candidato"] or ""
-                        for ano, rank_col in ((2018, "rank_2018"), (2022, "rank_2022")):
-                            rk = gr[rank_col]
-                            if rk is not None:
-                                sit_map[(nm, ano)] = "ELEITO" if int(rk) <= vagas else "NÃO ELEITO"
-                    logger.info(
-                        "comparativo: situacao derivada de rank (vagas=%d, uf=%s)", vagas, uf
-                    )
-                else:
-                    silver_ok = False
-
             candidatos = []
+            sit_disponivel_gold = False
             for r in gold_rows:
                 nm = r["nm_candidato"] or ""
-                ds18 = sit_map.get((nm, 2018), "")
-                ds22 = sit_map.get((nm, 2022), "")
+                ds18 = r["ds_situacao_2018"] or ""
+                ds22 = r["ds_situacao_2022"] or ""
+                if ds18 or ds22:
+                    sit_disponivel_gold = True
                 if situacao == "eleito" and not (_is_eleito(ds18) or _is_eleito(ds22)):
                     continue
                 if situacao == "nao_eleito" and (_is_eleito(ds18) or _is_eleito(ds22)):
@@ -7166,7 +7134,7 @@ async def get_comparativo_candidatos(
                     "anos": [2018, 2022],
                     "total": len(candidatos),
                     "candidatos": candidatos,
-                    "situacao_disponivel": silver_ok,
+                    "situacao_disponivel": sit_disponivel_gold,
                     "fonte": "bigquery",
                 }
             )
