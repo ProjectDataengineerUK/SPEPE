@@ -2860,35 +2860,6 @@ _PARTIDO_COR = {
     "PCdoB": "#dc2626",
 }
 
-_UF_TO_IBGE: dict[str, str] = {
-    "AC": "12",
-    "AL": "27",
-    "AP": "16",
-    "AM": "13",
-    "BA": "29",
-    "CE": "23",
-    "DF": "53",
-    "ES": "32",
-    "GO": "52",
-    "MA": "21",
-    "MT": "51",
-    "MS": "50",
-    "MG": "31",
-    "PA": "15",
-    "PB": "25",
-    "PR": "41",
-    "PE": "26",
-    "PI": "22",
-    "RJ": "33",
-    "RN": "24",
-    "RS": "43",
-    "RO": "11",
-    "RR": "14",
-    "SC": "42",
-    "SP": "35",
-    "SE": "28",
-    "TO": "17",
-}
 _UF_NAMES: dict[str, str] = {
     "AC": "Acre",
     "AL": "Alagoas",
@@ -2917,35 +2888,6 @@ _UF_NAMES: dict[str, str] = {
     "SP": "São Paulo",
     "SE": "Sergipe",
     "TO": "Tocantins",
-}
-_UF_REGIAO: dict[str, str] = {
-    "AC": "Norte",
-    "AM": "Norte",
-    "AP": "Norte",
-    "PA": "Norte",
-    "RO": "Norte",
-    "RR": "Norte",
-    "TO": "Norte",
-    "AL": "Nordeste",
-    "BA": "Nordeste",
-    "CE": "Nordeste",
-    "MA": "Nordeste",
-    "PB": "Nordeste",
-    "PE": "Nordeste",
-    "PI": "Nordeste",
-    "RN": "Nordeste",
-    "SE": "Nordeste",
-    "DF": "Centro-Oeste",
-    "GO": "Centro-Oeste",
-    "MS": "Centro-Oeste",
-    "MT": "Centro-Oeste",
-    "ES": "Sudeste",
-    "MG": "Sudeste",
-    "RJ": "Sudeste",
-    "SP": "Sudeste",
-    "PR": "Sul",
-    "RS": "Sul",
-    "SC": "Sul",
 }
 _REGIAO_TO_IBGE: dict[str, str] = {
     "Norte": "1",
@@ -3022,7 +2964,7 @@ def _local_mapa(nivel: str, cargo: str, ano: int, turno: int, uf: str = "") -> l
         pct2 = float(runner["total_votos"]) / float(total_geo) * 100 if runner is not None else 0.0
         geo_str = str(geo_val)
         if nivel in ("uf", "nacional"):
-            ibge_code = _UF_TO_IBGE.get(geo_str, "")
+            ibge_code = _UF_IBGE.get(geo_str, "")
             label = _UF_NAMES.get(geo_str, geo_str)
         elif nivel == "regiao":
             ibge_code = _REGIAO_TO_IBGE.get(geo_str, "")

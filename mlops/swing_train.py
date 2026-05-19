@@ -384,24 +384,22 @@ def train_swing_model(
     if df.empty:
         raise ValueError("Training dataset is empty — cannot train swing model")
 
-    X = df[SWING_FEATURE_COLS].fillna(0.0)
-    y = df["swing_target"].fillna(0.0)
-
-    X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
+    df_train, df_test = train_test_split(df, test_size=0.2, random_state=42)
+    y_test = df_test["swing_target"].fillna(0.0)
 
     logger.info(
         "Training SwingModel: cargo=%s uf=%s n_train=%d n_test=%d features=%d",
         cargo,
         uf or "all",
-        len(X_train),
-        len(X_test),
+        len(df_train),
+        len(df_test),
         len(SWING_FEATURE_COLS),
     )
 
     model = SwingModel(cargo=cargo, uf=uf)
-    model.fit(X_train, y_train)
+    model.fit(df_train)
 
-    y_pred = model.predict(X_test)
+    y_pred = model.predict(df_test)
 
     mae = float(np.mean(np.abs(y_pred - y_test.values)))
     rmse = float(np.sqrt(np.mean((y_pred - y_test.values) ** 2)))
@@ -409,7 +407,7 @@ def train_swing_model(
     corr, pval = pearsonr(y_pred, y_test.values) if len(y_test) > 2 else (0.0, 1.0)
 
     # Monte Carlo simulation to get prediction interval width
-    mc_preds = model.predict_mc(X_test, n_sim=n_sim) if hasattr(model, "predict_mc") else None
+    mc_preds = model.predict_mc(df_test, n_sim=n_sim) if hasattr(model, "predict_mc") else None
     mc_interval_width: float | None = None
     if mc_preds is not None:
         intervals = np.percentile(mc_preds, [2.5, 97.5], axis=0)
@@ -424,8 +422,8 @@ def train_swing_model(
     metrics = {
         "cargo": cargo,
         "uf": uf or "all",
-        "n_train": len(X_train),
-        "n_test": len(X_test),
+        "n_train": len(df_train),
+        "n_test": len(df_test),
         "mae": mae,
         "rmse": rmse,
         "pearson_r": float(corr),

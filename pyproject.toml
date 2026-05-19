@@ -93,7 +93,6 @@ python_version = "3.12"
 strict_optional = true
 warn_unused_ignores = false
 warn_return_any = false
-disable_error_codes = ["attr-defined", "union-attr"]
 
 [[tool.mypy.overrides]]
 module = [
