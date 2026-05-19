@@ -6599,10 +6599,11 @@ def _comparativo_from_silver_local(
     for _, r in pivot.iterrows():
         ds18 = r.get("ds_sit_2018") or ""
         ds22 = r.get("ds_sit_2022") or ""
-        if situacao == "eleito" and not (_is_eleito(ds18) or _is_eleito(ds22)):
-            continue
-        if situacao == "nao_eleito" and (_is_eleito(ds18) or _is_eleito(ds22)):
-            continue
+        if sit_disponivel:
+            if situacao == "eleito" and not (_is_eleito(ds18) or _is_eleito(ds22)):
+                continue
+            if situacao == "nao_eleito" and (_is_eleito(ds18) or _is_eleito(ds22)):
+                continue
         candidatos.append({
             "nm_candidato": r["nm_candidato"],
             "sg_partido": r.get("sg_partido") or "",
