@@ -1142,7 +1142,17 @@ async function loadDigital() {
     api(`/api/gdelt_eventos?uf=${_uf}`),
   ]);
   const noTokens = sentD?.status === 'sem_tokens';
+  const isFallbackDig = sentD?.status === 'fallback';
   document.getElementById('dig-no-tokens').style.display = noTokens ? 'block' : 'none';
+  let digBadgeEl = document.getElementById('dig-fallback-badge');
+  if (!digBadgeEl) {
+    digBadgeEl = document.createElement('div');
+    digBadgeEl.id = 'dig-fallback-badge';
+    digBadgeEl.style.cssText = 'margin:0 0 .75rem;padding:.3rem .6rem;background:rgba(251,191,36,.12);border:1px solid rgba(251,191,36,.4);border-radius:6px;font-size:.65rem;color:#fbbf24';
+    document.getElementById('dig-no-tokens').insertAdjacentElement('afterend', digBadgeEl);
+  }
+  digBadgeEl.style.display = isFallbackDig ? 'block' : 'none';
+  digBadgeEl.textContent = '⚠ Dados de exemplo — conecte Twitter/YouTube para monitoramento social real.';
 
   const score = sentD?.score ?? sentD?.sentimento_score ?? null;
   _set('dig-sent', score != null ? score.toFixed(2) : '—');

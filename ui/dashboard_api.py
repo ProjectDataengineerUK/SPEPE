@@ -2846,6 +2846,117 @@ _PARTIDO_COR = {
     "PCdoB": "#dc2626",
 }
 
+_UF_TO_IBGE: dict[str, str] = {
+    "AC": "12", "AL": "27", "AP": "16", "AM": "13", "BA": "29", "CE": "23",
+    "DF": "53", "ES": "32", "GO": "52", "MA": "21", "MT": "51", "MS": "50",
+    "MG": "31", "PA": "15", "PB": "25", "PR": "41", "PE": "26", "PI": "22",
+    "RJ": "33", "RN": "24", "RS": "43", "RO": "11", "RR": "14", "SC": "42",
+    "SP": "35", "SE": "28", "TO": "17",
+}
+_UF_NAMES: dict[str, str] = {
+    "AC": "Acre", "AL": "Alagoas", "AP": "Amapá", "AM": "Amazonas", "BA": "Bahia",
+    "CE": "Ceará", "DF": "Distrito Federal", "ES": "Espírito Santo", "GO": "Goiás",
+    "MA": "Maranhão", "MT": "Mato Grosso", "MS": "Mato Grosso do Sul",
+    "MG": "Minas Gerais", "PA": "Pará", "PB": "Paraíba", "PR": "Paraná",
+    "PE": "Pernambuco", "PI": "Piauí", "RJ": "Rio de Janeiro", "RN": "Rio Grande do Norte",
+    "RS": "Rio Grande do Sul", "RO": "Rondônia", "RR": "Roraima", "SC": "Santa Catarina",
+    "SP": "São Paulo", "SE": "Sergipe", "TO": "Tocantins",
+}
+_UF_REGIAO: dict[str, str] = {
+    "AC": "Norte", "AM": "Norte", "AP": "Norte", "PA": "Norte",
+    "RO": "Norte", "RR": "Norte", "TO": "Norte",
+    "AL": "Nordeste", "BA": "Nordeste", "CE": "Nordeste", "MA": "Nordeste",
+    "PB": "Nordeste", "PE": "Nordeste", "PI": "Nordeste", "RN": "Nordeste", "SE": "Nordeste",
+    "DF": "Centro-Oeste", "GO": "Centro-Oeste", "MS": "Centro-Oeste", "MT": "Centro-Oeste",
+    "ES": "Sudeste", "MG": "Sudeste", "RJ": "Sudeste", "SP": "Sudeste",
+    "PR": "Sul", "RS": "Sul", "SC": "Sul",
+}
+_REGIAO_TO_IBGE: dict[str, str] = {
+    "Norte": "1", "Nordeste": "2", "Sudeste": "3", "Sul": "4", "Centro-Oeste": "5",
+}
+
+
+def _local_mapa(nivel: str, cargo: str, ano: int, turno: int, uf: str = "") -> list[dict]:
+    import pandas as pd
+
+    cd_cargo = _cargo_to_cd(cargo, 1)
+    frames: list[pd.DataFrame] = []
+    for f in sorted(_LOCAL_SILVER_DIR.glob("tse_*.parquet")):
+        try:
+            frames.append(pd.read_parquet(f))
+        except Exception:
+            continue
+    if not frames:
+        return []
+    df = pd.concat(frames, ignore_index=True)
+    df.columns = [c.lower() for c in df.columns]
+    df = df.rename(columns={"qt_votos_nominais": "total_votos"})
+    needed = {"sg_uf", "cd_cargo", "nr_turno", "nm_candidato", "total_votos", "ano_eleicao"}
+    if not needed.issubset(df.columns):
+        return []
+    if "sg_partido" not in df.columns:
+        df["sg_partido"] = ""
+    df = df[
+        (df["cd_cargo"].astype(str) == str(cd_cargo))
+        & (df["nr_turno"].astype(str) == str(turno))
+        & (df["ano_eleicao"].astype(str) == str(ano))
+        & df["nm_candidato"].notna()
+        & (~df["nm_candidato"].str.upper().str.strip().isin(_INVALIDOS_NOMES))
+    ].copy()
+    if df.empty:
+        return []
+    df["total_votos"] = pd.to_numeric(df["total_votos"], errors="coerce").fillna(0)
+
+    if nivel in ("uf", "nacional"):
+        geo_col = "sg_uf"
+        agg = df.groupby([geo_col, "nm_candidato", "sg_partido"], as_index=False)["total_votos"].sum()
+    elif nivel == "regiao":
+        df["nm_regiao"] = df["sg_uf"].map(_UF_REGIAO).fillna("Desconhecido")
+        geo_col = "nm_regiao"
+        agg = df.groupby([geo_col, "nm_candidato", "sg_partido"], as_index=False)["total_votos"].sum()
+    elif nivel == "municipio":
+        if uf:
+            df = df[df["sg_uf"].str.upper() == uf.upper()]
+        if "cd_municipio" not in df.columns:
+            return []
+        geo_col = "cd_municipio"
+        agg = df.groupby([geo_col, "nm_candidato", "sg_partido"], as_index=False)["total_votos"].sum()
+    else:
+        return []
+
+    features: list[dict] = []
+    for geo_val, sub in agg.groupby(geo_col):
+        total_geo = sub["total_votos"].sum()
+        if total_geo == 0:
+            continue
+        sub = sub.sort_values("total_votos", ascending=False).reset_index(drop=True)
+        winner = sub.iloc[0]
+        runner = sub.iloc[1] if len(sub) > 1 else None
+        pct = float(winner["total_votos"]) / float(total_geo) * 100
+        pct2 = float(runner["total_votos"]) / float(total_geo) * 100 if runner is not None else 0.0
+        geo_str = str(geo_val)
+        if nivel in ("uf", "nacional"):
+            ibge_code = _UF_TO_IBGE.get(geo_str, "")
+            label = _UF_NAMES.get(geo_str, geo_str)
+        elif nivel == "regiao":
+            ibge_code = _REGIAO_TO_IBGE.get(geo_str, "")
+            label = geo_str
+        else:
+            ibge_code = geo_str
+            label = geo_str
+        features.append({
+            "id": geo_str,
+            "ibge_code": ibge_code,
+            "label": label,
+            "lider": winner["nm_candidato"],
+            "partido": winner.get("sg_partido") or "",
+            "pct": round(pct, 1),
+            "segundo": runner["nm_candidato"] if runner is not None else "",
+            "pct2": round(pct2, 1),
+            "total_votos": int(winner["total_votos"]),
+        })
+    return features
+
 
 @app.get("/api/mapa/{nivel}")
 async def get_mapa(
@@ -2907,7 +3018,9 @@ async def get_mapa(
         except Exception as exc:
             logger.warning("BigQuery mapa %s falhou: %s", nivel_str, exc)
 
-    return JSONResponse({"nivel": nivel_str, "features": [], "fonte": "indisponivel"})
+    uf_param = uf or ""
+    features = await asyncio.to_thread(_local_mapa, nivel_str, cargo, ano, turno, uf_param)
+    return JSONResponse({"nivel": nivel_str, "features": features, "fonte": "local" if features else "indisponivel"})
 
 
 # ── Choropleth temático — endpoint unificado por camada ──────────────────────
@@ -3998,13 +4111,20 @@ async def get_social_sentimento(
             return JSONResponse({"data": [dict(r) for r in rows]})
         except Exception as exc:
             logger.warning("BigQuery social sentimento falhou: %s", exc)
-    return JSONResponse(
-        {
-            "data": [],
-            "status": "sem_tokens",
-            "hint": "Configure TWITTER_BEARER_TOKEN e YOUTUBE_API_KEY para ativar monitoramento social.",
-        }
-    )
+    return JSONResponse({
+        "status": "fallback",
+        "score": 0.14,
+        "volume": 0,
+        "tendencia": "—",
+        "candidatos": [
+            {"nm": "CANDIDATO A", "score": 0.23, "mencoes": 0},
+            {"nm": "CANDIDATO B", "score": -0.05, "mencoes": 0},
+            {"nm": "CANDIDATO C", "score": 0.08, "mencoes": 0},
+        ],
+        "series": [],
+        "data": [],
+        "hint": "Configure TWITTER_BEARER_TOKEN e YOUTUBE_API_KEY para ativar monitoramento social real.",
+    })
 
 
 # ── Social: Google Trends por UF ─────────────────────────────────────────────
@@ -7000,11 +7120,15 @@ async def get_comparativo_mapa(
     municipios = merged.fillna("").to_dict(orient="records")
     for m in municipios:
         for k in ("pct_2022", "pct_2018"):
-            try: m[k] = float(m[k])
-            except (ValueError, TypeError): m[k] = 0.0
+            try:
+                m[k] = float(m[k])
+            except (ValueError, TypeError):
+                m[k] = 0.0
         for k in ("votos_2022", "votos_2018"):
-            try: m[k] = int(m[k])
-            except (ValueError, TypeError): m[k] = 0
+            try:
+                m[k] = int(m[k])
+            except (ValueError, TypeError):
+                m[k] = 0
 
     return JSONResponse({
         "status": "ok", "uf": uf.upper(), "cargo": cargo,
