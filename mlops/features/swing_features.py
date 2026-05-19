@@ -6,7 +6,6 @@ Pode usar BigQuery (quando disponível) ou parquet local.
 from __future__ import annotations
 
 import logging
-import os
 from pathlib import Path
 
 import numpy as np

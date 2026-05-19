@@ -6511,6 +6511,8 @@ def _comparativo_from_silver_local(
     Monta comparativo 2018×2022 a partir de arquivos Silver locais (parquet).
     Retorna (candidatos, situacao_disponivel).
     """
+    import pandas as pd
+
     frames: list[pd.DataFrame] = []
     for f in sorted(_LOCAL_SILVER_DIR.glob("tse_*.parquet")):
         try:

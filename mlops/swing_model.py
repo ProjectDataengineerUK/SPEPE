@@ -24,7 +24,7 @@ if TYPE_CHECKING:
 
 try:
     import catboost  # noqa: F401
-    from catboost import CatBoostRegressor, Pool
+    from catboost import CatBoostRegressor
 
     _CATBOOST_AVAILABLE = True
 except ImportError:
@@ -36,8 +36,6 @@ try:
     _LIGHTGBM_AVAILABLE = True
 except ImportError:
     _LIGHTGBM_AVAILABLE = False
-
-from mlops.shared_schema import INCUMBENCY_FEATURE_COLS
 
 logger = logging.getLogger(__name__)
 
@@ -279,8 +277,6 @@ class SwingModel:
             pool = Pool(X, cat_features=cat_indices)
             return self._model.predict(pool).astype(float)
         else:
-            import lightgbm as lgb
-
             for col in self._cat_feature_names:
                 if col in X.columns:
                     X[col] = X[col].astype("category")
@@ -441,8 +437,6 @@ class SwingModel:
         if self._backend == "catboost":
             self._model.save_model(str(path / "model.cbm"))
         else:
-            import lightgbm as lgb
-
             self._lgbm_model.booster_.save_model(str(path / "model.lgbm"))
 
         logger.info("SwingModel salvo em %s (backend=%s)", path, self._backend)
