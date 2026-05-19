@@ -7478,7 +7478,7 @@ async def get_comparativo_partidos(
         fed_agg: dict[str, dict] = {}
         sem_fed = []
         for p in partidos_raw:
-            fed: str = p["nm_federacao_2022"] or ""
+            fed: str = str(p["nm_federacao_2022"] or "")
             if fed:
                 if fed not in fed_agg:
                     fed_agg[fed] = {
