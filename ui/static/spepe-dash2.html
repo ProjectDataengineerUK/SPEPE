@@ -18,6 +18,7 @@
   --grn:#238636;--grn2:#2ea043;--blu:#1f6feb;--org:#f97316;--red:#da3633;
   --br:#30363d;
   --topbar:48px;--tabbar:36px;--chatbar:50px;
+  --fs-xs:.70rem;--fs-sm:.75rem;--fs-md:.85rem;
 }
 html,body,#app{height:100%;overflow:hidden}
 body{background:var(--bg);color:var(--tx);font-family:'Inter',system-ui,sans-serif;font-size:13px}
@@ -32,7 +33,7 @@ select,input,textarea{font-family:inherit}
 .lcard{background:var(--bg2);border:1px solid var(--br);border-radius:12px;padding:44px 40px;width:360px;box-shadow:0 8px 40px rgba(0,0,0,.6)}
 .lword{font-size:2rem;font-weight:800;text-align:center;letter-spacing:-.02em}
 .lword span{color:var(--grn2)}
-.ltag{font-size:.65rem;color:var(--tx2);text-align:center;text-transform:uppercase;letter-spacing:.1em;margin:4px 0 24px}
+.ltag{font-size:.70rem;color:var(--tx2);text-align:center;text-transform:uppercase;letter-spacing:.1em;margin:4px 0 24px}
 .lerr{display:none;color:#f87171;font-size:.72rem;margin-top:12px;padding:8px 10px;background:rgba(248,113,113,.1);border-radius:6px;border:1px solid rgba(248,113,113,.3);text-align:center}
 .btn-dev{display:block;width:100%;margin-top:12px;padding:10px;background:var(--bg3);border:1px solid var(--br);border-radius:6px;color:var(--tx2);font-size:.75rem;text-align:center}
 .btn-dev:hover{border-color:var(--grn);color:var(--tx)}
@@ -58,16 +59,16 @@ select,input,textarea{font-family:inherit}
 .sdot.red{background:var(--red)}
 .sdot.gry{background:#475569}
 .uav{width:26px;height:26px;border-radius:50%;background:linear-gradient(135deg,var(--grn),var(--blu));display:flex;align-items:center;justify-content:center;font-size:.6rem;font-weight:700;color:#fff;flex-shrink:0}
-.btn-out{background:transparent;border:1px solid var(--br);border-radius:6px;padding:3px 8px;font-size:.65rem;color:var(--tx2)}
+.btn-out{background:transparent;border:1px solid var(--br);border-radius:6px;padding:3px 8px;font-size:.70rem;color:var(--tx2)}
 .btn-out:hover{border-color:var(--red);color:var(--red)}
 .countdown{font-size:.6rem;font-weight:700;background:#431407;color:var(--org);border:1px solid rgba(249,115,22,.4);border-radius:10px;padding:2px 7px;white-space:nowrap}
 
 /* ── TAB BAR ── */
 #tabbar{height:var(--tabbar);background:var(--bg2);border-bottom:1px solid var(--br);display:flex;flex-shrink:0;z-index:15}
-.tab{flex:1;display:flex;align-items:center;justify-content:center;gap:4px;font-size:.65rem;font-weight:600;color:var(--tx3);cursor:pointer;border-bottom:2px solid transparent;transition:all .15s;user-select:none;white-space:nowrap;padding:0 2px}
+.tab{flex:1;display:flex;align-items:center;justify-content:center;gap:4px;font-size:.72rem;font-weight:600;color:var(--tx3);cursor:pointer;border-bottom:2px solid transparent;transition:all .15s;user-select:none;white-space:nowrap;padding:0 4px}
 .tab:hover{color:var(--tx);background:var(--bg3)}
 .tab.active{color:#fff;border-bottom-color:var(--grn2);background:var(--bg3)}
-.tab-badge{font-size:.5rem;background:var(--bg4);color:var(--tx2);border-radius:4px;padding:1px 4px;font-weight:500}
+.tab-badge{font-size:.62rem;background:#1f6feb22;color:#58a6ff;border-radius:4px;padding:1px 5px;font-weight:600}
 
 /* ── CONTENT AREA ── */
 #content{flex:1;overflow:hidden;position:relative;min-height:0}
@@ -80,16 +81,16 @@ select,input,textarea{font-family:inherit}
 .kpi-row-4{grid-template-columns:repeat(4,1fr)}
 .kpi{background:var(--bg2);border:1px solid var(--br);border-radius:8px;padding:10px 13px}
 .kpi-val{font-size:1.4rem;font-weight:800;font-family:'JetBrains Mono',monospace;line-height:1.1}
-.kpi-lbl{font-size:.6rem;color:var(--tx3);margin-top:3px;text-transform:uppercase;letter-spacing:.05em}
-.kpi-delta{font-size:.62rem;margin-top:2px}
+.kpi-lbl{font-size:.68rem;color:var(--tx3);margin-top:3px;text-transform:uppercase;letter-spacing:.04em}
+.kpi-delta{font-size:.70rem;margin-top:2px}
 .up{color:#22c55e}.dn{color:var(--red)}.neu{color:var(--tx2)}
-.shdr{font-size:.62rem;font-weight:700;color:var(--tx2);text-transform:uppercase;letter-spacing:.08em;margin:14px 0 7px;display:flex;align-items:center;gap:6px}
+.shdr{font-size:.72rem;font-weight:600;color:var(--tx2);letter-spacing:.02em;margin:14px 0 8px;display:flex;align-items:center;gap:6px}
 .empty{color:var(--tx3);font-size:.7rem;text-align:center;padding:20px}
 .bar-row{display:flex;align-items:center;gap:8px;margin-bottom:5px}
-.bar-lbl{font-size:.63rem;color:var(--tx2);width:110px;flex-shrink:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.bar-track{flex:1;height:10px;background:var(--bg4);border-radius:5px;overflow:hidden}
-.bar-fill{height:100%;border-radius:5px;transition:width .5s}
-.bar-pct{font-size:.63rem;font-family:monospace;color:var(--tx);width:38px;text-align:right;flex-shrink:0}
+.bar-lbl{font-size:.70rem;color:var(--tx2);width:120px;flex-shrink:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.bar-track{flex:1;height:8px;background:var(--bg4);border-radius:4px;overflow:hidden}
+.bar-fill{height:100%;border-radius:4px;transition:width .5s}
+.bar-pct{font-size:.70rem;font-family:monospace;color:var(--tx);width:40px;text-align:right;flex-shrink:0}
 .kv-row{display:flex;justify-content:space-between;padding:4px 0;border-bottom:1px solid var(--br);font-size:.7rem}
 .kv-lbl{color:var(--tx2)}
 .kv-val{color:var(--tx);font-weight:600}
@@ -97,19 +98,19 @@ select,input,textarea{font-family:inherit}
 .adv-nm{font-size:.7rem;color:var(--tx);flex:1}
 .adv-pct{font-size:.75rem;font-weight:700;font-family:monospace;color:var(--org)}
 .prob-wrap{margin-bottom:10px}
-.prob-lbl{font-size:.65rem;color:var(--tx2);margin-bottom:3px;display:flex;justify-content:space-between}
-.prob-track{height:12px;background:var(--bg4);border-radius:6px;overflow:hidden}
-.prob-fill{height:100%;border-radius:6px;transition:width .6s}
-.shap-row{display:flex;align-items:center;gap:8px;padding:4px 0;border-bottom:1px solid var(--br)}
-.shap-nm{font-size:.66rem;color:var(--tx);flex:1}
+.prob-lbl{font-size:.71rem;color:var(--tx2);margin-bottom:4px;display:flex;justify-content:space-between}
+.prob-track{height:10px;background:var(--bg4);border-radius:5px;overflow:hidden}
+.prob-fill{height:100%;border-radius:5px;transition:width .6s}
+.shap-row{display:flex;align-items:center;gap:8px;padding:5px 0;border-bottom:1px solid var(--br)}
+.shap-nm{font-size:.71rem;color:var(--tx);flex:1}
 .shap-bar-wrap{width:90px;height:6px;background:var(--bg4);border-radius:3px;overflow:hidden;flex-shrink:0}
 .shap-bar-fill{height:100%;border-radius:3px}
-.shap-val{font-size:.66rem;font-family:monospace;font-weight:700;width:52px;text-align:right;flex-shrink:0}
+.shap-val{font-size:.71rem;font-family:monospace;font-weight:700;width:54px;text-align:right;flex-shrink:0}
 .pill-row{display:flex;gap:5px;flex-wrap:wrap;margin-bottom:10px}
-.pill{padding:3px 10px;font-size:.62rem;border:1px solid var(--br);border-radius:12px;background:transparent;color:var(--tx2);cursor:pointer}
+.pill{padding:3px 10px;font-size:.69rem;border:1px solid var(--br);border-radius:12px;background:transparent;color:var(--tx2);cursor:pointer}
 .pill.active{background:var(--bg3);color:var(--grn2);border-color:var(--grn)}
 .pill:hover:not(.active){color:var(--tx)}
-.tag{font-size:.55rem;padding:1px 5px;border-radius:8px;font-weight:600;display:inline-block}
+.tag{font-size:.65rem;padding:2px 6px;border-radius:8px;font-weight:600;display:inline-block}
 .tag-grn{background:#2ea04322;color:#3fb950}
 .tag-blu{background:#1f6feb22;color:#58a6ff}
 .tag-org{background:#f9731622;color:#fb923c}
@@ -124,29 +125,30 @@ canvas{display:block}
 #map-overlay-bl{position:absolute;bottom:70px;left:10px;z-index:500}
 #map-overlay-br{position:absolute;bottom:10px;right:10px;z-index:500}
 .map-zoom-group{display:flex;flex-direction:column;gap:3px}
-.map-btn{padding:4px 9px;font-size:.6rem;border:1px solid var(--br);border-radius:4px;background:var(--bg2);color:var(--tx2);cursor:pointer;transition:all .15s}
+.map-btn{padding:4px 9px;font-size:.68rem;border:1px solid var(--br);border-radius:4px;background:var(--bg2);color:var(--tx2);cursor:pointer;transition:all .15s}
 .map-btn:hover{color:var(--tx);border-color:var(--bg4)}
 .map-btn.active{background:var(--grn);color:#000;border-color:var(--grn);font-weight:600}
-.map-crumb{font-size:.62rem;color:var(--tx2);background:var(--bg2);border:1px solid var(--br);border-radius:4px;padding:3px 8px;white-space:nowrap}
+.map-crumb{font-size:.70rem;color:var(--tx2);background:var(--bg2);border:1px solid var(--br);border-radius:4px;padding:3px 8px;white-space:nowrap}
 .map-crumb span{color:var(--grn2);cursor:pointer}
 .map-crumb span:hover{text-decoration:underline}
-.layer-chip{padding:3px 8px;font-size:.6rem;border:1px solid var(--br);border-radius:4px;background:var(--bg2);color:var(--tx3);cursor:pointer;transition:all .15s}
+.layer-chip{padding:3px 8px;font-size:.68rem;border:1px solid var(--br);border-radius:4px;background:var(--bg2);color:var(--tx3);cursor:pointer;transition:all .15s}
 .layer-chip:hover{color:var(--tx2)}
 .layer-chip.active{background:var(--bg3);color:var(--grn2);border-color:var(--grn)}
-#map-legend{background:var(--bg2);border:1px solid var(--br);border-radius:6px;padding:7px 10px;min-width:120px;font-size:.65rem;pointer-events:none;box-shadow:0 2px 8px rgba(0,0,0,.4)}
+#map-legend{background:var(--bg2);border:1px solid var(--br);border-radius:6px;padding:7px 10px;min-width:120px;font-size:.70rem;pointer-events:none;box-shadow:0 2px 8px rgba(0,0,0,.4)}
 
 /* ── RESULTS TAB layout ── */
 .results-grid{display:grid;grid-template-columns:55% 45%;gap:12px;flex:1;min-height:0;overflow:hidden}
 .chart-panel{background:var(--bg2);border:1px solid var(--br);border-radius:8px;padding:12px;overflow:hidden;display:flex;flex-direction:column;min-height:0}
-.chart-title{font-size:.65rem;font-weight:700;color:var(--tx2);text-transform:uppercase;letter-spacing:.07em;margin-bottom:8px;flex-shrink:0}
+.chart-title{font-size:.74rem;font-weight:600;color:var(--tx);letter-spacing:.01em;margin-bottom:8px;flex-shrink:0}
 .chart-wrap{flex:1;position:relative;min-height:0}
 .table-wrap{overflow-y:auto;flex:1;min-height:0}
 table.data{width:100%;border-collapse:collapse;font-size:.7rem}
-table.data th{padding:5px 7px;color:var(--tx2);text-align:left;border-bottom:1px solid var(--br);font-weight:600;font-size:.62rem;text-transform:uppercase;letter-spacing:.05em;position:sticky;top:0;background:var(--bg2)}
+table.data th{padding:6px 8px;color:var(--tx2);text-align:left;border-bottom:1px solid var(--br);font-weight:600;font-size:.70rem;text-transform:uppercase;letter-spacing:.03em;position:sticky;top:0;background:var(--bg2)}
+table.data th[onclick]:hover{background:var(--bg3);color:var(--tx);cursor:pointer}
 table.data td{padding:4px 7px;border-bottom:1px solid rgba(48,54,61,.5)}
 table.data tr:hover td{background:var(--bg3)}
-.badge-eleito{background:#2ea04322;color:#3fb950;font-size:.55rem;padding:1px 5px;border-radius:4px;font-weight:600}
-.badge-partido{font-size:.6rem;padding:1px 5px;border-radius:3px;font-weight:600;color:#fff}
+.badge-eleito{background:#2ea04322;color:#3fb950;font-size:.66rem;padding:2px 6px;border-radius:4px;font-weight:600}
+.badge-partido{font-size:.66rem;padding:2px 6px;border-radius:3px;font-weight:600;color:#fff}
 
 /* ── ELEITORADO 2x2 grid ── */
 .chart-2x2{display:grid;grid-template-columns:1fr 1fr;grid-template-rows:1fr 1fr;gap:10px;flex:1;min-height:0}
@@ -190,6 +192,24 @@ table.data tr:hover td{background:var(--bg3)}
 @keyframes blink{0%,60%,100%{transform:translateY(0)}30%{transform:translateY(-4px)}}
 #chat-status-dot{font-size:.6rem;margin-left:auto}
 #chat-reconnect{display:none;cursor:pointer;color:var(--org);font-size:.65rem;margin-left:4px}
+
+/* ── DEMO BANNER (unified status bar) ── */
+#demo-banner{display:none;padding:6px 14px;background:rgba(69,26,3,.75);border-bottom:1px solid #92400e55;font-size:.72rem;color:#fcd34d;flex-shrink:0;align-items:center;gap:10px;z-index:12;backdrop-filter:blur(4px)}
+#demo-banner.vis{display:flex}
+.ban-icon{font-size:.85rem;flex-shrink:0;opacity:.9}
+.ban-items{display:flex;gap:14px;flex-wrap:wrap;flex:1;min-width:0}
+.ban-item{display:flex;align-items:center;gap:5px;white-space:nowrap;font-size:.70rem}
+.ban-dot{width:5px;height:5px;border-radius:50%;background:#f59e0b;flex-shrink:0}
+.ban-dismiss{background:transparent;border:none;color:#fcd34d66;cursor:pointer;font-size:.85rem;flex-shrink:0;padding:2px 4px;line-height:1}
+.ban-dismiss:hover{color:#fcd34d}
+
+/* ── SKELETON SHIMMER ── */
+@keyframes shimmer{0%{background-position:-200% 0}100%{background-position:200% 0}}
+.skel{display:inline-block;border-radius:4px;background:linear-gradient(90deg,var(--bg3) 25%,var(--bg4) 50%,var(--bg3) 75%);background-size:200% 100%;animation:shimmer 1.2s infinite;vertical-align:middle}
+
+/* ── COMPARATIVO FILTER ── */
+.cmp2-filter-group{display:flex;align-items:center;gap:6px;padding:0 8px;border-left:1px solid var(--br)}
+.cmp2-filter-group:first-child{padding-left:0;border-left:none}
 </style>
 </head>
 <body>
@@ -268,6 +288,13 @@ table.data tr:hover td{background:var(--bg3)}
     <div class="tab" data-tab="previsao" onclick="switchTab('previsao')">&#128302; Previs&#227;o <span class="tab-badge">2026</span></div>
   </div>
 
+  <!-- DEMO / FALLBACK BANNER -->
+  <div id="demo-banner">
+    <span class="ban-icon">&#9888;</span>
+    <div class="ban-items"></div>
+    <button class="ban-dismiss" onclick="this.parentElement.classList.remove('vis')" title="Fechar">&#10005;</button>
+  </div>
+
   <!-- CONTENT -->
   <div id="content">
 
@@ -333,7 +360,7 @@ table.data tr:hover td{background:var(--bg3)}
     <div class="tab-panel" id="tab-eleitorado">
       <div class="panel-scroll">
         <div style="display:flex;align-items:center;gap:8px;margin-bottom:12px">
-          <span style="font-size:.7rem;font-weight:700;color:var(--tx2)">Perfil do Eleitorado</span>
+          <span style="font-size:.80rem;font-weight:700;color:var(--tx)">Perfil do Eleitorado</span>
           <span class="tag tag-grn">&#128197; Dados 2026</span>
         </div>
         <div class="kpi-row kpi-row-4">
@@ -355,7 +382,7 @@ table.data tr:hover td{background:var(--bg3)}
     <div class="tab-panel" id="tab-digital">
       <div class="panel-scroll">
         <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px">
-          <span style="font-size:.7rem;font-weight:700;color:var(--tx2)">Monitor Digital</span>
+          <span style="font-size:.80rem;font-weight:700;color:var(--tx)">Monitor Digital</span>
           <span class="tag tag-blu">&#128197; Tempo Real</span>
         </div>
         <div class="kpi-row kpi-row-4">
@@ -443,12 +470,14 @@ table.data tr:hover td{background:var(--bg3)}
     <div class="tab-panel" id="tab-comparativo">
       <div class="panel-scroll">
         <!-- filtros -->
-        <div style="display:flex;align-items:center;gap:10px;margin-bottom:12px;flex-wrap:wrap">
-          <span style="font-size:.7rem;font-weight:700;color:var(--tx2)">Comparativo Hist&#243;rico</span>
-          <span class="tag tag-grn">2018 &#215; 2022</span>
-          <div style="display:flex;align-items:center;gap:6px;margin-left:auto;flex-wrap:wrap">
-            <label style="font-size:.65rem;color:var(--tx2)">UF</label>
-            <select id="cmp2-uf" style="font-size:.67rem;padding:3px 7px;background:var(--bg3);border:1px solid var(--br);border-radius:5px;color:var(--tx)">
+        <div style="display:flex;align-items:center;gap:0;margin-bottom:12px;flex-wrap:wrap;background:var(--bg2);border:1px solid var(--br);border-radius:8px;padding:7px 10px">
+          <div class="cmp2-filter-group">
+            <span style="font-size:.74rem;font-weight:700;color:var(--tx);white-space:nowrap">Comparativo</span>
+            <span class="tag tag-grn">2018 &#215; 2022</span>
+          </div>
+          <div class="cmp2-filter-group">
+            <label style="font-size:.70rem;color:var(--tx2)">UF</label>
+            <select id="cmp2-uf" style="font-size:.70rem;padding:3px 7px;background:var(--bg3);border:1px solid var(--br);border-radius:5px;color:var(--tx);outline:none">
               <option>SP</option><option>MG</option><option>RJ</option><option>BA</option>
               <option>RS</option><option>PR</option><option>PE</option><option>CE</option>
               <option>GO</option><option>PA</option><option>SC</option><option>MA</option>
@@ -457,32 +486,34 @@ table.data tr:hover td{background:var(--bg3)}
               <option>PI</option><option>DF</option><option>TO</option><option>RO</option>
               <option>AC</option><option>AP</option><option>RR</option>
             </select>
-            <label style="font-size:.65rem;color:var(--tx2)">Cargo</label>
-            <select id="cmp2-cargo" style="font-size:.67rem;padding:3px 7px;background:var(--bg3);border:1px solid var(--br);border-radius:5px;color:var(--tx)">
-              <option value="Deputado Federal">Deputado Federal</option>
-              <option value="Deputado Estadual">Deputado Estadual</option>
+            <label style="font-size:.70rem;color:var(--tx2)">Cargo</label>
+            <select id="cmp2-cargo" style="font-size:.70rem;padding:3px 7px;background:var(--bg3);border:1px solid var(--br);border-radius:5px;color:var(--tx);outline:none">
+              <option value="Deputado Federal">Dep. Federal</option>
+              <option value="Deputado Estadual">Dep. Estadual</option>
               <option value="Senador">Senador</option>
               <option value="Governador">Governador</option>
             </select>
-            <div style="display:flex;gap:4px">
-              <button class="pill active" id="cmp2v-cands" onclick="cmp2SetView('candidatos',this)" style="font-size:.63rem">Candidatos</button>
-              <button class="pill" id="cmp2v-partidos" onclick="cmp2SetView('partidos',this)" style="font-size:.63rem">Partidos</button>
-            </div>
-            <!-- situacao filter (candidatos) -->
-            <div id="cmp2-sit-btns" style="display:flex;gap:3px">
-              <button class="pill active" id="cmp2s-todos" onclick="cmp2SetSit('todos',this)" style="font-size:.6rem">Todos</button>
-              <button class="pill" id="cmp2s-eleito" onclick="cmp2SetSit('eleito',this)" style="font-size:.6rem;color:#4ade80">Eleitos</button>
-              <button class="pill" id="cmp2s-nao" onclick="cmp2SetSit('nao_eleito',this)" style="font-size:.6rem;color:#f87171">N&#227;o Eleitos</button>
-            </div>
+          </div>
+          <div class="cmp2-filter-group">
+            <button class="pill active" id="cmp2v-cands" onclick="cmp2SetView('candidatos',this)">Candidatos</button>
+            <button class="pill" id="cmp2v-partidos" onclick="cmp2SetView('partidos',this)">Partidos</button>
+          </div>
+          <!-- situacao filter (candidatos) -->
+          <div id="cmp2-sit-btns" class="cmp2-filter-group">
+            <button class="pill active" id="cmp2s-todos" onclick="cmp2SetSit('todos',this)">Todos</button>
+            <button class="pill" id="cmp2s-eleito" onclick="cmp2SetSit('eleito',this)" style="color:#4ade80">Eleitos</button>
+            <button class="pill" id="cmp2s-nao" onclick="cmp2SetSit('nao_eleito',this)" style="color:#f87171">N&#227;o Eleitos</button>
+          </div>
+          <!-- agrupar federação (partidos) -->
+          <label id="cmp2-fed-lbl" style="display:none;align-items:center;gap:4px;font-size:.70rem;color:var(--tx2);cursor:pointer;padding:0 8px;border-left:1px solid var(--br)">
+            <input type="checkbox" id="cmp2-fed-chk" onchange="loadComparativo()" style="cursor:pointer"> Federações
+          </label>
+          <div class="cmp2-filter-group" style="margin-left:auto">
             <!-- busca candidato -->
             <input id="cmp2-search" type="search" placeholder="&#128269; Candidato..." oninput="cmp2Search(this.value)"
-              style="font-size:.65rem;padding:3px 8px;background:var(--bg3);border:1px solid var(--br);border-radius:5px;color:var(--tx);width:140px;outline:none">
-            <!-- agrupar federação (partidos) -->
-            <label id="cmp2-fed-lbl" style="display:none;align-items:center;gap:4px;font-size:.62rem;color:var(--tx2);cursor:pointer">
-              <input type="checkbox" id="cmp2-fed-chk" onchange="loadComparativo()" style="cursor:pointer"> Agrupar Federa&#231;&#245;es
-            </label>
-            <button onclick="loadComparativo()" style="padding:3px 12px;font-size:.65rem;background:var(--grn2);color:#fff;border:none;border-radius:5px;cursor:pointer">Buscar</button>
-            <button onclick="cmp2ToggleMapa()" id="cmp2-mapa-btn" style="padding:3px 10px;font-size:.65rem;background:var(--bg3);border:1px solid var(--br);border-radius:5px;cursor:pointer;color:var(--tx2)">&#128506; Mapa</button>
+              style="font-size:.70rem;padding:3px 8px;background:var(--bg3);border:1px solid var(--br);border-radius:5px;color:var(--tx);width:140px;outline:none">
+            <button onclick="loadComparativo()" style="padding:3px 12px;font-size:.70rem;background:var(--grn2);color:#fff;border:none;border-radius:5px;cursor:pointer;font-weight:600">Buscar</button>
+            <button onclick="cmp2ToggleMapa()" id="cmp2-mapa-btn" style="padding:3px 10px;font-size:.70rem;background:var(--bg3);border:1px solid var(--br);border-radius:5px;cursor:pointer;color:var(--tx2)">&#128506; Mapa</button>
           </div>
         </div>
 
@@ -496,15 +527,15 @@ table.data tr:hover td{background:var(--bg3)}
         <div class="kpi-row kpi-row-4" id="cmp2-kpis2" style="margin-bottom:10px">
           <div class="kpi"><div class="kpi-val" id="cmp2-eleitos22">&mdash;</div><div class="kpi-lbl">Eleitos 2022</div></div>
           <div class="kpi"><div class="kpi-val" id="cmp2-novos">&mdash;</div><div class="kpi-lbl">Estreantes 2022</div></div>
-          <div class="kpi"><div class="kpi-val" id="cmp2-top-gain" style="font-size:.56rem;line-height:1.2">&mdash;</div><div class="kpi-lbl">Maior crescimento</div></div>
-          <div class="kpi"><div class="kpi-val" id="cmp2-top-drop" style="font-size:.56rem;line-height:1.2">&mdash;</div><div class="kpi-lbl">Maior queda</div></div>
+          <div class="kpi"><div class="kpi-val" id="cmp2-top-gain" style="font-size:.72rem;line-height:1.3">&mdash;</div><div class="kpi-lbl">Maior crescimento</div></div>
+          <div class="kpi"><div class="kpi-val" id="cmp2-top-drop" style="font-size:.72rem;line-height:1.3">&mdash;</div><div class="kpi-lbl">Maior queda</div></div>
         </div>
         <!-- barra de seleção -->
         <div id="cmp2-compare-bar" style="display:none;margin-bottom:8px;padding:5px 10px;background:var(--bg3);border:1px solid var(--br);border-radius:6px;flex-direction:row;align-items:center;gap:8px;flex-wrap:wrap">
-          <span id="cmp2-sel-count" style="font-size:.62rem;color:var(--tx2);font-weight:600"></span>
-          <button onclick="cmp2Compare()" style="padding:2px 10px;font-size:.62rem;background:var(--grn2);color:#fff;border:none;border-radius:4px;cursor:pointer">&#128202; Comparar</button>
-          <button onclick="cmp2ClearSel()" style="padding:2px 8px;font-size:.6rem;background:transparent;color:var(--tx3);border:1px solid var(--br);border-radius:4px;cursor:pointer">Limpar</button>
-          <span id="cmp2-sel-names" style="font-size:.57rem;color:var(--tx3);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:300px"></span>
+          <span id="cmp2-sel-count" style="font-size:.70rem;color:var(--tx2);font-weight:600"></span>
+          <button onclick="cmp2Compare()" style="padding:2px 10px;font-size:.70rem;background:var(--grn2);color:#fff;border:none;border-radius:4px;cursor:pointer">&#128202; Comparar</button>
+          <button onclick="cmp2ClearSel()" style="padding:2px 8px;font-size:.70rem;background:transparent;color:var(--tx3);border:1px solid var(--br);border-radius:4px;cursor:pointer">Limpar</button>
+          <span id="cmp2-sel-names" style="font-size:.68rem;color:var(--tx3);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:300px"></span>
         </div>
         <!-- painel de comparação (chart) -->
         <div id="cmp2-compare-panel" style="display:none;margin-bottom:10px;padding:10px 12px;background:var(--bg2);border:1px solid var(--br);border-radius:8px">
@@ -515,16 +546,16 @@ table.data tr:hover td{background:var(--bg3)}
           <div style="height:180px"><canvas id="cmp2-compare-chart"></canvas></div>
         </div>
         <!-- aviso situacao indisponivel -->
-        <div id="cmp2-sit-warn" style="display:none;padding:4px 10px;margin-bottom:6px;background:#f59e0b18;border:1px solid #f59e0b44;border-radius:5px;font-size:.62rem;color:#f59e0b">
-          &#9888; Coluna <code style="background:#2d2d2d;padding:1px 3px;border-radius:2px">ds_situacao</code> ausente no Silver local &mdash; exibindo todos. Execute <code style="background:#2d2d2d;padding:1px 3px;border-radius:2px">python scripts/seed_silver.py</code> para ativar o filtro.
+        <div id="cmp2-sit-warn" style="display:none;padding:5px 12px;margin-bottom:8px;background:#1c1400;border:1px solid #f59e0b33;border-radius:6px;font-size:.70rem;color:#f59e0b">
+          &#9888; Coluna <code style="background:#2d2505;padding:1px 4px;border-radius:3px">ds_situacao</code> ausente &mdash; execute <code style="background:#2d2505;padding:1px 4px;border-radius:3px">python scripts/seed_silver.py</code> para ativar filtros.
         </div>
 
         <!-- mapa comparativo -->
         <div id="cmp2-mapa-panel" style="display:none;margin-bottom:10px;border:1px solid var(--br);border-radius:8px;overflow:hidden">
           <div style="padding:6px 12px;background:var(--bg3);border-bottom:1px solid var(--br);display:flex;align-items:center;gap:8px">
             <span style="font-size:.65rem;font-weight:700;color:var(--tx2)">&#128506; Mapa — Vencedor por Munic&#237;pio</span>
-            <span style="font-size:.58rem;color:var(--tx3)">2022 vs 2018</span>
-            <div id="cmp2-mapa-legend" style="display:flex;gap:6px;margin-left:auto;flex-wrap:wrap;font-size:.55rem;color:var(--tx3)"></div>
+            <span style="font-size:.70rem;color:var(--tx3)">2022 vs 2018</span>
+            <div id="cmp2-mapa-legend" style="display:flex;gap:6px;margin-left:auto;flex-wrap:wrap;font-size:.68rem;color:var(--tx3)"></div>
           </div>
           <div id="cmp2-leaflet" style="height:340px"></div>
           <div id="cmp2-mapa-tooltip" style="display:none;position:absolute;pointer-events:none;background:var(--bg2);border:1px solid var(--br);border-radius:6px;padding:6px 10px;font-size:.62rem;z-index:9999;max-width:220px"></div>
@@ -578,7 +609,7 @@ table.data tr:hover td{background:var(--bg3)}
     <div class="tab-panel" id="tab-previsao">
       <div class="panel-scroll">
         <div style="display:flex;align-items:center;gap:8px;margin-bottom:12px">
-          <span style="font-size:.7rem;font-weight:700;color:var(--tx2)">Modelo Preditivo</span>
+          <span style="font-size:.80rem;font-weight:700;color:var(--tx)">Modelo Preditivo</span>
           <span class="tag tag-org">&#128197; 2026</span>
           <div class="pill-row" style="margin:0 0 0 auto">
             <button class="pill" onclick="setScenario('otimista',this)">+ Otimista</button>
@@ -618,7 +649,7 @@ table.data tr:hover td{background:var(--bg3)}
     <div id="chat-phdr">
       <span class="ai-dot"></span>
       <span>SPEPE AI</span>
-      <span style="font-size:.58rem;color:var(--tx3);margin-left:4px;font-family:'JetBrains Mono',monospace">claude-sonnet-4-6</span>
+      <span style="font-size:.66rem;color:var(--tx3);margin-left:4px;font-family:'JetBrains Mono',monospace">claude-sonnet-4-6</span>
       <span id="chat-status-dot" style="color:var(--tx3)">&#9679;</span>
       <span id="chat-reconnect" onclick="initChat()">&#10227; reconectar</span>
       <button onclick="toggleChatPanel()" style="background:transparent;border:none;color:var(--tx2);font-size:.8rem;margin-left:6px">&#10005;</button>
@@ -656,6 +687,21 @@ let _rankTurno = 1, _rankData = [], _rankSortCol = 'votos', _rankSortAsc = false
 let _scenario = 'base';
 const _nativeFetch = window.fetch.bind(window);
 let gMap = null;
+
+// ── DEMO BANNER (unified) ──────────────────────────────────────────────────
+const _bannerStates = {};
+function _updateDemoBanner(key, msg) {
+  if (msg == null) delete _bannerStates[key];
+  else _bannerStates[key] = msg;
+  const el = document.getElementById('demo-banner');
+  if (!el) return;
+  const entries = Object.values(_bannerStates);
+  if (!entries.length) { el.classList.remove('vis'); return; }
+  el.classList.add('vis');
+  el.querySelector('.ban-items').innerHTML = entries.map(m =>
+    `<span class="ban-item"><span class="ban-dot"></span>${_esc(m)}</span>`
+  ).join('<span style="color:#f59e0b44;padding:0 2px">·</span>');
+}
 
 // ── HELPERS ────────────────────────────────────────────────────────────────
 async function api(url) {
@@ -816,6 +862,11 @@ function switchTab(tab) {
   _activeTab = tab;
   document.querySelectorAll('.tab').forEach(t => t.classList.toggle('active', t.dataset.tab === tab));
   document.querySelectorAll('.tab-panel').forEach(p => p.classList.toggle('active', p.id === 'tab-'+tab));
+  // Clear banner states not relevant to new tab
+  const bannerMap = {digital:['digital','gdelt'], comparativo:['comparativo'], previsao:['shap']};
+  const keep = new Set(Object.values(bannerMap).flat());
+  const active = new Set(bannerMap[tab] || []);
+  keep.forEach(k => { if (!active.has(k)) _updateDemoBanner(k, null); });
   loadTab(tab);
   if (tab === 'mapa') setTimeout(()=>{ if(gMap) gMap.invalidateSize(); }, 50);
 }
@@ -1014,8 +1065,8 @@ function _updateLegend() {
     const entries = Object.entries(seen).slice(0,8);
     if (!entries.length) { el.style.display='none'; return; }
     el.style.display = 'block';
-    el.innerHTML = '<div style="font-weight:600;color:var(--tx2);margin-bottom:5px;font-size:.6rem;text-transform:uppercase;letter-spacing:.06em">L&#237;deres</div>'
-      + entries.map(([nm,cor]) => `<div style="display:flex;align-items:center;gap:5px;margin-bottom:3px"><span style="color:${cor};font-size:.85rem;line-height:1">&#9679;</span><span style="color:var(--tx);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:90px;font-size:.62rem">${_esc(nm.split(' ')[0])}</span></div>`).join('');
+    el.innerHTML = '<div style="font-weight:600;color:var(--tx2);margin-bottom:5px;font-size:.68rem;text-transform:uppercase;letter-spacing:.05em">L&#237;deres</div>'
+      + entries.map(([nm,cor]) => `<div style="display:flex;align-items:center;gap:5px;margin-bottom:3px"><span style="color:${cor};font-size:.85rem;line-height:1">&#9679;</span><span style="color:var(--tx);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:90px;font-size:.70rem">${_esc(nm.split(' ')[0])}</span></div>`).join('');
   } else {
     const stops = {
       security:[['Alto','rgb(255,68,68)'],['Médio','rgb(180,48,48)'],['Baixo','#373744']],
@@ -1026,7 +1077,7 @@ function _updateLegend() {
     }[_activeLayer] || [];
     if (!stops.length) { el.style.display='none'; return; }
     el.style.display = 'block';
-    el.innerHTML = stops.map(([lbl,cor]) => `<div style="display:flex;align-items:center;gap:5px;margin-bottom:3px"><span style="width:10px;height:10px;border-radius:2px;background:${cor};flex-shrink:0;display:inline-block"></span><span style="color:var(--tx2);font-size:.62rem">${_esc(lbl)}</span></div>`).join('');
+    el.innerHTML = stops.map(([lbl,cor]) => `<div style="display:flex;align-items:center;gap:5px;margin-bottom:3px"><span style="width:10px;height:10px;border-radius:2px;background:${cor};flex-shrink:0;display:inline-block"></span><span style="color:var(--tx2);font-size:.70rem">${_esc(lbl)}</span></div>`).join('');
   }
 }
 
@@ -1144,15 +1195,7 @@ async function loadDigital() {
   const noTokens = sentD?.status === 'sem_tokens';
   const isFallbackDig = sentD?.status === 'fallback';
   document.getElementById('dig-no-tokens').style.display = noTokens ? 'block' : 'none';
-  let digBadgeEl = document.getElementById('dig-fallback-badge');
-  if (!digBadgeEl) {
-    digBadgeEl = document.createElement('div');
-    digBadgeEl.id = 'dig-fallback-badge';
-    digBadgeEl.style.cssText = 'margin:0 0 .75rem;padding:.3rem .6rem;background:rgba(251,191,36,.12);border:1px solid rgba(251,191,36,.4);border-radius:6px;font-size:.65rem;color:#fbbf24';
-    document.getElementById('dig-no-tokens').insertAdjacentElement('afterend', digBadgeEl);
-  }
-  digBadgeEl.style.display = isFallbackDig ? 'block' : 'none';
-  digBadgeEl.textContent = '⚠ Dados de exemplo — conecte Twitter/YouTube para monitoramento social real.';
+  _updateDemoBanner('digital', isFallbackDig ? 'Monitor social: dados de exemplo — conecte Twitter/YouTube' : null);
 
   const score = sentD?.score ?? sentD?.sentimento_score ?? null;
   _set('dig-sent', score != null ? score.toFixed(2) : '—');
@@ -1206,12 +1249,10 @@ async function loadDigital() {
   const gdeltEl = document.getElementById('gdelt-list');
   if (gdeltEl) {
     const gdeltIsExample = gdeltD?.status === 'fallback' || gdeltD?.fonte === 'estatico' || gdeltD?.fonte === 'exemplo';
-    const gdeltBadge = gdeltIsExample
-      ? `<div style="margin-bottom:.5rem;padding:.3rem .6rem;background:rgba(251,191,36,.12);border:1px solid rgba(251,191,36,.4);border-radius:6px;font-size:.65rem;color:#fbbf24">⚠ Dados de exemplo — GDELT sem BigQuery ativo</div>`
-      : '';
-    gdeltEl.innerHTML = gdeltBadge + (gdeltItems.slice(0,10).map(e => `<div class="kv-row">
+    _updateDemoBanner('gdelt', gdeltIsExample ? 'GDELT: dados de exemplo (sem BigQuery)' : null);
+    gdeltEl.innerHTML = (gdeltItems.slice(0,10).map(e => `<div class="kv-row">
       <span class="kv-lbl" style="flex:1">${_esc(e.titulo||e.title||e.tema||'—')}</span>
-      <span class="kv-val" style="font-size:.6rem;color:var(--tx3)">${_esc(e.dt||e.data||'')}</span>
+      <span class="kv-val" style="font-size:.68rem;color:var(--tx3)">${_esc(e.dt||e.data||'')}</span>
     </div>`).join('') || '<div class="empty">Sem eventos GDELT</div>');
   }
 }
@@ -1345,11 +1386,9 @@ async function loadPrevisao(scenario='base') {
   const shapEl = document.getElementById('shap-list');
   if (shapEl) {
     const isFallback = shap?.status === 'fallback';
-    const fallbackLabel = isFallback
-      ? `<div style="padding:4px 8px;margin-bottom:6px;background:#f59e0b18;border:1px solid #f59e0b44;border-radius:4px;font-size:.58rem;color:#f59e0b">&#9888; Valores estimados (modelo não treinado)</div>`
-      : '';
+    _updateDemoBanner('shap', isFallback ? 'SHAP: valores estimados (modelo não treinado ainda)' : null);
     const maxS = Math.max(...shapItems.map(s=>Math.abs(s.shap||0)), 0.001);
-    shapEl.innerHTML = fallbackLabel + (shapItems.slice(0,8).map(s => {
+    shapEl.innerHTML = (shapItems.slice(0,8).map(s => {
       const v = s.shap||0;
       const pct = Math.abs(v/maxS*100).toFixed(0);
       const col = v>0?'#22c55e':'var(--red)';
@@ -1706,13 +1745,13 @@ function cmp2Sort(col) {
 }
 
 function _sitBadge(ds) {
-  if (!ds) return '<span style="color:var(--tx3);font-size:.58rem">N/D</span>';
+  if (!ds) return '<span style="color:var(--tx3);font-size:.66rem">N/D</span>';
   const up = ds.toUpperCase();
   if (up.includes('ELEITO') && !up.includes('NÃO') && !up.includes('NAO'))
-    return `<span style="background:#16a34a22;color:#4ade80;border-radius:3px;padding:1px 5px;font-size:.58rem;font-weight:600">&#10003; Eleito</span>`;
+    return `<span style="background:#16a34a22;color:#4ade80;border-radius:3px;padding:2px 6px;font-size:.66rem;font-weight:600">&#10003; Eleito</span>`;
   if (up.includes('NÃO') || up.includes('NAO') || up === 'NÃO ELEITO' || up === 'NAO ELEITO')
-    return `<span style="background:#dc262622;color:#f87171;border-radius:3px;padding:1px 5px;font-size:.58rem">&#10007; N&#227;o Eleito</span>`;
-  return `<span style="color:var(--tx3);font-size:.58rem">${_esc(ds)}</span>`;
+    return `<span style="background:#dc262622;color:#f87171;border-radius:3px;padding:2px 6px;font-size:.66rem">&#10007; N&#227;o Eleito</span>`;
+  return `<span style="color:var(--tx3);font-size:.66rem">${_esc(ds)}</span>`;
 }
 
 async function loadComparativo() {
@@ -1754,16 +1793,8 @@ async function loadComparativo() {
   const sitWarn = document.getElementById('cmp2-sit-warn');
   if (sitWarn) sitWarn.style.display = (!isExemplo && !_cmp2SitAvail && _cmp2Sit !== 'todos') ? 'block' : 'none';
 
-  // badge de dados de exemplo
-  let cmp2ExBadge = document.getElementById('cmp2-exemplo-badge');
-  if (!cmp2ExBadge) {
-    cmp2ExBadge = document.createElement('div');
-    cmp2ExBadge.id = 'cmp2-exemplo-badge';
-    cmp2ExBadge.style.cssText = 'padding:4px 10px;margin-bottom:6px;background:rgba(251,191,36,.12);border:1px solid rgba(251,191,36,.4);border-radius:5px;font-size:.62rem;color:#fbbf24';
-    cmp2ExBadge.innerHTML = '&#9888; Dados de exemplo (RJ&nbsp;2018&#215;2022) &mdash; execute <code style="background:#2d2d2d;padding:1px 4px;border-radius:3px">python scripts/seed_silver.py</code> para dados reais';
-    if (sitWarn) sitWarn.insertAdjacentElement('beforebegin', cmp2ExBadge);
-  }
-  cmp2ExBadge.style.display = isExemplo ? 'block' : 'none';
+  // unified banner para dados de exemplo
+  _updateDemoBanner('comparativo', isExemplo ? 'Comparativo RJ exemplo — execute python scripts/seed_silver.py para dados reais' : null);
 
   if (!_cmp2Data.length) {
     if (empty) { empty.style.display = 'block'; empty.textContent = 'Nenhum resultado — ajuste os filtros ou execute python scripts/seed_silver.py'; }
@@ -1847,7 +1878,7 @@ function _cmp2Render() {
         <td><input type="checkbox" ${chk} data-nm="${nmEsc}" onchange="cmp2ToggleSelThis(this)" style="cursor:pointer"></td>
         <td>${i+1}</td>
         <td style="max-width:140px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${_esc(r.nm_candidato)}</td>
-        <td><span style="background:${cor}22;color:${cor};border-radius:3px;padding:1px 5px;font-size:.6rem;font-weight:600">${_esc(r.sg_partido)}</span></td>
+        <td><span style="background:${cor}22;color:${cor};border-radius:3px;padding:2px 6px;font-size:.68rem;font-weight:600">${_esc(r.sg_partido)}</span></td>
         <td style="text-align:center">${_sitBadge(r.ds_situacao_2018)}</td>
         <td style="text-align:right;color:#93c5fd">${r.votos_2018 ? _fmt(r.votos_2018) : '—'}</td>
         <td style="text-align:right;color:#93c5fd">${r.rank_2018 != null ? '#'+r.rank_2018 : '—'}</td>
@@ -1868,11 +1899,11 @@ function _cmp2Render() {
       const dvStr = dv > 0 ? '+'+_fmt(dv) : dv < 0 ? _fmt(dv) : '—';
       const cor = PARTIDO_COR[r.sg_partido] || '#64748b';
       const fedStr = r.nm_federacao_2022
-        ? `<span style="font-size:.57rem;color:var(--tx3);white-space:nowrap">${_esc(r.nm_federacao_2022)}</span>`
-        : '<span style="color:var(--tx3);font-size:.57rem">—</span>';
+        ? `<span style="font-size:.68rem;color:var(--tx3);white-space:nowrap">${_esc(r.nm_federacao_2022)}</span>`
+        : '<span style="color:var(--tx3);font-size:.68rem">—</span>';
       return `<tr>
         <td>${i+1}</td>
-        <td><span style="background:${cor}22;color:${cor};border-radius:3px;padding:1px 6px;font-size:.62rem;font-weight:700">${_esc(r.sg_partido)}</span></td>
+        <td><span style="background:${cor}22;color:${cor};border-radius:3px;padding:2px 6px;font-size:.68rem;font-weight:700">${_esc(r.sg_partido)}</span></td>
         <td>${fedStr}</td>
         <td style="text-align:right;color:#93c5fd">${r.votos_2018 ? _fmt(r.votos_2018) : '—'}</td>
         <td style="text-align:right;color:#93c5fd">${r.pct_2018 ? r.pct_2018.toFixed(1)+'%' : '—'}</td>

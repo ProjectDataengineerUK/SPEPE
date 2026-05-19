@@ -170,7 +170,6 @@ def _seed_perfil(uf: str) -> None:
     rng = np.random.default_rng(seed=7)
     rows = []
     for ano in (2018, 2022):
-        base = 12_000_000 if uf == "RJ" else 8_000_000
         for gen in generos:
             for faixa in faixas:
                 for esc in escols:
