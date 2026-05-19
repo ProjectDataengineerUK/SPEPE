@@ -1748,10 +1748,25 @@ async function loadComparativo() {
   }
   _cmp2Data = d[key] || [];
   _cmp2SitAvail = !!d.situacao_disponivel;
+  const isExemplo = d.fonte === 'exemplo';
+
+  // sit-warn: só mostra se filtro ativo mas situacao indisponível (nunca quando é exemplo)
   const sitWarn = document.getElementById('cmp2-sit-warn');
-  if (sitWarn) sitWarn.style.display = (!_cmp2SitAvail && _cmp2Sit !== 'todos') ? 'block' : 'none';
+  if (sitWarn) sitWarn.style.display = (!isExemplo && !_cmp2SitAvail && _cmp2Sit !== 'todos') ? 'block' : 'none';
+
+  // badge de dados de exemplo
+  let cmp2ExBadge = document.getElementById('cmp2-exemplo-badge');
+  if (!cmp2ExBadge) {
+    cmp2ExBadge = document.createElement('div');
+    cmp2ExBadge.id = 'cmp2-exemplo-badge';
+    cmp2ExBadge.style.cssText = 'padding:4px 10px;margin-bottom:6px;background:rgba(251,191,36,.12);border:1px solid rgba(251,191,36,.4);border-radius:5px;font-size:.62rem;color:#fbbf24';
+    cmp2ExBadge.innerHTML = '&#9888; Dados de exemplo (RJ&nbsp;2018&#215;2022) &mdash; execute <code style="background:#2d2d2d;padding:1px 4px;border-radius:3px">python scripts/seed_silver.py</code> para dados reais';
+    if (sitWarn) sitWarn.insertAdjacentElement('beforebegin', cmp2ExBadge);
+  }
+  cmp2ExBadge.style.display = isExemplo ? 'block' : 'none';
+
   if (!_cmp2Data.length) {
-    if (empty) { empty.style.display = 'block'; empty.textContent = 'Nenhum resultado — tente ajustar os filtros ou execute o job tse_ingest'; }
+    if (empty) { empty.style.display = 'block'; empty.textContent = 'Nenhum resultado — ajuste os filtros ou execute python scripts/seed_silver.py'; }
     return;
   }
   if (empty) empty.style.display = 'none';

@@ -6757,6 +6757,65 @@ _INVALIDOS_NOMES = {
 }
 
 
+_EXEMPLO_DEP_FEDERAL = [
+    ("DANIELA DO WAGUINHO", "UNIÃO", 311_000, 240_000, "ELEITO", "ELEITO"),
+    ("AUREO RIBEIRO", "SOLIDARIEDADE", 244_000, 210_000, "ELEITO", "ELEITO"),
+    ("ALEXANDRE RAMAGEM", "PL", 231_000, 0, "NÃO ELEITO", "ELEITO"),
+    ("CHRIS TONIETTO", "PL", 219_000, 0, "NÃO ELEITO", "ELEITO"),
+    ("CARLOS JORDY", "PL", 198_000, 155_000, "ELEITO", "ELEITO"),
+    ("DR LUIZINHO", "PP", 175_000, 195_000, "ELEITO", "ELEITO"),
+    ("HUGO MOTTA", "REPUBLICANOS", 164_000, 168_000, "ELEITO", "ELEITO"),
+    ("TALÍRIA PETRONE", "PSOL", 95_000, 96_000, "ELEITO", "ELEITO"),
+    ("JANDIRA FEGHALI", "PCdoB", 87_000, 106_000, "ELEITO", "ELEITO"),
+    ("BENEDITA DA SILVA", "PT", 76_000, 101_000, "ELEITO", "ELEITO"),
+    ("GLAUBER BRAGA", "PSOL", 68_000, 86_000, "NÃO ELEITO", "ELEITO"),
+    ("CESAR MAIA", "UNIÃO", 65_000, 70_000, "NÃO ELEITO", "NÃO ELEITO"),
+    ("PAULO PINHEIRO", "PT", 61_000, 0, "NÃO ELEITO", "NÃO ELEITO"),
+    ("ROBSON LEITE", "PDT", 57_000, 65_000, "NÃO ELEITO", "NÃO ELEITO"),
+    ("FLÁVIO SERAFINI", "PSOL", 37_000, 75_000, "NÃO ELEITO", "NÃO ELEITO"),
+    ("CHICO ALENCAR", "PSOL", 40_000, 82_000, "NÃO ELEITO", "ELEITO"),
+    ("PATRICIA ABRAVANEL", "PP", 72_000, 55_000, "NÃO ELEITO", "NÃO ELEITO"),
+    ("PAULO GANIME", "NOVO", 104_000, 112_000, "ELEITO", "ELEITO"),
+    ("MARCELO QUEIROZ", "PP", 112_000, 118_000, "ELEITO", "ELEITO"),
+    ("ANNE MOURA", "PSOL", 46_000, 43_000, "NÃO ELEITO", "NÃO ELEITO"),
+]
+
+
+def _comparativo_exemplo(cd_cargo: int, situacao: str, limit: int) -> list[dict]:
+    """Retorna candidatos sintéticos RJ quando não há Silver local (dados de exemplo)."""
+    total_22 = sum(v22 for _, _, v22, _, _, _ in _EXEMPLO_DEP_FEDERAL) or 1
+    total_18 = sum(v18 for _, _, _, v18, _, _ in _EXEMPLO_DEP_FEDERAL) or 1
+    rows = sorted(_EXEMPLO_DEP_FEDERAL, key=lambda x: x[2], reverse=True)
+    cands = []
+    for i, (nm, sg, v22, v18, ds18, ds22) in enumerate(rows):
+        if situacao == "eleito" and not (_is_eleito(ds22) or _is_eleito(ds18)):
+            continue
+        if situacao == "nao_eleito" and (_is_eleito(ds22) or _is_eleito(ds18)):
+            continue
+        delta = v22 - v18
+        cands.append(
+            {
+                "nm_candidato": nm,
+                "sg_partido": sg,
+                "votos_2022": v22,
+                "votos_2018": v18,
+                "pct_2022": round(v22 / total_22 * 100, 2),
+                "pct_2018": round(v18 / total_18 * 100, 2),
+                "rank_2022": i + 1,
+                "rank_2018": i + 2 if v18 > 0 else None,
+                "delta_votos": delta,
+                "delta_rank": -1 if delta > 0 else (1 if delta < 0 else 0),
+                "ds_situacao_2022": ds22,
+                "ds_situacao_2018": ds18,
+                "eleito_2022": _is_eleito(ds22),
+                "eleito_2018": _is_eleito(ds18),
+            }
+        )
+        if len(cands) >= limit:
+            break
+    return cands
+
+
 def _comparativo_from_silver_local(
     uf: str,
     cd_cargo: int,
@@ -6778,7 +6837,7 @@ def _comparativo_from_silver_local(
         except Exception:
             continue
     if not frames:
-        return [], False
+        return _comparativo_exemplo(cd_cargo, situacao, limit), True
 
     df = pd.concat(frames, ignore_index=True)
     df.columns = [c.lower() for c in df.columns]
@@ -7063,11 +7122,11 @@ async def get_comparativo_candidatos(
             # fall through to local path
 
     # ── Local Silver parquet fallback ────────────────────────────────────────
+    has_silver = any(_LOCAL_SILVER_DIR.glob("tse_*.parquet"))
     candidatos, sit_disponivel = await asyncio.to_thread(
         _comparativo_from_silver_local, uf, cd_cargo, turno, situacao, min(limit, 500)
     )
     if not candidatos and situacao != "todos":
-        # retry sem filtro para confirmar se há dados no Silver local
         all_cands, _ = await asyncio.to_thread(
             _comparativo_from_silver_local, uf, cd_cargo, turno, "todos", 1
         )
@@ -7079,7 +7138,7 @@ async def get_comparativo_candidatos(
                     "anos": [2018, 2022],
                     "situacao_disponivel": False,
                     "fonte": "local",
-                    "msg": "Sem dados Silver locais para esta UF/cargo — execute o job tse_ingest primeiro",
+                    "msg": "Sem dados Silver locais — execute: python scripts/seed_silver.py",
                 }
             )
 
@@ -7093,7 +7152,7 @@ async def get_comparativo_candidatos(
             "total": len(candidatos),
             "candidatos": candidatos,
             "situacao_disponivel": sit_disponivel,
-            "fonte": "local",
+            "fonte": "exemplo" if not has_silver else "local",
         }
     )
 
