@@ -7115,13 +7115,15 @@ async def get_comparativo_candidatos(
 
             # Tenta obter ds_situacao (Gold → Silver → desativado)
             sit_map: dict[tuple, str] = {}
+
+            def _run_sit_query(q: str) -> list:
+                return list(client.query(q, job_config=cfg).result())
+
             for sq in (sit_query_gold, sit_query_silver):
                 if sit_map:
                     break
                 try:
-                    sit_rows = await asyncio.to_thread(
-                        lambda q=sq: list(client.query(q, job_config=cfg).result())
-                    )
+                    sit_rows = await asyncio.to_thread(_run_sit_query, sq)
                     sit_map = {
                         (r["nm_candidato"], int(r["ano_eleicao"])): r["ds_situacao"] or ""
                         for r in sit_rows
