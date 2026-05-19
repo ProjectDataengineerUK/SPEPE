@@ -545,10 +545,6 @@ table.data tr:hover td{background:var(--bg3)}
           </div>
           <div style="height:180px"><canvas id="cmp2-compare-chart"></canvas></div>
         </div>
-        <!-- aviso situacao indisponivel -->
-        <div id="cmp2-sit-warn" style="display:none;padding:5px 12px;margin-bottom:8px;background:#1c1400;border:1px solid #f59e0b33;border-radius:6px;font-size:.70rem;color:#f59e0b">
-          &#9888; Coluna <code style="background:#2d2505;padding:1px 4px;border-radius:3px">ds_situacao</code> ausente &mdash; execute <code style="background:#2d2505;padding:1px 4px;border-radius:3px">python scripts/seed_silver.py</code> para ativar filtros.
-        </div>
 
         <!-- mapa comparativo -->
         <div id="cmp2-mapa-panel" style="display:none;margin-bottom:10px;border:1px solid var(--br);border-radius:8px;overflow:hidden">
@@ -1789,12 +1785,26 @@ async function loadComparativo() {
   _cmp2SitAvail = !!d.situacao_disponivel;
   const isExemplo = d.fonte === 'exemplo';
 
-  // sit-warn: só mostra se filtro ativo mas situacao indisponível (nunca quando é exemplo)
-  const sitWarn = document.getElementById('cmp2-sit-warn');
-  if (sitWarn) sitWarn.style.display = (!isExemplo && !_cmp2SitAvail && _cmp2Sit !== 'todos') ? 'block' : 'none';
+  // sit buttons: desabilita visualmente quando ds_situacao ausente
+  const sitBtns = document.querySelectorAll('#cmp2s-eleito, #cmp2s-nao');
+  sitBtns.forEach(b => {
+    b.disabled = !_cmp2SitAvail;
+    b.style.opacity = _cmp2SitAvail ? '' : '0.35';
+    b.style.cursor = _cmp2SitAvail ? '' : 'not-allowed';
+    b.title = _cmp2SitAvail ? '' : 'Execute python scripts/seed_silver.py para ativar';
+  });
+  if (!_cmp2SitAvail && _cmp2Sit !== 'todos') {
+    _cmp2Sit = 'todos';
+    document.querySelectorAll('[id^="cmp2s-"]').forEach(b => b.classList.toggle('active', b.id === 'cmp2s-todos'));
+  }
 
-  // unified banner para dados de exemplo
-  _updateDemoBanner('comparativo', isExemplo ? 'Comparativo RJ exemplo — execute python scripts/seed_silver.py para dados reais' : null);
+  // unified banner: exemplo ou ds_situacao ausente
+  const banMsg = isExemplo
+    ? 'Comparativo RJ exemplo — execute python scripts/seed_silver.py para dados reais'
+    : !_cmp2SitAvail
+      ? 'ds_situacao ausente no Silver local — filtros Eleito/Não Eleito desabilitados. Execute python scripts/seed_silver.py'
+      : null;
+  _updateDemoBanner('comparativo', banMsg);
 
   if (!_cmp2Data.length) {
     if (empty) { empty.style.display = 'block'; empty.textContent = 'Nenhum resultado — ajuste os filtros ou execute python scripts/seed_silver.py'; }
