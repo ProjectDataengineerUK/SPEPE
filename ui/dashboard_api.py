@@ -1476,11 +1476,16 @@ async def get_resultados(
             logger.warning("BigQuery resultados falhou: %s", exc)
 
     data = await asyncio.to_thread(_local_resultados, cargo, uf, ano, turno)
-    return JSONResponse({
-        "cargo": cargo, "uf": uf, "ano": ano, "turno": turno,
-        "candidatos": data,
-        "fonte": "local" if data else "indisponivel",
-    })
+    return JSONResponse(
+        {
+            "cargo": cargo,
+            "uf": uf,
+            "ano": ano,
+            "turno": turno,
+            "candidatos": data,
+            "fonte": "local" if data else "indisponivel",
+        }
+    )
 
 
 def _local_resultados(cargo: str, uf: str, ano: int, turno: int) -> list[dict]:
@@ -2646,7 +2651,11 @@ def _local_perfis(uf: str, ano: int) -> dict:
 
     _empty = {"genero": [], "faixa_etaria": [], "escolaridade": [], "fonte": "local_vazio"}
     frames: list[pd.DataFrame] = []
-    for pattern in [f"tse_perfil_{uf.lower()}*.parquet", "tse_perfil_*.parquet", f"perfil_{uf.lower()}*.parquet"]:
+    for pattern in [
+        f"tse_perfil_{uf.lower()}*.parquet",
+        "tse_perfil_*.parquet",
+        f"perfil_{uf.lower()}*.parquet",
+    ]:
         for f in sorted(_LOCAL_SILVER_DIR.glob(pattern)):
             try:
                 frames.append(pd.read_parquet(f))
@@ -2665,9 +2674,12 @@ def _local_perfis(uf: str, ano: int) -> dict:
     if df.empty:
         return _empty
     col_genero = next((c for c in df.columns if "genero" in c), None)
-    col_faixa  = next((c for c in df.columns if "faixa" in c or "idade" in c), None)
-    col_esc    = next((c for c in df.columns if "escolar" in c or "instruc" in c), None)
-    col_qt     = next((c for c in df.columns if "eleitor" in c or ("qt" in c and "voto" not in c)), None) or "qt_eleitores"
+    col_faixa = next((c for c in df.columns if "faixa" in c or "idade" in c), None)
+    col_esc = next((c for c in df.columns if "escolar" in c or "instruc" in c), None)
+    col_qt = (
+        next((c for c in df.columns if "eleitor" in c or ("qt" in c and "voto" not in c)), None)
+        or "qt_eleitores"
+    )
     if col_qt not in df.columns:
         df[col_qt] = 1
     df[col_qt] = pd.to_numeric(df[col_qt], errors="coerce").fillna(1)
@@ -2682,8 +2694,10 @@ def _local_perfis(uf: str, ano: int) -> dict:
         for ev, qt in df.groupby(col_esc)[col_qt].sum().items():
             esc[str(ev)] = int(qt)
     return {
-        "genero":      [{"label": k, "qt_eleitores": v} for k, v in genero.items()],
-        "faixa_etaria": sorted([{"label": k, "qt_eleitores": v} for k, v in faixa.items()], key=lambda x: x["label"]),
+        "genero": [{"label": k, "qt_eleitores": v} for k, v in genero.items()],
+        "faixa_etaria": sorted(
+            [{"label": k, "qt_eleitores": v} for k, v in faixa.items()], key=lambda x: x["label"]
+        ),
         "escolaridade": [{"label": k, "qt_eleitores": v} for k, v in esc.items()],
         "fonte": "local",
     }
@@ -2847,32 +2861,98 @@ _PARTIDO_COR = {
 }
 
 _UF_TO_IBGE: dict[str, str] = {
-    "AC": "12", "AL": "27", "AP": "16", "AM": "13", "BA": "29", "CE": "23",
-    "DF": "53", "ES": "32", "GO": "52", "MA": "21", "MT": "51", "MS": "50",
-    "MG": "31", "PA": "15", "PB": "25", "PR": "41", "PE": "26", "PI": "22",
-    "RJ": "33", "RN": "24", "RS": "43", "RO": "11", "RR": "14", "SC": "42",
-    "SP": "35", "SE": "28", "TO": "17",
+    "AC": "12",
+    "AL": "27",
+    "AP": "16",
+    "AM": "13",
+    "BA": "29",
+    "CE": "23",
+    "DF": "53",
+    "ES": "32",
+    "GO": "52",
+    "MA": "21",
+    "MT": "51",
+    "MS": "50",
+    "MG": "31",
+    "PA": "15",
+    "PB": "25",
+    "PR": "41",
+    "PE": "26",
+    "PI": "22",
+    "RJ": "33",
+    "RN": "24",
+    "RS": "43",
+    "RO": "11",
+    "RR": "14",
+    "SC": "42",
+    "SP": "35",
+    "SE": "28",
+    "TO": "17",
 }
 _UF_NAMES: dict[str, str] = {
-    "AC": "Acre", "AL": "Alagoas", "AP": "Amapá", "AM": "Amazonas", "BA": "Bahia",
-    "CE": "Ceará", "DF": "Distrito Federal", "ES": "Espírito Santo", "GO": "Goiás",
-    "MA": "Maranhão", "MT": "Mato Grosso", "MS": "Mato Grosso do Sul",
-    "MG": "Minas Gerais", "PA": "Pará", "PB": "Paraíba", "PR": "Paraná",
-    "PE": "Pernambuco", "PI": "Piauí", "RJ": "Rio de Janeiro", "RN": "Rio Grande do Norte",
-    "RS": "Rio Grande do Sul", "RO": "Rondônia", "RR": "Roraima", "SC": "Santa Catarina",
-    "SP": "São Paulo", "SE": "Sergipe", "TO": "Tocantins",
+    "AC": "Acre",
+    "AL": "Alagoas",
+    "AP": "Amapá",
+    "AM": "Amazonas",
+    "BA": "Bahia",
+    "CE": "Ceará",
+    "DF": "Distrito Federal",
+    "ES": "Espírito Santo",
+    "GO": "Goiás",
+    "MA": "Maranhão",
+    "MT": "Mato Grosso",
+    "MS": "Mato Grosso do Sul",
+    "MG": "Minas Gerais",
+    "PA": "Pará",
+    "PB": "Paraíba",
+    "PR": "Paraná",
+    "PE": "Pernambuco",
+    "PI": "Piauí",
+    "RJ": "Rio de Janeiro",
+    "RN": "Rio Grande do Norte",
+    "RS": "Rio Grande do Sul",
+    "RO": "Rondônia",
+    "RR": "Roraima",
+    "SC": "Santa Catarina",
+    "SP": "São Paulo",
+    "SE": "Sergipe",
+    "TO": "Tocantins",
 }
 _UF_REGIAO: dict[str, str] = {
-    "AC": "Norte", "AM": "Norte", "AP": "Norte", "PA": "Norte",
-    "RO": "Norte", "RR": "Norte", "TO": "Norte",
-    "AL": "Nordeste", "BA": "Nordeste", "CE": "Nordeste", "MA": "Nordeste",
-    "PB": "Nordeste", "PE": "Nordeste", "PI": "Nordeste", "RN": "Nordeste", "SE": "Nordeste",
-    "DF": "Centro-Oeste", "GO": "Centro-Oeste", "MS": "Centro-Oeste", "MT": "Centro-Oeste",
-    "ES": "Sudeste", "MG": "Sudeste", "RJ": "Sudeste", "SP": "Sudeste",
-    "PR": "Sul", "RS": "Sul", "SC": "Sul",
+    "AC": "Norte",
+    "AM": "Norte",
+    "AP": "Norte",
+    "PA": "Norte",
+    "RO": "Norte",
+    "RR": "Norte",
+    "TO": "Norte",
+    "AL": "Nordeste",
+    "BA": "Nordeste",
+    "CE": "Nordeste",
+    "MA": "Nordeste",
+    "PB": "Nordeste",
+    "PE": "Nordeste",
+    "PI": "Nordeste",
+    "RN": "Nordeste",
+    "SE": "Nordeste",
+    "DF": "Centro-Oeste",
+    "GO": "Centro-Oeste",
+    "MS": "Centro-Oeste",
+    "MT": "Centro-Oeste",
+    "ES": "Sudeste",
+    "MG": "Sudeste",
+    "RJ": "Sudeste",
+    "SP": "Sudeste",
+    "PR": "Sul",
+    "RS": "Sul",
+    "SC": "Sul",
 }
 _REGIAO_TO_IBGE: dict[str, str] = {
-    "Norte": "1", "Nordeste": "2", "Sudeste": "3", "Sul": "4", "Centro-Oeste": "5",
+    "Norte": "1",
+    "Nordeste": "2",
+    "Sudeste": "3",
+    "Sul": "4",
+    "Centro-Oeste": "5",
 }
 
 
@@ -2909,18 +2989,24 @@ def _local_mapa(nivel: str, cargo: str, ano: int, turno: int, uf: str = "") -> l
 
     if nivel in ("uf", "nacional"):
         geo_col = "sg_uf"
-        agg = df.groupby([geo_col, "nm_candidato", "sg_partido"], as_index=False)["total_votos"].sum()
+        agg = df.groupby([geo_col, "nm_candidato", "sg_partido"], as_index=False)[
+            "total_votos"
+        ].sum()
     elif nivel == "regiao":
         df["nm_regiao"] = df["sg_uf"].map(_UF_REGIAO).fillna("Desconhecido")
         geo_col = "nm_regiao"
-        agg = df.groupby([geo_col, "nm_candidato", "sg_partido"], as_index=False)["total_votos"].sum()
+        agg = df.groupby([geo_col, "nm_candidato", "sg_partido"], as_index=False)[
+            "total_votos"
+        ].sum()
     elif nivel == "municipio":
         if uf:
             df = df[df["sg_uf"].str.upper() == uf.upper()]
         if "cd_municipio" not in df.columns:
             return []
         geo_col = "cd_municipio"
-        agg = df.groupby([geo_col, "nm_candidato", "sg_partido"], as_index=False)["total_votos"].sum()
+        agg = df.groupby([geo_col, "nm_candidato", "sg_partido"], as_index=False)[
+            "total_votos"
+        ].sum()
     else:
         return []
 
@@ -2944,17 +3030,19 @@ def _local_mapa(nivel: str, cargo: str, ano: int, turno: int, uf: str = "") -> l
         else:
             ibge_code = geo_str
             label = geo_str
-        features.append({
-            "id": geo_str,
-            "ibge_code": ibge_code,
-            "label": label,
-            "lider": winner["nm_candidato"],
-            "partido": winner.get("sg_partido") or "",
-            "pct": round(pct, 1),
-            "segundo": runner["nm_candidato"] if runner is not None else "",
-            "pct2": round(pct2, 1),
-            "total_votos": int(winner["total_votos"]),
-        })
+        features.append(
+            {
+                "id": geo_str,
+                "ibge_code": ibge_code,
+                "label": label,
+                "lider": winner["nm_candidato"],
+                "partido": winner.get("sg_partido") or "",
+                "pct": round(pct, 1),
+                "segundo": runner["nm_candidato"] if runner is not None else "",
+                "pct2": round(pct2, 1),
+                "total_votos": int(winner["total_votos"]),
+            }
+        )
     return features
 
 
@@ -3020,7 +3108,9 @@ async def get_mapa(
 
     uf_param = uf or ""
     features = await asyncio.to_thread(_local_mapa, nivel_str, cargo, ano, turno, uf_param)
-    return JSONResponse({"nivel": nivel_str, "features": features, "fonte": "local" if features else "indisponivel"})
+    return JSONResponse(
+        {"nivel": nivel_str, "features": features, "fonte": "local" if features else "indisponivel"}
+    )
 
 
 # ── Choropleth temático — endpoint unificado por camada ──────────────────────
@@ -4111,20 +4201,22 @@ async def get_social_sentimento(
             return JSONResponse({"data": [dict(r) for r in rows]})
         except Exception as exc:
             logger.warning("BigQuery social sentimento falhou: %s", exc)
-    return JSONResponse({
-        "status": "fallback",
-        "score": 0.14,
-        "volume": 0,
-        "tendencia": "—",
-        "candidatos": [
-            {"nm": "CANDIDATO A", "score": 0.23, "mencoes": 0},
-            {"nm": "CANDIDATO B", "score": -0.05, "mencoes": 0},
-            {"nm": "CANDIDATO C", "score": 0.08, "mencoes": 0},
-        ],
-        "series": [],
-        "data": [],
-        "hint": "Configure TWITTER_BEARER_TOKEN e YOUTUBE_API_KEY para ativar monitoramento social real.",
-    })
+    return JSONResponse(
+        {
+            "status": "fallback",
+            "score": 0.14,
+            "volume": 0,
+            "tendencia": "—",
+            "candidatos": [
+                {"nm": "CANDIDATO A", "score": 0.23, "mencoes": 0},
+                {"nm": "CANDIDATO B", "score": -0.05, "mencoes": 0},
+                {"nm": "CANDIDATO C", "score": 0.08, "mencoes": 0},
+            ],
+            "series": [],
+            "data": [],
+            "hint": "Configure TWITTER_BEARER_TOKEN e YOUTUBE_API_KEY para ativar monitoramento social real.",
+        }
+    )
 
 
 # ── Social: Google Trends por UF ─────────────────────────────────────────────
@@ -6713,7 +6805,13 @@ def _is_eleito(ds: str | None) -> bool:
 
 
 _INVALIDOS_NOMES = {
-    "VOTO BRANCO", "VOTO NULO", "VOTO EM BRANCO", "#NULO#", "#NULO", "NULO", "BRANCO"
+    "VOTO BRANCO",
+    "VOTO NULO",
+    "VOTO EM BRANCO",
+    "#NULO#",
+    "#NULO",
+    "NULO",
+    "BRANCO",
 }
 
 
@@ -6744,11 +6842,18 @@ def _comparativo_from_silver_local(
     df.columns = [c.lower() for c in df.columns]
 
     # normalise column names
-    col_map = {"sg_uf": "sg_uf", "cd_cargo": "cd_cargo", "nr_turno": "nr_turno",
-               "ano_eleicao": "ano_eleicao", "nm_candidato": "nm_candidato",
-               "sg_partido": "sg_partido", "total_votos": "total_votos",
-               "qt_votos_nominais": "total_votos", "ds_situacao": "ds_situacao",
-               "ds_sit_cand_tot": "ds_situacao"}
+    col_map = {
+        "sg_uf": "sg_uf",
+        "cd_cargo": "cd_cargo",
+        "nr_turno": "nr_turno",
+        "ano_eleicao": "ano_eleicao",
+        "nm_candidato": "nm_candidato",
+        "sg_partido": "sg_partido",
+        "total_votos": "total_votos",
+        "qt_votos_nominais": "total_votos",
+        "ds_situacao": "ds_situacao",
+        "ds_sit_cand_tot": "ds_situacao",
+    }
     df = df.rename(columns={k: v for k, v in col_map.items() if k in df.columns})
 
     needed = {"sg_uf", "cd_cargo", "nr_turno", "ano_eleicao", "nm_candidato", "total_votos"}
@@ -6785,15 +6890,27 @@ def _comparativo_from_silver_local(
     )
 
     # pivot
-    pivot = grp.groupby("nm_candidato").agg(
-        sg_partido=("sg_partido", "last"),
-        votos_2018=("votos", lambda s: s[grp.loc[s.index, "ano_eleicao"] == 2018].sum()),
-        votos_2022=("votos", lambda s: s[grp.loc[s.index, "ano_eleicao"] == 2022].sum()),
-        ds_sit_2018=("ds_situacao", lambda s: next(
-            (v for v, a in zip(s, grp.loc[s.index, "ano_eleicao"]) if a == 2018 and v), "")),
-        ds_sit_2022=("ds_situacao", lambda s: next(
-            (v for v, a in zip(s, grp.loc[s.index, "ano_eleicao"]) if a == 2022 and v), "")),
-    ).reset_index()
+    pivot = (
+        grp.groupby("nm_candidato")
+        .agg(
+            sg_partido=("sg_partido", "last"),
+            votos_2018=("votos", lambda s: s[grp.loc[s.index, "ano_eleicao"] == 2018].sum()),
+            votos_2022=("votos", lambda s: s[grp.loc[s.index, "ano_eleicao"] == 2022].sum()),
+            ds_sit_2018=(
+                "ds_situacao",
+                lambda s: next(
+                    (v for v, a in zip(s, grp.loc[s.index, "ano_eleicao"]) if a == 2018 and v), ""
+                ),
+            ),
+            ds_sit_2022=(
+                "ds_situacao",
+                lambda s: next(
+                    (v for v, a in zip(s, grp.loc[s.index, "ano_eleicao"]) if a == 2022 and v), ""
+                ),
+            ),
+        )
+        .reset_index()
+    )
 
     tot18 = pivot["votos_2018"].sum() or 1
     tot22 = pivot["votos_2022"].sum() or 1
@@ -6809,8 +6926,11 @@ def _comparativo_from_silver_local(
             pivot.loc[pivot["nm_candidato"] == nm, "rank_2018"] = i + 1
 
     pivot["delta_rank"] = pivot.apply(
-        lambda r: (int(r["rank_2018"]) - int(r["rank_2022"]))
-        if pd.notna(r["rank_2018"]) and pd.notna(r["rank_2022"]) else None,
+        lambda r: (
+            (int(r["rank_2018"]) - int(r["rank_2022"]))
+            if pd.notna(r["rank_2018"]) and pd.notna(r["rank_2022"])
+            else None
+        ),
         axis=1,
     )
 
@@ -6823,22 +6943,24 @@ def _comparativo_from_silver_local(
                 continue
             if situacao == "nao_eleito" and (_is_eleito(ds18) or _is_eleito(ds22)):
                 continue
-        candidatos.append({
-            "nm_candidato": r["nm_candidato"],
-            "sg_partido": r.get("sg_partido") or "",
-            "votos_2018": int(r["votos_2018"]),
-            "votos_2022": int(r["votos_2022"]),
-            "pct_2018": float(r["pct_2018"]),
-            "pct_2022": float(r["pct_2022"]),
-            "rank_2018": int(r["rank_2018"]) if pd.notna(r.get("rank_2018")) else None,
-            "rank_2022": int(r["rank_2022"]) if pd.notna(r.get("rank_2022")) else None,
-            "delta_votos": int(r["delta_votos"]),
-            "delta_rank": int(r["delta_rank"]) if pd.notna(r.get("delta_rank")) else None,
-            "ds_situacao_2018": ds18,
-            "ds_situacao_2022": ds22,
-            "eleito_2018": _is_eleito(ds18),
-            "eleito_2022": _is_eleito(ds22),
-        })
+        candidatos.append(
+            {
+                "nm_candidato": r["nm_candidato"],
+                "sg_partido": r.get("sg_partido") or "",
+                "votos_2018": int(r["votos_2018"]),
+                "votos_2022": int(r["votos_2022"]),
+                "pct_2018": float(r["pct_2018"]),
+                "pct_2022": float(r["pct_2022"]),
+                "rank_2018": int(r["rank_2018"]) if pd.notna(r.get("rank_2018")) else None,
+                "rank_2022": int(r["rank_2022"]) if pd.notna(r.get("rank_2022")) else None,
+                "delta_votos": int(r["delta_votos"]),
+                "delta_rank": int(r["delta_rank"]) if pd.notna(r.get("delta_rank")) else None,
+                "ds_situacao_2018": ds18,
+                "ds_situacao_2022": ds22,
+                "eleito_2018": _is_eleito(ds18),
+                "eleito_2022": _is_eleito(ds22),
+            }
+        )
         if len(candidatos) >= limit:
             break
 
@@ -6961,31 +7083,38 @@ async def get_comparativo_candidatos(
                     continue
                 if situacao == "nao_eleito" and (_is_eleito(ds18) or _is_eleito(ds22)):
                     continue
-                candidatos.append({
-                    "nm_candidato": nm,
-                    "sg_partido": r["sg_partido"] or "",
-                    "votos_2018": int(r["votos_2018"] or 0),
-                    "votos_2022": int(r["votos_2022"] or 0),
-                    "pct_2018": float(r["pct_2018"] or 0.0),
-                    "pct_2022": float(r["pct_2022"] or 0.0),
-                    "rank_2018": int(r["rank_2018"]) if r["rank_2018"] else None,
-                    "rank_2022": int(r["rank_2022"]) if r["rank_2022"] else None,
-                    "delta_votos": int(r["delta_votos"] or 0),
-                    "delta_rank": int(r["delta_rank"]) if r["delta_rank"] else None,
-                    "ds_situacao_2018": ds18,
-                    "ds_situacao_2022": ds22,
-                    "eleito_2018": _is_eleito(ds18),
-                    "eleito_2022": _is_eleito(ds22),
-                })
+                candidatos.append(
+                    {
+                        "nm_candidato": nm,
+                        "sg_partido": r["sg_partido"] or "",
+                        "votos_2018": int(r["votos_2018"] or 0),
+                        "votos_2022": int(r["votos_2022"] or 0),
+                        "pct_2018": float(r["pct_2018"] or 0.0),
+                        "pct_2022": float(r["pct_2022"] or 0.0),
+                        "rank_2018": int(r["rank_2018"]) if r["rank_2018"] else None,
+                        "rank_2022": int(r["rank_2022"]) if r["rank_2022"] else None,
+                        "delta_votos": int(r["delta_votos"] or 0),
+                        "delta_rank": int(r["delta_rank"]) if r["delta_rank"] else None,
+                        "ds_situacao_2018": ds18,
+                        "ds_situacao_2022": ds22,
+                        "eleito_2018": _is_eleito(ds18),
+                        "eleito_2022": _is_eleito(ds22),
+                    }
+                )
 
-            return JSONResponse({
-                "status": "ok",
-                "uf": uf.upper(), "cargo": cargo, "turno": turno,
-                "anos": [2018, 2022], "total": len(candidatos),
-                "candidatos": candidatos,
-                "situacao_disponivel": silver_ok,
-                "fonte": "bigquery",
-            })
+            return JSONResponse(
+                {
+                    "status": "ok",
+                    "uf": uf.upper(),
+                    "cargo": cargo,
+                    "turno": turno,
+                    "anos": [2018, 2022],
+                    "total": len(candidatos),
+                    "candidatos": candidatos,
+                    "situacao_disponivel": silver_ok,
+                    "fonte": "bigquery",
+                }
+            )
 
         except Exception as exc:
             logger.warning("comparativo BQ falhou, tentando Silver local: %s", exc)
@@ -7001,22 +7130,30 @@ async def get_comparativo_candidatos(
             _comparativo_from_silver_local, uf, cd_cargo, turno, "todos", 1
         )
         if not all_cands:
-            return JSONResponse({
-                "status": "sem_dados",
-                "candidatos": [], "anos": [2018, 2022],
-                "situacao_disponivel": False,
-                "fonte": "local",
-                "msg": "Sem dados Silver locais para esta UF/cargo — execute o job tse_ingest primeiro",
-            })
+            return JSONResponse(
+                {
+                    "status": "sem_dados",
+                    "candidatos": [],
+                    "anos": [2018, 2022],
+                    "situacao_disponivel": False,
+                    "fonte": "local",
+                    "msg": "Sem dados Silver locais para esta UF/cargo — execute o job tse_ingest primeiro",
+                }
+            )
 
-    return JSONResponse({
-        "status": "ok",
-        "uf": uf.upper(), "cargo": cargo, "turno": turno,
-        "anos": [2018, 2022], "total": len(candidatos),
-        "candidatos": candidatos,
-        "situacao_disponivel": sit_disponivel,
-        "fonte": "local",
-    })
+    return JSONResponse(
+        {
+            "status": "ok",
+            "uf": uf.upper(),
+            "cargo": cargo,
+            "turno": turno,
+            "anos": [2018, 2022],
+            "total": len(candidatos),
+            "candidatos": candidatos,
+            "situacao_disponivel": sit_disponivel,
+            "fonte": "local",
+        }
+    )
 
 
 @app.get("/api/comparativo/mapa")
@@ -7055,9 +7192,13 @@ async def get_comparativo_mapa(
 
     col_map = {
         "qt_votos_nominais": "total_votos",
-        "sg_uf": "sg_uf", "cd_cargo": "cd_cargo", "nr_turno": "nr_turno",
-        "nm_candidato": "nm_candidato", "sg_partido": "sg_partido",
-        "nm_municipio": "nm_municipio", "ano_eleicao": "ano_eleicao",
+        "sg_uf": "sg_uf",
+        "cd_cargo": "cd_cargo",
+        "nr_turno": "nr_turno",
+        "nm_candidato": "nm_candidato",
+        "sg_partido": "sg_partido",
+        "nm_municipio": "nm_municipio",
+        "ano_eleicao": "ano_eleicao",
     }
     df = df.rename(columns={k: v for k, v in col_map.items() if k in df.columns})
     if "total_votos" not in df.columns and "qt_votos_nominais" not in df.columns:
@@ -7065,10 +7206,24 @@ async def get_comparativo_mapa(
         if votos_col:
             df = df.rename(columns={votos_col: "total_votos"})
 
-    needed = {"sg_uf", "cd_cargo", "nr_turno", "nm_candidato", "nm_municipio", "total_votos", "ano_eleicao"}
+    needed = {
+        "sg_uf",
+        "cd_cargo",
+        "nr_turno",
+        "nm_candidato",
+        "nm_municipio",
+        "total_votos",
+        "ano_eleicao",
+    }
     if not needed.issubset(df.columns):
-        return JSONResponse({"status": "sem_dados", "municipios": [], "fonte": "local",
-                             "msg": f"Colunas insuficientes: {list(df.columns[:10])}"})
+        return JSONResponse(
+            {
+                "status": "sem_dados",
+                "municipios": [],
+                "fonte": "local",
+                "msg": f"Colunas insuficientes: {list(df.columns[:10])}",
+            }
+        )
 
     df = df[
         (df["sg_uf"].str.upper() == uf.upper())
@@ -7089,32 +7244,53 @@ async def get_comparativo_mapa(
 
     # vencedor por município × ano
     grp = (
-        df.groupby(["nm_municipio", "nm_candidato", "sg_partido", "ano_eleicao"])
-        ["total_votos"].sum().reset_index()
+        df.groupby(["nm_municipio", "nm_candidato", "sg_partido", "ano_eleicao"])["total_votos"]
+        .sum()
+        .reset_index()
     )
     grp["rank"] = grp.groupby(["nm_municipio", "ano_eleicao"])["total_votos"].rank(
         ascending=False, method="first"
     )
     liders = grp[grp["rank"] == 1].copy()
 
-    tot = df.groupby(["nm_municipio", "ano_eleicao"])["total_votos"].sum().reset_index(name="total_mun")
+    tot = (
+        df.groupby(["nm_municipio", "ano_eleicao"])["total_votos"]
+        .sum()
+        .reset_index(name="total_mun")
+    )
     liders = liders.merge(tot, on=["nm_municipio", "ano_eleicao"], how="left")
     liders["pct"] = (liders["total_votos"] / liders["total_mun"].replace(0, 1) * 100).round(2)
     liders["nm_mun_norm"] = liders["nm_municipio"].apply(_norm)
 
-    l22 = liders[liders["ano_eleicao"] == 2022][["nm_mun_norm", "nm_candidato", "sg_partido", "pct", "total_votos"]].rename(
-        columns={"nm_candidato": "nm_vencedor_2022", "sg_partido": "sg_partido_2022",
-                 "pct": "pct_2022", "total_votos": "votos_2022"})
-    l18 = liders[liders["ano_eleicao"] == 2018][["nm_mun_norm", "nm_candidato", "sg_partido", "pct", "total_votos"]].rename(
-        columns={"nm_candidato": "nm_vencedor_2018", "sg_partido": "sg_partido_2018",
-                 "pct": "pct_2018", "total_votos": "votos_2018"})
+    l22 = liders[liders["ano_eleicao"] == 2022][
+        ["nm_mun_norm", "nm_candidato", "sg_partido", "pct", "total_votos"]
+    ].rename(
+        columns={
+            "nm_candidato": "nm_vencedor_2022",
+            "sg_partido": "sg_partido_2022",
+            "pct": "pct_2022",
+            "total_votos": "votos_2022",
+        }
+    )
+    l18 = liders[liders["ano_eleicao"] == 2018][
+        ["nm_mun_norm", "nm_candidato", "sg_partido", "pct", "total_votos"]
+    ].rename(
+        columns={
+            "nm_candidato": "nm_vencedor_2018",
+            "sg_partido": "sg_partido_2018",
+            "pct": "pct_2018",
+            "total_votos": "votos_2018",
+        }
+    )
 
     merged = l22.merge(l18, on="nm_mun_norm", how="outer")
     merged["mudou_lider"] = merged["nm_vencedor_2022"] != merged["nm_vencedor_2018"]
     merged["mudou_partido"] = merged["sg_partido_2022"] != merged["sg_partido_2018"]
 
     # nome original do município (para o join com geojson)
-    nm_map = liders.drop_duplicates("nm_mun_norm").set_index("nm_mun_norm")["nm_municipio"].to_dict()
+    nm_map = (
+        liders.drop_duplicates("nm_mun_norm").set_index("nm_mun_norm")["nm_municipio"].to_dict()
+    )
     merged["nm_municipio"] = merged["nm_mun_norm"].map(nm_map)
 
     municipios = merged.fillna("").to_dict(orient="records")
@@ -7130,10 +7306,16 @@ async def get_comparativo_mapa(
             except (ValueError, TypeError):
                 m[k] = 0
 
-    return JSONResponse({
-        "status": "ok", "uf": uf.upper(), "cargo": cargo,
-        "municipios": municipios, "total": len(municipios), "fonte": "local",
-    })
+    return JSONResponse(
+        {
+            "status": "ok",
+            "uf": uf.upper(),
+            "cargo": cargo,
+            "municipios": municipios,
+            "total": len(municipios),
+            "fonte": "local",
+        }
+    )
 
 
 # Federações eleitorais 2022 (TSE não expõe via resultados — lookup estático)

@@ -88,9 +88,7 @@ def _load_from_bigquery(
         )
 
     ibge_join = ""
-    ibge_cols = (
-        "0.0 AS log_populacao, 0.0 AS log_renda, 50.0 AS taxa_alfabetizacao"
-    )
+    ibge_cols = "0.0 AS log_populacao, 0.0 AS log_renda, 50.0 AS taxa_alfabetizacao"
     if has_ibge:
         ibge_join = f"""
         LEFT JOIN `{project_id}.{gold_dataset}.fact_ibge_municipio` ibge
@@ -223,7 +221,11 @@ def _load_from_local(
     )
     cand_col = next((c for c in ["nm_candidato", "nm_urna_candidato"] if c in df_tse.columns), None)
     mun_col = next(
-        (c for c in ["cd_municipio_ibge", "cd_municipio", "cod_municipio_ibge"] if c in df_tse.columns),
+        (
+            c
+            for c in ["cd_municipio_ibge", "cd_municipio", "cod_municipio_ibge"]
+            if c in df_tse.columns
+        ),
         None,
     )
     ano_col = next((c for c in ["ano_eleicao", "ano"] if c in df_tse.columns), None)
@@ -272,9 +274,7 @@ def _load_from_local(
         ["nm_candidato", "cd_municipio", "pct_votos"]
     ].rename(columns={"pct_votos": "pct_votos_historico"})
 
-    df_pairs = df_2022.merge(
-        df_2018, on=["nm_candidato", "cd_municipio"], how="left"
-    )
+    df_pairs = df_2022.merge(df_2018, on=["nm_candidato", "cd_municipio"], how="left")
     df_pairs["pct_votos_historico"] = df_pairs["pct_votos_historico"].fillna(0.0)
     df_pairs["swing_target"] = df_pairs["pct_votos"] - df_pairs["pct_votos_historico"]
 
@@ -293,7 +293,11 @@ def _load_from_local(
             df_ibge = pd.concat(ibge_frames, ignore_index=True)
             df_ibge.columns = [c.lower() for c in df_ibge.columns]
             mun_ibge_col = next(
-                (c for c in ["cd_municipio_ibge", "cd_municipio", "cod_municipio_ibge"] if c in df_ibge.columns),
+                (
+                    c
+                    for c in ["cd_municipio_ibge", "cd_municipio", "cod_municipio_ibge"]
+                    if c in df_ibge.columns
+                ),
                 None,
             )
             if mun_ibge_col:
@@ -305,7 +309,9 @@ def _load_from_local(
                             df_ibge["log_populacao"] = np.log1p(df_ibge["populacao_total"])
                         elif col == "log_renda" and "renda_per_capita" in df_ibge.columns:
                             df_ibge["log_renda"] = np.log1p(df_ibge["renda_per_capita"])
-                keep_cols = ["cd_municipio"] + [c for c in _SILVER_IBGE_COLS if c in df_ibge.columns]
+                keep_cols = ["cd_municipio"] + [
+                    c for c in _SILVER_IBGE_COLS if c in df_ibge.columns
+                ]
                 df_ibge = df_ibge[keep_cols].drop_duplicates("cd_municipio")
                 df_pairs = df_pairs.merge(df_ibge, on="cd_municipio", how="left")
 
@@ -348,9 +354,8 @@ def build_swing_dataset(
     if cargo not in _CARGO_CD:
         raise ValueError(f"cargo must be one of {list(_CARGO_CD.keys())}, got '{cargo}'")
 
-    use_bq = (
-        os.environ.get("USE_BIGQUERY", "").lower() in ("true", "1", "yes")
-        and bool(project_id or os.environ.get("GCP_PROJECT_ID"))
+    use_bq = os.environ.get("USE_BIGQUERY", "").lower() in ("true", "1", "yes") and bool(
+        project_id or os.environ.get("GCP_PROJECT_ID")
     )
 
     if use_bq:
@@ -382,9 +387,7 @@ def train_swing_model(
     X = df[SWING_FEATURE_COLS].fillna(0.0)
     y = df["swing_target"].fillna(0.0)
 
-    X_train, X_test, y_train, y_test = train_test_split(
-        X, y, test_size=0.2, random_state=42
-    )
+    X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
 
     logger.info(
         "Training SwingModel: cargo=%s uf=%s n_train=%d n_test=%d features=%d",
@@ -415,8 +418,7 @@ def train_swing_model(
     feat_importance: dict[str, float] = {}
     if hasattr(model, "feature_importances_"):
         feat_importance = {
-            col: float(v)
-            for col, v in zip(SWING_FEATURE_COLS, model.feature_importances_)
+            col: float(v) for col, v in zip(SWING_FEATURE_COLS, model.feature_importances_)
         }
 
     metrics = {
@@ -473,7 +475,10 @@ def save_artifact(
         if isinstance(v, (np.floating, np.integer)):
             meta_out[k] = float(v)
         elif isinstance(v, dict):
-            meta_out[k] = {kk: float(vv) if isinstance(vv, (np.floating, np.integer)) else vv for kk, vv in v.items()}
+            meta_out[k] = {
+                kk: float(vv) if isinstance(vv, (np.floating, np.integer)) else vv
+                for kk, vv in v.items()
+            }
 
     meta_out["model_path"] = str(model_path)
     meta_out["trained_at"] = pd.Timestamp.utcnow().isoformat()

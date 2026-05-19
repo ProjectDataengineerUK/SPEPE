@@ -28,23 +28,25 @@ CD_CARGO_NAMES: dict[int, str] = {
     13: "prefeito",
 }
 
-MAJORITARIO_CARGOS = {1, 3, 5, 13}   # → SwingModel
+MAJORITARIO_CARGOS = {1, 3, 5, 13}  # → SwingModel
 PROPORCIONAL_CARGOS = {6, 7, 8, 11}  # → DeputadoModel
 
 CARGO_CONFIGS: dict[int, dict] = {
-    1:  {"escopo": "nacional", "n_sim": 5000, "vagas": 1, "turno": 2},
-    3:  {"escopo": "estadual", "n_sim": 5000, "vagas": 1, "turno": 2},
-    5:  {"escopo": "estadual", "n_sim": 3000, "vagas": 3, "turno": 1},
-    6:  {"escopo": "estadual", "n_sim": 2000, "vagas": None, "turno": 1},
-    7:  {"escopo": "estadual", "n_sim": 2000, "vagas": None, "turno": 1},
-    8:  {"escopo": "distrital", "n_sim": 2000, "vagas": None, "turno": 1},
+    1: {"escopo": "nacional", "n_sim": 5000, "vagas": 1, "turno": 2},
+    3: {"escopo": "estadual", "n_sim": 5000, "vagas": 1, "turno": 2},
+    5: {"escopo": "estadual", "n_sim": 3000, "vagas": 3, "turno": 1},
+    6: {"escopo": "estadual", "n_sim": 2000, "vagas": None, "turno": 1},
+    7: {"escopo": "estadual", "n_sim": 2000, "vagas": None, "turno": 1},
+    8: {"escopo": "distrital", "n_sim": 2000, "vagas": None, "turno": 1},
     11: {"escopo": "municipal", "n_sim": 1000, "vagas": None, "turno": 1},
     13: {"escopo": "municipal", "n_sim": 3000, "vagas": 1, "turno": 2},
 }
 
 
 def get_cargo_config(cd_cargo: int) -> dict:
-    return CARGO_CONFIGS.get(cd_cargo, {"escopo": "desconhecido", "n_sim": 1000, "vagas": None, "turno": 1})
+    return CARGO_CONFIGS.get(
+        cd_cargo, {"escopo": "desconhecido", "n_sim": 1000, "vagas": None, "turno": 1}
+    )
 
 
 def get_model_type(cd_cargo: int) -> str:
@@ -136,9 +138,11 @@ def predict(
         ].to_dict(orient="records")
         # Enriquecer com cadeiras previstas por partido
         from mlops.quociente_eleitoral import VAGAS_DEP_FEDERAL
+
         vagas = VAGAS_DEP_FEDERAL.get(uf, 8)
         df_partido = (
-            mc_df.groupby("sg_partido")["votos_mean"].sum()
+            mc_df.groupby("sg_partido")["votos_mean"]
+            .sum()
             .reset_index()
             .rename(columns={"votos_mean": "votos_previstos_uf"})
         )

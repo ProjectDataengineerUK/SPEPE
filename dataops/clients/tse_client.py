@@ -291,7 +291,13 @@ def download_eleitorado_locais(uf: str) -> str:
                                     chunk[col].str.replace(",", ".", regex=False),
                                     errors="coerce",
                                 )
-                        for col in ("cd_municipio", "nr_zona", "nr_secao", "nr_local_votacao", "qt_aptos"):
+                        for col in (
+                            "cd_municipio",
+                            "nr_zona",
+                            "nr_secao",
+                            "nr_local_votacao",
+                            "qt_aptos",
+                        ):
                             if col in chunk.columns:
                                 chunk[col] = pd.to_numeric(chunk[col], errors="coerce")
                         if "sg_uf" in chunk.columns:

@@ -82,7 +82,7 @@ include = [
 [tool.ruff]
 line-length = 100
 target-version = "py312"
-extend-exclude = ["skills/", "kb/"]
+extend-exclude = ["skills/", "kb/", ".claude/"]
 
 [tool.pytest.ini_options]
 asyncio_mode = "auto"

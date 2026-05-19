@@ -42,10 +42,9 @@ def build_swing_features(
     if len(anos) >= 2:
         ano_atual = anos[-1]
         ano_anterior = anos[-2]
-        historico = (
-            df[df["ano_eleicao"] == ano_anterior][["nm_candidato", "sg_uf", "pct_votos"]]
-            .rename(columns={"pct_votos": "pct_votos_historico"})
-        )
+        historico = df[df["ano_eleicao"] == ano_anterior][
+            ["nm_candidato", "sg_uf", "pct_votos"]
+        ].rename(columns={"pct_votos": "pct_votos_historico"})
         df = df[df["ano_eleicao"] == ano_atual].merge(
             historico, on=["nm_candidato", "sg_uf"], how="left"
         )
@@ -127,7 +126,9 @@ def build_swing_features(
     if "qtd_beneficiarios_novo_bolsa_familia" not in df.columns:
         df["qtd_beneficiarios_novo_bolsa_familia"] = _NUM_FILL
     else:
-        df["qtd_beneficiarios_novo_bolsa_familia"] = df["qtd_beneficiarios_novo_bolsa_familia"].fillna(_NUM_FILL)
+        df["qtd_beneficiarios_novo_bolsa_familia"] = df[
+            "qtd_beneficiarios_novo_bolsa_familia"
+        ].fillna(_NUM_FILL)
     populacao = np.where(df["log_populacao"] > 0, np.exp(df["log_populacao"]), 0.0)
     df["pct_beneficiarios_bf"] = np.where(
         populacao > 0,
@@ -144,11 +145,15 @@ def build_swing_features(
         polls = df_polls.copy()
         if "data_pesquisa" in polls.columns:
             polls = polls.sort_values("data_pesquisa")
-        rej_agg = polls.groupby(["nm_candidato", "sg_uf"]).agg(
-            media_rejeicao=("rejeicao_pct", "mean"),
-            _rej_primeira=("rejeicao_pct", "first"),
-            _rej_ultima=("rejeicao_pct", "last"),
-        ).reset_index()
+        rej_agg = (
+            polls.groupby(["nm_candidato", "sg_uf"])
+            .agg(
+                media_rejeicao=("rejeicao_pct", "mean"),
+                _rej_primeira=("rejeicao_pct", "first"),
+                _rej_ultima=("rejeicao_pct", "last"),
+            )
+            .reset_index()
+        )
         rej_agg["delta_rejeicao"] = rej_agg["_rej_ultima"] - rej_agg["_rej_primeira"]
         rej_agg = rej_agg.drop(columns=["_rej_primeira", "_rej_ultima"])
         df = df.merge(rej_agg, on=["nm_candidato", "sg_uf"], how="left")
@@ -214,7 +219,9 @@ def build_swing_features_from_bq(
     try:
         from google.cloud import bigquery
     except ImportError:
-        raise ImportError("google-cloud-bigquery não instalado. Execute: pip install google-cloud-bigquery")
+        raise ImportError(
+            "google-cloud-bigquery não instalado. Execute: pip install google-cloud-bigquery"
+        )
 
     client = bigquery.Client(project=project_id)
 
@@ -342,9 +349,11 @@ def build_swing_features_from_local(
     uf_lower = uf.lower()
 
     # Localizar arquivos de votos
-    votos_candidates = list(data_dir.glob(f"*tse*{uf_lower}*.parquet")) + \
-                       list(data_dir.glob(f"*tse*{uf}*.parquet")) + \
-                       list(data_dir.glob(f"*{uf_lower}*.parquet"))
+    votos_candidates = (
+        list(data_dir.glob(f"*tse*{uf_lower}*.parquet"))
+        + list(data_dir.glob(f"*tse*{uf}*.parquet"))
+        + list(data_dir.glob(f"*{uf_lower}*.parquet"))
+    )
 
     if not votos_candidates:
         logger.warning("Nenhum parquet de votos encontrado em %s para UF=%s", data_dir, uf)
@@ -359,11 +368,14 @@ def build_swing_features_from_local(
     # Garantir colunas mínimas
     for col in ["nm_candidato", "sg_uf", "cd_municipio", "ano_eleicao", "pct_votos", "sg_partido"]:
         if col not in df_votos.columns:
-            df_votos[col] = _NUM_FILL if col not in ["nm_candidato", "sg_uf", "sg_partido"] else _CAT_FILL
+            df_votos[col] = (
+                _NUM_FILL if col not in ["nm_candidato", "sg_uf", "sg_partido"] else _CAT_FILL
+            )
 
     # Tentar carregar IBGE local
-    ibge_candidates = list(data_dir.glob(f"*ibge*{uf_lower}*.parquet")) + \
-                      list(data_dir.glob(f"*ibge*{uf}*.parquet"))
+    ibge_candidates = list(data_dir.glob(f"*ibge*{uf_lower}*.parquet")) + list(
+        data_dir.glob(f"*ibge*{uf}*.parquet")
+    )
     df_ibge = None
     if ibge_candidates:
         raw = pd.read_parquet(ibge_candidates[0])
@@ -375,7 +387,9 @@ def build_swing_features_from_local(
                 df_ibge[dst] = np.log(raw[src].replace(0, np.nan)).fillna(_NUM_FILL)
             else:
                 df_ibge[dst] = _NUM_FILL
-        df_ibge["taxa_alfabetizacao"] = raw.get("taxa_alfabetizacao", pd.Series(_NUM_FILL, index=raw.index))
+        df_ibge["taxa_alfabetizacao"] = raw.get(
+            "taxa_alfabetizacao", pd.Series(_NUM_FILL, index=raw.index)
+        )
 
     return build_swing_features(
         df_votos=df_votos,

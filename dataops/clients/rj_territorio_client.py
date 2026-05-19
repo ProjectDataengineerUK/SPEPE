@@ -77,7 +77,10 @@ MUNICIPIOS_RJ: dict[int, dict] = {
     3301207: {"nm_municipio": "Carmo", "regiao_rj": "Médio Paraíba / Interior"},
     3301504: {"nm_municipio": "Casimiro de Abreu", "regiao_rj": "Médio Paraíba / Interior"},
     3301876: {"nm_municipio": "Comendador Levy Gasparian", "regiao_rj": "Médio Paraíba / Interior"},
-    3301900: {"nm_municipio": "Engenheiro Paulo de Frontin", "regiao_rj": "Médio Paraíba / Interior"},
+    3301900: {
+        "nm_municipio": "Engenheiro Paulo de Frontin",
+        "regiao_rj": "Médio Paraíba / Interior",
+    },
     3302254: {"nm_municipio": "Italva", "regiao_rj": "Médio Paraíba / Interior"},
     3302304: {"nm_municipio": "Itaocara", "regiao_rj": "Médio Paraíba / Interior"},
     3302403: {"nm_municipio": "Itaperuna", "regiao_rj": "Médio Paraíba / Interior"},

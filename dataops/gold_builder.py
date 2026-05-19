@@ -823,9 +823,7 @@ def _build_gold_via_bigquery_sql() -> dict:
     results = {}
     for table_name, sql in sqls.items():
         dataset_path = (
-            f"{_GCP_PROJECT}.{_BQ_MLOPS_DATASET}"
-            if table_name in _MLOPS_TABLES
-            else gold
+            f"{_GCP_PROJECT}.{_BQ_MLOPS_DATASET}" if table_name in _MLOPS_TABLES else gold
         )
         try:
             client.query(f"DROP TABLE IF EXISTS `{dataset_path}.{table_name}`").result()

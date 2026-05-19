@@ -71,9 +71,7 @@ SWING_FEATURE_COLS: list[str] = [
 
 _CAT_FEATURE_NAMES: list[str] = ["nm_regiao", "nm_candidato"]
 
-_NUM_FEATURE_COLS: list[str] = [
-    c for c in SWING_FEATURE_COLS if c not in _CAT_FEATURE_NAMES
-]
+_NUM_FEATURE_COLS: list[str] = [c for c in SWING_FEATURE_COLS if c not in _CAT_FEATURE_NAMES]
 
 _MISSING_NUM_FILL: float = 0.0
 _MISSING_CAT_FILL: str = "DESCONHECIDO"
@@ -178,8 +176,7 @@ class SwingModel:
 
         if not self._feature_cols:
             raise ValueError(
-                "Nenhuma feature disponível no DataFrame. "
-                f"Esperadas: {SWING_FEATURE_COLS}"
+                f"Nenhuma feature disponível no DataFrame. Esperadas: {SWING_FEATURE_COLS}"
             )
 
         if len(X) < 10:
@@ -211,9 +208,7 @@ class SwingModel:
         )
         return self
 
-    def _fit_catboost(
-        self, X: pd.DataFrame, y: np.ndarray, cat_cols: list[str]
-    ) -> None:
+    def _fit_catboost(self, X: pd.DataFrame, y: np.ndarray, cat_cols: list[str]) -> None:
         from catboost import CatBoostRegressor, Pool
 
         cat_indices = [X.columns.tolist().index(c) for c in cat_cols if c in X.columns]
@@ -231,9 +226,7 @@ class SwingModel:
         )
         self._model.fit(pool)
 
-    def _fit_lightgbm(
-        self, X: pd.DataFrame, y: np.ndarray, cat_cols: list[str]
-    ) -> None:
+    def _fit_lightgbm(self, X: pd.DataFrame, y: np.ndarray, cat_cols: list[str]) -> None:
         import lightgbm as lgb
 
         for col in cat_cols:
@@ -270,9 +263,7 @@ class SwingModel:
             from catboost import Pool
 
             cat_indices = [
-                X.columns.tolist().index(c)
-                for c in self._cat_feature_names
-                if c in X.columns
+                X.columns.tolist().index(c) for c in self._cat_feature_names if c in X.columns
             ]
             pool = Pool(X, cat_features=cat_indices)
             return self._model.predict(pool).astype(float)
@@ -296,9 +287,7 @@ class SwingModel:
     # predict_proba_eleito
     # ------------------------------------------------------------------
 
-    def predict_proba_eleito(
-        self, df: pd.DataFrame, threshold: float = 0.0
-    ) -> np.ndarray:
+    def predict_proba_eleito(self, df: pd.DataFrame, threshold: float = 0.0) -> np.ndarray:
         """Converte swing previsto em probabilidade de vitória (sigmoid sobre margem).
 
         threshold=0.0 → prob > 0.5 significa que o candidato mantém ou cresce.
@@ -384,9 +373,7 @@ class SwingModel:
         from catboost import Pool
 
         cat_indices = [
-            X.columns.tolist().index(c)
-            for c in self._cat_feature_names
-            if c in X.columns
+            X.columns.tolist().index(c) for c in self._cat_feature_names if c in X.columns
         ]
         pool = Pool(X, cat_features=cat_indices)
         shap_matrix = self._model.get_feature_importance(pool, type="ShapValues")
@@ -403,9 +390,7 @@ class SwingModel:
             return pd.DataFrame(shap_vals, columns=self._feature_cols)
         except ImportError:
             # Fallback: feature importances broadcast para todas as linhas
-            logger.warning(
-                "shap não instalado. Retornando feature_importances_ normalizadas."
-            )
+            logger.warning("shap não instalado. Retornando feature_importances_ normalizadas.")
             importances = self._lgbm_model.feature_importances_
             importances_norm = importances / (importances.sum() + 1e-12)
             repeated = np.tile(importances_norm, (len(X), 1))
@@ -475,9 +460,7 @@ class SwingModel:
 
     def _check_fitted(self) -> None:
         if self._backend is None:
-            raise RuntimeError(
-                "SwingModel não treinado. Chame fit() antes de predict()."
-            )
+            raise RuntimeError("SwingModel não treinado. Chame fit() antes de predict().")
         if self._backend == "catboost" and self._model is None:
             raise RuntimeError("Modelo CatBoost não inicializado corretamente.")
         if self._backend == "lightgbm" and self._lgbm_model is None:

@@ -21,11 +21,15 @@ logger = logging.getLogger("spepe.mlops.deputado_model")
 
 try:
     from catboost import CatBoostRegressor
+
     _CATBOOST_AVAILABLE = True
 except ImportError:
     from sklearn.ensemble import GradientBoostingRegressor as CatBoostRegressor  # type: ignore[no-redef]
+
     _CATBOOST_AVAILABLE = False
-    logger.warning("CatBoost não disponível — usando sklearn GradientBoostingRegressor como fallback")
+    logger.warning(
+        "CatBoost não disponível — usando sklearn GradientBoostingRegressor como fallback"
+    )
 
 _PARTIDO_FEATURES_UF = [
     "pct_votos_historico_partido",
@@ -93,10 +97,9 @@ class DeputadoModel:
     def _build_candidato_features(self, df: pd.DataFrame) -> tuple[pd.DataFrame, pd.Series]:
         """Features por candidato (pct dentro do partido)."""
         df = df.copy()
-        df["rank_historico_partido"] = (
-            df.groupby(["sg_partido", "ano_eleicao"])["pct_votos_historico"]
-            .rank(ascending=False, method="min")
-        )
+        df["rank_historico_partido"] = df.groupby(["sg_partido", "ano_eleicao"])[
+            "pct_votos_historico"
+        ].rank(ascending=False, method="min")
         total_partido = df.groupby("sg_partido")["votos_candidato"].transform("sum")
         df["pct_votos_no_partido"] = df["votos_candidato"] / total_partido.replace(0, np.nan)
         df["pct_votos_no_partido"] = df["pct_votos_no_partido"].fillna(0.0)
@@ -124,19 +127,29 @@ class DeputadoModel:
         self.model_candidato.fit(X_cand.values, y_cand.values)
 
         self._fitted = True
-        logger.info("DeputadoModel[%s] treinado — %d candidatos, %d partidos", self.uf, len(df), X_partido.shape[0])
+        logger.info(
+            "DeputadoModel[%s] treinado — %d candidatos, %d partidos",
+            self.uf,
+            len(df),
+            X_partido.shape[0],
+        )
         return self
 
-    def predict_cadeiras(self, df_partido: pd.DataFrame, vagas: int | None = None) -> dict[str, int]:
+    def predict_cadeiras(
+        self, df_partido: pd.DataFrame, vagas: int | None = None
+    ) -> dict[str, int]:
         """
         Prevê cadeiras por partido usando D'Hondt.
         df_partido: nm_partido, votos_previstos_uf
         Usa mlops.quociente_eleitoral.simulate_quociente()
         """
         from mlops.quociente_eleitoral import simulate_quociente, VAGAS_DEP_FEDERAL
+
         vagas = vagas or VAGAS_DEP_FEDERAL.get(self.uf, 8)
 
-        col_partido = next((c for c in ["nm_partido", "sg_partido"] if c in df_partido.columns), None)
+        col_partido = next(
+            (c for c in ["nm_partido", "sg_partido"] if c in df_partido.columns), None
+        )
         if col_partido is None:
             raise ValueError("df_partido precisa ter coluna 'nm_partido' ou 'sg_partido'")
 
@@ -169,10 +182,12 @@ class DeputadoModel:
             votos_partido_pred = np.clip(self.model_partido.predict(X_partido.values), 0, None)
             partido_list = df["sg_partido"].drop_duplicates().reset_index(drop=True)
             votos_partido_map = dict(zip(partido_list, votos_partido_pred))
-            votos_base = np.array([
-                pct_pred[i] * votos_partido_map.get(df["sg_partido"].iloc[i], 0)
-                for i in range(len(df))
-            ])
+            votos_base = np.array(
+                [
+                    pct_pred[i] * votos_partido_map.get(df["sg_partido"].iloc[i], 0)
+                    for i in range(len(df))
+                ]
+            )
 
         rng = np.random.default_rng(seed=42)
         candidatos = df["nm_candidato"].tolist()
@@ -209,14 +224,20 @@ class DeputadoModel:
         votos_q05 = np.percentile(votos_sim_all, 5, axis=0)
         votos_q95 = np.percentile(votos_sim_all, 95, axis=0)
 
-        return pd.DataFrame({
-            "nm_candidato": candidatos,
-            "sg_partido": partidos,
-            "prob_eleicao": prob_eleicao,
-            "votos_mean": votos_mean,
-            "votos_q05": votos_q05,
-            "votos_q95": votos_q95,
-        }).sort_values("prob_eleicao", ascending=False).reset_index(drop=True)
+        return (
+            pd.DataFrame(
+                {
+                    "nm_candidato": candidatos,
+                    "sg_partido": partidos,
+                    "prob_eleicao": prob_eleicao,
+                    "votos_mean": votos_mean,
+                    "votos_q05": votos_q05,
+                    "votos_q95": votos_q95,
+                }
+            )
+            .sort_values("prob_eleicao", ascending=False)
+            .reset_index(drop=True)
+        )
 
     def save(self, path: str | Path) -> None:
         path = Path(path)

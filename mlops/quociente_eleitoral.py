@@ -111,10 +111,7 @@ def simulate_quociente(votos_partido: dict[str, int], vagas: int) -> dict[str, i
     for _ in range(sobras):
         if not elegíveis:
             break
-        media = {
-            p: votos_partido[p] / (cadeiras_finais[p] + 1)
-            for p in elegíveis
-        }
+        media = {p: votos_partido[p] / (cadeiras_finais[p] + 1) for p in elegíveis}
         vencedor = max(media, key=lambda p: (media[p], votos_partido[p]))
         cadeiras_finais[vencedor] += 1
 
@@ -222,16 +219,12 @@ def run_monte_carlo(
         cadeiras = simulate_quociente(votos_partido, vagas)
 
         # Reconstruir lista de candidatos com votos simulados para ordenação intra-partido
-        cands_sim = [
-            {**candidatos[i], "total_votos": int(votos_sim[i])}
-            for i in range(n_cand)
-        ]
+        cands_sim = [{**candidatos[i], "total_votos": int(votos_sim[i])} for i in range(n_cand)]
         resultado = simulate_candidates(cands_sim, cadeiras)
 
         # Mapear resultado de volta para índices originais por sq_candidato
         eleito_map: dict = {
-            r.get("sq_candidato"): r.get("eleito_simulado", False)
-            for r in resultado
+            r.get("sq_candidato"): r.get("eleito_simulado", False) for r in resultado
         }
         for i, cand in enumerate(candidatos):
             if eleito_map.get(cand.get("sq_candidato"), False):
@@ -243,10 +236,9 @@ def run_monte_carlo(
     # IC 95% via bootstrap percentis: amostrar blocos de simulações
     block_size = max(1, n_sim // 100)
     n_blocks = n_sim // block_size
-    block_probs = np.array([
-        eleito_matrix[b * block_size:(b + 1) * block_size].mean(axis=0)
-        for b in range(n_blocks)
-    ])  # shape (n_blocks, n_cand)
+    block_probs = np.array(
+        [eleito_matrix[b * block_size : (b + 1) * block_size].mean(axis=0) for b in range(n_blocks)]
+    )  # shape (n_blocks, n_cand)
 
     ic_lower = np.percentile(block_probs, 2.5, axis=0)
     ic_upper = np.percentile(block_probs, 97.5, axis=0)
@@ -290,8 +282,15 @@ def simulate_election(
     Raises:
         ValueError: Se colunas obrigatórias estiverem ausentes.
     """
-    _required = {"nm_candidato", "sg_partido", "sq_candidato", "total_votos",
-                 "sg_uf", "cd_cargo", "ano_eleicao"}
+    _required = {
+        "nm_candidato",
+        "sg_partido",
+        "sq_candidato",
+        "total_votos",
+        "sg_uf",
+        "cd_cargo",
+        "ano_eleicao",
+    }
     missing = _required - set(df_votos.columns)
     if missing:
         raise ValueError(f"Colunas ausentes no DataFrame: {missing}")
@@ -305,9 +304,7 @@ def simulate_election(
     ].to_dict(orient="records")
 
     # Votos válidos por partido (nominais apenas — sem brancos/nulos)
-    votos_partido: dict[str, int] = (
-        df_votos.groupby("sg_partido")["total_votos"].sum().to_dict()
-    )
+    votos_partido: dict[str, int] = df_votos.groupby("sg_partido")["total_votos"].sum().to_dict()
     total_votos_validos = int(sum(votos_partido.values()))
 
     qe = total_votos_validos / vagas if vagas > 0 else 0.0
@@ -337,10 +334,7 @@ def simulate_election(
     candidatos_final.sort(key=lambda x: x["prob_eleicao_mc"], reverse=True)
 
     elegíveis = [p for p, v in votos_partido.items() if v / qe >= 1.0] if qe > 0 else []
-    cadeiras_qp = sum(
-        math.floor(votos_partido.get(p, 0) / qe)
-        for p in elegíveis
-    ) if qe > 0 else 0
+    cadeiras_qp = sum(math.floor(votos_partido.get(p, 0) / qe) for p in elegíveis) if qe > 0 else 0
     cadeiras_sobras = sum(cadeiras_por_partido.values()) - cadeiras_qp
 
     return ResultadoSimulacao(
