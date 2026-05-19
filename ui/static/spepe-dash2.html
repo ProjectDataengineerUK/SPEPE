@@ -1798,8 +1798,7 @@ async function loadComparativo() {
     document.querySelectorAll('[id^="cmp2s-"]').forEach(b => b.classList.toggle('active', b.id === 'cmp2s-todos'));
   }
 
-  // unified banner: só quando dado é de exemplo (ds_situacao ausente é autoexplicado pelos botões)
-  _updateDemoBanner('comparativo', isExemplo ? 'Comparativo RJ exemplo — execute python scripts/seed_silver.py para dados reais' : null);
+  _updateDemoBanner('comparativo', null);
 
   if (!_cmp2Data.length) {
     if (empty) { empty.style.display = 'block'; empty.textContent = 'Nenhum resultado — ajuste os filtros ou execute python scripts/seed_silver.py'; }

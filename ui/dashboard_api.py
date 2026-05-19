@@ -7039,12 +7039,10 @@ async def get_comparativo_candidatos(
                 bigquery.ScalarQueryParameter("turno", "INT64", turno),
             ]
 
-            # ds_situacao vem da Gold (ANY_VALUE por município) — não precisa de Silver
             gold_query = f"""
                 WITH base AS (
                     SELECT nm_candidato, sg_partido, ano_eleicao,
-                           SUM(total_votos)        AS votos,
-                           ANY_VALUE(ds_situacao)  AS ds_situacao
+                           SUM(total_votos) AS votos
                     FROM `{gold}.fact_municipio_candidato_eleicao`
                     WHERE sg_uf    = @uf
                       AND cd_cargo = @cd_cargo
@@ -7054,22 +7052,20 @@ async def get_comparativo_candidatos(
                     GROUP BY nm_candidato, sg_partido, ano_eleicao
                 ),
                 ranked AS (
-                    SELECT nm_candidato, sg_partido, ano_eleicao, votos, ds_situacao,
+                    SELECT nm_candidato, sg_partido, ano_eleicao, votos,
                         ROUND(votos / NULLIF(SUM(votos) OVER (PARTITION BY ano_eleicao), 0) * 100, 2) AS pct,
                         RANK() OVER (PARTITION BY ano_eleicao ORDER BY votos DESC) AS ranking
                     FROM base
                 ),
                 pivoted AS (
                     SELECT nm_candidato,
-                        MAX(sg_partido)                                AS sg_partido,
-                        MAX(IF(ano_eleicao=2018, votos,        NULL)) AS votos_2018,
-                        MAX(IF(ano_eleicao=2022, votos,        NULL)) AS votos_2022,
-                        MAX(IF(ano_eleicao=2018, pct,          NULL)) AS pct_2018,
-                        MAX(IF(ano_eleicao=2022, pct,          NULL)) AS pct_2022,
-                        MAX(IF(ano_eleicao=2018, ranking,      NULL)) AS rank_2018,
-                        MAX(IF(ano_eleicao=2022, ranking,      NULL)) AS rank_2022,
-                        MAX(IF(ano_eleicao=2018, ds_situacao,  NULL)) AS ds_situacao_2018,
-                        MAX(IF(ano_eleicao=2022, ds_situacao,  NULL)) AS ds_situacao_2022
+                        MAX(sg_partido)                           AS sg_partido,
+                        MAX(IF(ano_eleicao=2018, votos,   NULL)) AS votos_2018,
+                        MAX(IF(ano_eleicao=2022, votos,   NULL)) AS votos_2022,
+                        MAX(IF(ano_eleicao=2018, pct,     NULL)) AS pct_2018,
+                        MAX(IF(ano_eleicao=2022, pct,     NULL)) AS pct_2022,
+                        MAX(IF(ano_eleicao=2018, ranking, NULL)) AS rank_2018,
+                        MAX(IF(ano_eleicao=2022, ranking, NULL)) AS rank_2022
                     FROM ranked GROUP BY nm_candidato
                 )
                 SELECT nm_candidato, sg_partido,
@@ -7080,28 +7076,65 @@ async def get_comparativo_candidatos(
                     rank_2018, rank_2022,
                     COALESCE(votos_2022,0) - COALESCE(votos_2018,0) AS delta_votos,
                     IF(rank_2022 IS NOT NULL AND rank_2018 IS NOT NULL,
-                       rank_2018 - rank_2022, NULL)                  AS delta_rank,
-                    ds_situacao_2018,
-                    ds_situacao_2022
+                       rank_2018 - rank_2022, NULL)                  AS delta_rank
                 FROM pivoted
                 ORDER BY COALESCE(votos_2022, votos_2018) DESC
                 LIMIT {min(limit, 500)}
             """
 
-            cfg_gold = bigquery.QueryJobConfig(query_parameters=params)
+            # ds_situacao: tenta Gold primeiro (coluna existe se gold_build_job rodou
+            # com versão atual), depois Silver. Falha silenciosa — lista carrega sempre.
+            sit_query_gold = f"""
+                SELECT nm_candidato, ano_eleicao,
+                       ANY_VALUE(ds_situacao) AS ds_situacao
+                FROM `{gold}.fact_municipio_candidato_eleicao`
+                WHERE sg_uf    = @uf
+                  AND cd_cargo = @cd_cargo
+                  AND nr_turno = @turno
+                  AND ano_eleicao IN (2018, 2022)
+                  AND ds_situacao IS NOT NULL
+                GROUP BY nm_candidato, ano_eleicao
+            """
+            sit_query_silver = f"""
+                SELECT nm_candidato, ano_eleicao,
+                       ANY_VALUE(ds_situacao) AS ds_situacao
+                FROM `{settings.gcp_project_id}.{settings.bigquery_dataset_silver}.tse_*`
+                WHERE sg_uf    = @uf
+                  AND cd_cargo = @cd_cargo
+                  AND nr_turno = @turno
+                  AND ano_eleicao IN (2018, 2022)
+                  AND nm_candidato IS NOT NULL
+                GROUP BY nm_candidato, ano_eleicao
+            """
+
+            cfg = bigquery.QueryJobConfig(query_parameters=params)
 
             gold_rows = await asyncio.to_thread(
-                lambda: list(client.query(gold_query, job_config=cfg_gold).result())
+                lambda: list(client.query(gold_query, job_config=cfg).result())
             )
 
+            # Tenta obter ds_situacao (Gold → Silver → desativado)
+            sit_map: dict[tuple, str] = {}
+            for sq in (sit_query_gold, sit_query_silver):
+                if sit_map:
+                    break
+                try:
+                    sit_rows = await asyncio.to_thread(
+                        lambda q=sq: list(client.query(q, job_config=cfg).result())
+                    )
+                    sit_map = {
+                        (r["nm_candidato"], int(r["ano_eleicao"])): r["ds_situacao"] or ""
+                        for r in sit_rows
+                        if r["nm_candidato"] and r["ds_situacao"]
+                    }
+                except Exception as exc:
+                    logger.warning("sit_map query falhou (%s): %s", sq[:60], exc)
+
             candidatos = []
-            sit_disponivel_gold = False
             for r in gold_rows:
                 nm = r["nm_candidato"] or ""
-                ds18 = r["ds_situacao_2018"] or ""
-                ds22 = r["ds_situacao_2022"] or ""
-                if ds18 or ds22:
-                    sit_disponivel_gold = True
+                ds18 = sit_map.get((nm, 2018), "")
+                ds22 = sit_map.get((nm, 2022), "")
                 if situacao == "eleito" and not (_is_eleito(ds18) or _is_eleito(ds22)):
                     continue
                 if situacao == "nao_eleito" and (_is_eleito(ds18) or _is_eleito(ds22)):
@@ -7134,14 +7167,24 @@ async def get_comparativo_candidatos(
                     "anos": [2018, 2022],
                     "total": len(candidatos),
                     "candidatos": candidatos,
-                    "situacao_disponivel": sit_disponivel_gold,
+                    "situacao_disponivel": bool(sit_map),
                     "fonte": "bigquery",
                 }
             )
 
         except Exception as exc:
-            logger.warning("comparativo BQ falhou, tentando Silver local: %s", exc)
-            # fall through to local path
+            logger.error("comparativo BQ falhou: %s", exc, exc_info=True)
+            return JSONResponse(
+                {
+                    "status": "sem_dados",
+                    "candidatos": [],
+                    "anos": [2018, 2022],
+                    "situacao_disponivel": False,
+                    "fonte": "bigquery",
+                    "msg": f"BigQuery indisponível: {exc}",
+                },
+                status_code=503,
+            )
 
     # ── Local Silver parquet fallback ────────────────────────────────────────
     has_silver = any(_LOCAL_SILVER_DIR.glob("tse_*.parquet"))
