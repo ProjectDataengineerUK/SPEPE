@@ -7045,7 +7045,7 @@ async def get_comparativo_candidatos(
                 WITH base AS (
                     SELECT nm_candidato,
                            ANY_VALUE(COALESCE(nm_urna_candidato, nm_candidato)) AS nm_urna,
-                           sg_partido, ano_eleicao,
+                           ANY_VALUE(sg_partido) AS sg_partido, ano_eleicao,
                            SUM(total_votos) AS votos
                     FROM `{gold}.fact_municipio_candidato_eleicao`
                     WHERE sg_uf    = @uf
@@ -7053,7 +7053,7 @@ async def get_comparativo_candidatos(
                       AND nr_turno = @turno
                       AND ano_eleicao IN (2018, 2022)
                       AND {_FILTER_INVALIDOS}
-                    GROUP BY nm_candidato, sg_partido, ano_eleicao
+                    GROUP BY nm_candidato, ano_eleicao
                 ),
                 ranked AS (
                     SELECT nm_candidato, nm_urna, sg_partido, ano_eleicao, votos,
@@ -7088,7 +7088,7 @@ async def get_comparativo_candidatos(
             """
             gold_query_fallback = f"""
                 WITH base AS (
-                    SELECT nm_candidato, sg_partido, ano_eleicao,
+                    SELECT nm_candidato, ANY_VALUE(sg_partido) AS sg_partido, ano_eleicao,
                            SUM(total_votos) AS votos
                     FROM `{gold}.fact_municipio_candidato_eleicao`
                     WHERE sg_uf    = @uf
@@ -7096,7 +7096,7 @@ async def get_comparativo_candidatos(
                       AND nr_turno = @turno
                       AND ano_eleicao IN (2018, 2022)
                       AND {_FILTER_INVALIDOS}
-                    GROUP BY nm_candidato, sg_partido, ano_eleicao
+                    GROUP BY nm_candidato, ano_eleicao
                 ),
                 ranked AS (
                     SELECT nm_candidato, sg_partido, ano_eleicao, votos,
