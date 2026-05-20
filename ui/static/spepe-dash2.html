@@ -504,6 +504,12 @@ table.data tr:hover td{background:var(--bg3)}
             <button class="pill" id="cmp2s-eleito" onclick="cmp2SetSit('eleito',this)" style="color:#4ade80">Eleitos</button>
             <button class="pill" id="cmp2s-nao" onclick="cmp2SetSit('nao_eleito',this)" style="color:#f87171">N&#227;o Eleitos</button>
           </div>
+          <!-- filtro ano -->
+          <div id="cmp2-ano-btns" class="cmp2-filter-group">
+            <button class="pill active" id="cmp2a-ambos" onclick="cmp2SetAno('ambos',this)">Ambos</button>
+            <button class="pill" id="cmp2a-2018" onclick="cmp2SetAno('2018',this)">2018</button>
+            <button class="pill" id="cmp2a-2022" onclick="cmp2SetAno('2022',this)">2022</button>
+          </div>
           <!-- agrupar federação (partidos) -->
           <label id="cmp2-fed-lbl" style="display:none;align-items:center;gap:4px;font-size:.70rem;color:var(--tx2);cursor:pointer;padding:0 8px;border-left:1px solid var(--br)">
             <input type="checkbox" id="cmp2-fed-chk" onchange="loadComparativo()" style="cursor:pointer"> Federações
@@ -1528,6 +1534,7 @@ let _cmp2Data = [];
 let _cmp2SortCol = 'votos22', _cmp2SortAsc = false;
 let _cmp2Sit = 'todos';
 let _cmp2Filter = '';
+let _cmp2AnoFiltro = 'ambos';
 let _cmp2Selected = new Set();
 let _cmp2SitAvail = false;
 let _cmp2CompareChart = null;
@@ -1557,6 +1564,14 @@ function cmp2SetSit(s, btn) {
 
 function cmp2Search(val) {
   _cmp2Filter = val.trim().toUpperCase();
+  _cmp2Render();
+}
+function cmp2SetAno(val, btn) {
+  _cmp2AnoFiltro = val;
+  document.querySelectorAll('[id^="cmp2a-"]').forEach(b => b.classList.remove('active'));
+  if (btn) btn.classList.add('active');
+  if (val === '2018') _cmp2SortCol = 'votos18';
+  else if (val === '2022') _cmp2SortCol = 'votos22';
   _cmp2Render();
 }
 
@@ -1844,6 +1859,10 @@ function _cmp2Render() {
                          || (r.nm_candidato_legal||'').toUpperCase().includes(_cmp2Filter)
                          || (r.sg_partido||'').toUpperCase().includes(_cmp2Filter));
   }
+
+  // filtro ano
+  if (_cmp2AnoFiltro === '2018') data = data.filter(r => r.votos_2018 > 0);
+  else if (_cmp2AnoFiltro === '2022') data = data.filter(r => r.votos_2022 > 0);
 
   // filtro situação (client-side quando sit_disponivel, ou avisa quando não)
   if (_cmp2SitAvail && _cmp2View === 'candidatos') {
