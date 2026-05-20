@@ -1838,9 +1838,10 @@ function _cmp2Render() {
   if (!_cmp2Data.length) return;
   let data = [..._cmp2Data];
 
-  // filtro texto
+  // filtro texto — busca em nome de urna, nome legal e partido
   if (_cmp2Filter) {
     data = data.filter(r => (r.nm_candidato||'').toUpperCase().includes(_cmp2Filter)
+                         || (r.nm_candidato_legal||'').toUpperCase().includes(_cmp2Filter)
                          || (r.sg_partido||'').toUpperCase().includes(_cmp2Filter));
   }
 

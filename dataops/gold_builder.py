@@ -61,6 +61,32 @@ def _build_gold_via_bigquery_sql() -> dict:
             logger.warning("Falha ao verificar sq_candidato: %s — partido JOIN desativado", _e)
             _has_dim_cand = False
 
+    # Check which ds_situacao sources are available — column absent in older Silver builds
+    # DS_SIT_TOT_TURNO (resultado eleitoral: ELEITO/NÃO ELEITO) lives in consulta_cand files,
+    # NOT in votacao_secao. Silver tse_* tables from votacao_secao may not have it.
+    _dim_has_situacao = False
+    _silver_has_situacao = False
+    try:
+        _sit_schema = client.query(
+            f"SELECT table_name, column_name"
+            f" FROM `{_GCP_PROJECT}.{_BQ_SILVER_DATASET}.INFORMATION_SCHEMA.COLUMNS`"
+            f" WHERE column_name = 'ds_situacao'"
+            f"   AND (table_name = 'dim_candidato' OR table_name LIKE 'tse_%')"
+        ).to_dataframe(create_bqstorage_client=False)
+        _dim_has_situacao = bool(
+            (_sit_schema["table_name"] == "dim_candidato").any()
+        ) if not _sit_schema.empty else False
+        _silver_has_situacao = bool(
+            _sit_schema["table_name"].str.startswith("tse_").any()
+        ) if not _sit_schema.empty else False
+        if not _dim_has_situacao and not _silver_has_situacao:
+            logger.info(
+                "ds_situacao ausente em dim_candidato e tse_* — ds_situacao=NULL no Gold "
+                "(rode spepe-tse-candidaturas-ingest + spepe-silver-transform para corrigir)"
+            )
+    except Exception as _e:
+        logger.warning("Falha ao verificar ds_situacao: %s", _e)
+
     if _has_dim_cand:
         _partido_cols = """c.sg_partido              AS sg_partido,
                     c.nm_partido               AS nm_partido,"""
@@ -70,6 +96,18 @@ def _build_gold_via_bigquery_sql() -> dict:
         _s = "s."
         _from_tse_s = f"{silver_wc} s"
         _partido_grp = "c.sg_partido, c.nm_partido,"
+        # ds_situacao priority: dim_candidato (DS_SIT_TOT_TURNO from consulta_cand) > Silver TSE > NULL
+        if _dim_has_situacao and _silver_has_situacao:
+            _situacao_sel = "COALESCE(c.ds_situacao, s.ds_situacao)"
+        elif _dim_has_situacao:
+            _situacao_sel = "c.ds_situacao"
+        elif _silver_has_situacao:
+            _situacao_sel = "s.ds_situacao"
+        else:
+            _situacao_sel = "CAST(NULL AS STRING)"
+        # nome de urna preferido; fallback para nm_candidato (nome legal) se ausente
+        _urna_col = "COALESCE(c.nm_urna, s.nm_candidato) AS nm_urna_candidato,"
+        _urna_grp = "c.nm_urna,"
     else:
         _partido_cols = """CAST(NULL AS STRING)       AS sg_partido,
                     CAST(NULL AS STRING)       AS nm_partido,"""
@@ -77,6 +115,9 @@ def _build_gold_via_bigquery_sql() -> dict:
         _s = ""
         _from_tse_s = silver_wc
         _partido_grp = ""
+        _situacao_sel = "ds_situacao" if _silver_has_situacao else "CAST(NULL AS STRING)"
+        _urna_col = "CAST(NULL AS STRING)       AS nm_urna_candidato,"
+        _urna_grp = ""
 
     # Silver per-UF tables have nm_municipio_x/y (from TSE+IBGE join); tse_presidente has same
     # after schema alignment in transform_presidente_to_silver.
@@ -170,13 +211,14 @@ def _build_gold_via_bigquery_sql() -> dict:
                     {_nm_mun_sel},
                     SAFE_CAST({_s}cd_municipio_ibge AS INT64)   AS cd_municipio_ibge,
                     {_s}nm_candidato,
+                    {_urna_col}
                     {_partido_cols}
                     SAFE_CAST({_s}cd_cargo AS INT64)             AS cd_cargo,
                     {_s}ds_cargo,
                     SAFE_CAST({_s}nr_turno AS INT64)             AS nr_turno,
                     SAFE_CAST({_s}ano_eleicao AS INT64)          AS ano_eleicao,
                     SAFE_CAST(SUM({_s}qt_votos) AS INT64)        AS total_votos,
-                    ANY_VALUE({_s}ds_situacao)                   AS ds_situacao,
+                    ANY_VALUE({_situacao_sel})                   AS ds_situacao,
                     CURRENT_TIMESTAMP()                          AS ingested_at
                 FROM {_from_tse_s}
                 {_partido_join}
@@ -187,7 +229,7 @@ def _build_gold_via_bigquery_sql() -> dict:
                   )
                   AND {_s}nm_candidato NOT LIKE '#%')
                 GROUP BY {_s}sg_uf, {_s}cd_municipio, {_nm_mun_grp}, {_s}cd_municipio_ibge,
-                         {_s}nm_candidato, {_partido_grp}
+                         {_s}nm_candidato, {_urna_grp} {_partido_grp}
                          {_s}cd_cargo, {_s}ds_cargo, {_s}nr_turno, {_s}ano_eleicao
             )
         """,
@@ -826,7 +868,8 @@ def _build_gold_via_bigquery_sql() -> dict:
             f"{_GCP_PROJECT}.{_BQ_MLOPS_DATASET}" if table_name in _MLOPS_TABLES else gold
         )
         try:
-            client.query(f"DROP TABLE IF EXISTS `{dataset_path}.{table_name}`").result()
+            # CREATE OR REPLACE TABLE is atomic in BQ — preserves original if SELECT fails.
+            # Never DROP before CREATE: a failed SELECT would permanently destroy the table.
             job = client.query(sql)
             job.result()
             row_count = (

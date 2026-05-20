@@ -1813,6 +1813,8 @@ def transform_candidaturas_to_silver(
         "nm_urna",
         "cd_cargo",
         "ds_cargo",
+        "ds_situacao",
+        "cd_situacao",
         "ano",
     ]
 

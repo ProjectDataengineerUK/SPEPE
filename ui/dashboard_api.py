@@ -7039,7 +7039,54 @@ async def get_comparativo_candidatos(
                 bigquery.ScalarQueryParameter("turno", "INT64", turno),
             ]
 
+            # Tenta incluir nm_urna_candidato (disponível após gold_build_job com fix).
+            # Se a coluna não existir (Gold antigo), cai no fallback sem ela.
             gold_query = f"""
+                WITH base AS (
+                    SELECT nm_candidato,
+                           ANY_VALUE(COALESCE(nm_urna_candidato, nm_candidato)) AS nm_urna,
+                           sg_partido, ano_eleicao,
+                           SUM(total_votos) AS votos
+                    FROM `{gold}.fact_municipio_candidato_eleicao`
+                    WHERE sg_uf    = @uf
+                      AND cd_cargo = @cd_cargo
+                      AND nr_turno = @turno
+                      AND ano_eleicao IN (2018, 2022)
+                      AND {_FILTER_INVALIDOS}
+                    GROUP BY nm_candidato, sg_partido, ano_eleicao
+                ),
+                ranked AS (
+                    SELECT nm_candidato, nm_urna, sg_partido, ano_eleicao, votos,
+                        ROUND(votos / NULLIF(SUM(votos) OVER (PARTITION BY ano_eleicao), 0) * 100, 2) AS pct,
+                        RANK() OVER (PARTITION BY ano_eleicao ORDER BY votos DESC) AS ranking
+                    FROM base
+                ),
+                pivoted AS (
+                    SELECT nm_candidato,
+                        MAX(nm_urna)                              AS nm_urna_candidato,
+                        MAX(sg_partido)                           AS sg_partido,
+                        MAX(IF(ano_eleicao=2018, votos,   NULL)) AS votos_2018,
+                        MAX(IF(ano_eleicao=2022, votos,   NULL)) AS votos_2022,
+                        MAX(IF(ano_eleicao=2018, pct,     NULL)) AS pct_2018,
+                        MAX(IF(ano_eleicao=2022, pct,     NULL)) AS pct_2022,
+                        MAX(IF(ano_eleicao=2018, ranking, NULL)) AS rank_2018,
+                        MAX(IF(ano_eleicao=2022, ranking, NULL)) AS rank_2022
+                    FROM ranked GROUP BY nm_candidato
+                )
+                SELECT nm_candidato, nm_urna_candidato, sg_partido,
+                    COALESCE(votos_2018, 0)                          AS votos_2018,
+                    COALESCE(votos_2022, 0)                          AS votos_2022,
+                    COALESCE(pct_2018,   0.0)                        AS pct_2018,
+                    COALESCE(pct_2022,   0.0)                        AS pct_2022,
+                    rank_2018, rank_2022,
+                    COALESCE(votos_2022,0) - COALESCE(votos_2018,0) AS delta_votos,
+                    IF(rank_2022 IS NOT NULL AND rank_2018 IS NOT NULL,
+                       rank_2018 - rank_2022, NULL)                  AS delta_rank
+                FROM pivoted
+                ORDER BY COALESCE(votos_2022, votos_2018) DESC
+                LIMIT {min(limit, 500)}
+            """
+            gold_query_fallback = f"""
                 WITH base AS (
                     SELECT nm_candidato, sg_partido, ano_eleicao,
                            SUM(total_votos) AS votos
@@ -7059,6 +7106,7 @@ async def get_comparativo_candidatos(
                 ),
                 pivoted AS (
                     SELECT nm_candidato,
+                        nm_candidato                              AS nm_urna_candidato,
                         MAX(sg_partido)                           AS sg_partido,
                         MAX(IF(ano_eleicao=2018, votos,   NULL)) AS votos_2018,
                         MAX(IF(ano_eleicao=2022, votos,   NULL)) AS votos_2022,
@@ -7068,7 +7116,7 @@ async def get_comparativo_candidatos(
                         MAX(IF(ano_eleicao=2022, ranking, NULL)) AS rank_2022
                     FROM ranked GROUP BY nm_candidato
                 )
-                SELECT nm_candidato, sg_partido,
+                SELECT nm_candidato, nm_urna_candidato, sg_partido,
                     COALESCE(votos_2018, 0)                          AS votos_2018,
                     COALESCE(votos_2022, 0)                          AS votos_2022,
                     COALESCE(pct_2018,   0.0)                        AS pct_2018,
@@ -7109,9 +7157,18 @@ async def get_comparativo_candidatos(
 
             cfg = bigquery.QueryJobConfig(query_parameters=params)
 
-            gold_rows = await asyncio.to_thread(
-                lambda: list(client.query(gold_query, job_config=cfg).result())
-            )
+            try:
+                gold_rows = await asyncio.to_thread(
+                    lambda: list(client.query(gold_query, job_config=cfg).result())
+                )
+            except Exception as _qe:
+                if "nm_urna_candidato" in str(_qe):
+                    logger.warning("nm_urna_candidato não existe no Gold — usando query sem nome de urna")
+                    gold_rows = await asyncio.to_thread(
+                        lambda: list(client.query(gold_query_fallback, job_config=cfg).result())
+                    )
+                else:
+                    raise
 
             # Tenta obter ds_situacao (Gold → Silver → desativado)
             sit_map: dict[tuple, str] = {}
@@ -7135,6 +7192,7 @@ async def get_comparativo_candidatos(
             candidatos = []
             for r in gold_rows:
                 nm = r["nm_candidato"] or ""
+                nm_urna = r["nm_urna_candidato"] or nm
                 ds18 = sit_map.get((nm, 2018), "")
                 ds22 = sit_map.get((nm, 2022), "")
                 if situacao == "eleito" and not (_is_eleito(ds18) or _is_eleito(ds22)):
@@ -7143,7 +7201,8 @@ async def get_comparativo_candidatos(
                     continue
                 candidatos.append(
                     {
-                        "nm_candidato": nm,
+                        "nm_candidato": nm_urna,   # nome de urna para exibição
+                        "nm_candidato_legal": nm,  # nome legal (chave TSE)
                         "sg_partido": r["sg_partido"] or "",
                         "votos_2018": int(r["votos_2018"] or 0),
                         "votos_2022": int(r["votos_2022"] or 0),
