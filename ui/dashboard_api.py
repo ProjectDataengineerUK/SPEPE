@@ -7083,7 +7083,7 @@ async def get_comparativo_candidatos(
                     IF(rank_2022 IS NOT NULL AND rank_2018 IS NOT NULL,
                        rank_2018 - rank_2022, NULL)                  AS delta_rank
                 FROM pivoted
-                ORDER BY COALESCE(votos_2022, votos_2018) DESC
+                ORDER BY COALESCE(NULLIF(votos_2022, 0), votos_2018) DESC
                 LIMIT {min(limit, 500)}
             """
             gold_query_fallback = f"""
@@ -7126,7 +7126,7 @@ async def get_comparativo_candidatos(
                     IF(rank_2022 IS NOT NULL AND rank_2018 IS NOT NULL,
                        rank_2018 - rank_2022, NULL)                  AS delta_rank
                 FROM pivoted
-                ORDER BY COALESCE(votos_2022, votos_2018) DESC
+                ORDER BY COALESCE(NULLIF(votos_2022, 0), votos_2018) DESC
                 LIMIT {min(limit, 500)}
             """
 
