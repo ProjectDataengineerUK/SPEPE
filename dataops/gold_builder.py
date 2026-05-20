@@ -150,7 +150,7 @@ def _build_gold_via_bigquery_sql() -> dict:
                 CURRENT_TIMESTAMP()                          AS ingested_at
             FROM {_from_tse_s}
             {_partido_join}
-            WHERE _TABLE_SUFFIX NOT LIKE 'br\\_%'
+            WHERE _TABLE_SUFFIX NOT LIKE 'br_%'
             GROUP BY {_s}sg_uf, {_s}cd_municipio, {_nm_mun_grp}, {_s}cd_municipio_ibge,
                      {_s}nm_candidato, {_partido_grp}
                      {_s}cd_cargo, {_s}ds_cargo, {_s}ano_eleicao
@@ -227,7 +227,7 @@ def _build_gold_via_bigquery_sql() -> dict:
                     CURRENT_TIMESTAMP()                          AS ingested_at
                 FROM {_from_tse_s}
                 {_partido_join}
-                WHERE _TABLE_SUFFIX NOT LIKE 'br\\_%'
+                WHERE _TABLE_SUFFIX NOT LIKE 'br_%'
                   AND ({_s}nm_candidato IS NOT NULL
                   AND UPPER(TRIM({_s}nm_candidato)) NOT IN (
                       'VOTO BRANCO','VOTO NULO','#NULO#','#NULO',
