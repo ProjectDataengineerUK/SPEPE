@@ -7163,7 +7163,9 @@ async def get_comparativo_candidatos(
                 )
             except Exception as _qe:
                 if "nm_urna_candidato" in str(_qe):
-                    logger.warning("nm_urna_candidato não existe no Gold — usando query sem nome de urna")
+                    logger.warning(
+                        "nm_urna_candidato não existe no Gold — usando query sem nome de urna"
+                    )
                     gold_rows = await asyncio.to_thread(
                         lambda: list(client.query(gold_query_fallback, job_config=cfg).result())
                     )
@@ -7201,7 +7203,7 @@ async def get_comparativo_candidatos(
                     continue
                 candidatos.append(
                     {
-                        "nm_candidato": nm_urna,   # nome de urna para exibição
+                        "nm_candidato": nm_urna,  # nome de urna para exibição
                         "nm_candidato_legal": nm,  # nome legal (chave TSE)
                         "sg_partido": r["sg_partido"] or "",
                         "votos_2018": int(r["votos_2018"] or 0),
@@ -7243,8 +7245,7 @@ async def get_comparativo_candidatos(
                     "situacao_disponivel": False,
                     "fonte": "bigquery",
                     "msg": f"BigQuery indisponível: {exc}",
-                },
-                status_code=503,
+                }
             )
 
     # ── Local Silver parquet fallback ────────────────────────────────────────
@@ -7547,7 +7548,7 @@ async def get_comparativo_partidos(
         )
     except Exception as exc:
         logger.error("comparativo partidos BQ erro: %s", exc, exc_info=True)
-        return JSONResponse({"status": "error", "error": str(exc), "partidos": []}, status_code=500)
+        return JSONResponse({"status": "error", "error": str(exc), "partidos": []})
 
     nm_map: dict[str, str] = {}
     try:

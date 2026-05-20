@@ -73,12 +73,16 @@ def _build_gold_via_bigquery_sql() -> dict:
             f" WHERE column_name = 'ds_situacao'"
             f"   AND (table_name = 'dim_candidato' OR table_name LIKE 'tse_%')"
         ).to_dataframe(create_bqstorage_client=False)
-        _dim_has_situacao = bool(
-            (_sit_schema["table_name"] == "dim_candidato").any()
-        ) if not _sit_schema.empty else False
-        _silver_has_situacao = bool(
-            _sit_schema["table_name"].str.startswith("tse_").any()
-        ) if not _sit_schema.empty else False
+        _dim_has_situacao = (
+            bool((_sit_schema["table_name"] == "dim_candidato").any())
+            if not _sit_schema.empty
+            else False
+        )
+        _silver_has_situacao = (
+            bool(_sit_schema["table_name"].str.startswith("tse_").any())
+            if not _sit_schema.empty
+            else False
+        )
         if not _dim_has_situacao and not _silver_has_situacao:
             logger.info(
                 "ds_situacao ausente em dim_candidato e tse_* — ds_situacao=NULL no Gold "
