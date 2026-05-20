@@ -94,7 +94,15 @@ def _build_gold_via_bigquery_sql() -> dict:
     if _has_dim_cand:
         _partido_cols = """c.sg_partido              AS sg_partido,
                     c.nm_partido               AS nm_partido,"""
-        _partido_join = f"""LEFT JOIN `{silver}.dim_candidato` c
+        _partido_join = f"""LEFT JOIN (
+                SELECT sq_candidato, ano,
+                       ANY_VALUE(sg_partido)  AS sg_partido,
+                       ANY_VALUE(nm_partido)  AS nm_partido,
+                       ANY_VALUE(nm_urna)     AS nm_urna,
+                       ANY_VALUE(ds_situacao) AS ds_situacao
+                FROM `{silver}.dim_candidato`
+                GROUP BY sq_candidato, ano
+            ) c
                 ON CAST(s.sq_candidato AS STRING) = CAST(c.sq_candidato AS STRING)
                 AND SAFE_CAST(s.ano_eleicao AS INT64) = SAFE_CAST(c.ano AS INT64)"""
         _s = "s."
