@@ -8538,6 +8538,100 @@ async def get_comparativo_partidos(
     )
 
 
+def _local_comparativo_indicadores(uf: str, ano: int) -> list[dict]:
+    """Mescla Silver local (IBGE + segurança + saúde) para o overlay do mapa Comparativo."""
+    import pandas as pd
+
+    def _read_parquets(glob_pattern: str) -> pd.DataFrame | None:
+        files = sorted(_LOCAL_SILVER_DIR.glob(glob_pattern))
+        if not files:
+            return None
+        dfs = []
+        for f in files:
+            try:
+                dfs.append(pd.read_parquet(f))
+            except Exception:
+                pass
+        return pd.concat(dfs, ignore_index=True) if dfs else None
+
+    def _filter_uf_ano(df: pd.DataFrame) -> pd.DataFrame:
+        if "sg_uf" in df.columns:
+            df = df[df["sg_uf"].str.upper() == uf]
+        if "ano" in df.columns:
+            df = df[df["ano"] == ano]
+        return df
+
+    norm = lambda s: (s or "").strip().upper()
+
+    # ── IBGE ────────────────────────────────────────────────────────────────
+    ibge_map: dict[str, dict] = {}
+    df_ibge = _read_parquets("ibge_*.parquet")
+    if df_ibge is not None:
+        df_ibge = _filter_uf_ano(df_ibge)
+        for _, r in df_ibge.iterrows():
+            nm = norm(r.get("nm_municipio", ""))
+            if not nm:
+                continue
+            alfab_raw = float(r.get("taxa_alfabetizacao") or 0)
+            if alfab_raw == 0:
+                analf = float(r.get("taxa_analfabetismo") or 0)
+                alfab_raw = round(100 - (analf * 100 if analf <= 1 else analf), 1) if analf else 0
+            ibge_map[nm] = {
+                "idhm":  round(float(r.get("idhm") or 0), 3),
+                "renda": round(float(r.get("renda_per_capita") or 0), 0),
+                "alfab": alfab_raw,
+                "gini":  round(float(r.get("gini") or 0), 3),
+            }
+
+    # ── Segurança ────────────────────────────────────────────────────────────
+    seg_map: dict[str, dict] = {}
+    df_seg = _read_parquets("seguranca_municipal_*.parquet")
+    if df_seg is not None:
+        df_seg = _filter_uf_ano(df_seg)
+        for _, r in df_seg.iterrows():
+            nm = norm(r.get("nm_municipio", ""))
+            if not nm:
+                continue
+            seg_map[nm] = {
+                "ivs":       round(float(r.get("ivs_total") or r.get("ivs_valor") or 0), 3),
+                "homicidio": round(float(r.get("taxa_homicidio_100k") or r.get("taxa_homicidio") or 0), 1),
+            }
+
+    # ── Saúde ─────────────────────────────────────────────────────────────────
+    sau_map: dict[str, dict] = {}
+    df_sau = _read_parquets("saude_municipal_*.parquet")
+    if df_sau is not None:
+        df_sau = _filter_uf_ano(df_sau)
+        for _, r in df_sau.iterrows():
+            nm = norm(r.get("nm_municipio", ""))
+            if not nm:
+                continue
+            cob = float(r.get("pct_cobertura_plano_saude") or r.get("cobertura_esf_pct") or 0)
+            sau_map[nm] = {
+                "mortalidade": round(float(r.get("taxa_mortalidade_infantil_1000") or r.get("tx_mortalidade_infantil") or 0), 1),
+                "cobertura":   round(cob * 100 if cob <= 1 else cob, 1),
+            }
+
+    all_nms = set(ibge_map) | set(seg_map) | set(sau_map)
+    result = []
+    for nm in sorted(all_nms):
+        ibge = ibge_map.get(nm, {})
+        seg  = seg_map.get(nm, {})
+        sau  = sau_map.get(nm, {})
+        result.append({
+            "nm":          nm.title(),
+            "idhm":        ibge.get("idhm"),
+            "renda":       ibge.get("renda"),
+            "alfab":       ibge.get("alfab"),
+            "gini":        ibge.get("gini"),
+            "mortalidade": sau.get("mortalidade"),
+            "cobertura":   sau.get("cobertura"),
+            "ivs":         seg.get("ivs"),
+            "homicidio":   seg.get("homicidio"),
+        })
+    return result
+
+
 @app.get("/api/comparativo/indicadores")
 async def get_comparativo_indicadores(
     uf: str = Query("SP"),
@@ -8549,7 +8643,8 @@ async def get_comparativo_indicadores(
     indexada por nm (nome do município). Sem limit — retorna todos os municípios da UF.
     """
     if not (settings.gcp_project_id and os.environ.get("USE_BIGQUERY", "").lower() == "true"):
-        return JSONResponse({"municipios": [], "fonte": "bigquery_indisponivel"})
+        result = await asyncio.to_thread(_local_comparativo_indicadores, uf.upper(), ano)
+        return JSONResponse({"municipios": result, "fonte": "silver_local", "uf": uf.upper(), "ano": ano})
     try:
         result = await _bq_comparativo_indicadores(uf.upper(), ano)
         return JSONResponse(
@@ -8557,7 +8652,8 @@ async def get_comparativo_indicadores(
         )
     except Exception as exc:
         logger.warning("comparativo/indicadores falhou: %s", exc)
-        return JSONResponse({"municipios": [], "erro": str(exc)})
+        result = await asyncio.to_thread(_local_comparativo_indicadores, uf.upper(), ano)
+        return JSONResponse({"municipios": result, "fonte": "silver_fallback", "uf": uf.upper(), "ano": ano})
 
 
 async def _bq_comparativo_indicadores(uf: str, ano: int) -> list[dict]:
