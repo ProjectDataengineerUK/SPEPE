@@ -264,7 +264,7 @@ table.data tr:hover td{background:var(--bg3)}
       <option value="2018">2018</option>
     </select>
     <div class="tb-right">
-      <div class="src-dots" title="Status das fontes de dados">
+      <div class="src-dots" title="Auditoria de dados — clique para verificar tabelas" style="cursor:pointer" onclick="openDataAudit()">
         <div class="sdot grn" title="TSE"></div>
         <div class="sdot grn" title="IBGE"></div>
         <div class="sdot yel" title="Social"></div>
@@ -695,6 +695,31 @@ table.data tr:hover td{background:var(--bg3)}
     </div>
 
   </div><!-- /content -->
+
+  <!-- MODAL: AUDITORIA DE DADOS -->
+  <div id="audit-overlay" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.65);z-index:9000;overflow-y:auto" onclick="if(event.target===this)closeDataAudit()">
+    <div style="margin:32px auto;max-width:900px;background:var(--bg2);border:1px solid var(--br);border-radius:12px;overflow:hidden">
+      <!-- Header -->
+      <div style="padding:14px 18px;background:var(--bg3);border-bottom:1px solid var(--br);display:flex;align-items:center;gap:10px">
+        <span style="font-size:.85rem;font-weight:700;color:var(--tx)">&#128202; Auditoria de Dados — Tabelas BigQuery</span>
+        <div id="audit-summary" style="display:flex;gap:8px;margin-left:8px;font-size:.70rem"></div>
+        <div style="margin-left:auto;display:flex;gap:6px;align-items:center">
+          <select id="audit-filter" style="font-size:.68rem;background:var(--bg3);color:var(--tx2);border:1px solid var(--br);border-radius:4px;padding:2px 5px" onchange="auditRender()">
+            <option value="all">Todas</option>
+            <option value="ok">&#10003; Populadas</option>
+            <option value="empty">&#9675; Vazias</option>
+            <option value="missing">&#10007; Inexistentes</option>
+          </select>
+          <button onclick="loadDataAudit()" style="font-size:.68rem;padding:3px 10px;background:var(--bg3);border:1px solid var(--br);border-radius:5px;cursor:pointer;color:var(--tx2)">&#8635; Atualizar</button>
+          <button onclick="closeDataAudit()" style="font-size:.80rem;background:transparent;border:none;color:var(--tx3);cursor:pointer;padding:2px 6px">&#10005;</button>
+        </div>
+      </div>
+      <!-- Body -->
+      <div id="audit-body" style="padding:14px 16px;min-height:200px">
+        <div style="text-align:center;padding:40px;color:var(--tx3)">Clique em Atualizar para carregar&#8230;</div>
+      </div>
+    </div>
+  </div>
 
   <!-- CHAT BAR -->
   <div id="chat-bar">
@@ -2387,6 +2412,123 @@ function _cmp2Render() {
       </tr>`;
     }).join('');
   }
+}
+
+// ── AUDITORIA DE DADOS ───────────────────────────────────────────────────────
+let _auditData = null;
+
+function openDataAudit() {
+  document.getElementById('audit-overlay').style.display = '';
+  if (!_auditData) loadDataAudit();
+}
+function closeDataAudit() {
+  document.getElementById('audit-overlay').style.display = 'none';
+}
+
+async function loadDataAudit() {
+  document.getElementById('audit-body').innerHTML =
+    '<div style="text-align:center;padding:40px;color:var(--tx3)">Consultando BigQuery&#8230;</div>';
+  const d = await api('/api/data-audit');
+  if (!d || d.fonte === 'bigquery_indisponivel') {
+    document.getElementById('audit-body').innerHTML =
+      '<div style="padding:30px;text-align:center;color:var(--tx3);font-size:.78rem">BigQuery não configurado.<br>Configure GCP_PROJECT_ID e USE_BIGQUERY=true para ver o status das tabelas.</div>';
+    return;
+  }
+  if (d.erro) {
+    document.getElementById('audit-body').innerHTML =
+      `<div style="padding:30px;text-align:center;color:#f87171;font-size:.75rem">Erro: ${d.erro}</div>`;
+    return;
+  }
+  _auditData = d;
+  _auditUpdateSrcDots(d);
+  auditRender();
+}
+
+function _auditUpdateSrcDots(d) {
+  if (!d?.tables) return;
+  const byTable = {};
+  for (const t of d.tables) byTable[t.table] = t.status;
+  const dots = document.querySelectorAll('.src-dots .sdot');
+  const map = ['fact_municipio_candidato_eleicao','fact_ibge_municipio','fact_social_municipio','fact_intencao_voto','fact_google_trends_uf'];
+  dots.forEach((dot, i) => {
+    const s = byTable[map[i]];
+    dot.className = 'sdot ' + (s==='ok'?'grn':s==='empty'?'yel':'gry');
+  });
+  const s = d.summary || {};
+  const pct = Math.round((s.ok||0)/Math.max(s.total||1,1)*100);
+  document.querySelector('.src-dots').title = `Auditoria: ${s.ok}/${s.total} tabelas populadas (${pct}%) — clique para detalhes`;
+}
+
+function auditRender() {
+  if (!_auditData) return;
+  const filter = document.getElementById('audit-filter')?.value || 'all';
+  const s = _auditData.summary || {};
+  const proj = _auditData.project || '';
+
+  // Summary badges
+  const summEl = document.getElementById('audit-summary');
+  if (summEl) {
+    summEl.innerHTML =
+      `<span style="background:#1a3a1a;color:#4ade80;padding:2px 8px;border-radius:4px">✓ ${s.ok||0} ok</span>` +
+      `<span style="background:#2a2010;color:#fbbf24;padding:2px 8px;border-radius:4px">○ ${s.empty||0} vazias</span>` +
+      `<span style="background:#2a1010;color:#f87171;padding:2px 8px;border-radius:4px">✗ ${s.missing||0} inexist.</span>`;
+  }
+
+  const rows = (_auditData.tables || []).filter(t => filter === 'all' || t.status === filter);
+
+  // Group by layer
+  const groups = {};
+  for (const t of rows) {
+    (groups[t.layer] = groups[t.layer] || []).push(t);
+  }
+  const layerLabel = { gold: '🥇 Gold', mlops: '🧪 MLOps', silver: '🥈 Silver' };
+
+  let html = '';
+  for (const [layer, tables] of Object.entries(groups)) {
+    html += `<div style="font-size:.65rem;font-weight:700;color:var(--tx2);letter-spacing:.05em;text-transform:uppercase;margin:10px 0 6px">${layerLabel[layer]||layer}</div>`;
+    html += '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:8px">';
+    for (const t of tables) {
+      const st = t.status;
+      const bc = st==='ok'?'#1a3a1a':st==='empty'?'#252010':'#2a1010';
+      const tc = st==='ok'?'#4ade80':st==='empty'?'#fbbf24':'#f87171';
+      const si = st==='ok'?'✓':st==='empty'?'○':'✗';
+      const rowTxt = st==='ok' ? `<b>${_fmt(t.rows)}</b> linhas` : (st==='empty'?'Tabela vazia':'Não existe');
+      const dateTxt = (t.date_min && t.date_max) ? `${t.date_min} → ${t.date_max}` : '';
+      const jobCmds = t.jobs.map(j =>
+        `<span style="cursor:pointer;text-decoration:underline;color:#60a5fa" onclick="auditCopyJob('${j}','${proj}')" title="Clique para copiar comando gcloud">${j}</span>`
+      ).join(' + ');
+      const modTxt = t.last_modified ? `Atualizado: ${t.last_modified.slice(0,10)}` : '';
+      html += `
+        <div style="background:var(--bg3);border:1px solid ${bc};border-radius:8px;padding:10px 12px">
+          <div style="display:flex;align-items:center;gap:6px;margin-bottom:5px">
+            <span style="font-size:.85rem">${t.icon}</span>
+            <span style="font-size:.70rem;font-weight:700;color:var(--tx);flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${t.label}</span>
+            <span style="font-size:.68rem;font-weight:700;color:${tc};background:${bc};padding:1px 6px;border-radius:10px">${si} ${st}</span>
+          </div>
+          <div style="font-size:.62rem;color:var(--tx3);font-family:monospace;margin-bottom:4px">${t.table}</div>
+          <div style="font-size:.66rem;color:${tc};margin-bottom:3px">${rowTxt}${t.size_mb>0?' · '+t.size_mb+'MB':''}</div>
+          ${dateTxt ? `<div style="font-size:.62rem;color:var(--tx3);margin-bottom:3px">📅 ${dateTxt}</div>` : ''}
+          ${modTxt ? `<div style="font-size:.61rem;color:var(--tx3);margin-bottom:4px">${modTxt}</div>` : ''}
+          <div style="font-size:.61rem;color:var(--tx3);margin-top:4px;border-top:1px solid var(--br);padding-top:4px">
+            ▶ ${jobCmds}
+          </div>
+        </div>`;
+    }
+    html += '</div>';
+  }
+  if (!html) html = '<div style="padding:30px;text-align:center;color:var(--tx3)">Nenhum resultado para o filtro selecionado.</div>';
+  document.getElementById('audit-body').innerHTML = html;
+}
+
+function auditCopyJob(job, proj) {
+  const region = 'southamerica-east1';
+  const cmd = `gcloud run jobs execute ${job} --project ${proj||'spepe-dev'} --region ${region}`;
+  navigator.clipboard?.writeText(cmd);
+  const tip = document.createElement('div');
+  tip.textContent = 'Copiado!';
+  tip.style.cssText = 'position:fixed;top:60px;right:20px;background:#1e3a1e;color:#4ade80;padding:6px 14px;border-radius:6px;font-size:.72rem;z-index:9999';
+  document.body.appendChild(tip);
+  setTimeout(() => tip.remove(), 1500);
 }
 
 // ── LOCAIS DE VOTAÇÃO ────────────────────────────────────────────────────────

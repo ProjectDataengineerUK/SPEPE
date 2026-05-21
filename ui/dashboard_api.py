@@ -152,6 +152,7 @@ _PUBLIC_API_PATHS = {
     "/api/mapa/locais",
     "/api/locais/resumo",
     "/api/comparativo/indicadores",
+    "/api/data-audit",
     "/api/model/status",
     "/api/model/shap",
     "/api/resultados/partido",
@@ -4844,6 +4845,207 @@ async def get_parlamentares(
 
 
 # ── Diagnóstico de dados — quais tabelas Gold/Silver têm dados ───────────────
+
+
+_AUDIT_SPEC: list[dict] = [
+    # ── Gold — TSE eleitoral ─────────────────────────────────────────────────
+    {"table": "fact_municipio_candidato_eleicao", "layer": "gold", "icon": "🏆",
+     "label": "TSE Resultados por Município", "date_col": "ano_eleicao",
+     "jobs": ["spepe-tse-ingest", "spepe-silver-transform", "spepe-gold-build"]},
+    {"table": "fact_candidato_eleicao", "layer": "gold", "icon": "👤",
+     "label": "TSE Candidato Eleição", "date_col": "ano_eleicao",
+     "jobs": ["spepe-tse-ingest", "spepe-gold-build"]},
+    {"table": "fact_municipio_eleicao", "layer": "gold", "icon": "🏙",
+     "label": "TSE Município Eleição", "date_col": "ano_eleicao",
+     "jobs": ["spepe-tse-ingest", "spepe-gold-build"]},
+    {"table": "fact_secao_eleicao", "layer": "gold", "icon": "📍",
+     "label": "TSE Seções Eleitorais", "date_col": "ano_eleicao",
+     "jobs": ["spepe-tse-ingest", "spepe-gold-build"]},
+    {"table": "fact_presidente_resultado", "layer": "gold", "icon": "🗳",
+     "label": "TSE Presidente", "date_col": "ano_eleicao",
+     "jobs": ["spepe-tse-ingest", "spepe-gold-build"]},
+    {"table": "fact_perfil_eleitorado", "layer": "gold", "icon": "👥",
+     "label": "Perfil Eleitorado", "date_col": "ano_eleitoral",
+     "jobs": ["spepe-tse-perfil-ingest", "spepe-gold-build"]},
+    {"table": "fact_locais_votacao", "layer": "gold", "icon": "🏫",
+     "label": "Locais de Votação", "date_col": None,
+     "jobs": ["spepe-tse-locais-ingest", "spepe-gold-build"]},
+    {"table": "fact_abstencao_secao", "layer": "gold", "icon": "🚫",
+     "label": "Abstenção por Seção", "date_col": "ano_eleicao",
+     "jobs": ["spepe-tse-ingest", "spepe-gold-build"]},
+    # ── Gold — socioeconômico ────────────────────────────────────────────────
+    {"table": "fact_ibge_municipio", "layer": "gold", "icon": "📊",
+     "label": "IBGE / IDH", "date_col": "ano",
+     "jobs": ["spepe-ibge-sync", "spepe-gold-build"]},
+    {"table": "fact_seguranca_municipio", "layer": "gold", "icon": "🛡",
+     "label": "Segurança SINESP", "date_col": "ano",
+     "jobs": ["spepe-security-ingest", "spepe-gold-build"]},
+    {"table": "fact_saude_municipio", "layer": "gold", "icon": "🏥",
+     "label": "Saúde DATASUS", "date_col": "ano",
+     "jobs": ["spepe-datasus-ingest", "spepe-gold-build"]},
+    {"table": "fact_transferencias_sociais", "layer": "gold", "icon": "💰",
+     "label": "Bolsa Família / CadÚnico", "date_col": "ano",
+     "jobs": ["spepe-cadunico-ingest", "spepe-gold-build"]},
+    {"table": "fact_emendas_parlamentar", "layer": "gold", "icon": "📜",
+     "label": "Emendas Parlamentares", "date_col": "ano",
+     "jobs": ["spepe-emendas-ingest", "spepe-gold-build"]},
+    {"table": "fact_emendas_municipio", "layer": "gold", "icon": "🏘",
+     "label": "Emendas por Município", "date_col": "ano",
+     "jobs": ["spepe-emendas-ingest", "spepe-gold-build"]},
+    {"table": "fact_sancoes_uf", "layer": "gold", "icon": "⛔",
+     "label": "Sanções CEIS/CNEP", "date_col": None,
+     "jobs": ["spepe-sancoes-ingest", "spepe-gold-build"]},
+    {"table": "fact_endividamento_nacional", "layer": "gold", "icon": "📉",
+     "label": "Endividamento BACEN", "date_col": None,
+     "jobs": ["spepe-endividamento-ingest", "spepe-gold-build"]},
+    {"table": "fact_votacoes_parlamentar", "layer": "gold", "icon": "🏛",
+     "label": "Câmara / Senado Votações", "date_col": "ano",
+     "jobs": ["spepe-camara-senado-ingest", "spepe-gold-build"]},
+    # ── Gold — digital / pesquisas ───────────────────────────────────────────
+    {"table": "fact_intencao_voto", "layer": "gold", "icon": "📋",
+     "label": "Intenção de Voto (Polls)", "date_col": "ano_eleitoral",
+     "jobs": ["spepe-polls-ingest", "spepe-gold-build"]},
+    {"table": "fact_pesquisa", "layer": "gold", "icon": "📊",
+     "label": "Pesquisas Eleitorais", "date_col": "ano_eleitoral",
+     "jobs": ["spepe-polls-ingest", "spepe-gold-build"]},
+    {"table": "fact_social_municipio", "layer": "gold", "icon": "📱",
+     "label": "Sentimento Social", "date_col": "ano",
+     "jobs": ["spepe-social-ingest", "spepe-gold-build"]},
+    {"table": "fact_google_trends_uf", "layer": "gold", "icon": "🔥",
+     "label": "Google Trends", "date_col": "ano",
+     "jobs": ["spepe-digital-ingest", "spepe-gold-build"]},
+    {"table": "fact_meta_ads_uf", "layer": "gold", "icon": "📢",
+     "label": "Meta Ads", "date_col": "ano",
+     "jobs": ["spepe-digital-ingest", "spepe-gold-build"]},
+    {"table": "fact_meta_ads_demografico", "layer": "gold", "icon": "🎯",
+     "label": "Meta Ads Demográfico", "date_col": "ano",
+     "jobs": ["spepe-digital-ingest", "spepe-gold-build"]},
+    {"table": "fact_indice_digital_candidato", "layer": "gold", "icon": "💡",
+     "label": "Índice Digital Candidato", "date_col": "ano",
+     "jobs": ["spepe-digital-ingest", "spepe-gold-build"]},
+    # ── MLOps ────────────────────────────────────────────────────────────────
+    {"table": "fact_predictions", "layer": "mlops", "icon": "🔮",
+     "label": "Predições PyMC", "date_col": "prediction_date",
+     "jobs": ["spepe-pymc-train"]},
+    {"table": "model_evaluations", "layer": "mlops", "icon": "🧪",
+     "label": "Avaliações de Modelo", "date_col": "evaluation_date",
+     "jobs": ["spepe-pymc-train"]},
+    {"table": "bias_metrics", "layer": "mlops", "icon": "⚖",
+     "label": "Bias / Fairness", "date_col": "evaluation_date",
+     "jobs": ["spepe-pymc-electoral-train"]},
+]
+
+
+@app.get("/api/data-audit")
+async def get_data_audit() -> JSONResponse:
+    """Auditoria completa das tabelas Gold + MLOps — row counts, date ranges, status por tabela.
+
+    Usa __TABLES__ metadata (1 query por dataset) para ser rápido.
+    Cruza com _AUDIT_SPEC para adicionar label, jobs responsáveis e ícone.
+    """
+    if not (settings.gcp_project_id and os.environ.get("USE_BIGQUERY", "").lower() == "true"):
+        return JSONResponse({"tables": [], "fonte": "bigquery_indisponivel", "summary": {}})
+    try:
+        result = await _bq_data_audit()
+        ok = sum(1 for t in result if t["status"] == "ok")
+        empty = sum(1 for t in result if t["status"] == "empty")
+        missing = sum(1 for t in result if t["status"] == "missing")
+        return JSONResponse({
+            "tables": result,
+            "summary": {"ok": ok, "empty": empty, "missing": missing, "total": len(result)},
+            "project": settings.gcp_project_id,
+        })
+    except Exception as exc:
+        logger.warning("data-audit falhou: %s", exc)
+        return JSONResponse({"tables": [], "erro": str(exc), "summary": {}})
+
+
+async def _bq_data_audit() -> list[dict]:
+    from google.cloud import bigquery
+
+    client = bigquery.Client(project=settings.gcp_project_id)
+    gold = settings.bigquery_dataset_gold
+    mlops = settings.bigquery_dataset_mlops if hasattr(settings, "bigquery_dataset_mlops") else "spepe_mlops"
+
+    # Step 1: get row counts for all tables at once via __TABLES__ metadata
+    meta: dict[str, dict] = {}
+    for dataset in [gold, mlops]:
+        try:
+            q = f"""
+                SELECT table_id, row_count, size_bytes,
+                       TIMESTAMP_MILLIS(last_modified_time) AS last_modified
+                FROM `{settings.gcp_project_id}.{dataset}.__TABLES__`
+            """
+            rows = await asyncio.to_thread(lambda q=q: list(client.query(q).result()))
+            for r in rows:
+                meta[f"{dataset}.{r['table_id']}"] = {
+                    "rows": int(r["row_count"] or 0),
+                    "size_mb": round((r["size_bytes"] or 0) / 1_048_576, 2),
+                    "last_modified": str(r["last_modified"] or "")[:19],
+                }
+        except Exception as exc:
+            logger.warning("__TABLES__ %s: %s", dataset, exc)
+
+    # Step 2: for populated tables, get date range (date_col min/max)
+    date_ranges: dict[str, dict] = {}
+    date_queries = []
+    for spec in _AUDIT_SPEC:
+        ds = gold if spec["layer"] == "gold" else mlops
+        key = f"{ds}.{spec['table']}"
+        dc = spec.get("date_col")
+        if dc and meta.get(key, {}).get("rows", 0) > 0:
+            full = f"`{settings.gcp_project_id}.{ds}.{spec['table']}`"
+            date_queries.append((key, f"SELECT CAST(MIN({dc}) AS STRING) AS d_min, CAST(MAX({dc}) AS STRING) AS d_max FROM {full}"))
+
+    async def _fetch_range(key: str, q: str) -> tuple[str, dict]:
+        try:
+            rows = await asyncio.to_thread(lambda q=q: list(client.query(q).result()))
+            return key, {"date_min": str(rows[0]["d_min"] or "")[:10], "date_max": str(rows[0]["d_max"] or "")[:10]}
+        except Exception:
+            return key, {}
+
+    if date_queries:
+        results = await asyncio.gather(*[_fetch_range(k, q) for k, q in date_queries])
+        date_ranges = dict(results)
+
+    # Step 3: merge spec + meta + date_ranges
+    output = []
+    for spec in _AUDIT_SPEC:
+        ds = gold if spec["layer"] == "gold" else mlops
+        key = f"{ds}.{spec['table']}"
+        m = meta.get(key)
+        dr = date_ranges.get(key, {})
+        if m is None:
+            status = "missing"
+            rows = 0
+            size_mb = 0.0
+            last_mod = ""
+        elif m["rows"] == 0:
+            status = "empty"
+            rows = 0
+            size_mb = m["size_mb"]
+            last_mod = m["last_modified"]
+        else:
+            status = "ok"
+            rows = m["rows"]
+            size_mb = m["size_mb"]
+            last_mod = m["last_modified"]
+
+        output.append({
+            "table": spec["table"],
+            "dataset": ds,
+            "layer": spec["layer"],
+            "icon": spec["icon"],
+            "label": spec["label"],
+            "status": status,
+            "rows": rows,
+            "size_mb": size_mb,
+            "last_modified": last_mod,
+            "date_min": dr.get("date_min", ""),
+            "date_max": dr.get("date_max", ""),
+            "jobs": spec["jobs"],
+        })
+    return output
 
 
 @app.get("/api/debug/tables", dependencies=[Depends(require_auth)])
