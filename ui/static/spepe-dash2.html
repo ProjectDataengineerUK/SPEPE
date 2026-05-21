@@ -554,9 +554,10 @@ table.data tr:hover td{background:var(--bg3)}
 
         <!-- mapa comparativo -->
         <div id="cmp2-mapa-panel" style="display:none;margin-bottom:10px;border:1px solid var(--br);border-radius:8px;overflow:hidden">
-          <div style="padding:6px 12px;background:var(--bg3);border-bottom:1px solid var(--br);display:flex;align-items:center;gap:8px">
-            <span style="font-size:.65rem;font-weight:700;color:var(--tx2)">&#128506; Mapa — Vencedor por Munic&#237;pio</span>
-            <span style="font-size:.70rem;color:var(--tx3)">2022 vs 2018</span>
+          <div style="padding:6px 12px;background:var(--bg3);border-bottom:1px solid var(--br);display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+            <span id="cmp2-mapa-titulo" style="font-size:.65rem;font-weight:700;color:var(--tx2)">&#128506; Mapa — Vencedor por Munic&#237;pio</span>
+            <span id="cmp2-mapa-subtitulo" style="font-size:.70rem;color:var(--tx3)">Clique em um candidato para ver sua distribui&#231;&#227;o</span>
+            <button id="cmp2-mapa-reset-btn" onclick="cmp2MapaReset()" style="display:none;padding:2px 8px;font-size:.65rem;background:transparent;border:1px solid var(--br);border-radius:4px;cursor:pointer;color:var(--tx3)">&#8635; Vencedores</button>
             <div id="cmp2-mapa-legend" style="display:flex;gap:6px;margin-left:auto;flex-wrap:wrap;font-size:.68rem;color:var(--tx3)"></div>
           </div>
           <div id="cmp2-leaflet" style="height:340px"></div>
@@ -1541,6 +1542,9 @@ let _cmp2CompareChart = null;
 let _cmp2MapaVisible = false;
 let _cmp2MapaLayer = null;
 let _cmp2MapaMap = null;
+let _cmp2MapaUF = null;
+let _cmp2MapaCand = null;
+let _cmp2MapaCand2 = null;
 
 function cmp2SetView(v, btn) {
   _cmp2View = v;
@@ -1641,6 +1645,44 @@ function cmp2HideCompare() {
 }
 
 // ── MAPA COMPARATIVO ────────────────────────────────────────────────────────
+function cmp2MapaSelectCand(evt, nm) {
+  // ignorar clique no checkbox
+  if (evt && evt.target && evt.target.type === 'checkbox') return;
+  const decoded = nm.replace(/&quot;/g, '"');
+  if (_cmp2MapaCand === decoded && !_cmp2MapaCand2) {
+    // segundo clique no mesmo = modo comparação (c1 já fixo, agora c2)
+    return;
+  }
+  if (!_cmp2MapaCand) {
+    _cmp2MapaCand = decoded;
+  } else if (_cmp2MapaCand !== decoded && !_cmp2MapaCand2) {
+    _cmp2MapaCand2 = decoded;
+  } else {
+    // terceiro clique = resetar para esse candidato sozinho
+    _cmp2MapaCand = decoded;
+    _cmp2MapaCand2 = null;
+  }
+  _cmp2Render(); // re-render para atualizar highlight de linha
+  if (_cmp2MapaVisible) _cmp2LoadMapa();
+  else { cmp2ToggleMapa(); } // abre mapa automaticamente
+}
+
+function cmp2MapaReset() {
+  _cmp2MapaCand = null;
+  _cmp2MapaCand2 = null;
+  _cmp2Render();
+  if (_cmp2MapaVisible) _cmp2LoadMapa();
+}
+
+function _pctColor(pct, maxPct, hue) {
+  // Gradiente escuro→brilhante baseado em pct/maxPct
+  const t = Math.min(1, (pct || 0) / Math.max(maxPct || 1, 0.01));
+  if (t < 0.01) return '#0f172a';
+  const l = Math.round(15 + t * 50);
+  const s = Math.round(50 + t * 40);
+  return `hsl(${hue},${s}%,${l}%)`;
+}
+
 function cmp2ToggleMapa() {
   _cmp2MapaVisible = !_cmp2MapaVisible;
   const panel = document.getElementById('cmp2-mapa-panel');
@@ -1652,12 +1694,14 @@ function cmp2ToggleMapa() {
 }
 
 async function _cmp2LoadMapa() {
-  const uf = (document.getElementById('cmp2-uf') || {}).value || 'SP';
+  const uf    = (document.getElementById('cmp2-uf')    || {}).value || 'SP';
   const cargo = (document.getElementById('cmp2-cargo') || {}).value || 'Deputado Federal';
   const mapDiv = document.getElementById('cmp2-leaflet');
   if (!mapDiv) return;
 
-  // init Leaflet once per UF change
+  const _normStr = s => (s||'').normalize('NFD').replace(/[̀-ͯ]/g,'').toUpperCase().trim();
+
+  // Inicializa Leaflet uma vez (ou recria se UF mudou — já resetado em loadComparativo)
   if (!_cmp2MapaMap) {
     _cmp2MapaMap = L.map(mapDiv, { zoomControl: true, scrollWheelZoom: false }).setView([-15, -47], 4);
     L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_nolabels/{z}/{x}/{y}{r}.png', {
@@ -1665,19 +1709,27 @@ async function _cmp2LoadMapa() {
     }).addTo(_cmp2MapaMap);
   }
 
-  // fetch geojson + mapa data in parallel
+  // Decide URL da API conforme modo
+  let apiUrl;
+  if (_cmp2MapaCand) {
+    apiUrl = `/api/comparativo/mapa/candidato?uf=${encodeURIComponent(uf)}&cargo=${encodeURIComponent(cargo)}&turno=1&candidato=${encodeURIComponent(_cmp2MapaCand)}`;
+    if (_cmp2MapaCand2) apiUrl += `&candidato2=${encodeURIComponent(_cmp2MapaCand2)}`;
+  } else {
+    apiUrl = `/api/comparativo/mapa?uf=${encodeURIComponent(uf)}&cargo=${encodeURIComponent(cargo)}&turno=1`;
+  }
+
   const [geo, mapaD] = await Promise.all([
     fetch(`/static/geo_mun_${uf.toUpperCase()}.geojson`).then(r => r.ok ? r.json() : null).catch(() => null),
-    api(`/api/comparativo/mapa?uf=${encodeURIComponent(uf)}&cargo=${encodeURIComponent(cargo)}&turno=1`),
+    api(apiUrl),
   ]);
 
   if (!geo || !mapaD || !mapaD.municipios) {
-    mapDiv.innerHTML = '<div style="padding:40px;text-align:center;color:var(--tx3);font-size:.7rem">Dados do mapa indispon&#237;veis — execute tse_ingest primeiro</div>';
+    const msg = mapaD?.msg || 'Dados do mapa indisponíveis — execute tse_ingest primeiro';
+    mapDiv.innerHTML = `<div style="padding:40px;text-align:center;color:var(--tx3);font-size:.7rem">${msg}</div>`;
     return;
   }
 
-  // normalise: remove accents, uppercase
-  const _normStr = s => (s||'').normalize('NFD').replace(/[̀-ͯ]/g,'').toUpperCase().trim();
+  // Indexar municipios por nome normalizado
   const munMap = {};
   for (const m of mapaD.municipios) {
     munMap[_normStr(m.nm_municipio)] = m;
@@ -1685,32 +1737,75 @@ async function _cmp2LoadMapa() {
 
   if (_cmp2MapaLayer) { _cmp2MapaLayer.remove(); _cmp2MapaLayer = null; }
 
-  const partidoCores = {...PARTIDO_COR};
-  const _partidoCor = p => partidoCores[p] || '#64748b';
-
   const tooltip = document.getElementById('cmp2-mapa-tooltip');
+  const modo = mapaD.modo || 'vencedor';
+  const maxPct = mapaD.max_pct || 15;
+  const _partidoCor = p => (PARTIDO_COR||{})[p] || '#64748b';
+
+  // ── Função de cor por modo ──────────────────────────────────────────────
+  const _corMunicipio = (feat) => {
+    const nm = _normStr(feat.properties.name || feat.properties.description || '');
+    const d = munMap[nm];
+    if (!d) return { fillColor: '#0f172a', fillOpacity: 0.15, color: '#1e293b', weight: 0.4 };
+    if (modo === 'candidato') {
+      // choropleth: 2022 prioritário, fallback 2018
+      const pct = d.pct_2022 > 0 ? d.pct_2022 : d.pct_2018;
+      return { fillColor: _pctColor(pct, maxPct, 142), fillOpacity: 0.85, color: '#0f172a', weight: 0.5 };
+    }
+    if (modo === 'comparacao') {
+      const lider = d.lider_2022 || d.lider_2018;
+      if (lider === 'c1') return { fillColor: _pctColor(d.pct_c1_2022||d.pct_c1_2018, maxPct, 210), fillOpacity: 0.85, color: '#0f172a', weight: 0.5 };
+      if (lider === 'c2') return { fillColor: _pctColor(d.pct_c2_2022||d.pct_c2_2018, maxPct, 0),   fillOpacity: 0.85, color: '#0f172a', weight: 0.5 };
+      return { fillColor: '#7c3aed', fillOpacity: 0.5, color: '#0f172a', weight: 0.5 };
+    }
+    // modo vencedor: cor do partido 2022
+    const cor = _partidoCor(d.sg_partido_2022);
+    return { fillColor: cor, fillOpacity: d ? 0.75 : 0.2, color: '#0f172a', weight: 0.5 };
+  };
+
+  // ── Tooltip por modo ────────────────────────────────────────────────────
+  const _tooltipHtml = (feat, d) => {
+    const nm = feat.properties.name || '?';
+    if (!d) return `<div style="font-weight:700">${nm}</div><div style="color:var(--tx3)">Sem dados</div>`;
+    if (modo === 'candidato') {
+      const nm22 = _cmp2MapaCand ? _cmp2MapaCand.split(' ').slice(0,3).join(' ') : '';
+      return `<div style="font-weight:700;margin-bottom:3px">${nm}</div>
+        ${d.pct_2022>0 ? `<div style="color:#4ade80">2022: <b>${_fmt(d.votos_2022)}</b> votos (${d.pct_2022.toFixed(1)}%)</div>` : ''}
+        ${d.pct_2018>0 ? `<div style="color:#93c5fd">2018: <b>${_fmt(d.votos_2018)}</b> votos (${d.pct_2018.toFixed(1)}%)</div>` : ''}
+        ${!d.pct_2022&&!d.pct_2018 ? `<div style="color:var(--tx3)">${nm22} sem votos aqui</div>` : ''}`;
+    }
+    if (modo === 'comparacao') {
+      const c1 = (_cmp2MapaCand||'').split(' ')[0];
+      const c2 = (_cmp2MapaCand2||'').split(' ')[0];
+      const v1 = d.votos_c1_2022||d.votos_c1_2018||0;
+      const v2 = d.votos_c2_2022||d.votos_c2_2018||0;
+      const p1 = d.pct_c1_2022||d.pct_c1_2018||0;
+      const p2 = d.pct_c2_2022||d.pct_c2_2018||0;
+      const lider = d.lider_2022||d.lider_2018;
+      return `<div style="font-weight:700;margin-bottom:3px">${nm}</div>
+        <div style="color:#60a5fa">&#9632; ${c1}: <b>${_fmt(v1)}</b> (${p1.toFixed(1)}%)</div>
+        <div style="color:#f87171">&#9632; ${c2}: <b>${_fmt(v2)}</b> (${p2.toFixed(1)}%)</div>
+        <div style="color:var(--tx3);font-size:.60rem;margin-top:3px">${lider==='c1'?'▲ '+c1+' vence':lider==='c2'?'▲ '+c2+' vence':'Empate'}</div>`;
+    }
+    // vencedor
+    const cor22 = _partidoCor(d.sg_partido_2022);
+    return `<div style="font-weight:700;margin-bottom:3px">${nm}</div>
+      <div>2022: <span style="color:${cor22};font-weight:600">${d.nm_vencedor_2022||'—'}</span> (${d.sg_partido_2022||'—'}) ${d.pct_2022?d.pct_2022.toFixed(1)+'%':''}</div>
+      <div style="color:var(--tx3)">2018: ${d.nm_vencedor_2018||'—'} (${d.sg_partido_2018||'—'}) ${d.pct_2018?d.pct_2018.toFixed(1)+'%':''}</div>
+      ${d.mudou_lider?'<div style="color:#f59e0b;font-size:.57rem">&#9650; Mudou lider</div>':''}`;
+  };
+
   _cmp2MapaLayer = L.geoJSON(geo, {
-    style: feat => {
-      const nm = _normStr(feat.properties.name || feat.properties.description || '');
-      const d = munMap[nm];
-      const cor = d ? _partidoCor(d.sg_partido_2022) : '#1e293b';
-      return { fillColor: cor, fillOpacity: d ? 0.75 : 0.2, color: '#0f172a', weight: 0.5 };
-    },
+    style: _corMunicipio,
     onEachFeature: (feat, layer) => {
       const nm = _normStr(feat.properties.name || '');
       const d = munMap[nm];
+      const origStyle = _corMunicipio(feat);
       layer.on({
         mouseover: e => {
-          layer.setStyle({ fillOpacity: 1, weight: 2, color: '#fff' });
+          layer.setStyle({ ...origStyle, fillOpacity: 1, weight: 2, color: '#fff' });
           if (tooltip) {
-            const cor22 = d ? _partidoCor(d.sg_partido_2022) : '#64748b';
-            tooltip.innerHTML = d
-              ? `<div style="font-weight:700;margin-bottom:3px">${feat.properties.name}</div>
-                 <div>&#10003; 2022: <span style="color:${cor22};font-weight:600">${d.nm_vencedor_2022||'—'}</span> <span style="color:${cor22}">(${d.sg_partido_2022||'—'})</span> ${d.pct_2022 ? d.pct_2022.toFixed(1)+'%' : ''}</div>
-                 <div style="color:var(--tx3)">&#10003; 2018: ${d.nm_vencedor_2018||'—'} (${d.sg_partido_2018||'—'}) ${d.pct_2018 ? d.pct_2018.toFixed(1)+'%' : ''}</div>
-                 ${d.mudou_lider ? '<div style="color:#f59e0b;font-size:.57rem">&#9650; Mudou lider</div>' : ''}
-                 ${d.mudou_partido ? '<div style="color:#f87171;font-size:.57rem">&#9650; Mudou partido</div>' : ''}`
-              : `<div style="font-weight:700">${feat.properties.name}</div><div style="color:var(--tx3)">Sem dados</div>`;
+            tooltip.innerHTML = _tooltipHtml(feat, d);
             tooltip.style.display = 'block';
           }
         },
@@ -1728,22 +1823,52 @@ async function _cmp2LoadMapa() {
     }
   }).addTo(_cmp2MapaMap);
 
-  // fit bounds
+  // Zoom no layer atual
   try { _cmp2MapaMap.fitBounds(_cmp2MapaLayer.getBounds(), { padding: [10, 10] }); } catch(e) {}
 
-  // legenda top partidos
+  // Atualizar header dinâmico
+  const tit  = document.getElementById('cmp2-mapa-titulo');
+  const sub  = document.getElementById('cmp2-mapa-subtitulo');
+  const rst  = document.getElementById('cmp2-mapa-reset-btn');
   const legDiv = document.getElementById('cmp2-mapa-legend');
-  if (legDiv) {
-    const contagem = {};
-    for (const m of mapaD.municipios) {
-      const p = m.sg_partido_2022 || '?';
-      contagem[p] = (contagem[p] || 0) + 1;
+  if (modo === 'candidato') {
+    const nm1 = (_cmp2MapaCand||'').split(' ').slice(0,3).join(' ');
+    if (tit) tit.textContent = `📍 ${nm1}`;
+    if (sub) sub.textContent = 'Votos por município — clique em outro candidato para comparar';
+    if (rst) rst.style.display = '';
+    if (legDiv) {
+      const steps = [0,25,50,75,100];
+      legDiv.innerHTML = steps.map(p => {
+        const c = _pctColor(p, 100, 142);
+        return `<span style="display:flex;align-items:center;gap:2px"><span style="width:10px;height:10px;border-radius:2px;background:${c};display:inline-block"></span><span>${p===0?'0%':p===100?'Máx':''}</span></span>`;
+      }).join('');
     }
-    const top = Object.entries(contagem).sort((a,b)=>b[1]-a[1]).slice(0,6);
-    legDiv.innerHTML = top.map(([p,n]) => {
-      const cor = _partidoCor(p);
-      return `<span style="display:flex;align-items:center;gap:3px"><span style="width:8px;height:8px;border-radius:2px;background:${cor};display:inline-block"></span>${p} (${n})</span>`;
-    }).join('');
+  } else if (modo === 'comparacao') {
+    const n1 = (_cmp2MapaCand||'').split(' ')[0];
+    const n2 = (_cmp2MapaCand2||'').split(' ')[0];
+    if (tit) tit.textContent = `🗺 ${n1} vs ${n2}`;
+    if (sub) sub.textContent = 'Azul = ' + n1 + '  ·  Vermelho = ' + n2;
+    if (rst) rst.style.display = '';
+    if (legDiv) legDiv.innerHTML =
+      `<span style="display:flex;align-items:center;gap:3px"><span style="width:8px;height:8px;border-radius:2px;background:hsl(210,80%,45%);display:inline-block"></span>${n1}</span>` +
+      `<span style="display:flex;align-items:center;gap:3px"><span style="width:8px;height:8px;border-radius:2px;background:hsl(0,80%,45%);display:inline-block"></span>${n2}</span>` +
+      `<span style="display:flex;align-items:center;gap:3px"><span style="width:8px;height:8px;border-radius:2px;background:#7c3aed;display:inline-block"></span>Empate</span>`;
+  } else {
+    if (tit) tit.textContent = '🗺 Mapa — Vencedor por Município';
+    if (sub) sub.textContent = 'Clique em um candidato para ver sua distribuição';
+    if (rst) rst.style.display = 'none';
+    if (legDiv) {
+      const contagem = {};
+      for (const m of mapaD.municipios) {
+        const p = m.sg_partido_2022 || '?';
+        contagem[p] = (contagem[p] || 0) + 1;
+      }
+      const top = Object.entries(contagem).sort((a,b)=>b[1]-a[1]).slice(0,6);
+      legDiv.innerHTML = top.map(([p,n]) => {
+        const cor = _partidoCor(p);
+        return `<span style="display:flex;align-items:center;gap:3px"><span style="width:8px;height:8px;border-radius:2px;background:${cor};display:inline-block"></span>${p} (${n})</span>`;
+      }).join('');
+    }
   }
 
   setTimeout(() => _cmp2MapaMap.invalidateSize(), 100);
@@ -1768,6 +1893,13 @@ function _sitBadge(ds) {
 async function loadComparativo() {
   const uf = (document.getElementById('cmp2-uf') || {}).value || 'SP';
   const cargo = (document.getElementById('cmp2-cargo') || {}).value || 'Deputado Federal';
+  // se UF ou cargo mudou, destruir mapa para forçar re-zoom correto
+  if (_cmp2MapaUF !== uf.toUpperCase()) {
+    if (_cmp2MapaMap) { _cmp2MapaMap.remove(); _cmp2MapaMap = null; }
+    _cmp2MapaUF = uf.toUpperCase();
+    _cmp2MapaCand = null;
+    _cmp2MapaCand2 = null;
+  }
   const empty = document.getElementById('cmp2-empty');
   if (empty) { empty.style.display = 'block'; empty.textContent = 'Carregando...'; }
   document.getElementById('cmp2-table-cands').style.display = 'none';
@@ -1898,7 +2030,9 @@ function _cmp2Render() {
       const rowBg = r.eleito_2022 ? 'background:rgba(34,197,94,.04)' : r.eleito_2018 ? 'background:rgba(107,127,196,.04)' : '';
       const chk = _cmp2Selected.has(r.nm_candidato) ? 'checked' : '';
       const nmEsc = (r.nm_candidato||'').replace(/"/g,'&quot;');
-      return `<tr style="${rowBg}">
+      const isMapSel = _cmp2MapaCand === r.nm_candidato || _cmp2MapaCand2 === r.nm_candidato;
+      const mapBorder = isMapSel ? 'outline:2px solid #3b82f6;outline-offset:-2px;' : '';
+      return `<tr style="cursor:pointer;${rowBg}${mapBorder}" onclick="cmp2MapaSelectCand(event,'${nmEsc}')">
         <td><input type="checkbox" ${chk} data-nm="${nmEsc}" onchange="cmp2ToggleSelThis(this)" style="cursor:pointer"></td>
         <td>${i+1}</td>
         <td style="max-width:140px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${_esc(r.nm_candidato)}</td>

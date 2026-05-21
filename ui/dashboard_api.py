@@ -7615,6 +7615,159 @@ _FEDERACOES_2022: dict[str, str] = {
 }
 
 
+@app.get("/api/comparativo/mapa/candidato")
+async def get_comparativo_mapa_candidato(
+    uf: str = Query("SP"),
+    cargo: str = Query("Deputado Federal"),
+    turno: int = Query(1),
+    candidato: str = Query(...),
+    candidato2: str = Query(""),
+) -> JSONResponse:
+    """
+    Votos de um ou dois candidatos por município (choropleth dinâmico).
+    Retorna pct relativo ao total de votos válidos no município/ano.
+    """
+    cd_cargo = _cargo_to_cd(cargo, 6)
+
+    if not (settings.gcp_project_id and os.environ.get("USE_BIGQUERY", "").lower() == "true"):
+        return JSONResponse({"status": "bigquery_disabled", "municipios": []})
+
+    from google.cloud import bigquery as _bq
+
+    bq = _bq.Client(project=settings.gcp_project_id)
+    gold = f"{settings.gcp_project_id}.{settings.bigquery_dataset_gold}"
+
+    if candidato2:
+        # ── Modo comparação: c1 vs c2 por município (vencedor local) ──────────
+        query = f"""
+            WITH base AS (
+                SELECT nm_municipio, nm_candidato, ano_eleicao,
+                       SUM(total_votos)                             AS votos,
+                       SUM(SUM(total_votos)) OVER (
+                           PARTITION BY nm_municipio, ano_eleicao
+                       )                                            AS total_mun
+                FROM `{gold}.fact_municipio_candidato_eleicao`
+                WHERE sg_uf = @uf AND cd_cargo = @cd_cargo AND nr_turno = @turno
+                  AND ano_eleicao IN (2018, 2022)
+                  AND nm_candidato IN (@c1, @c2)
+                GROUP BY nm_municipio, nm_candidato, ano_eleicao
+            ),
+            pivoted AS (
+                SELECT nm_municipio, ano_eleicao,
+                       MAX(IF(nm_candidato=@c1, votos, 0))               AS votos_c1,
+                       MAX(IF(nm_candidato=@c2, votos, 0))               AS votos_c2,
+                       MAX(total_mun)                                    AS total_mun
+                FROM base GROUP BY nm_municipio, ano_eleicao
+            )
+            SELECT nm_municipio, ano_eleicao,
+                   votos_c1,
+                   votos_c2,
+                   ROUND(votos_c1 / NULLIF(total_mun,0)*100, 2) AS pct_c1,
+                   ROUND(votos_c2 / NULLIF(total_mun,0)*100, 2) AS pct_c2,
+                   CASE WHEN votos_c1 > votos_c2 THEN 'c1'
+                        WHEN votos_c2 > votos_c1 THEN 'c2'
+                        ELSE 'empate' END                         AS lider
+            FROM pivoted
+            ORDER BY nm_municipio, ano_eleicao
+        """
+        params = [
+            _bq.ScalarQueryParameter("uf", "STRING", uf.upper()),
+            _bq.ScalarQueryParameter("cd_cargo", "INT64", cd_cargo),
+            _bq.ScalarQueryParameter("turno", "INT64", turno),
+            _bq.ScalarQueryParameter("c1", "STRING", candidato),
+            _bq.ScalarQueryParameter("c2", "STRING", candidato2),
+        ]
+        rows = await asyncio.to_thread(
+            lambda: list(
+                bq.query(query, job_config=_bq.QueryJobConfig(query_parameters=params)).result()
+            )
+        )
+        municipios: dict[str, dict] = {}
+        for r in rows:
+            nm = r.get("nm_municipio") or ""
+            ano = int(r.get("ano_eleicao") or 0)
+            key_sfx = str(ano)
+            if nm not in municipios:
+                municipios[nm] = {"nm_municipio": nm}
+            municipios[nm][f"votos_c1_{key_sfx}"] = int(r.get("votos_c1") or 0)
+            municipios[nm][f"votos_c2_{key_sfx}"] = int(r.get("votos_c2") or 0)
+            municipios[nm][f"pct_c1_{key_sfx}"] = float(r.get("pct_c1") or 0)
+            municipios[nm][f"pct_c2_{key_sfx}"] = float(r.get("pct_c2") or 0)
+            municipios[nm][f"lider_{key_sfx}"] = r.get("lider") or "empate"
+        return JSONResponse(
+            {
+                "status": "ok",
+                "modo": "comparacao",
+                "candidato1": candidato,
+                "candidato2": candidato2,
+                "municipios": list(municipios.values()),
+                "fonte": "bigquery",
+            }
+        )
+
+    # ── Modo simples: um candidato, 2018 e 2022 ───────────────────────────────
+    query = f"""
+        WITH cand AS (
+            SELECT nm_municipio, ano_eleicao,
+                   SUM(total_votos)                                    AS votos,
+                   SUM(SUM(total_votos)) OVER (
+                       PARTITION BY nm_municipio, ano_eleicao
+                   )                                                   AS total_mun
+            FROM `{gold}.fact_municipio_candidato_eleicao`
+            WHERE sg_uf = @uf AND cd_cargo = @cd_cargo AND nr_turno = @turno
+              AND nm_candidato = @cand AND ano_eleicao IN (2018, 2022)
+            GROUP BY nm_municipio, ano_eleicao
+        )
+        SELECT nm_municipio, ano_eleicao,
+               votos,
+               ROUND(votos / NULLIF(total_mun,0)*100, 2) AS pct
+        FROM cand
+        ORDER BY nm_municipio, ano_eleicao
+    """
+    params = [
+        _bq.ScalarQueryParameter("uf", "STRING", uf.upper()),
+        _bq.ScalarQueryParameter("cd_cargo", "INT64", cd_cargo),
+        _bq.ScalarQueryParameter("turno", "INT64", turno),
+        _bq.ScalarQueryParameter("cand", "STRING", candidato),
+    ]
+    rows = await asyncio.to_thread(
+        lambda: list(
+            bq.query(query, job_config=_bq.QueryJobConfig(query_parameters=params)).result()
+        )
+    )
+    municipios_d: dict[str, dict] = {}
+    for r in rows:
+        nm = r.get("nm_municipio") or ""
+        ano = int(r.get("ano_eleicao") or 0)
+        if nm not in municipios_d:
+            municipios_d[nm] = {
+                "nm_municipio": nm,
+                "votos_2018": 0,
+                "pct_2018": 0.0,
+                "votos_2022": 0,
+                "pct_2022": 0.0,
+            }
+        if ano == 2018:
+            municipios_d[nm]["votos_2018"] = int(r.get("votos") or 0)
+            municipios_d[nm]["pct_2018"] = float(r.get("pct") or 0)
+        elif ano == 2022:
+            municipios_d[nm]["votos_2022"] = int(r.get("votos") or 0)
+            municipios_d[nm]["pct_2022"] = float(r.get("pct") or 0)
+    result_list = list(municipios_d.values())
+    max_pct = max((m["pct_2022"] or m["pct_2018"] for m in result_list), default=1.0)
+    return JSONResponse(
+        {
+            "status": "ok",
+            "modo": "candidato",
+            "candidato": candidato,
+            "municipios": result_list,
+            "max_pct": max_pct,
+            "total_municipios": len(result_list),
+            "fonte": "bigquery",
+        }
+    )
+
+
 @app.get("/api/comparativo/partidos")
 async def get_comparativo_partidos(
     uf: str = Query("SP"),
