@@ -3368,6 +3368,7 @@ async def _bq_choropleth(layer: str, cargo: str, candidato: str, ano: int) -> li
 async def get_mapa_locais(
     uf: str = Query(..., description="Sigla da UF, ex: SP"),
     cd_municipio: str | None = Query(None),
+    nm_municipio: str | None = Query(None),
     nr_zona: str | None = Query(None),
     only_with_coords: bool = Query(True),
 ) -> Response:
@@ -3377,7 +3378,7 @@ async def get_mapa_locais(
             {"type": "FeatureCollection", "features": [], "fonte": "bigquery_indisponivel"}
         )
     try:
-        features = await _bq_locais_votacao(uf.upper(), cd_municipio, nr_zona, only_with_coords)
+        features = await _bq_locais_votacao(uf.upper(), cd_municipio, nm_municipio, nr_zona, only_with_coords)
         return _json_safe_response({"type": "FeatureCollection", "features": features})
     except Exception as exc:
         logger.warning("BQ locais_votacao falhou: %s", exc)
@@ -3387,6 +3388,7 @@ async def get_mapa_locais(
 async def _bq_locais_votacao(
     uf: str,
     cd_municipio: str | None,
+    nm_municipio: str | None,
     nr_zona: str | None,
     only_with_coords: bool,
 ) -> list[dict]:
@@ -3401,6 +3403,9 @@ async def _bq_locais_votacao(
     if cd_municipio:
         filters.append("cd_municipio = @cd_municipio")
         params.append(bigquery.ScalarQueryParameter("cd_municipio", "INT64", int(cd_municipio)))
+    if nm_municipio:
+        filters.append("UPPER(nm_municipio) = UPPER(@nm_municipio)")
+        params.append(bigquery.ScalarQueryParameter("nm_municipio", "STRING", nm_municipio))
     if nr_zona:
         filters.append("nr_zona = @nr_zona")
         params.append(bigquery.ScalarQueryParameter("nr_zona", "INT64", int(nr_zona)))

@@ -1019,6 +1019,7 @@ async function initMap() {
   L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
     attribution:'&copy; OpenStreetMap &copy; CARTO', subdomains:'abcd', maxZoom:19
   }).addTo(gMap);
+  gMap.on('zoomend', () => { if (_prevLocActive) _prevLocLoad(); });
   setTimeout(()=>{ gMap.invalidateSize(); reloadMap(); }, 200);
 }
 
@@ -2589,6 +2590,13 @@ let _locMarkersLayer = null;
 let _locResumoCache = null;
 let _locUF = null;
 let _locSortCol = 'nr_zona';
+// comparativo map — locais overlay
+let _cmp2LocLayer  = null;
+let _cmp2LocActive = false;
+let _cmp2LocUFBounds = null;
+// previsão map — locais overlay
+let _prevLocLayer  = null;
+let _prevLocActive = false;
 let _locSortAsc = true;
 
 function _zonaHue(nr) {
@@ -2774,6 +2782,163 @@ async function _loadLocaisMap() {
     } catch (_) {}
     setTimeout(() => _locMap.invalidateSize(), 100);
   }
+}
+
+// ── LOCAIS DE VOTAÇÃO — helper compartilhado ────────────────────────────────
+
+function _drawLocaisMarkers(leafletMap, existingLayer, features) {
+  if (existingLayer) existingLayer.clearLayers();
+  const layer = existingLayer || L.layerGroup().addTo(leafletMap);
+  if (!features || !features.length) return layer;
+
+  for (const f of features) {
+    const p = f.properties;
+    const [lng, lat] = f.geometry.coordinates;
+    const color = _zonaColor(p.nr_zona);
+    const r = Math.min(9, Math.max(4, 3 + (p.qt_secoes || 1) * 0.25));
+    const m = L.circleMarker([lat, lng], {
+      radius: r, color, fillColor: color, fillOpacity: 0.85, weight: 1.5,
+    });
+    m.bindPopup(`
+      <div style="font-size:.74rem;min-width:190px;max-width:240px">
+        <div style="font-weight:700;margin-bottom:4px;word-break:break-word">${p.nm_local_votacao || 'Local ' + p.nr_local_votacao}</div>
+        <div style="color:#8b949e;margin-bottom:2px">&#128205; ${p.ds_endereco || '&mdash;'}${p.nm_bairro ? ', ' + p.nm_bairro : ''}</div>
+        <div style="display:flex;gap:14px;margin-top:6px">
+          <span style="color:${color}">&#9679;</span>
+          <span>Zona <b>${String(p.nr_zona).padStart(3,'0')}</b></span>
+          <span>&#128203; <b>${p.qt_secoes ?? '&mdash;'}</b> se&#231;&#245;es</span>
+        </div>
+        <div style="color:#484f58;font-size:.64rem;margin-top:5px">CEP ${p.nr_cep || '&mdash;'} &middot; ${p.nm_municipio}</div>
+      </div>
+    `, { maxWidth: 280 });
+    layer.addLayer(m);
+  }
+  return layer;
+}
+
+// ── LOCAIS — mapa Comparativo ────────────────────────────────────────────────
+
+async function _cmp2LocEnter(nmMunicipio, bounds) {
+  if (!_cmp2MapaMap) return;
+  _cmp2LocActive = true;
+
+  // salva bounds da UF para o back
+  try { _cmp2LocUFBounds = _cmp2MapaMap.getBounds(); } catch(_) {}
+
+  // zoom no município
+  if (bounds) {
+    try { _cmp2MapaMap.fitBounds(bounds, { padding: [20, 20], maxZoom: 14 }); } catch(_) {}
+  }
+
+  // breadcrumb + botão voltar
+  const crumb = document.getElementById('cmp2-loc-crumb');
+  const back  = document.getElementById('cmp2-loc-back');
+  if (crumb) { crumb.textContent = '📍 ' + nmMunicipio; crumb.style.display = ''; }
+  if (back)  back.style.display = '';
+
+  // spinner
+  const spin = document.getElementById('cmp2-loc-spinner');
+  if (spin) { spin.style.display = 'flex'; }
+
+  const uf  = (_uf || 'SP').toUpperCase();
+  const geo = await api(`/api/mapa/locais?uf=${uf}&nm_municipio=${encodeURIComponent(nmMunicipio)}&only_with_coords=true`);
+
+  if (spin) spin.style.display = 'none';
+
+  if (!_cmp2LocLayer) {
+    _cmp2LocLayer = L.layerGroup().addTo(_cmp2MapaMap);
+  }
+  _drawLocaisMarkers(_cmp2MapaMap, _cmp2LocLayer, geo?.features || []);
+
+  if (!geo?.features?.length) {
+    if (crumb) crumb.textContent = `📍 ${nmMunicipio} — sem coords cadastradas`;
+  }
+}
+
+function _cmp2LocBack() {
+  _cmp2LocActive = false;
+  if (_cmp2LocLayer) { _cmp2LocLayer.clearLayers(); }
+
+  const crumb = document.getElementById('cmp2-loc-crumb');
+  const back  = document.getElementById('cmp2-loc-back');
+  if (crumb) crumb.style.display = 'none';
+  if (back)  back.style.display  = 'none';
+
+  if (_cmp2LocUFBounds && _cmp2MapaMap) {
+    try { _cmp2MapaMap.fitBounds(_cmp2LocUFBounds, { padding: [10, 10] }); } catch(_) {}
+  }
+}
+
+// ── LOCAIS — mapa Previsão 2026 ──────────────────────────────────────────────
+
+async function _prevLocLoad() {
+  if (!gMap) return;
+  const uf = (_uf || 'SP').toUpperCase();
+
+  const btn   = document.getElementById('btn-locais');
+  const back  = document.getElementById('prev-loc-back');
+  const crumb = document.getElementById('prev-loc-crumb');
+
+  // determine municipality from current zoom bounds if zoom >= 11
+  const zoom = gMap.getZoom();
+  let nmMun = null;
+  if (zoom >= 11 && window._geoLayer) {
+    // try to find which municipality polygon contains the map center
+    const center = gMap.getCenter();
+    window._geoLayer.eachLayer(layer => {
+      if (nmMun) return;
+      try {
+        if (layer.getBounds && layer.getBounds().contains(center)) {
+          nmMun = layer.feature?.properties?.name || null;
+        }
+      } catch(_) {}
+    });
+  }
+
+  let url = `/api/mapa/locais?uf=${uf}&only_with_coords=true`;
+  if (nmMun) url += `&nm_municipio=${encodeURIComponent(nmMun)}`;
+
+  if (crumb) { crumb.textContent = nmMun ? `📍 ${nmMun}` : `📍 ${uf}`; crumb.style.display = ''; }
+  if (back)  back.style.display = '';
+  if (btn)   { btn.style.background = 'var(--grn2)'; btn.style.color = '#fff'; }
+
+  const geo = await api(url);
+
+  if (!_prevLocLayer) {
+    _prevLocLayer = L.layerGroup().addTo(gMap);
+  }
+  _drawLocaisMarkers(gMap, _prevLocLayer, geo?.features || []);
+
+  if (!geo?.features?.length && crumb) {
+    crumb.textContent = (nmMun ? `📍 ${nmMun}` : `📍 ${uf}`) + ' — sem coords';
+  }
+}
+
+function _prevLocToggle() {
+  _prevLocActive = !_prevLocActive;
+  const btn   = document.getElementById('btn-locais');
+  const back  = document.getElementById('prev-loc-back');
+  const crumb = document.getElementById('prev-loc-crumb');
+
+  if (!_prevLocActive) {
+    if (_prevLocLayer) _prevLocLayer.clearLayers();
+    if (btn)   { btn.style.background = ''; btn.style.color = ''; }
+    if (back)  back.style.display  = 'none';
+    if (crumb) crumb.style.display = 'none';
+    return;
+  }
+  _prevLocLoad();
+}
+
+function _prevLocBack() {
+  _prevLocActive = false;
+  if (_prevLocLayer) _prevLocLayer.clearLayers();
+  const btn   = document.getElementById('btn-locais');
+  const back  = document.getElementById('prev-loc-back');
+  const crumb = document.getElementById('prev-loc-crumb');
+  if (btn)   { btn.style.background = ''; btn.style.color = ''; }
+  if (back)  back.style.display  = 'none';
+  if (crumb) crumb.style.display = 'none';
 }
 
 // ── DASHBOARD UPDATE (called by WS handler) ────────────────────────────────
