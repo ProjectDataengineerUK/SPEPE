@@ -152,6 +152,10 @@ _PUBLIC_API_PATHS = {
     "/api/mapa/locais",
     "/api/locais/resumo",
     "/api/comparativo/indicadores",
+    "/api/precandidatos",
+    "/api/comparativo/candidatos",
+    "/api/comparativo/mapa",
+    "/api/comparativo/partidos",
     "/api/data-audit",
     "/api/model/status",
     "/api/model/shap",
@@ -409,7 +413,7 @@ _DEMO_CANDIDATOS: dict[str, list[dict]] = {
         {"nm": "Bolsonaro", "partido": "PL", "pct_t1": 43.2, "votos": "51_072_345"},
         {"nm": "Simone Tebet", "partido": "MDB", "pct_t1": 4.2, "votos": "4_991_727"},
         {"nm": "Ciro Gomes", "partido": "PDT", "pct_t1": 3.0, "votos": "3_599_287"},
-        {"nm": "Soraya Thronicke", "partido": "União", "pct_t1": 0.9, "votos": '1_070_"'},
+        {"nm": "Soraya Thronicke", "partido": "União", "pct_t1": 0.9, "votos": "1_070_981"},
     ],
     "Governador": [
         {
@@ -1098,6 +1102,316 @@ async def get_candidatos(
 
     return JSONResponse(
         {"cargo": cargo, "uf": uf, "ano": ano, "candidatos": [], "fonte": "indisponivel"}
+    )
+
+
+# ── Pré-candidatos 2026 — dados estáticos pesquisados em 21/05/2026 ──────────
+# Fonte: levantamentos públicos (Diário do Rio, Poder360, Agenda do Poder, JOTA)
+
+_PRE_CANDIDATOS_2026: dict[str, dict[str, list[dict]]] = {
+    "RJ": {
+        "governador": [
+            {
+                "nm": "Eduardo Paes",
+                "partido": "PSD",
+                "status": "confirmado",
+                "instagram": "@eduardopaes",
+                "youtube": "@EduardoPaes",
+                "x": "@eduardopaes",
+                "facebook": "eduardopaesoficial",
+                "obs": "Favorito — 50% nas pesquisas. Prefeito do Rio; vice: Jane Reis (MDB).",
+            },
+            {
+                "nm": "Douglas Ruas",
+                "partido": "PL",
+                "status": "confirmado",
+                "instagram": "@douglasruasrj",
+                "obs": "Dep. estadual; articulação Flávio Bolsonaro.",
+            },
+            {
+                "nm": "Anthony Garotinho",
+                "partido": "Republicanos",
+                "status": "confirmado",
+                "instagram": "@anthonygarotinhorj",
+                "tiktok": "@anthonygarotinhorj",
+                "x": "@anthonygarotinhorj",
+                "obs": "Lançou pré-candidatura ao governo (mai/2026). Também testado para Dep. Federal.",
+            },
+            {
+                "nm": "André Marinho",
+                "partido": "Novo",
+                "status": "confirmado",
+                "obs": "Confirmado pelo Novo.",
+            },
+            {
+                "nm": "André Português",
+                "partido": "Republicanos",
+                "status": "confirmado",
+                "obs": "Ex-prefeito de Miguel Pereira.",
+            },
+            {
+                "nm": "William Siri",
+                "partido": "PSOL",
+                "status": "confirmado",
+                "instagram": "@williamsiri",
+                "obs": "Vereador do Rio; lançado pelo PSOL.",
+            },
+            {
+                "nm": "Washington Reis",
+                "partido": "MDB",
+                "status": "citado",
+                "obs": "Pré-candidato; candidatura depende de questão jurídica no STF.",
+            },
+            {
+                "nm": "Fabiano Horta",
+                "partido": "PT",
+                "status": "citado",
+                "instagram": "@fabianohorta",
+                "obs": "Ex-prefeito de Maricá; tendência do PT apoiar Eduardo Paes.",
+            },
+            {
+                "nm": "Rodrigo Neves",
+                "partido": "PDT",
+                "status": "citado",
+                "instagram": "@rodrigonevesniteroi",
+                "obs": "Prefeito de Niterói; articulação estadual.",
+            },
+        ],
+        "dep federal": [
+            {
+                "nm": "Wladimir Garotinho",
+                "partido": "PL",
+                "status": "confirmado",
+                "youtube": "@wladimirgarotinhooficial",
+                "facebook": "wladimirgarotinhoo",
+                "obs": "Ex-prefeito de Campos; base Norte Fluminense; alinhado Flávio Bolsonaro.",
+            },
+            {
+                "nm": "Anthony Garotinho",
+                "partido": "Republicanos",
+                "status": "confirmado",
+                "instagram": "@anthonygarotinhorj",
+                "tiktok": "@anthonygarotinhorj",
+                "x": "@anthonygarotinhorj",
+                "obs": "Ex-governador. Pode migrar para disputa ao governo.",
+            },
+            {
+                "nm": "Juliana Benício",
+                "partido": "Cidadania",
+                "status": "confirmado",
+                "instagram": "@julianabeniciooficial",
+                "youtube": "@Juliana.Benicio",
+                "facebook": "JulianaBenicioOficial",
+                "obs": "Niterói; ligada ao grupo Rodrigo Neves/Cidadania.",
+            },
+            {
+                "nm": "Gracyanne Barbosa",
+                "partido": "Republicanos",
+                "status": "confirmado",
+                "instagram": "@graoficial",
+                "obs": "Influenciadora fitness; alto engajamento digital.",
+            },
+            {
+                "nm": "Felipe Curi",
+                "partido": "PP",
+                "status": "confirmado",
+                "instagram": "@delegadofelipecuri",
+                "obs": "Ex-secretário de Polícia Civil; apoio Flávio Bolsonaro.",
+            },
+            {
+                "nm": "Cristina Mel",
+                "partido": "PSDB",
+                "status": "confirmado",
+                "instagram": "@cristinamel",
+                "obs": "Cantora gospel; pré-candidatura anunciada.",
+            },
+            {
+                "nm": "Zé de Abreu",
+                "partido": "PT",
+                "status": "confirmado",
+                "instagram": "@zehdeabreu",
+                "x": "@zehdeabreu",
+                "obs": "Ator; candidatura apoiada por Quaquá (PT-RJ).",
+            },
+            {
+                "nm": "Elias Jabbour",
+                "partido": "PCdoB",
+                "status": "confirmado",
+                "instagram": "@eliasmkjabbour",
+                "obs": "Economista/professor; site eliasjabbour.com.br.",
+            },
+            {
+                "nm": "José Camilo Zito",
+                "partido": "Cidadania",
+                "status": "confirmado",
+                "obs": "Ex-prefeito de Duque de Caxias; filiou-se ao Cidadania.",
+            },
+            {
+                "nm": "Haroldo Filho",
+                "partido": "Podemos",
+                "status": "confirmado",
+                "instagram": "@haroldofilho",
+                "obs": "Secretário de Valença; pré-candidatura anunciada.",
+            },
+            {
+                "nm": "Dado Dolabella",
+                "partido": "MDB",
+                "status": "confirmado",
+                "instagram": "@dadodolabella",
+                "obs": "Ator; anúncio pelo MDB foi apagado — candidatura instável.",
+            },
+            {
+                "nm": "Altineu Côrtes",
+                "partido": "PL",
+                "status": "citado",
+                "instagram": "@altineucortes",
+                "obs": "Citado como puxador competitivo.",
+            },
+            {
+                "nm": "Áureo Ribeiro",
+                "partido": "Solidariedade",
+                "status": "citado",
+                "instagram": "@aureoribeiro",
+            },
+            {
+                "nm": "Carlos Jordy",
+                "partido": "PL",
+                "status": "citado",
+                "instagram": "@carlosjordy",
+                "x": "@carlosjordy",
+            },
+            {
+                "nm": "Chico Alencar",
+                "partido": "PSOL",
+                "status": "citado",
+                "instagram": "@chicoalencar",
+                "x": "@chicoalencar",
+            },
+            {
+                "nm": "Daniel Soranz",
+                "partido": "PSD",
+                "status": "citado",
+                "instagram": "@danielsoranz",
+                "x": "@danielsoranz",
+            },
+            {
+                "nm": "Dr. Luizinho",
+                "partido": "PP",
+                "status": "citado",
+                "instagram": "@drluizinho",
+                "x": "@drluizinho",
+            },
+            {
+                "nm": "General Pazuello",
+                "partido": "PL",
+                "status": "citado",
+                "instagram": "@genpazuello",
+            },
+            {
+                "nm": "Glauber Braga",
+                "partido": "PSOL",
+                "status": "citado",
+                "instagram": "@glauber_braga",
+                "x": "@glauber_braga",
+            },
+            {
+                "nm": "Gutemberg Reis",
+                "partido": "MDB",
+                "status": "citado",
+                "instagram": "@gutembergreis",
+            },
+            {
+                "nm": "Lindbergh Farias",
+                "partido": "PT",
+                "status": "citado",
+                "instagram": "@lindberghfarias",
+                "x": "@lindberghfarias",
+            },
+            {
+                "nm": "Marcelo Crivella",
+                "partido": "Republicanos",
+                "status": "citado",
+                "x": "@mcrivella",
+            },
+            {
+                "nm": "Marcelo Freixo",
+                "partido": "PT",
+                "status": "citado",
+                "instagram": "@marcelofreixo",
+                "x": "@marcelofreixo",
+            },
+            {
+                "nm": "Otoni de Paula",
+                "partido": "MDB",
+                "status": "citado",
+                "instagram": "@otonidepaula",
+                "x": "@otonidepaula",
+            },
+            {
+                "nm": "Pastor Henrique Vieira",
+                "partido": "PSOL",
+                "status": "citado",
+                "instagram": "@pastorhenriquevieira",
+            },
+            {
+                "nm": "Reimont",
+                "partido": "PT",
+                "status": "citado",
+                "instagram": "@reimont",
+                "x": "@reimont",
+            },
+            {
+                "nm": "Soraya Santos",
+                "partido": "PL",
+                "status": "citado",
+                "instagram": "@sorayasantos",
+            },
+            {
+                "nm": "Talíria Petrone",
+                "partido": "PSOL",
+                "status": "citado",
+                "instagram": "@taliriapetrone",
+                "x": "@taliriapetrone",
+            },
+            {
+                "nm": "Tarcísio Motta",
+                "partido": "PSOL",
+                "status": "citado",
+                "instagram": "@tarcisiomotta",
+                "x": "@tarcisiomotta",
+            },
+            {
+                "nm": "Alessandro Molon",
+                "partido": "PSB",
+                "status": "citado",
+                "instagram": "@alessandromolon",
+                "x": "@alessandromolon",
+            },
+        ],
+    }
+}
+
+
+@app.get("/api/precandidatos")
+async def get_precandidatos(
+    uf: str = Query("RJ"),
+    cargo: str = Query("dep federal"),
+    ano: int = Query(2026),
+) -> JSONResponse:
+    """Pré-candidatos 2026 pesquisados — dados estáticos (levantamento mai/2026)."""
+    cargo_key = cargo.lower().strip()
+    candidatos = _PRE_CANDIDATOS_2026.get(uf.upper(), {}).get(cargo_key, [])
+    return JSONResponse(
+        {
+            "uf": uf.upper(),
+            "cargo": cargo,
+            "ano": ano,
+            "total": len(candidatos),
+            "confirmados": sum(1 for c in candidatos if c.get("status") == "confirmado"),
+            "candidatos": candidatos,
+            "fonte": "levantamento_estatico_mai2026",
+            "aviso": "Lista não oficial — convenções partidárias: 20/jul a 05/ago/2026",
+        }
     )
 
 
@@ -3346,7 +3660,9 @@ async def _bq_locais_resumo(uf: str, cd_municipio: str | None) -> dict:
     mun_filter = ""
     if cd_municipio:
         mun_filter = "AND cd_municipio = @cd_municipio"
-        base_params.append(bigquery.ScalarQueryParameter("cd_municipio", "INT64", int(cd_municipio)))
+        base_params.append(
+            bigquery.ScalarQueryParameter("cd_municipio", "INT64", int(cd_municipio))
+        )
 
     zona_query = f"""
         SELECT nr_zona, nm_municipio,
@@ -3372,10 +3688,10 @@ async def _bq_locais_resumo(uf: str, cd_municipio: str | None) -> dict:
 
     zona_rows, mun_rows = await asyncio.gather(
         asyncio.to_thread(
-            lambda: list(
+            lambda bp=base_params: list(
                 client.query(
                     zona_query,
-                    job_config=bigquery.QueryJobConfig(query_parameters=base_params),
+                    job_config=bigquery.QueryJobConfig(query_parameters=bp),
                 ).result()
             )
         ),
@@ -4849,90 +5165,225 @@ async def get_parlamentares(
 
 _AUDIT_SPEC: list[dict] = [
     # ── Gold — TSE eleitoral ─────────────────────────────────────────────────
-    {"table": "fact_municipio_candidato_eleicao", "layer": "gold", "icon": "🏆",
-     "label": "TSE Resultados por Município", "date_col": "ano_eleicao",
-     "jobs": ["spepe-tse-ingest", "spepe-silver-transform", "spepe-gold-build"]},
-    {"table": "fact_candidato_eleicao", "layer": "gold", "icon": "👤",
-     "label": "TSE Candidato Eleição", "date_col": "ano_eleicao",
-     "jobs": ["spepe-tse-ingest", "spepe-gold-build"]},
-    {"table": "fact_municipio_eleicao", "layer": "gold", "icon": "🏙",
-     "label": "TSE Município Eleição", "date_col": "ano_eleicao",
-     "jobs": ["spepe-tse-ingest", "spepe-gold-build"]},
-    {"table": "fact_secao_eleicao", "layer": "gold", "icon": "📍",
-     "label": "TSE Seções Eleitorais", "date_col": "ano_eleicao",
-     "jobs": ["spepe-tse-ingest", "spepe-gold-build"]},
-    {"table": "fact_presidente_resultado", "layer": "gold", "icon": "🗳",
-     "label": "TSE Presidente", "date_col": "ano_eleicao",
-     "jobs": ["spepe-tse-ingest", "spepe-gold-build"]},
-    {"table": "fact_perfil_eleitorado", "layer": "gold", "icon": "👥",
-     "label": "Perfil Eleitorado", "date_col": "ano_eleitoral",
-     "jobs": ["spepe-tse-perfil-ingest", "spepe-gold-build"]},
-    {"table": "fact_locais_votacao", "layer": "gold", "icon": "🏫",
-     "label": "Locais de Votação", "date_col": None,
-     "jobs": ["spepe-tse-locais-ingest", "spepe-gold-build"]},
-    {"table": "fact_abstencao_secao", "layer": "gold", "icon": "🚫",
-     "label": "Abstenção por Seção", "date_col": "ano_eleicao",
-     "jobs": ["spepe-tse-ingest", "spepe-gold-build"]},
+    {
+        "table": "fact_municipio_candidato_eleicao",
+        "layer": "gold",
+        "icon": "🏆",
+        "label": "TSE Resultados por Município",
+        "date_col": "ano_eleicao",
+        "jobs": ["spepe-tse-ingest", "spepe-silver-transform", "spepe-gold-build"],
+    },
+    {
+        "table": "fact_candidato_eleicao",
+        "layer": "gold",
+        "icon": "👤",
+        "label": "TSE Candidato Eleição",
+        "date_col": "ano_eleicao",
+        "jobs": ["spepe-tse-ingest", "spepe-gold-build"],
+    },
+    {
+        "table": "fact_municipio_eleicao",
+        "layer": "gold",
+        "icon": "🏙",
+        "label": "TSE Município Eleição",
+        "date_col": "ano_eleicao",
+        "jobs": ["spepe-tse-ingest", "spepe-gold-build"],
+    },
+    {
+        "table": "fact_secao_eleicao",
+        "layer": "gold",
+        "icon": "📍",
+        "label": "TSE Seções Eleitorais",
+        "date_col": "ano_eleicao",
+        "jobs": ["spepe-tse-ingest", "spepe-gold-build"],
+    },
+    {
+        "table": "fact_presidente_resultado",
+        "layer": "gold",
+        "icon": "🗳",
+        "label": "TSE Presidente",
+        "date_col": "ano_eleicao",
+        "jobs": ["spepe-tse-ingest", "spepe-gold-build"],
+    },
+    {
+        "table": "fact_perfil_eleitorado",
+        "layer": "gold",
+        "icon": "👥",
+        "label": "Perfil Eleitorado",
+        "date_col": "ano_eleitoral",
+        "jobs": ["spepe-tse-perfil-ingest", "spepe-gold-build"],
+    },
+    {
+        "table": "fact_locais_votacao",
+        "layer": "gold",
+        "icon": "🏫",
+        "label": "Locais de Votação",
+        "date_col": None,
+        "jobs": ["spepe-tse-locais-ingest", "spepe-gold-build"],
+    },
+    {
+        "table": "fact_abstencao_secao",
+        "layer": "gold",
+        "icon": "🚫",
+        "label": "Abstenção por Seção",
+        "date_col": "ano_eleicao",
+        "jobs": ["spepe-tse-ingest", "spepe-gold-build"],
+    },
     # ── Gold — socioeconômico ────────────────────────────────────────────────
-    {"table": "fact_ibge_municipio", "layer": "gold", "icon": "📊",
-     "label": "IBGE / IDH", "date_col": "ano",
-     "jobs": ["spepe-ibge-sync", "spepe-gold-build"]},
-    {"table": "fact_seguranca_municipio", "layer": "gold", "icon": "🛡",
-     "label": "Segurança SINESP", "date_col": "ano",
-     "jobs": ["spepe-security-ingest", "spepe-gold-build"]},
-    {"table": "fact_saude_municipio", "layer": "gold", "icon": "🏥",
-     "label": "Saúde DATASUS", "date_col": "ano",
-     "jobs": ["spepe-datasus-ingest", "spepe-gold-build"]},
-    {"table": "fact_transferencias_sociais", "layer": "gold", "icon": "💰",
-     "label": "Bolsa Família / CadÚnico", "date_col": "ano",
-     "jobs": ["spepe-cadunico-ingest", "spepe-gold-build"]},
-    {"table": "fact_emendas_parlamentar", "layer": "gold", "icon": "📜",
-     "label": "Emendas Parlamentares", "date_col": "ano",
-     "jobs": ["spepe-emendas-ingest", "spepe-gold-build"]},
-    {"table": "fact_emendas_municipio", "layer": "gold", "icon": "🏘",
-     "label": "Emendas por Município", "date_col": "ano",
-     "jobs": ["spepe-emendas-ingest", "spepe-gold-build"]},
-    {"table": "fact_sancoes_uf", "layer": "gold", "icon": "⛔",
-     "label": "Sanções CEIS/CNEP", "date_col": None,
-     "jobs": ["spepe-sancoes-ingest", "spepe-gold-build"]},
-    {"table": "fact_endividamento_nacional", "layer": "gold", "icon": "📉",
-     "label": "Endividamento BACEN", "date_col": None,
-     "jobs": ["spepe-endividamento-ingest", "spepe-gold-build"]},
-    {"table": "fact_votacoes_parlamentar", "layer": "gold", "icon": "🏛",
-     "label": "Câmara / Senado Votações", "date_col": "ano",
-     "jobs": ["spepe-camara-senado-ingest", "spepe-gold-build"]},
+    {
+        "table": "fact_ibge_municipio",
+        "layer": "gold",
+        "icon": "📊",
+        "label": "IBGE / IDH",
+        "date_col": "ano",
+        "jobs": ["spepe-ibge-sync", "spepe-gold-build"],
+    },
+    {
+        "table": "fact_seguranca_municipio",
+        "layer": "gold",
+        "icon": "🛡",
+        "label": "Segurança SINESP",
+        "date_col": "ano",
+        "jobs": ["spepe-security-ingest", "spepe-gold-build"],
+    },
+    {
+        "table": "fact_saude_municipio",
+        "layer": "gold",
+        "icon": "🏥",
+        "label": "Saúde DATASUS",
+        "date_col": "ano",
+        "jobs": ["spepe-datasus-ingest", "spepe-gold-build"],
+    },
+    {
+        "table": "fact_transferencias_sociais",
+        "layer": "gold",
+        "icon": "💰",
+        "label": "Bolsa Família / CadÚnico",
+        "date_col": "ano",
+        "jobs": ["spepe-cadunico-ingest", "spepe-gold-build"],
+    },
+    {
+        "table": "fact_emendas_parlamentar",
+        "layer": "gold",
+        "icon": "📜",
+        "label": "Emendas Parlamentares",
+        "date_col": "ano",
+        "jobs": ["spepe-emendas-ingest", "spepe-gold-build"],
+    },
+    {
+        "table": "fact_emendas_municipio",
+        "layer": "gold",
+        "icon": "🏘",
+        "label": "Emendas por Município",
+        "date_col": "ano",
+        "jobs": ["spepe-emendas-ingest", "spepe-gold-build"],
+    },
+    {
+        "table": "fact_sancoes_uf",
+        "layer": "gold",
+        "icon": "⛔",
+        "label": "Sanções CEIS/CNEP",
+        "date_col": None,
+        "jobs": ["spepe-sancoes-ingest", "spepe-gold-build"],
+    },
+    {
+        "table": "fact_endividamento_nacional",
+        "layer": "gold",
+        "icon": "📉",
+        "label": "Endividamento BACEN",
+        "date_col": None,
+        "jobs": ["spepe-endividamento-ingest", "spepe-gold-build"],
+    },
+    {
+        "table": "fact_votacoes_parlamentar",
+        "layer": "gold",
+        "icon": "🏛",
+        "label": "Câmara / Senado Votações",
+        "date_col": "ano",
+        "jobs": ["spepe-camara-senado-ingest", "spepe-gold-build"],
+    },
     # ── Gold — digital / pesquisas ───────────────────────────────────────────
-    {"table": "fact_intencao_voto", "layer": "gold", "icon": "📋",
-     "label": "Intenção de Voto (Polls)", "date_col": "ano_eleitoral",
-     "jobs": ["spepe-polls-ingest", "spepe-gold-build"]},
-    {"table": "fact_pesquisa", "layer": "gold", "icon": "📊",
-     "label": "Pesquisas Eleitorais", "date_col": "ano_eleitoral",
-     "jobs": ["spepe-polls-ingest", "spepe-gold-build"]},
-    {"table": "fact_social_municipio", "layer": "gold", "icon": "📱",
-     "label": "Sentimento Social", "date_col": "ano",
-     "jobs": ["spepe-social-ingest", "spepe-gold-build"]},
-    {"table": "fact_google_trends_uf", "layer": "gold", "icon": "🔥",
-     "label": "Google Trends", "date_col": "ano",
-     "jobs": ["spepe-digital-ingest", "spepe-gold-build"]},
-    {"table": "fact_meta_ads_uf", "layer": "gold", "icon": "📢",
-     "label": "Meta Ads", "date_col": "ano",
-     "jobs": ["spepe-digital-ingest", "spepe-gold-build"]},
-    {"table": "fact_meta_ads_demografico", "layer": "gold", "icon": "🎯",
-     "label": "Meta Ads Demográfico", "date_col": "ano",
-     "jobs": ["spepe-digital-ingest", "spepe-gold-build"]},
-    {"table": "fact_indice_digital_candidato", "layer": "gold", "icon": "💡",
-     "label": "Índice Digital Candidato", "date_col": "ano",
-     "jobs": ["spepe-digital-ingest", "spepe-gold-build"]},
+    {
+        "table": "fact_intencao_voto",
+        "layer": "gold",
+        "icon": "📋",
+        "label": "Intenção de Voto (Polls)",
+        "date_col": "ano_eleitoral",
+        "jobs": ["spepe-polls-ingest", "spepe-gold-build"],
+    },
+    {
+        "table": "fact_pesquisa",
+        "layer": "gold",
+        "icon": "📊",
+        "label": "Pesquisas Eleitorais",
+        "date_col": "ano_eleitoral",
+        "jobs": ["spepe-polls-ingest", "spepe-gold-build"],
+    },
+    {
+        "table": "fact_social_municipio",
+        "layer": "gold",
+        "icon": "📱",
+        "label": "Sentimento Social",
+        "date_col": "ano",
+        "jobs": ["spepe-social-ingest", "spepe-gold-build"],
+    },
+    {
+        "table": "fact_google_trends_uf",
+        "layer": "gold",
+        "icon": "🔥",
+        "label": "Google Trends",
+        "date_col": "ano",
+        "jobs": ["spepe-digital-ingest", "spepe-gold-build"],
+    },
+    {
+        "table": "fact_meta_ads_uf",
+        "layer": "gold",
+        "icon": "📢",
+        "label": "Meta Ads",
+        "date_col": "ano",
+        "jobs": ["spepe-digital-ingest", "spepe-gold-build"],
+    },
+    {
+        "table": "fact_meta_ads_demografico",
+        "layer": "gold",
+        "icon": "🎯",
+        "label": "Meta Ads Demográfico",
+        "date_col": "ano",
+        "jobs": ["spepe-digital-ingest", "spepe-gold-build"],
+    },
+    {
+        "table": "fact_indice_digital_candidato",
+        "layer": "gold",
+        "icon": "💡",
+        "label": "Índice Digital Candidato",
+        "date_col": "ano",
+        "jobs": ["spepe-digital-ingest", "spepe-gold-build"],
+    },
     # ── MLOps ────────────────────────────────────────────────────────────────
-    {"table": "fact_predictions", "layer": "mlops", "icon": "🔮",
-     "label": "Predições PyMC", "date_col": "prediction_date",
-     "jobs": ["spepe-pymc-train"]},
-    {"table": "model_evaluations", "layer": "mlops", "icon": "🧪",
-     "label": "Avaliações de Modelo", "date_col": "evaluation_date",
-     "jobs": ["spepe-pymc-train"]},
-    {"table": "bias_metrics", "layer": "mlops", "icon": "⚖",
-     "label": "Bias / Fairness", "date_col": "evaluation_date",
-     "jobs": ["spepe-pymc-electoral-train"]},
+    {
+        "table": "fact_predictions",
+        "layer": "mlops",
+        "icon": "🔮",
+        "label": "Predições PyMC",
+        "date_col": "prediction_date",
+        "jobs": ["spepe-pymc-train"],
+    },
+    {
+        "table": "model_evaluations",
+        "layer": "mlops",
+        "icon": "🧪",
+        "label": "Avaliações de Modelo",
+        "date_col": "evaluation_date",
+        "jobs": ["spepe-pymc-train"],
+    },
+    {
+        "table": "bias_metrics",
+        "layer": "mlops",
+        "icon": "⚖",
+        "label": "Bias / Fairness",
+        "date_col": "evaluation_date",
+        "jobs": ["spepe-pymc-electoral-train"],
+    },
 ]
 
 
@@ -4950,11 +5401,13 @@ async def get_data_audit() -> JSONResponse:
         ok = sum(1 for t in result if t["status"] == "ok")
         empty = sum(1 for t in result if t["status"] == "empty")
         missing = sum(1 for t in result if t["status"] == "missing")
-        return JSONResponse({
-            "tables": result,
-            "summary": {"ok": ok, "empty": empty, "missing": missing, "total": len(result)},
-            "project": settings.gcp_project_id,
-        })
+        return JSONResponse(
+            {
+                "tables": result,
+                "summary": {"ok": ok, "empty": empty, "missing": missing, "total": len(result)},
+                "project": settings.gcp_project_id,
+            }
+        )
     except Exception as exc:
         logger.warning("data-audit falhou: %s", exc)
         return JSONResponse({"tables": [], "erro": str(exc), "summary": {}})
@@ -4965,7 +5418,11 @@ async def _bq_data_audit() -> list[dict]:
 
     client = bigquery.Client(project=settings.gcp_project_id)
     gold = settings.bigquery_dataset_gold
-    mlops = settings.bigquery_dataset_mlops if hasattr(settings, "bigquery_dataset_mlops") else "spepe_mlops"
+    mlops = (
+        settings.bigquery_dataset_mlops
+        if hasattr(settings, "bigquery_dataset_mlops")
+        else "spepe_mlops"
+    )
 
     # Step 1: get row counts for all tables at once via __TABLES__ metadata
     meta: dict[str, dict] = {}
@@ -4995,12 +5452,20 @@ async def _bq_data_audit() -> list[dict]:
         dc = spec.get("date_col")
         if dc and meta.get(key, {}).get("rows", 0) > 0:
             full = f"`{settings.gcp_project_id}.{ds}.{spec['table']}`"
-            date_queries.append((key, f"SELECT CAST(MIN({dc}) AS STRING) AS d_min, CAST(MAX({dc}) AS STRING) AS d_max FROM {full}"))
+            date_queries.append(
+                (
+                    key,
+                    f"SELECT CAST(MIN({dc}) AS STRING) AS d_min, CAST(MAX({dc}) AS STRING) AS d_max FROM {full}",
+                )
+            )
 
     async def _fetch_range(key: str, q: str) -> tuple[str, dict]:
         try:
             rows = await asyncio.to_thread(lambda q=q: list(client.query(q).result()))
-            return key, {"date_min": str(rows[0]["d_min"] or "")[:10], "date_max": str(rows[0]["d_max"] or "")[:10]}
+            return key, {
+                "date_min": str(rows[0]["d_min"] or "")[:10],
+                "date_max": str(rows[0]["d_max"] or "")[:10],
+            }
         except Exception:
             return key, {}
 
@@ -5031,20 +5496,22 @@ async def _bq_data_audit() -> list[dict]:
             size_mb = m["size_mb"]
             last_mod = m["last_modified"]
 
-        output.append({
-            "table": spec["table"],
-            "dataset": ds,
-            "layer": spec["layer"],
-            "icon": spec["icon"],
-            "label": spec["label"],
-            "status": status,
-            "rows": rows,
-            "size_mb": size_mb,
-            "last_modified": last_mod,
-            "date_min": dr.get("date_min", ""),
-            "date_max": dr.get("date_max", ""),
-            "jobs": spec["jobs"],
-        })
+        output.append(
+            {
+                "table": spec["table"],
+                "dataset": ds,
+                "layer": spec["layer"],
+                "icon": spec["icon"],
+                "label": spec["label"],
+                "status": status,
+                "rows": rows,
+                "size_mb": size_mb,
+                "last_modified": last_mod,
+                "date_min": dr.get("date_min", ""),
+                "date_max": dr.get("date_max", ""),
+                "jobs": spec["jobs"],
+            }
+        )
     return output
 
 
@@ -5069,7 +5536,7 @@ async def debug_tables() -> JSONResponse:
                     FROM `{settings.gcp_project_id}.{dataset}.__TABLES__`
                     ORDER BY table_id
                 """
-                rows = list(client.query(query).result())
+                rows = await asyncio.to_thread(lambda q=query: list(client.query(q).result()))
                 for r in rows:
                     results.append(
                         {
@@ -8000,8 +8467,8 @@ async def get_comparativo_mapa_candidato(
         municipios: dict[str, dict] = {}
         for r in rows:
             nm = r.get("nm_municipio") or ""
-            ano = int(r.get("ano_eleicao") or 0)
-            key_sfx = str(ano)
+            row_ano = int(r.get("ano_eleicao") or 0)
+            key_sfx = str(row_ano)
             if nm not in municipios:
                 municipios[nm] = {"nm_municipio": nm}
             municipios[nm][f"votos_c1_{key_sfx}"] = int(r.get("votos_c1") or 0)
@@ -8053,7 +8520,7 @@ async def get_comparativo_mapa_candidato(
     municipios_d: dict[str, dict] = {}
     for r in rows:
         nm = r.get("nm_municipio") or ""
-        ano = int(r.get("ano_eleicao") or 0)
+        row_ano = int(r.get("ano_eleicao") or 0)
         if nm not in municipios_d:
             municipios_d[nm] = {
                 "nm_municipio": nm,
@@ -8062,10 +8529,10 @@ async def get_comparativo_mapa_candidato(
                 "votos_2022": 0,
                 "pct_2022": 0.0,
             }
-        if ano == 2018:
+        if row_ano == 2018:
             municipios_d[nm]["votos_2018"] = int(r.get("votos") or 0)
             municipios_d[nm]["pct_2018"] = float(r.get("pct") or 0)
-        elif ano == 2022:
+        elif row_ano == 2022:
             municipios_d[nm]["votos_2022"] = int(r.get("votos") or 0)
             municipios_d[nm]["pct_2022"] = float(r.get("pct") or 0)
     result_list = list(municipios_d.values())
@@ -8263,7 +8730,9 @@ async def get_comparativo_indicadores(
         return JSONResponse({"municipios": [], "fonte": "bigquery_indisponivel"})
     try:
         result = await _bq_comparativo_indicadores(uf.upper(), ano)
-        return JSONResponse({"municipios": result, "fonte": "bigquery", "uf": uf.upper(), "ano": ano})
+        return JSONResponse(
+            {"municipios": result, "fonte": "bigquery", "uf": uf.upper(), "ano": ano}
+        )
     except Exception as exc:
         logger.warning("comparativo/indicadores falhou: %s", exc)
         return JSONResponse({"municipios": [], "erro": str(exc)})
@@ -8323,7 +8792,9 @@ async def _bq_comparativo_indicadores(uf: str, ano: int) -> list[dict]:
     ]
     rows = await asyncio.to_thread(
         lambda: list(
-            client.query(query, job_config=bigquery.QueryJobConfig(query_parameters=params)).result()
+            client.query(
+                query, job_config=bigquery.QueryJobConfig(query_parameters=params)
+            ).result()
         )
     )
     return [

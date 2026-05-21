@@ -237,7 +237,7 @@ table.data tr:hover td{background:var(--bg3)}
   <nav id="topbar">
     <div class="tb-logo"><span>SP</span>EPE</div>
     <div class="tb-sep"></div>
-    <input id="cand-input" type="text" placeholder="Candidato..." list="cand-list" autocomplete="off" oninput="applyFilters()">
+    <input id="cand-input" type="text" placeholder="Candidato..." list="cand-list" autocomplete="off" oninput="applyFilters();showPreCandSocial(this.value)">
     <datalist id="cand-list"></datalist>
     <select class="tb-sel" id="f-cargo" onchange="applyFilters()">
       <option value="presidente">Presidente</option>
@@ -258,11 +258,7 @@ table.data tr:hover td{background:var(--bg3)}
       <option value="RR">RR</option><option value="RS">RS</option><option value="SC">SC</option>
       <option value="SE">SE</option><option value="SP" selected>SP</option><option value="TO">TO</option>
     </select>
-    <select class="tb-sel" id="f-ano" onchange="applyFilters()">
-      <option value="2026">2026</option>
-      <option value="2022" selected>2022</option>
-      <option value="2018">2018</option>
-    </select>
+    <span class="tb-sel" style="cursor:default;user-select:none">2026</span>
     <div class="tb-right">
       <div class="src-dots" title="Auditoria de dados — clique para verificar tabelas" style="cursor:pointer" onclick="openDataAudit()">
         <div class="sdot grn" title="TSE"></div>
@@ -277,6 +273,16 @@ table.data tr:hover td{background:var(--bg3)}
     </div>
   </nav>
 
+  <!-- PRÉ-CANDIDATO INFO BAR (2026) -->
+  <div id="precand-info" style="display:none;background:#111827;border-bottom:1px solid #1e3a5f;padding:5px 16px;font-size:0.72rem;color:#8faac8;gap:14px;align-items:center;flex-wrap:wrap">
+    <span id="pi-cargo" style="background:#1e3a5f;color:#5cb8ff;padding:2px 7px;border-radius:3px;font-weight:600;font-size:0.68rem"></span>
+    <span id="pi-partido" style="color:#e2a82e;font-weight:600"></span>
+    <span id="pi-status"></span>
+    <span id="pi-sociais" style="color:#6bcfb0"></span>
+    <span id="pi-obs" style="color:#687a90;font-style:italic;flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis"></span>
+    <span style="color:#2a4060;cursor:pointer;font-size:0.9rem;padding:0 4px" onclick="document.getElementById('precand-info').style.display='none'">&#x2715;</span>
+  </div>
+
   <!-- TAB BAR -->
   <div id="tabbar">
     <div class="tab active" data-tab="mapa" onclick="switchTab('mapa')">&#128506; Mapa</div>
@@ -285,7 +291,7 @@ table.data tr:hover td{background:var(--bg3)}
     <div class="tab" data-tab="digital" onclick="switchTab('digital')">&#128241; Digital <span class="tab-badge">2026</span></div>
     <div class="tab" data-tab="ranking" onclick="switchTab('ranking')">&#127942; Ranking</div>
     <div class="tab" data-tab="comparativo" onclick="switchTab('comparativo');loadComparativo()">&#9878; Comparativo</div>
-    <div class="tab" data-tab="locais" onclick="switchTab('locais');loadLocais()">&#127968; Locais</div>
+    <div class="tab" data-tab="locais" onclick="switchTab('locais')">&#127968; Locais</div>
     <div class="tab" data-tab="previsao" onclick="switchTab('previsao')">&#128302; Previs&#227;o <span class="tab-badge">2026</span></div>
   </div>
 
@@ -763,7 +769,8 @@ const IBGE_GEO = {
 };
 
 // ── STATE ──────────────────────────────────────────────────────────────────
-let _uf = 'SP', _cargo = 'governador', _ano = 2022, _candidato = '';
+let _uf = 'SP', _cargo = 'governador', _ano = 2026, _candidato = '';
+let _preCand2026 = {};  // {NM_UPPER → candidato obj}
 let _activeTab = 'mapa';
 let _mapLevel = 'uf', _mapCtx = {uf:'SP'}, _activeLayer = 'electoral';
 let _mapData = {}, _geoLayer = null, _heatLayer = null;
@@ -921,7 +928,7 @@ function _initCountdown() {
 function applyFilters() {
   _cargo     = document.getElementById('f-cargo').value;
   _uf        = document.getElementById('f-uf').value;
-  _ano       = parseInt(document.getElementById('f-ano').value, 10);
+  _ano       = 2026;
   _candidato = document.getElementById('cand-input').value.trim();
   _mapCtx    = {uf: _uf === 'BR' ? null : _uf};
   _mapLevel  = 'uf';
@@ -934,13 +941,51 @@ async function loadCandidatoList() {
   const dl = document.getElementById('cand-list');
   if (!dl) return;
   dl.innerHTML = '';
+  _preCand2026 = {};
+
+  // Pré-candidatos 2026 (dados estáticos pesquisados)
+  if (_ano === 2026) {
+    const pd = await api(`/api/precandidatos?uf=${_uf}&cargo=${encodeURIComponent(_cargo)}&ano=2026`);
+    (pd?.candidatos || []).forEach(c => {
+      _preCand2026[c.nm.toUpperCase()] = c;
+      const opt = document.createElement('option');
+      opt.value = c.nm;
+      const tag = c.status === 'confirmado' ? '✓' : '◌';
+      opt.label = `${c.nm} — ${c.partido} ${tag}`;
+      dl.appendChild(opt);
+    });
+  }
+
+  // Dados históricos BigQuery
   const d = await api(`/api/candidatos?ano=${_ano}&uf=${_uf}&cargo=${encodeURIComponent(_cargo)}`);
   (d?.candidatos || []).forEach(c => {
+    if (_preCand2026[c.nm.toUpperCase()]) return; // já incluído acima
     const opt = document.createElement('option');
     opt.value = c.nm;
     opt.label = c.pct_t1 != null ? `${c.nm} — ${c.pct_t1}%` : c.nm;
     dl.appendChild(opt);
   });
+}
+
+function showPreCandSocial(nm) {
+  if (_ano !== 2026) { document.getElementById('precand-info').style.display = 'none'; return; }
+  const c = _preCand2026[(nm || '').trim().toUpperCase()];
+  const el = document.getElementById('precand-info');
+  if (!c) { el.style.display = 'none'; return; }
+
+  document.getElementById('pi-cargo').textContent = _cargo === 'governador' ? 'GOV' : 'DEP FED';
+  document.getElementById('pi-partido').textContent = c.partido || '';
+  document.getElementById('pi-status').textContent =
+    c.status === 'confirmado' ? '✅ Confirmado' : c.status === 'citado' ? '📋 Citado' : '';
+
+  const icons = { instagram: '📸', youtube: '▶', x: '𝕏', tiktok: '🎵', facebook: 'f' };
+  const sociais = ['instagram','youtube','x','tiktok','facebook']
+    .filter(k => c[k])
+    .map(k => `${icons[k]} ${c[k]}`);
+  document.getElementById('pi-sociais').textContent = sociais.join('  ·  ');
+  document.getElementById('pi-obs').textContent = c.obs || '';
+
+  el.style.display = 'flex';
 }
 
 // ── TABS ───────────────────────────────────────────────────────────────────
@@ -1761,7 +1806,7 @@ function cmp2MapaSelectCand(evt, nm) {
   }
   _cmp2DataCache = null;
   _cmp2Render();
-  if (_cmp2MapaVisible) _cmp2LoadMapa();
+  if (_cmp2MapaVisible) _cmp2LoadMapa().catch(console.error);
   else cmp2ToggleMapa();
 }
 
@@ -1769,14 +1814,18 @@ function cmp2MapaReset() {
   _cmp2MapaCand = null; _cmp2MapaCand2 = null;
   _cmp2MapaTipo = 'partido'; _cmp2DataCache = null;
   _cmp2Render();
-  if (_cmp2MapaVisible) _cmp2LoadMapa();
+  if (_cmp2MapaVisible) _cmp2LoadMapa().catch(console.error);
 }
 
 async function cmp2IndSelect(ind, btn) {
   _cmp2Ind = ind;
   document.querySelectorAll('[id^="cmi-"]').forEach(b => b.classList.remove('active'));
   (btn || document.getElementById('cmi-none'))?.classList.add('active');
-  if (!_cmp2MapaVisible) { cmp2ToggleMapa(); return; }
+  if (!_cmp2MapaVisible) {
+    if (ind && !_cmp2IndCache) await _cmp2LoadIndicadores();
+    cmp2ToggleMapa();
+    return;
+  }
   if (ind && !_cmp2IndCache) await _cmp2LoadIndicadores();
   if (_cmp2GeoCache && _cmp2DataCache) _cmp2RenderTipo();
 }
@@ -1838,7 +1887,7 @@ function cmp2ToggleMapa() {
   if (panel) panel.style.display = _cmp2MapaVisible ? '' : 'none';
   if (btn) btn.style.background = _cmp2MapaVisible ? 'var(--grn2)' : 'var(--bg3)';
   if (btn) btn.style.color = _cmp2MapaVisible ? '#fff' : 'var(--tx2)';
-  if (_cmp2MapaVisible) _cmp2LoadMapa();
+  if (_cmp2MapaVisible) _cmp2LoadMapa().catch(console.error);
 }
 
 async function _cmp2LoadMapa() {
@@ -1865,7 +1914,7 @@ async function _cmp2LoadMapa() {
   const [geo, mapaD] = await Promise.all([
     _cmp2GeoCache
       ? Promise.resolve(_cmp2GeoCache)
-      : fetch(`/static/geo_mun_${uf.toUpperCase()}.geojson`).then(r => r.ok ? r.json() : null).catch(() => null),
+      : _nativeFetch(`/static/geo_mun_${uf.toUpperCase()}.geojson`).then(r => r.ok ? r.json() : null).catch(() => null),
     _cmp2DataCache ? Promise.resolve(_cmp2DataCache) : api(apiUrl),
   ]);
   _cmp2GeoCache  = geo;
@@ -2236,6 +2285,7 @@ async function loadComparativo() {
     _cmp2MapaCand = null;
     _cmp2MapaCand2 = null;
     _cmp2GeoCache = null;
+    _cmp2DataCache = null;
     _cmp2IndCache = null;
   }
   const empty = document.getElementById('cmp2-empty');
@@ -2731,7 +2781,7 @@ window.applyDashboardUpdate = function(update) {
     const f = update.set_filter;
     if (f.uf)       { _uf = f.uf;       const el=document.getElementById('f-uf');    if(el) el.value=_uf; }
     if (f.cargo)    { _cargo = f.cargo;  const el=document.getElementById('f-cargo'); if(el) el.value=_cargo; }
-    if (f.ano)      { _ano = f.ano;      const el=document.getElementById('f-ano');   if(el) el.value=_ano; }
+    if (f.ano)      { _ano = f.ano; }
     if (f.candidato){ _candidato=f.candidato; const el=document.getElementById('cand-input'); if(el) el.value=_candidato; }
     loadTab(_activeTab);
     if (_activeTab === 'mapa') reloadMap();
