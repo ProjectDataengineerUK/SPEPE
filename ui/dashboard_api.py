@@ -8671,27 +8671,38 @@ async def _bq_comparativo_indicadores(uf: str, ano: int) -> list[dict]:
                    ROUND(gini, 3)                   AS gini,
                    ROUND(pct_extrema_pobreza, 1)    AS extrema_pobreza
             FROM `{gold}.fact_ibge_municipio`
-            WHERE sg_uf = @uf AND ano = @ano
+            WHERE sg_uf = @uf AND ano >= 2000
+            QUALIFY ROW_NUMBER() OVER (PARTITION BY nm_municipio ORDER BY ano DESC) = 1
+        ),
+        ibge_dim AS (
+            SELECT DISTINCT cd_municipio_ibge, nm_municipio
+            FROM `{gold}.fact_ibge_municipio`
+            WHERE sg_uf = @uf AND ano >= 2000
+            QUALIFY ROW_NUMBER() OVER (PARTITION BY cd_municipio_ibge ORDER BY ano DESC) = 1
         ),
         saude AS (
-            SELECT i.nm_municipio AS nm,
+            SELECT d.nm_municipio AS nm,
                    ROUND(s.taxa_mortalidade_infantil_1000, 1) AS mortalidade,
                    ROUND(COALESCE(s.pct_cobertura_plano_saude,0)*100, 1) AS cobertura,
                    ROUND(s.idsus_score, 3)                   AS idsus
-            FROM `{gold}.fact_saude_municipio` s
-            LEFT JOIN (SELECT DISTINCT cd_municipio_ibge, nm_municipio FROM `{gold}.fact_ibge_municipio`) i
-              USING (cd_municipio_ibge)
-            WHERE s.sg_uf = @uf AND s.ano = @ano
+            FROM (
+                SELECT * FROM `{gold}.fact_saude_municipio`
+                WHERE sg_uf = @uf AND ano >= 2000
+                QUALIFY ROW_NUMBER() OVER (PARTITION BY cd_municipio_ibge ORDER BY ano DESC) = 1
+            ) s
+            LEFT JOIN ibge_dim d USING (cd_municipio_ibge)
         ),
         seg AS (
-            SELECT i.nm_municipio AS nm,
+            SELECT d.nm_municipio AS nm,
                    ROUND(s.ivs_total, 3)             AS ivs,
                    ROUND(s.taxa_homicidio_100k, 1)   AS homicidio,
                    ROUND(s.taxa_roubo_100k, 1)       AS roubo
-            FROM `{gold}.fact_seguranca_municipio` s
-            LEFT JOIN (SELECT DISTINCT cd_municipio_ibge, nm_municipio FROM `{gold}.fact_ibge_municipio`) i
-              USING (cd_municipio_ibge)
-            WHERE s.sg_uf = @uf AND s.ano = @ano
+            FROM (
+                SELECT * FROM `{gold}.fact_seguranca_municipio`
+                WHERE sg_uf = @uf AND ano >= 2000
+                QUALIFY ROW_NUMBER() OVER (PARTITION BY cd_municipio_ibge ORDER BY ano DESC) = 1
+            ) s
+            LEFT JOIN ibge_dim d USING (cd_municipio_ibge)
         )
         SELECT
             COALESCE(ibge.nm, saude.nm, seg.nm)  AS nm,
@@ -8706,7 +8717,6 @@ async def _bq_comparativo_indicadores(uf: str, ano: int) -> list[dict]:
     """
     params = [
         bigquery.ScalarQueryParameter("uf", "STRING", uf),
-        bigquery.ScalarQueryParameter("ano", "INT64", ano),
     ]
     rows = await asyncio.to_thread(
         lambda: list(
