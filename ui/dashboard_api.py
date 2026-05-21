@@ -8665,11 +8665,11 @@ async def _bq_comparativo_indicadores(uf: str, ano: int) -> list[dict]:
     query = f"""
         WITH ibge AS (
             SELECT nm_municipio AS nm,
-                   ROUND(idhm, 3)                  AS idhm,
-                   ROUND(renda_per_capita, 0)       AS renda,
-                   ROUND(taxa_alfabetizacao, 1)     AS alfab,
-                   ROUND(gini, 3)                   AS gini,
-                   ROUND(pct_extrema_pobreza, 1)    AS extrema_pobreza
+                   ROUND(idhm, 3)                                       AS idhm,
+                   ROUND(renda_per_capita, 0)                           AS renda,
+                   ROUND(100.0 - COALESCE(taxa_analfabetismo, 0), 1)   AS alfab,
+                   ROUND(gini, 3)                                       AS gini,
+                   ROUND(pct_extrema_pobreza, 1)                        AS extrema_pobreza
             FROM `{gold}.fact_ibge_municipio`
             WHERE sg_uf = @uf AND ano >= 2000
             QUALIFY ROW_NUMBER() OVER (PARTITION BY nm_municipio ORDER BY ano DESC) = 1

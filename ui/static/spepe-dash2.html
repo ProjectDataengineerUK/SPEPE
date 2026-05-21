@@ -1832,9 +1832,10 @@ async function _cmp2LoadIndicadores() {
   const d = await api(`/api/comparativo/indicadores?uf=${encodeURIComponent(uf)}&ano=2022`);
   if (loader) loader.style.display = 'none';
   if (!d || d.erro) return;
+  if (!d.municipios?.length) return;
   const norm = s => (s||'').normalize('NFD').replace(/[̀-ͯ]/g,'').toUpperCase().trim();
   _cmp2IndCache = {};
-  for (const m of (d.municipios || [])) _cmp2IndCache[norm(m.nm)] = m;
+  for (const m of d.municipios) _cmp2IndCache[norm(m.nm)] = m;
 }
 
 // meta: {field, label, dir:'asc'|'desc', unit}
