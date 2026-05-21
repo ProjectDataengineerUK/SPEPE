@@ -277,7 +277,6 @@ table.data tr:hover td{background:var(--bg3)}
     <div class="tab active" data-tab="resultados" onclick="switchTab('resultados')">&#128202; Resultados</div>
     <div class="tab" data-tab="eleitorado" onclick="switchTab('eleitorado')">&#128101; Eleitorado <span class="tab-badge">2026</span></div>
     <div class="tab" data-tab="comparativo" onclick="switchTab('comparativo');loadComparativo()">&#9878; Comparativo</div>
-    <div class="tab" data-tab="locais" onclick="switchTab('locais')">&#127968; Locais</div>
     <div class="tab" data-tab="previsao" onclick="switchTab('previsao')">&#128302; Previs&#227;o <span class="tab-badge">2026</span></div>
   </div>
 
@@ -383,6 +382,7 @@ table.data tr:hover td{background:var(--bg3)}
               style="font-size:.70rem;padding:3px 8px;background:var(--bg3);border:1px solid var(--br);border-radius:5px;color:var(--tx);width:140px;outline:none">
             <button onclick="loadComparativo()" style="padding:3px 12px;font-size:.70rem;background:var(--grn2);color:#fff;border:none;border-radius:5px;cursor:pointer;font-weight:600">Buscar</button>
             <button onclick="cmp2ToggleMapa()" id="cmp2-mapa-btn" style="padding:3px 10px;font-size:.70rem;background:var(--bg3);border:1px solid var(--br);border-radius:5px;cursor:pointer;color:var(--tx2)">&#128506; Mapa</button>
+            <button onclick="cmp2ToggleLocais()" id="cmp2-locais-btn" style="padding:3px 10px;font-size:.70rem;background:var(--bg3);border:1px solid var(--br);border-radius:5px;cursor:pointer;color:var(--tx2)">&#127968; Locais</button>
           </div>
         </div>
 
@@ -439,6 +439,46 @@ table.data tr:hover td{background:var(--bg3)}
           </div>
           <div id="cmp2-leaflet" style="height:340px"></div>
           <div id="cmp2-mapa-tooltip" style="display:none;position:absolute;pointer-events:none;background:var(--bg2);border:1px solid var(--br);border-radius:6px;padding:6px 10px;font-size:.62rem;z-index:9999;max-width:220px"></div>
+        </div>
+
+        <!-- locais de votação -->
+        <div id="cmp2-locais-panel" style="display:none;margin-bottom:10px;border:1px solid var(--br);border-radius:8px;overflow:hidden">
+          <div style="padding:6px 12px;background:var(--bg3);border-bottom:1px solid var(--br);display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+            <span style="font-size:.65rem;font-weight:700;color:var(--tx2)">&#127968; Locais de Vota&#231;&#227;o</span>
+            <span class="tag tag-grn" style="font-size:.60rem">TSE Cadastro</span>
+            <select id="loc-mun-sel" style="font-size:.70rem;background:var(--bg3);color:var(--tx);border:1px solid var(--br);border-radius:5px;padding:2px 6px;max-width:180px" onchange="onLocMunChange()">
+              <option value="">Todos os munic&#237;pios</option>
+            </select>
+            <select id="loc-zona-sel" style="font-size:.70rem;background:var(--bg3);color:var(--tx);border:1px solid var(--br);border-radius:5px;padding:2px 6px" onchange="onLocZonaChange()">
+              <option value="">Todas as zonas</option>
+            </select>
+            <span id="loc-loading" style="display:none;font-size:.70rem;color:var(--tx3)">Carregando&#8230;</span>
+            <div style="display:flex;gap:12px;margin-left:auto">
+              <span class="kpi" style="min-width:0;padding:0 8px"><div class="kpi-val" id="loc-zonas" style="font-size:.80rem">&mdash;</div><div class="kpi-lbl">Zonas</div></span>
+              <span class="kpi" style="min-width:0;padding:0 8px"><div class="kpi-val" id="loc-locais" style="font-size:.80rem">&mdash;</div><div class="kpi-lbl">Locais</div></span>
+              <span class="kpi" style="min-width:0;padding:0 8px"><div class="kpi-val" id="loc-secoes" style="font-size:.80rem">&mdash;</div><div class="kpi-lbl">Se&#231;&#245;es</div></span>
+              <span class="kpi" style="min-width:0;padding:0 8px"><div class="kpi-val" id="loc-coords" style="font-size:.80rem">&mdash;</div><div class="kpi-lbl">c/ coords</div></span>
+            </div>
+          </div>
+          <div style="display:flex;gap:8px;height:340px;padding:8px">
+            <div id="loc-leaflet" style="flex:1.6;border-radius:6px;overflow:hidden;background:#0d1117;min-height:200px"></div>
+            <div style="flex:1;overflow:hidden;display:flex;flex-direction:column;min-width:0">
+              <div id="loc-table-empty" style="display:none;padding:20px;text-align:center;color:var(--tx3);font-size:.75rem">
+                Selecione um munic&#237;pio para ver os locais no mapa.
+              </div>
+              <div style="overflow-y:auto;flex:1">
+                <table class="data">
+                  <thead><tr>
+                    <th onclick="locSort('nr_zona')" style="cursor:pointer">Zona</th>
+                    <th onclick="locSort('nm_municipio')" style="cursor:pointer">Munic&#237;pio</th>
+                    <th onclick="locSort('qt_locais')" style="cursor:pointer;text-align:right">Locais</th>
+                    <th onclick="locSort('qt_secoes')" style="cursor:pointer;text-align:right">Se&#231;&#245;es</th>
+                  </tr></thead>
+                  <tbody id="loc-tbody"></tbody>
+                </table>
+              </div>
+            </div>
+          </div>
         </div>
 
         <!-- tabelas -->
@@ -671,48 +711,6 @@ table.data tr:hover td{background:var(--bg3)}
       </div>
     </div>
 
-    <!-- TAB: LOCAIS DE VOTAÇÃO -->
-    <div class="tab-panel" id="tab-locais">
-      <div class="panel-scroll">
-        <div style="display:flex;align-items:center;gap:8px;padding:4px 0 8px;flex-wrap:wrap">
-          <span style="font-size:.80rem;font-weight:700;color:var(--tx)">Locais de Vota&#231;&#227;o</span>
-          <span class="tag tag-grn">&#127968; TSE Cadastro</span>
-          <select id="loc-mun-sel" style="font-size:.70rem;background:var(--bg3);color:var(--tx);border:1px solid var(--br);border-radius:5px;padding:3px 6px;max-width:200px" onchange="onLocMunChange()">
-            <option value="">Todos os munic&#237;pios</option>
-          </select>
-          <select id="loc-zona-sel" style="font-size:.70rem;background:var(--bg3);color:var(--tx);border:1px solid var(--br);border-radius:5px;padding:3px 6px" onchange="onLocZonaChange()">
-            <option value="">Todas as zonas</option>
-          </select>
-          <span id="loc-loading" style="display:none;font-size:.70rem;color:var(--tx3)">Carregando&#8230;</span>
-        </div>
-        <div class="kpi-row kpi-row-4">
-          <div class="kpi"><div class="kpi-val" id="loc-zonas">&mdash;</div><div class="kpi-lbl">Zonas eleitorais</div></div>
-          <div class="kpi"><div class="kpi-val" id="loc-locais">&mdash;</div><div class="kpi-lbl">Locais de vota&#231;&#227;o</div></div>
-          <div class="kpi"><div class="kpi-val" id="loc-secoes">&mdash;</div><div class="kpi-lbl">Se&#231;&#245;es</div></div>
-          <div class="kpi"><div class="kpi-val" id="loc-coords">&mdash;</div><div class="kpi-lbl">Com coordenadas</div></div>
-        </div>
-        <div style="display:flex;gap:8px;height:calc(100vh - var(--topbar) - var(--tabbar) - var(--chatbar) - 158px)">
-          <div id="loc-leaflet" style="flex:1.6;border-radius:8px;overflow:hidden;background:#0d1117;min-height:200px"></div>
-          <div style="flex:1;overflow:hidden;display:flex;flex-direction:column;min-width:0">
-            <div style="font-size:.68rem;font-weight:600;color:var(--tx2);padding:2px 0 6px;letter-spacing:.04em;text-transform:uppercase">Zonas / Locais</div>
-            <div id="loc-table-empty" style="display:none;padding:20px;text-align:center;color:var(--tx3);font-size:.75rem">
-              Selecione um munic&#237;pio para ver os locais de vota&#231;&#227;o no mapa.
-            </div>
-            <div style="overflow-y:auto;flex:1">
-              <table class="data">
-                <thead><tr>
-                  <th onclick="locSort('nr_zona')" style="cursor:pointer">Zona</th>
-                  <th onclick="locSort('nm_municipio')" style="cursor:pointer">Munic&#237;pio</th>
-                  <th onclick="locSort('qt_locais')" style="cursor:pointer;text-align:right">Locais</th>
-                  <th onclick="locSort('qt_secoes')" style="cursor:pointer;text-align:right">Se&#231;&#245;es</th>
-                </tr></thead>
-                <tbody id="loc-tbody"></tbody>
-              </table>
-            </div>
-          </div>
-        </div>
-      </div>
-    </div>
 
   </div><!-- /content -->
 
@@ -1021,7 +1019,6 @@ function loadTab(tab) {
     resultados:  loadResultados,
     eleitorado:  loadEleitorado,
     comparativo: loadComparativo,
-    locais:      loadLocais,
     previsao:    loadPrevisaoTab,
   };
   if (loaders[tab]) loaders[tab]();
@@ -1908,6 +1905,15 @@ function _geoCentroid(feat) {
   let lng = 0, lat = 0;
   for (const [x, y] of ring) { lng += x; lat += y; }
   return [lat / ring.length, lng / ring.length];
+}
+
+function cmp2ToggleLocais() {
+  const panel = document.getElementById('cmp2-locais-panel');
+  const btn   = document.getElementById('cmp2-locais-btn');
+  const visible = panel && panel.style.display !== 'none';
+  if (panel) panel.style.display = visible ? 'none' : '';
+  if (btn) { btn.style.background = visible ? 'var(--bg3)' : 'var(--grn2)'; btn.style.color = visible ? 'var(--tx2)' : '#fff'; }
+  if (!visible) loadLocais();
 }
 
 function cmp2ToggleMapa() {
