@@ -1645,42 +1645,63 @@ function cmp2HideCompare() {
 }
 
 // ── MAPA COMPARATIVO ────────────────────────────────────────────────────────
+let _cmp2MapaTipo  = 'partido'; // tipo de visualização atual
+let _cmp2GeoCache  = null;      // GeoJSON cacheado por UF
+let _cmp2DataCache = null;      // dados da API cacheados
+let _cmp2HeatLayer = null;      // camada Leaflet.heat
+
+const _CMP2_TIPOS = {
+  vencedor:   [{v:'partido',l:'Partido'},{v:'calor',l:'Calor'},{v:'margem',l:'Dom&#237;nio'},{v:'virada',l:'Virada 18&#x2192;22'}],
+  candidato:  [{v:'pct',l:'% Votos'},{v:'calor',l:'Calor'},{v:'crescimento',l:'Evolu&#231;&#227;o'}],
+  comparacao: [{v:'duelo',l:'Duelo'},{v:'margem',l:'Margem'}],
+};
+
+function cmp2MapaTipo(v, btn) {
+  _cmp2MapaTipo = v;
+  document.querySelectorAll('[id^="cmt-"]').forEach(b => b.classList.remove('active'));
+  if (btn) btn.classList.add('active');
+  if (_cmp2GeoCache && _cmp2DataCache) _cmp2RenderTipo();
+}
+
 function cmp2MapaSelectCand(evt, nm) {
-  // ignorar clique no checkbox
   if (evt && evt.target && evt.target.type === 'checkbox') return;
   const decoded = nm.replace(/&quot;/g, '"');
-  if (_cmp2MapaCand === decoded && !_cmp2MapaCand2) {
-    // segundo clique no mesmo = modo comparação (c1 já fixo, agora c2)
-    return;
-  }
   if (!_cmp2MapaCand) {
-    _cmp2MapaCand = decoded;
+    _cmp2MapaCand = decoded; _cmp2MapaTipo = 'pct';
   } else if (_cmp2MapaCand !== decoded && !_cmp2MapaCand2) {
-    _cmp2MapaCand2 = decoded;
+    _cmp2MapaCand2 = decoded; _cmp2MapaTipo = 'duelo';
   } else {
-    // terceiro clique = resetar para esse candidato sozinho
-    _cmp2MapaCand = decoded;
-    _cmp2MapaCand2 = null;
+    _cmp2MapaCand = decoded; _cmp2MapaCand2 = null; _cmp2MapaTipo = 'pct';
   }
-  _cmp2Render(); // re-render para atualizar highlight de linha
+  _cmp2DataCache = null;
+  _cmp2Render();
   if (_cmp2MapaVisible) _cmp2LoadMapa();
-  else { cmp2ToggleMapa(); } // abre mapa automaticamente
+  else cmp2ToggleMapa();
 }
 
 function cmp2MapaReset() {
-  _cmp2MapaCand = null;
-  _cmp2MapaCand2 = null;
+  _cmp2MapaCand = null; _cmp2MapaCand2 = null;
+  _cmp2MapaTipo = 'partido'; _cmp2DataCache = null;
   _cmp2Render();
   if (_cmp2MapaVisible) _cmp2LoadMapa();
 }
 
 function _pctColor(pct, maxPct, hue) {
-  // Gradiente escuro→brilhante baseado em pct/maxPct
   const t = Math.min(1, (pct || 0) / Math.max(maxPct || 1, 0.01));
   if (t < 0.01) return '#0f172a';
-  const l = Math.round(15 + t * 50);
-  const s = Math.round(50 + t * 40);
-  return `hsl(${hue},${s}%,${l}%)`;
+  return `hsl(${hue},${Math.round(50+t*40)}%,${Math.round(15+t*50)}%)`;
+}
+
+function _geoCentroid(feat) {
+  const g = feat.geometry; if (!g) return null;
+  let ring;
+  if (g.type === 'Polygon') ring = g.coordinates[0];
+  else if (g.type === 'MultiPolygon') ring = g.coordinates[0][0];
+  else return null;
+  if (!ring || !ring.length) return null;
+  let lng = 0, lat = 0;
+  for (const [x, y] of ring) { lng += x; lat += y; }
+  return [lat / ring.length, lng / ring.length];
 }
 
 function cmp2ToggleMapa() {
@@ -1699,9 +1720,6 @@ async function _cmp2LoadMapa() {
   const mapDiv = document.getElementById('cmp2-leaflet');
   if (!mapDiv) return;
 
-  const _normStr = s => (s||'').normalize('NFD').replace(/[̀-ͯ]/g,'').toUpperCase().trim();
-
-  // Inicializa Leaflet uma vez (ou recria se UF mudou — já resetado em loadComparativo)
   if (!_cmp2MapaMap) {
     _cmp2MapaMap = L.map(mapDiv, { zoomControl: true, scrollWheelZoom: false }).setView([-15, -47], 4);
     L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_nolabels/{z}/{x}/{y}{r}.png', {
@@ -1709,7 +1727,6 @@ async function _cmp2LoadMapa() {
     }).addTo(_cmp2MapaMap);
   }
 
-  // Decide URL da API conforme modo
   let apiUrl;
   if (_cmp2MapaCand) {
     apiUrl = `/api/comparativo/mapa/candidato?uf=${encodeURIComponent(uf)}&cargo=${encodeURIComponent(cargo)}&turno=1&candidato=${encodeURIComponent(_cmp2MapaCand)}`;
@@ -1719,159 +1736,271 @@ async function _cmp2LoadMapa() {
   }
 
   const [geo, mapaD] = await Promise.all([
-    fetch(`/static/geo_mun_${uf.toUpperCase()}.geojson`).then(r => r.ok ? r.json() : null).catch(() => null),
-    api(apiUrl),
+    _cmp2GeoCache
+      ? Promise.resolve(_cmp2GeoCache)
+      : fetch(`/static/geo_mun_${uf.toUpperCase()}.geojson`).then(r => r.ok ? r.json() : null).catch(() => null),
+    _cmp2DataCache ? Promise.resolve(_cmp2DataCache) : api(apiUrl),
   ]);
+  _cmp2GeoCache  = geo;
+  _cmp2DataCache = mapaD;
 
   if (!geo || !mapaD || !mapaD.municipios) {
     const msg = mapaD?.msg || 'Dados do mapa indisponíveis — execute tse_ingest primeiro';
     mapDiv.innerHTML = `<div style="padding:40px;text-align:center;color:var(--tx3);font-size:.7rem">${msg}</div>`;
     return;
   }
+  _cmp2RenderTipo();
+}
 
-  // Indexar municipios por nome normalizado
-  const munMap = {};
-  for (const m of mapaD.municipios) {
-    munMap[_normStr(m.nm_municipio)] = m;
+// ── Render central — sem nova chamada de API ─────────────────────────────────
+function _cmp2RenderTipo() {
+  if (!_cmp2GeoCache || !_cmp2DataCache || !_cmp2MapaMap) return;
+  const geo   = _cmp2GeoCache;
+  const mapaD = _cmp2DataCache;
+  const modo  = mapaD.modo || 'vencedor';
+
+  // Atualiza pills de tipo
+  const tipoBar = document.getElementById('cmp2-mapa-tipos');
+  if (tipoBar) {
+    const opts = _CMP2_TIPOS[modo] || _CMP2_TIPOS.vencedor;
+    if (!opts.find(o => o.v === _cmp2MapaTipo)) _cmp2MapaTipo = opts[0].v;
+    tipoBar.innerHTML = opts.map(o =>
+      `<button id="cmt-${o.v}" class="pill${_cmp2MapaTipo===o.v?' active':''}" onclick="cmp2MapaTipo('${o.v}',this)" style="font-size:.63rem;padding:2px 8px">${o.l}</button>`
+    ).join('');
   }
 
+  // Remove layers anteriores
   if (_cmp2MapaLayer) { _cmp2MapaLayer.remove(); _cmp2MapaLayer = null; }
+  if (_cmp2HeatLayer) { _cmp2HeatLayer.remove(); _cmp2HeatLayer = null; }
 
-  const tooltip = document.getElementById('cmp2-mapa-tooltip');
-  const modo = mapaD.modo || 'vencedor';
-  const maxPct = mapaD.max_pct || 15;
+  const _normStr = s => (s||'').normalize('NFD').replace(/[̀-ͯ]/g,'').toUpperCase().trim();
+  const munMap = {};
+  for (const m of mapaD.municipios) munMap[_normStr(m.nm_municipio)] = m;
+
+  if (_cmp2MapaTipo === 'calor') {
+    _cmp2AddHeatLayer(geo, mapaD, munMap, modo);
+  } else {
+    _cmp2AddPolygonLayer(geo, mapaD, munMap, modo);
+    try { _cmp2MapaMap.fitBounds(_cmp2MapaLayer.getBounds(), { padding: [10, 10] }); } catch(e) {}
+  }
+
+  _cmp2UpdateMapaHeader(modo, mapaD, munMap);
+  setTimeout(() => _cmp2MapaMap.invalidateSize(), 100);
+}
+
+// ── Calor (Leaflet.heat) ─────────────────────────────────────────────────────
+function _cmp2AddHeatLayer(geo, mapaD, munMap, modo) {
+  const _normStr = s => (s||'').normalize('NFD').replace(/[̀-ͯ]/g,'').toUpperCase().trim();
+  const pts = [];
+  let maxW = 1;
+  for (const feat of (geo.features || [])) {
+    const nm  = _normStr(feat.properties.name || '');
+    const d   = munMap[nm];
+    const ctr = _geoCentroid(feat);
+    if (!ctr || !d) continue;
+    let w = 0;
+    if (modo === 'candidato')  w = d.votos_2022 || d.votos_2018 || 0;
+    else if (modo === 'comparacao') w = Math.max(d.votos_c1_2022||0, d.votos_c2_2022||0, d.votos_c1_2018||0, d.votos_c2_2018||0);
+    else w = (d.votos_2022||0) + (d.votos_2018||0);
+    if (w > maxW) maxW = w;
+    pts.push([ctr[0], ctr[1], w]);
+  }
+  const norm = pts.map(([la, lo, w]) => [la, lo, Math.log1p(w) / Math.log1p(maxW)]);
+  _cmp2HeatLayer = L.heatLayer(norm, {
+    radius: 28, blur: 22, maxZoom: 12, max: 1,
+    gradient: { 0.0: '#060d1a', 0.25: '#0d2d6e', 0.5: '#1d4ed8', 0.72: '#eab308', 0.88: '#f97316', 1.0: '#ef4444' }
+  }).addTo(_cmp2MapaMap);
+  // Camada invisível só para fitBounds
+  const ghost = L.geoJSON(geo, { style: () => ({ opacity:0, fillOpacity:0 }) }).addTo(_cmp2MapaMap);
+  try { _cmp2MapaMap.fitBounds(ghost.getBounds(), { padding: [10, 10] }); } catch(e) {}
+  ghost.remove();
+}
+
+// ── Polígonos (todos os outros tipos) ────────────────────────────────────────
+function _cmp2AddPolygonLayer(geo, mapaD, munMap, modo) {
+  const _normStr = s => (s||'').normalize('NFD').replace(/[̀-ͯ]/g,'').toUpperCase().trim();
   const _partidoCor = p => (PARTIDO_COR||{})[p] || '#64748b';
+  const maxPct = mapaD.max_pct || 15;
 
-  // ── Função de cor por modo ──────────────────────────────────────────────
-  const _corMunicipio = (feat) => {
+  // Pré-computa maxima para escalas
+  let maxDelta = 0.1, maxMargem = 1;
+  for (const m of mapaD.municipios) {
+    const d = Math.abs((m.pct_2022||0) - (m.pct_2018||0));
+    if (d > maxDelta) maxDelta = d;
+    const mg = Math.abs((m.pct_c1_2022||m.pct_c1_2018||0) - (m.pct_c2_2022||m.pct_c2_2018||0));
+    if (mg > maxMargem) maxMargem = mg;
+    if ((m.pct_2022||0) > maxMargem) maxMargem = m.pct_2022;
+  }
+
+  const _cor = (feat) => {
     const nm = _normStr(feat.properties.name || feat.properties.description || '');
-    const d = munMap[nm];
-    if (!d) return { fillColor: '#0f172a', fillOpacity: 0.15, color: '#1e293b', weight: 0.4 };
+    const d  = munMap[nm];
+    const nil = { fillColor:'#0f172a', fillOpacity:0.1, color:'#1e293b', weight:0.4 };
+    if (!d) return nil;
+
+    if (modo === 'vencedor') {
+      if (_cmp2MapaTipo === 'partido') {
+        return { fillColor: _partidoCor(d.sg_partido_2022||d.sg_partido_2018), fillOpacity:0.78, color:'#0f172a', weight:0.5 };
+      }
+      if (_cmp2MapaTipo === 'margem') {
+        return { fillColor: _pctColor(d.pct_2022||d.pct_2018, Math.min(maxMargem,70), 270), fillOpacity:0.85, color:'#0f172a', weight:0.5 };
+      }
+      if (_cmp2MapaTipo === 'virada') {
+        if (d.mudou_lider)   return { fillColor:'#f97316', fillOpacity:0.88, color:'#0f172a', weight:0.5 };
+        if (d.mudou_partido) return { fillColor:'#eab308', fillOpacity:0.78, color:'#0f172a', weight:0.5 };
+        return { fillColor:'#1e293b', fillOpacity:0.55, color:'#0f172a', weight:0.4 };
+      }
+    }
     if (modo === 'candidato') {
-      // choropleth: 2022 prioritário, fallback 2018
-      const pct = d.pct_2022 > 0 ? d.pct_2022 : d.pct_2018;
-      return { fillColor: _pctColor(pct, maxPct, 142), fillOpacity: 0.85, color: '#0f172a', weight: 0.5 };
+      if (_cmp2MapaTipo === 'pct') {
+        const pct = d.pct_2022 > 0 ? d.pct_2022 : d.pct_2018;
+        return { fillColor: _pctColor(pct, maxPct, 142), fillOpacity:0.85, color:'#0f172a', weight:0.5 };
+      }
+      if (_cmp2MapaTipo === 'crescimento') {
+        const delta = (d.pct_2022||0) - (d.pct_2018||0);
+        if (!d.pct_2018 && !d.pct_2022) return nil;
+        if (delta >= 0) return { fillColor: _pctColor(delta, maxDelta, 142), fillOpacity:0.85, color:'#0f172a', weight:0.5 };
+        return { fillColor: _pctColor(-delta, maxDelta, 0), fillOpacity:0.85, color:'#0f172a', weight:0.5 };
+      }
     }
     if (modo === 'comparacao') {
       const lider = d.lider_2022 || d.lider_2018;
-      if (lider === 'c1') return { fillColor: _pctColor(d.pct_c1_2022||d.pct_c1_2018, maxPct, 210), fillOpacity: 0.85, color: '#0f172a', weight: 0.5 };
-      if (lider === 'c2') return { fillColor: _pctColor(d.pct_c2_2022||d.pct_c2_2018, maxPct, 0),   fillOpacity: 0.85, color: '#0f172a', weight: 0.5 };
-      return { fillColor: '#7c3aed', fillOpacity: 0.5, color: '#0f172a', weight: 0.5 };
+      if (_cmp2MapaTipo === 'duelo') {
+        if (lider==='c1') return { fillColor: _pctColor(d.pct_c1_2022||d.pct_c1_2018, maxPct, 210), fillOpacity:0.85, color:'#0f172a', weight:0.5 };
+        if (lider==='c2') return { fillColor: _pctColor(d.pct_c2_2022||d.pct_c2_2018, maxPct, 0),   fillOpacity:0.85, color:'#0f172a', weight:0.5 };
+        return { fillColor:'#7c3aed', fillOpacity:0.5, color:'#0f172a', weight:0.5 };
+      }
+      if (_cmp2MapaTipo === 'margem') {
+        const p1 = d.pct_c1_2022||d.pct_c1_2018||0, p2 = d.pct_c2_2022||d.pct_c2_2018||0;
+        const mg = Math.abs(p1-p2);
+        if (mg < 0.5) return { fillColor:'#7c3aed', fillOpacity:0.65, color:'#0f172a', weight:0.5 };
+        const hue = lider==='c1' ? 210 : lider==='c2' ? 0 : 270;
+        return { fillColor: _pctColor(mg, maxMargem, hue), fillOpacity:0.85, color:'#0f172a', weight:0.5 };
+      }
     }
-    // modo vencedor: cor do partido 2022
-    const cor = _partidoCor(d.sg_partido_2022);
-    return { fillColor: cor, fillOpacity: d ? 0.75 : 0.2, color: '#0f172a', weight: 0.5 };
+    return nil;
   };
 
-  // ── Tooltip por modo ────────────────────────────────────────────────────
-  const _tooltipHtml = (feat, d) => {
+  const _tip = (feat, d) => {
     const nm = feat.properties.name || '?';
-    if (!d) return `<div style="font-weight:700">${nm}</div><div style="color:var(--tx3)">Sem dados</div>`;
+    if (!d) return `<b>${nm}</b><div style="color:var(--tx3)">Sem dados</div>`;
+    const _pc = v => (PARTIDO_COR||{})[v] || '#64748b';
     if (modo === 'candidato') {
-      const nm22 = _cmp2MapaCand ? _cmp2MapaCand.split(' ').slice(0,3).join(' ') : '';
-      return `<div style="font-weight:700;margin-bottom:3px">${nm}</div>
-        ${d.pct_2022>0 ? `<div style="color:#4ade80">2022: <b>${_fmt(d.votos_2022)}</b> votos (${d.pct_2022.toFixed(1)}%)</div>` : ''}
-        ${d.pct_2018>0 ? `<div style="color:#93c5fd">2018: <b>${_fmt(d.votos_2018)}</b> votos (${d.pct_2018.toFixed(1)}%)</div>` : ''}
-        ${!d.pct_2022&&!d.pct_2018 ? `<div style="color:var(--tx3)">${nm22} sem votos aqui</div>` : ''}`;
+      const delta = ((d.pct_2022||0)-(d.pct_2018||0)).toFixed(1);
+      const dClr  = delta>0?'#4ade80':delta<0?'#f87171':'var(--tx3)';
+      return `<b>${nm}</b><div style="font-size:.58rem;color:var(--tx3)">${(_cmp2MapaCand||'').split(' ').slice(0,2).join(' ')}</div>
+        ${d.pct_2022>0?`<div style="color:#4ade80">2022: <b>${_fmt(d.votos_2022)}</b> (${d.pct_2022.toFixed(1)}%)</div>`:''}
+        ${d.pct_2018>0?`<div style="color:#93c5fd">2018: <b>${_fmt(d.votos_2018)}</b> (${d.pct_2018.toFixed(1)}%)</div>`:''}
+        ${(d.pct_2022>0&&d.pct_2018>0)?`<div style="color:${dClr};font-size:.58rem">&Delta; ${delta>0?'+':''}${delta}pp</div>`:''}`;
     }
     if (modo === 'comparacao') {
-      const c1 = (_cmp2MapaCand||'').split(' ')[0];
-      const c2 = (_cmp2MapaCand2||'').split(' ')[0];
-      const v1 = d.votos_c1_2022||d.votos_c1_2018||0;
-      const v2 = d.votos_c2_2022||d.votos_c2_2018||0;
-      const p1 = d.pct_c1_2022||d.pct_c1_2018||0;
-      const p2 = d.pct_c2_2022||d.pct_c2_2018||0;
-      const lider = d.lider_2022||d.lider_2018;
-      return `<div style="font-weight:700;margin-bottom:3px">${nm}</div>
-        <div style="color:#60a5fa">&#9632; ${c1}: <b>${_fmt(v1)}</b> (${p1.toFixed(1)}%)</div>
-        <div style="color:#f87171">&#9632; ${c2}: <b>${_fmt(v2)}</b> (${p2.toFixed(1)}%)</div>
-        <div style="color:var(--tx3);font-size:.60rem;margin-top:3px">${lider==='c1'?'▲ '+c1+' vence':lider==='c2'?'▲ '+c2+' vence':'Empate'}</div>`;
+      const c1=(_cmp2MapaCand||'').split(' ')[0], c2=(_cmp2MapaCand2||'').split(' ')[0];
+      const v1=d.votos_c1_2022||d.votos_c1_2018||0, v2=d.votos_c2_2022||d.votos_c2_2018||0;
+      const p1=(d.pct_c1_2022||d.pct_c1_2018||0).toFixed(1), p2=(d.pct_c2_2022||d.pct_c2_2018||0).toFixed(1);
+      const l=d.lider_2022||d.lider_2018, wc=l==='c1'?'#60a5fa':l==='c2'?'#f87171':'#a78bfa';
+      return `<b>${nm}</b><div style="color:${wc};font-size:.58rem;font-weight:600">&#9650; ${l==='c1'?c1:l==='c2'?c2:'Empate'}</div>
+        <div style="color:#60a5fa">&#9632; ${c1}: ${_fmt(v1)} (${p1}%)</div>
+        <div style="color:#f87171">&#9632; ${c2}: ${_fmt(v2)} (${p2}%)</div>`;
     }
-    // vencedor
-    const cor22 = _partidoCor(d.sg_partido_2022);
-    return `<div style="font-weight:700;margin-bottom:3px">${nm}</div>
-      <div>2022: <span style="color:${cor22};font-weight:600">${d.nm_vencedor_2022||'—'}</span> (${d.sg_partido_2022||'—'}) ${d.pct_2022?d.pct_2022.toFixed(1)+'%':''}</div>
+    const c22=_pc(d.sg_partido_2022), c18=_pc(d.sg_partido_2018);
+    return `<b>${nm}</b>
+      <div>2022: <span style="color:${c22};font-weight:600">${d.nm_vencedor_2022||'—'}</span> <span style="color:${c22}">(${d.sg_partido_2022||'—'})</span> ${d.pct_2022?d.pct_2022.toFixed(1)+'%':''}</div>
       <div style="color:var(--tx3)">2018: ${d.nm_vencedor_2018||'—'} (${d.sg_partido_2018||'—'}) ${d.pct_2018?d.pct_2018.toFixed(1)+'%':''}</div>
-      ${d.mudou_lider?'<div style="color:#f59e0b;font-size:.57rem">&#9650; Mudou lider</div>':''}`;
+      ${d.mudou_lider?'<div style="color:#f97316;font-size:.57rem">&#9889; Virada de l&#237;der</div>':d.mudou_partido?'<div style="color:#eab308;font-size:.57rem">&#9889; Mudou partido</div>':''}`;
   };
 
+  const tooltip = document.getElementById('cmp2-mapa-tooltip');
   _cmp2MapaLayer = L.geoJSON(geo, {
-    style: _corMunicipio,
+    style: _cor,
     onEachFeature: (feat, layer) => {
       const nm = _normStr(feat.properties.name || '');
-      const d = munMap[nm];
-      const origStyle = _corMunicipio(feat);
+      const d  = munMap[nm];
+      const os = _cor(feat);
       layer.on({
         mouseover: e => {
-          layer.setStyle({ ...origStyle, fillOpacity: 1, weight: 2, color: '#fff' });
-          if (tooltip) {
-            tooltip.innerHTML = _tooltipHtml(feat, d);
-            tooltip.style.display = 'block';
-          }
+          layer.setStyle({ ...os, fillOpacity: Math.min(1,(os.fillOpacity||0.7)+0.15), weight:2, color:'#fff' });
+          if (tooltip) { tooltip.innerHTML = _tip(feat,d); tooltip.style.display='block'; }
         },
         mousemove: e => {
-          if (tooltip) {
-            tooltip.style.left = (e.originalEvent.clientX + 12) + 'px';
-            tooltip.style.top  = (e.originalEvent.clientY - 10) + 'px';
-          }
+          if (tooltip) { tooltip.style.left=(e.originalEvent.clientX+14)+'px'; tooltip.style.top=(e.originalEvent.clientY-10)+'px'; }
         },
-        mouseout: () => {
-          _cmp2MapaLayer.resetStyle(layer);
-          if (tooltip) tooltip.style.display = 'none';
-        },
+        mouseout: () => { _cmp2MapaLayer.resetStyle(layer); if(tooltip) tooltip.style.display='none'; },
       });
     }
   }).addTo(_cmp2MapaMap);
+}
 
-  // Zoom no layer atual
-  try { _cmp2MapaMap.fitBounds(_cmp2MapaLayer.getBounds(), { padding: [10, 10] }); } catch(e) {}
-
-  // Atualizar header dinâmico
-  const tit  = document.getElementById('cmp2-mapa-titulo');
-  const sub  = document.getElementById('cmp2-mapa-subtitulo');
-  const rst  = document.getElementById('cmp2-mapa-reset-btn');
+// ── Header / legenda dinâmicos ───────────────────────────────────────────────
+function _cmp2UpdateMapaHeader(modo, mapaD, munMap) {
+  const tit   = document.getElementById('cmp2-mapa-titulo');
+  const sub   = document.getElementById('cmp2-mapa-subtitulo');
+  const rst   = document.getElementById('cmp2-mapa-reset-btn');
   const legDiv = document.getElementById('cmp2-mapa-legend');
+  const _pc   = p => (PARTIDO_COR||{})[p] || '#64748b';
+  const _dot  = (cor, lbl) =>
+    `<span style="display:flex;align-items:center;gap:3px"><span style="width:8px;height:8px;border-radius:2px;background:${cor};display:inline-block"></span>${lbl}</span>`;
+  const _grad = (hue, maxVal) => [0,.25,.5,.75,1].map(t => {
+    const c = _pctColor(t*maxVal, maxVal, hue);
+    return `<span style="width:${t===0?10:t===1?10:8}px;height:8px;border-radius:2px;background:${c};display:inline-block"></span>`;
+  }).join('');
+
   if (modo === 'candidato') {
     const nm1 = (_cmp2MapaCand||'').split(' ').slice(0,3).join(' ');
+    const subtexts = { pct:'% dos votos válidos por município', crescimento:'Evolução de % de votos — verde=cresceu / vermelho=caiu', calor:'Intensidade por volume de votos' };
     if (tit) tit.textContent = `📍 ${nm1}`;
-    if (sub) sub.textContent = 'Votos por município — clique em outro candidato para comparar';
+    if (sub) sub.textContent = subtexts[_cmp2MapaTipo] || '';
     if (rst) rst.style.display = '';
     if (legDiv) {
-      const steps = [0,25,50,75,100];
-      legDiv.innerHTML = steps.map(p => {
-        const c = _pctColor(p, 100, 142);
-        return `<span style="display:flex;align-items:center;gap:2px"><span style="width:10px;height:10px;border-radius:2px;background:${c};display:inline-block"></span><span>${p===0?'0%':p===100?'Máx':''}</span></span>`;
-      }).join('');
+      if (_cmp2MapaTipo === 'crescimento') {
+        legDiv.innerHTML = _dot('hsl(0,80%,45%)','Queda') + _dot('#334155','Estável') + _dot('hsl(142,80%,40%)','Cresceu');
+      } else if (_cmp2MapaTipo === 'calor') {
+        legDiv.innerHTML = _dot('#0d2d6e','Baixo') + _dot('#eab308','Médio') + _dot('#ef4444','Alto');
+      } else {
+        legDiv.innerHTML = _grad(142, mapaD.max_pct||15) +
+          `<span style="font-size:.58rem;color:var(--tx3);margin-left:3px">0→${(mapaD.max_pct||15).toFixed(1)}%</span>`;
+      }
     }
   } else if (modo === 'comparacao') {
-    const n1 = (_cmp2MapaCand||'').split(' ')[0];
-    const n2 = (_cmp2MapaCand2||'').split(' ')[0];
-    if (tit) tit.textContent = `🗺 ${n1} vs ${n2}`;
-    if (sub) sub.textContent = 'Azul = ' + n1 + '  ·  Vermelho = ' + n2;
+    const n1=(_cmp2MapaCand||'').split(' ')[0], n2=(_cmp2MapaCand2||'').split(' ')[0];
+    if (tit) tit.textContent = `⚔ ${n1} vs ${n2}`;
+    if (sub) sub.textContent = _cmp2MapaTipo==='margem' ? 'Intensidade pela margem de vitória' : `Azul=${n1} · Vermelho=${n2}`;
     if (rst) rst.style.display = '';
-    if (legDiv) legDiv.innerHTML =
-      `<span style="display:flex;align-items:center;gap:3px"><span style="width:8px;height:8px;border-radius:2px;background:hsl(210,80%,45%);display:inline-block"></span>${n1}</span>` +
-      `<span style="display:flex;align-items:center;gap:3px"><span style="width:8px;height:8px;border-radius:2px;background:hsl(0,80%,45%);display:inline-block"></span>${n2}</span>` +
-      `<span style="display:flex;align-items:center;gap:3px"><span style="width:8px;height:8px;border-radius:2px;background:#7c3aed;display:inline-block"></span>Empate</span>`;
+    if (legDiv) {
+      if (_cmp2MapaTipo === 'margem') {
+        legDiv.innerHTML = _dot('#7c3aed','Disputado') + _dot('hsl(210,80%,45%)',n1+' domina') + _dot('hsl(0,80%,45%)',n2+' domina');
+      } else {
+        legDiv.innerHTML = _dot('hsl(210,80%,45%)',n1) + _dot('hsl(0,80%,45%)',n2) + _dot('#7c3aed','Empate');
+      }
+    }
   } else {
-    if (tit) tit.textContent = '🗺 Mapa — Vencedor por Município';
-    if (sub) sub.textContent = 'Clique em um candidato para ver sua distribuição';
+    // vencedor
+    const subtexts = {
+      partido: 'Cor do partido vencedor em 2022',
+      calor:   'Volume total de votos por município',
+      margem:  'Quanto o vencedor dominou (roxo = mais dominante)',
+      virada:  'Municípios que mudaram de l&#237;der (laranja) ou partido (amarelo) entre 2018 e 2022',
+    };
+    if (tit) tit.textContent = '🗺 Mapa — Resultado por Município';
+    if (sub) sub.innerHTML = subtexts[_cmp2MapaTipo] || 'Clique em um candidato para ver sua distribuição';
     if (rst) rst.style.display = 'none';
     if (legDiv) {
-      const contagem = {};
-      for (const m of mapaD.municipios) {
-        const p = m.sg_partido_2022 || '?';
-        contagem[p] = (contagem[p] || 0) + 1;
+      if (_cmp2MapaTipo === 'partido') {
+        const cnt = {};
+        for (const m of mapaD.municipios) cnt[m.sg_partido_2022||'?'] = (cnt[m.sg_partido_2022||'?']||0)+1;
+        legDiv.innerHTML = Object.entries(cnt).sort((a,b)=>b[1]-a[1]).slice(0,6)
+          .map(([p,n]) => _dot(_pc(p), `${p} (${n})`)).join('');
+      } else if (_cmp2MapaTipo === 'virada') {
+        const nV = mapaD.municipios.filter(m=>m.mudou_lider).length;
+        const nP = mapaD.municipios.filter(m=>m.mudou_partido&&!m.mudou_lider).length;
+        const nE = mapaD.municipios.filter(m=>!m.mudou_lider&&!m.mudou_partido).length;
+        legDiv.innerHTML = _dot('#f97316',`Virada líder (${nV})`) + _dot('#eab308',`Mudou partido (${nP})`) + _dot('#1e293b',`Estável (${nE})`);
+      } else if (_cmp2MapaTipo === 'margem') {
+        legDiv.innerHTML = _dot('hsl(270,50%,20%)','Disputado') + _grad(270,70) + _dot('hsl(270,80%,55%)','Dominante');
+      } else if (_cmp2MapaTipo === 'calor') {
+        legDiv.innerHTML = _dot('#0d2d6e','Baixo') + _dot('#eab308','Médio') + _dot('#ef4444','Alto');
       }
-      const top = Object.entries(contagem).sort((a,b)=>b[1]-a[1]).slice(0,6);
-      legDiv.innerHTML = top.map(([p,n]) => {
-        const cor = _partidoCor(p);
-        return `<span style="display:flex;align-items:center;gap:3px"><span style="width:8px;height:8px;border-radius:2px;background:${cor};display:inline-block"></span>${p} (${n})</span>`;
-      }).join('');
     }
   }
-
-  setTimeout(() => _cmp2MapaMap.invalidateSize(), 100);
 }
 
 function cmp2Sort(col) {
