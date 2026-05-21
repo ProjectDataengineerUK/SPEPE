@@ -41,6 +41,7 @@ N_CADEIRAS_RJ = 46
 @dataclass
 class DeputadoResult:
     """Resultado completo do modelo M-F."""
+
     candidatos: list[str]
     partidos: dict[str, str]
     prob_eleicao: dict[str, float]
@@ -66,9 +67,7 @@ class DeputadoResult:
             for c in self.candidatos
         ]
         return (
-            pd.DataFrame(rows)
-            .sort_values("prob_eleicao", ascending=False)
-            .reset_index(drop=True)
+            pd.DataFrame(rows).sort_values("prob_eleicao", ascending=False).reset_index(drop=True)
         )
 
 
@@ -111,7 +110,9 @@ def prepare_deputado_features(
     votos_hist = df.get("votos_historico", df.get("votos_2022", pd.Series(0, index=df.index)))
     df["log_votos_hist"] = np.log1p(votos_hist.fillna(0))
 
-    df["incumbente_federal"] = df["incumbente_federal"].fillna(0).astype(float) if "incumbente_federal" in df else 0.0
+    df["incumbente_federal"] = (
+        df["incumbente_federal"].fillna(0).astype(float) if "incumbente_federal" in df else 0.0
+    )
 
     for col in ("posicao_estimada_nominata", "cadeiras_estimadas_partido"):
         norm_col = col + "_norm"
@@ -122,15 +123,21 @@ def prepare_deputado_features(
             df[norm_col] = 0.0
 
     for col in (
-        "forca_nominata", "indice_concentracao_top5",
-        "capilaridade_municipios", "apoios_prefeitos_ponderados",
+        "forca_nominata",
+        "indice_concentracao_top5",
+        "capilaridade_municipios",
+        "apoios_prefeitos_ponderados",
     ):
         if col not in df:
             df[col] = 0.0
         else:
             df[col] = df[col].fillna(0.0)
 
-    for src, dst in (("ig_followers", "ig_followers_log"), ("yt_subscribers", "yt_subscribers_log"), ("x_followers", "x_followers_log")):
+    for src, dst in (
+        ("ig_followers", "ig_followers_log"),
+        ("yt_subscribers", "yt_subscribers_log"),
+        ("x_followers", "x_followers_log"),
+    ):
         df[dst] = np.log1p(df[src].fillna(0)) if src in df else 0.0
 
     if train_stats is None:
@@ -140,9 +147,7 @@ def prepare_deputado_features(
         feat_mean = train_stats["feat_mean"]
         feat_std = train_stats["feat_std"]
 
-    X = np.column_stack(
-        [(df[c].values - feat_mean[c]) / (feat_std[c] + 1e-6) for c in feat_cols]
-    )
+    X = np.column_stack([(df[c].values - feat_mean[c]) / (feat_std[c] + 1e-6) for c in feat_cols])
 
     # Partido grouping (federações como entidade única)
     partido_series = df.get("partido", pd.Series("OUTROS", index=df.index))
@@ -339,9 +344,7 @@ def predict_deputados(
         + 0.25 * _normalize(_get_feat("forca_nominata"))
         + 0.20 * _normalize(_get_feat("apoios_prefeitos_ponderados"))
         + 0.15 * _normalize(_get_feat("capilaridade_municipios"))
-        + 0.10 * _normalize(
-            _get_feat("ig_followers_log") + _get_feat("yt_subscribers_log")
-        )
+        + 0.10 * _normalize(_get_feat("ig_followers_log") + _get_feat("yt_subscribers_log"))
         + 0.05 * (1 - _normalize(_get_feat("incumbente_federal")) * 0)
     )
 
@@ -392,7 +395,10 @@ def simulate_deputados_from_estimates(
     )
 
     candidatos = list(votos_media.keys())
-    score = {c: round(mc.votos_medio.get(c, 0) / (max(mc.votos_medio.values()) + 1), 4) for c in candidatos}
+    score = {
+        c: round(mc.votos_medio.get(c, 0) / (max(mc.votos_medio.values()) + 1), 4)
+        for c in candidatos
+    }
 
     return DeputadoResult(
         candidatos=candidatos,

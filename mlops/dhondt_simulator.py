@@ -229,8 +229,12 @@ class DHondtSimulator:
             n_simulacoes=n_simulacoes,
             probabilidade_eleicao=prob,
             votos_medio={c: float(votos_arr[:, i].mean()) for i, c in enumerate(candidatos)},
-            votos_p10={c: float(np.percentile(votos_arr[:, i], 10)) for i, c in enumerate(candidatos)},
-            votos_p90={c: float(np.percentile(votos_arr[:, i], 90)) for i, c in enumerate(candidatos)},
+            votos_p10={
+                c: float(np.percentile(votos_arr[:, i], 10)) for i, c in enumerate(candidatos)
+            },
+            votos_p90={
+                c: float(np.percentile(votos_arr[:, i], 90)) for i, c in enumerate(candidatos)
+            },
             cadeiras_medio_por_partido=cadeiras_medio,
         )
 

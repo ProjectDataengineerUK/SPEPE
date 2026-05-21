@@ -42,40 +42,100 @@ logger = logging.getLogger("spepe.mlops.pymc_governador_model")
 # 8 macrorregiões de planejamento do RJ (CEPERJ/SEPLAG)
 RJ_MACRORREGIOES = {
     "Metropolitana": [
-        "Rio de Janeiro", "Duque de Caxias", "Nova Iguaçu", "São Gonçalo",
-        "Niterói", "Belford Roxo", "Mesquita", "Nilópolis", "São João de Meriti",
-        "Queimados", "Itaguaí", "Seropédica", "Maricá", "Magé", "Japeri",
-        "Paracambi", "Guapimirim", "Tanguá", "Cachoeiras de Macacu", "Rio Bonito",
+        "Rio de Janeiro",
+        "Duque de Caxias",
+        "Nova Iguaçu",
+        "São Gonçalo",
+        "Niterói",
+        "Belford Roxo",
+        "Mesquita",
+        "Nilópolis",
+        "São João de Meriti",
+        "Queimados",
+        "Itaguaí",
+        "Seropédica",
+        "Maricá",
+        "Magé",
+        "Japeri",
+        "Paracambi",
+        "Guapimirim",
+        "Tanguá",
+        "Cachoeiras de Macacu",
+        "Rio Bonito",
     ],
     "Serra": [
-        "Petrópolis", "Teresópolis", "Nova Friburgo", "Sumidouro", "Bom Jardim",
-        "Cantagalo", "Cordeiro", "Duas Barras", "Macuco", "Santa Maria Madalena",
-        "São Sebastião do Alto", "Trajano de Moraes",
+        "Petrópolis",
+        "Teresópolis",
+        "Nova Friburgo",
+        "Sumidouro",
+        "Bom Jardim",
+        "Cantagalo",
+        "Cordeiro",
+        "Duas Barras",
+        "Macuco",
+        "Santa Maria Madalena",
+        "São Sebastião do Alto",
+        "Trajano de Moraes",
     ],
     "Baixadas Litorâneas": [
-        "Cabo Frio", "Araruama", "Armação dos Búzios", "Arraial do Cabo",
-        "Casimiro de Abreu", "Iguaba Grande", "Rio das Ostras", "São Pedro da Aldeia",
-        "Saquarema", "Silva Jardim",
+        "Cabo Frio",
+        "Araruama",
+        "Armação dos Búzios",
+        "Arraial do Cabo",
+        "Casimiro de Abreu",
+        "Iguaba Grande",
+        "Rio das Ostras",
+        "São Pedro da Aldeia",
+        "Saquarema",
+        "Silva Jardim",
     ],
     "Lagos": [
-        "Saquarema", "Araruama", "Cabo Frio", "Búzios",
+        "Saquarema",
+        "Araruama",
+        "Cabo Frio",
+        "Búzios",
     ],
     "Médio Paraíba": [
-        "Volta Redonda", "Barra Mansa", "Resende", "Itatiaia", "Porto Real",
-        "Quatis", "Rio Claro", "Barra do Piraí", "Valença", "Paraíba do Sul",
-        "Três Rios", "Vassouras", "Engenheiro Paulo de Frontin", "Miguel Pereira",
-        "Mendes", "Piraí",
+        "Volta Redonda",
+        "Barra Mansa",
+        "Resende",
+        "Itatiaia",
+        "Porto Real",
+        "Quatis",
+        "Rio Claro",
+        "Barra do Piraí",
+        "Valença",
+        "Paraíba do Sul",
+        "Três Rios",
+        "Vassouras",
+        "Engenheiro Paulo de Frontin",
+        "Miguel Pereira",
+        "Mendes",
+        "Piraí",
     ],
     "Norte": [
-        "Campos dos Goytacazes", "São Fidélis", "Cardoso Moreira", "São Francisco de Itabapoana",
-        "São João da Barra", "Quissamã",
+        "Campos dos Goytacazes",
+        "São Fidélis",
+        "Cardoso Moreira",
+        "São Francisco de Itabapoana",
+        "São João da Barra",
+        "Quissamã",
     ],
     "Noroeste": [
-        "Itaperuna", "Miracema", "Natividade", "Bom Jesus do Itabapoana", "Porciúncula",
-        "Varre-Sai", "Italva", "Laje do Muriaé", "São José de Ubá",
+        "Itaperuna",
+        "Miracema",
+        "Natividade",
+        "Bom Jesus do Itabapoana",
+        "Porciúncula",
+        "Varre-Sai",
+        "Italva",
+        "Laje do Muriaé",
+        "São José de Ubá",
     ],
     "Costa Verde": [
-        "Angra dos Reis", "Mangaratiba", "Paraty",
+        "Angra dos Reis",
+        "Mangaratiba",
+        "Paraty",
     ],
 }
 
@@ -113,9 +173,15 @@ def prepare_governador_features(
     extra_cols = ["taxa_rejeicao", "saldo_intencao_rejeicao", "apoios_prefeitos_ponderados"]
 
     df = df.copy()
-    df["log_populacao"] = np.log1p(df.get("populacao_total", pd.Series(0, index=df.index)).fillna(0))
+    df["log_populacao"] = np.log1p(
+        df.get("populacao_total", pd.Series(0, index=df.index)).fillna(0)
+    )
     df["log_renda"] = np.log1p(df.get("renda_per_capita", pd.Series(0, index=df.index)).fillna(0))
-    df["taxa_alfabetizacao"] = df["taxa_alfabetizacao"].fillna(85.0) if "taxa_alfabetizacao" in df else pd.Series(85.0, index=df.index)
+    df["taxa_alfabetizacao"] = (
+        df["taxa_alfabetizacao"].fillna(85.0)
+        if "taxa_alfabetizacao" in df
+        else pd.Series(85.0, index=df.index)
+    )
 
     for col in extra_cols:
         if col not in df:
@@ -157,8 +223,16 @@ def prepare_governador_features(
     cand_idx = cand_cat.codes
     cand_labels = list(cand_cat.categories)
 
-    is_new = df["is_new_candidate"].fillna(0).values.astype(int) if "is_new_candidate" in df else np.zeros(len(df), dtype=int)
-    poll_missing = df["poll_missing"].fillna(0).values.astype(int) if "poll_missing" in df else np.zeros(len(df), dtype=int)
+    is_new = (
+        df["is_new_candidate"].fillna(0).values.astype(int)
+        if "is_new_candidate" in df
+        else np.zeros(len(df), dtype=int)
+    )
+    poll_missing = (
+        df["poll_missing"].fillna(0).values.astype(int)
+        if "poll_missing" in df
+        else np.zeros(len(df), dtype=int)
+    )
 
     features = {
         "X": X,
