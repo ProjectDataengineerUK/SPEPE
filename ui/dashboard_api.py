@@ -3688,7 +3688,7 @@ async def _bq_locais_resumo(uf: str, cd_municipio: str | None) -> dict:
 
     zona_rows, mun_rows = await asyncio.gather(
         asyncio.to_thread(
-            lambda bp=base_params: list(
+            lambda bp=base_params: list(  # type: ignore[misc]
                 client.query(
                     zona_query,
                     job_config=bigquery.QueryJobConfig(query_parameters=bp),
@@ -5433,7 +5433,7 @@ async def _bq_data_audit() -> list[dict]:
                        TIMESTAMP_MILLIS(last_modified_time) AS last_modified
                 FROM `{settings.gcp_project_id}.{dataset}.__TABLES__`
             """
-            rows = await asyncio.to_thread(lambda q=q: list(client.query(q).result()))
+            rows = await asyncio.to_thread(lambda q=q: list(client.query(q).result()))  # type: ignore[misc]
             for r in rows:
                 meta[f"{dataset}.{r['table_id']}"] = {
                     "rows": int(r["row_count"] or 0),
@@ -5461,7 +5461,7 @@ async def _bq_data_audit() -> list[dict]:
 
     async def _fetch_range(key: str, q: str) -> tuple[str, dict]:
         try:
-            rows = await asyncio.to_thread(lambda q=q: list(client.query(q).result()))
+            rows = await asyncio.to_thread(lambda q=q: list(client.query(q).result()))  # type: ignore[misc]
             return key, {
                 "date_min": str(rows[0]["d_min"] or "")[:10],
                 "date_max": str(rows[0]["d_max"] or "")[:10],
@@ -5482,17 +5482,17 @@ async def _bq_data_audit() -> list[dict]:
         dr = date_ranges.get(key, {})
         if m is None:
             status = "missing"
-            rows = 0
+            row_count: int = 0
             size_mb = 0.0
             last_mod = ""
         elif m["rows"] == 0:
             status = "empty"
-            rows = 0
+            row_count = 0
             size_mb = m["size_mb"]
             last_mod = m["last_modified"]
         else:
             status = "ok"
-            rows = m["rows"]
+            row_count = m["rows"]
             size_mb = m["size_mb"]
             last_mod = m["last_modified"]
 
@@ -5504,7 +5504,7 @@ async def _bq_data_audit() -> list[dict]:
                 "icon": spec["icon"],
                 "label": spec["label"],
                 "status": status,
-                "rows": rows,
+                "rows": row_count,
                 "size_mb": size_mb,
                 "last_modified": last_mod,
                 "date_min": dr.get("date_min", ""),
@@ -5536,7 +5536,7 @@ async def debug_tables() -> JSONResponse:
                     FROM `{settings.gcp_project_id}.{dataset}.__TABLES__`
                     ORDER BY table_id
                 """
-                rows = await asyncio.to_thread(lambda q=query: list(client.query(q).result()))
+                rows = await asyncio.to_thread(lambda q=query: list(client.query(q).result()))  # type: ignore[misc]
                 for r in rows:
                     results.append(
                         {
