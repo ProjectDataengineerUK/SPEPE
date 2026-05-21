@@ -561,6 +561,20 @@ table.data tr:hover td{background:var(--bg3)}
             <button id="cmp2-mapa-reset-btn" onclick="cmp2MapaReset()" style="display:none;padding:2px 8px;font-size:.65rem;background:transparent;border:1px solid var(--br);border-radius:4px;cursor:pointer;color:var(--tx3)">&#8635; Vencedores</button>
             <div id="cmp2-mapa-legend" style="display:flex;gap:6px;margin-left:auto;flex-wrap:wrap;font-size:.68rem;color:var(--tx3)"></div>
           </div>
+          <div id="cmp2-mapa-tipos" style="padding:4px 10px;background:var(--bg3);border-bottom:1px solid var(--br);display:flex;gap:4px;flex-wrap:wrap;align-items:center"></div>
+          <div id="cmp2-mapa-ind" style="padding:3px 10px;background:var(--bg3);border-bottom:1px solid var(--br);display:flex;gap:4px;flex-wrap:wrap;align-items:center">
+            <span style="font-size:.60rem;color:var(--tx3);font-weight:600;letter-spacing:.04em;text-transform:uppercase;margin-right:2px">Socioec.</span>
+            <button id="cmi-none" class="pill active" onclick="cmp2IndSelect(null,this)" style="font-size:.61rem;padding:2px 7px">&#10005; Nenhum</button>
+            <button id="cmi-idhm" class="pill" onclick="cmp2IndSelect('idhm',this)" style="font-size:.61rem;padding:2px 7px">IDHM</button>
+            <button id="cmi-renda" class="pill" onclick="cmp2IndSelect('renda',this)" style="font-size:.61rem;padding:2px 7px">Renda</button>
+            <button id="cmi-alfab" class="pill" onclick="cmp2IndSelect('alfab',this)" style="font-size:.61rem;padding:2px 7px">Alfab.</button>
+            <button id="cmi-gini" class="pill" onclick="cmp2IndSelect('gini',this)" style="font-size:.61rem;padding:2px 7px">Gini</button>
+            <button id="cmi-mortalidade" class="pill" onclick="cmp2IndSelect('mortalidade',this)" style="font-size:.61rem;padding:2px 7px">Mortalidade</button>
+            <button id="cmi-cobertura" class="pill" onclick="cmp2IndSelect('cobertura',this)" style="font-size:.61rem;padding:2px 7px">Cob. Sa&#250;de</button>
+            <button id="cmi-ivs" class="pill" onclick="cmp2IndSelect('ivs',this)" style="font-size:.61rem;padding:2px 7px">IVS</button>
+            <button id="cmi-homicidio" class="pill" onclick="cmp2IndSelect('homicidio',this)" style="font-size:.61rem;padding:2px 7px">Homic&#237;dios</button>
+            <span id="cmp2-ind-loading" style="display:none;font-size:.60rem;color:var(--tx3);margin-left:4px">&#8230;</span>
+          </div>
           <div id="cmp2-leaflet" style="height:340px"></div>
           <div id="cmp2-mapa-tooltip" style="display:none;position:absolute;pointer-events:none;background:var(--bg2);border:1px solid var(--br);border-radius:6px;padding:6px 10px;font-size:.62rem;z-index:9999;max-width:220px"></div>
         </div>
@@ -1690,10 +1704,12 @@ function cmp2HideCompare() {
 }
 
 // ── MAPA COMPARATIVO ────────────────────────────────────────────────────────
-let _cmp2MapaTipo  = 'partido'; // tipo de visualização atual
-let _cmp2GeoCache  = null;      // GeoJSON cacheado por UF
-let _cmp2DataCache = null;      // dados da API cacheados
-let _cmp2HeatLayer = null;      // camada Leaflet.heat
+let _cmp2MapaTipo  = 'partido';
+let _cmp2GeoCache  = null;
+let _cmp2DataCache = null;
+let _cmp2HeatLayer = null;
+let _cmp2Ind       = null;      // indicador socioeconômico ativo (null = nenhum)
+let _cmp2IndCache  = null;      // {nm_norm → {idhm, renda, ...}} por UF
 
 const _CMP2_TIPOS = {
   vencedor:   [{v:'partido',l:'Partido'},{v:'calor',l:'Calor'},{v:'margem',l:'Dom&#237;nio'},{v:'virada',l:'Virada 18&#x2192;22'}],
@@ -1729,6 +1745,47 @@ function cmp2MapaReset() {
   _cmp2MapaTipo = 'partido'; _cmp2DataCache = null;
   _cmp2Render();
   if (_cmp2MapaVisible) _cmp2LoadMapa();
+}
+
+async function cmp2IndSelect(ind, btn) {
+  _cmp2Ind = ind;
+  document.querySelectorAll('[id^="cmi-"]').forEach(b => b.classList.remove('active'));
+  (btn || document.getElementById('cmi-none'))?.classList.add('active');
+  if (!_cmp2MapaVisible) { cmp2ToggleMapa(); return; }
+  if (ind && !_cmp2IndCache) await _cmp2LoadIndicadores();
+  if (_cmp2GeoCache && _cmp2DataCache) _cmp2RenderTipo();
+}
+
+async function _cmp2LoadIndicadores() {
+  const uf = (document.getElementById('cmp2-uf') || {}).value || 'SP';
+  const loader = document.getElementById('cmp2-ind-loading');
+  if (loader) loader.style.display = '';
+  const d = await api(`/api/comparativo/indicadores?uf=${encodeURIComponent(uf)}&ano=2022`);
+  if (loader) loader.style.display = 'none';
+  if (!d || d.erro) return;
+  const norm = s => (s||'').normalize('NFD').replace(/[̀-ͯ]/g,'').toUpperCase().trim();
+  _cmp2IndCache = {};
+  for (const m of (d.municipios || [])) _cmp2IndCache[norm(m.nm)] = m;
+}
+
+// meta: {field, label, dir:'asc'|'desc', unit}
+const _CMP2_IND_META = {
+  idhm:       {field:'idhm',       label:'IDHM',              dir:'desc', unit:'',      pal:'good'},
+  renda:      {field:'renda',      label:'Renda p/cap.',       dir:'desc', unit:'R$',    pal:'good'},
+  alfab:      {field:'alfab',      label:'Alfabetização',      dir:'desc', unit:'%',     pal:'good'},
+  gini:       {field:'gini',       label:'Gini',               dir:'asc',  unit:'',      pal:'bad'},
+  mortalidade:{field:'mortalidade',label:'Mortal. infantil',   dir:'asc',  unit:'‰',     pal:'bad'},
+  cobertura:  {field:'cobertura',  label:'Cob. plano saúde',   dir:'desc', unit:'%',     pal:'good'},
+  ivs:        {field:'ivs',        label:'IVS',                dir:'asc',  unit:'',      pal:'bad'},
+  homicidio:  {field:'homicidio',  label:'Homicídios/100k',    dir:'asc',  unit:'',      pal:'bad'},
+};
+
+function _indColor(val, min, max, pal) {
+  if (val == null || max === min) return '#1a2030';
+  const t = Math.max(0, Math.min(1, (val - min) / (max - min)));
+  // good: blue(low)→green(high) →better; bad: green(low)→red(high) →worse
+  if (pal === 'good') return `hsl(${Math.round(200 - t*80)},${Math.round(55+t*30)}%,${Math.round(18+t*38)}%)`;
+  return `hsl(${Math.round(120 - t*120)},${Math.round(55+t*30)}%,${Math.round(18+t*38)}%)`;
 }
 
 function _pctColor(pct, maxPct, hue) {
@@ -1822,7 +1879,10 @@ function _cmp2RenderTipo() {
   const munMap = {};
   for (const m of mapaD.municipios) munMap[_normStr(m.nm_municipio)] = m;
 
-  if (_cmp2MapaTipo === 'calor') {
+  if (_cmp2Ind && _cmp2IndCache) {
+    _cmp2AddIndicadorLayer(geo, munMap);
+    try { _cmp2MapaMap.fitBounds(_cmp2MapaLayer.getBounds(), { padding: [10, 10] }); } catch(e) {}
+  } else if (_cmp2MapaTipo === 'calor') {
     _cmp2AddHeatLayer(geo, mapaD, munMap, modo);
   } else {
     _cmp2AddPolygonLayer(geo, mapaD, munMap, modo);
@@ -1831,6 +1891,60 @@ function _cmp2RenderTipo() {
 
   _cmp2UpdateMapaHeader(modo, mapaD, munMap);
   setTimeout(() => _cmp2MapaMap.invalidateSize(), 100);
+}
+
+// ── Indicador socioeconômico ─────────────────────────────────────────────────
+function _cmp2AddIndicadorLayer(geo, munMap) {
+  const meta  = _CMP2_IND_META[_cmp2Ind];
+  if (!meta) return;
+  const norm  = s => (s||'').normalize('NFD').replace(/[̀-ͯ]/g,'').toUpperCase().trim();
+  const tooltip = document.getElementById('cmp2-mapa-tooltip');
+
+  // compute min/max across all municipalities in cache
+  const vals = Object.values(_cmp2IndCache).map(m => m[meta.field]).filter(v => v != null && v > 0);
+  const minV = Math.min(...vals), maxV = Math.max(...vals);
+
+  _cmp2MapaLayer = L.geoJSON(geo, {
+    style: feat => {
+      const key = norm(feat.properties.name || '');
+      const ind = _cmp2IndCache[key];
+      const val = ind?.[meta.field];
+      return {
+        fillColor: _indColor(val, minV, maxV, meta.pal),
+        fillOpacity: val != null ? 0.82 : 0.15,
+        color: '#1e2938', weight: 0.6, opacity: 0.8,
+      };
+    },
+    onEachFeature: (feat, layer) => {
+      const key   = norm(feat.properties.name || '');
+      const ind   = _cmp2IndCache[key];
+      const elec  = munMap[key];
+      const val   = ind?.[meta.field];
+      layer.on('mouseover', e => {
+        if (tooltip) {
+          const fmtV = val != null
+            ? (meta.unit === 'R$' ? `R$ ${_fmt(val)}` : `${val}${meta.unit}`)
+            : '—';
+          tooltip.style.display = '';
+          tooltip.style.left = (e.originalEvent.pageX + 12) + 'px';
+          tooltip.style.top  = (e.originalEvent.pageY - 28) + 'px';
+          tooltip.innerHTML  = `
+            <b>${feat.properties.name || key}</b><br>
+            <span style="color:#8b949e">${meta.label}: </span><b>${fmtV}</b>
+            ${elec ? `<br><span style="color:#6b7fc4">2018: ${elec.nm_vencedor_2018||'—'}</span>` : ''}
+            ${elec ? `<br><span style="color:#4ade80">2022: ${elec.nm_vencedor_2022||'—'}</span>` : ''}
+          `;
+        }
+      });
+      layer.on('mousemove', e => {
+        if (tooltip) {
+          tooltip.style.left = (e.originalEvent.pageX + 12) + 'px';
+          tooltip.style.top  = (e.originalEvent.pageY - 28) + 'px';
+        }
+      });
+      layer.on('mouseout', () => { if (tooltip) tooltip.style.display = 'none'; });
+    },
+  }).addTo(_cmp2MapaMap);
 }
 
 // ── Calor (Leaflet.heat) ─────────────────────────────────────────────────────
@@ -1989,6 +2103,29 @@ function _cmp2UpdateMapaHeader(modo, mapaD, munMap) {
     return `<span style="width:${t===0?10:t===1?10:8}px;height:8px;border-radius:2px;background:${c};display:inline-block"></span>`;
   }).join('');
 
+  // Indicador socioeconômico ativo: sobrepõe o header normal
+  if (_cmp2Ind && _CMP2_IND_META[_cmp2Ind]) {
+    const meta = _CMP2_IND_META[_cmp2Ind];
+    const vals = _cmp2IndCache ? Object.values(_cmp2IndCache).map(m=>m[meta.field]).filter(v=>v!=null&&v>0) : [];
+    const minV = vals.length ? Math.min(...vals) : 0;
+    const maxV = vals.length ? Math.max(...vals) : 1;
+    const fmtV = v => meta.unit === 'R$' ? `R$${_fmt(v)}` : `${v}${meta.unit}`;
+    if (tit) tit.textContent = `📊 Indicador: ${meta.label}`;
+    if (sub) sub.textContent = meta.pal==='good' ? '🔵 baixo → 🟢 alto (melhor)' : '🟢 baixo (melhor) → 🔴 alto';
+    if (rst) rst.style.display = (_cmp2MapaCand ? '' : 'none');
+    if (legDiv) {
+      const steps = [0, 0.33, 0.66, 1];
+      legDiv.innerHTML = steps.map(t => {
+        const v = minV + t * (maxV - minV);
+        const c = _indColor(v, minV, maxV, meta.pal);
+        return `<span style="display:flex;align-items:center;gap:2px;font-size:.58rem;color:var(--tx3)">
+          <span style="width:9px;height:9px;border-radius:2px;background:${c};display:inline-block"></span>${fmtV(Math.round(v*100)/100)}
+        </span>`;
+      }).join('');
+    }
+    return;
+  }
+
   if (modo === 'candidato') {
     const nm1 = (_cmp2MapaCand||'').split(' ').slice(0,3).join(' ');
     const subtexts = { pct:'% dos votos válidos por município', crescimento:'Evolução de % de votos — verde=cresceu / vermelho=caiu', calor:'Intensidade por volume de votos' };
@@ -2073,6 +2210,8 @@ async function loadComparativo() {
     _cmp2MapaUF = uf.toUpperCase();
     _cmp2MapaCand = null;
     _cmp2MapaCand2 = null;
+    _cmp2GeoCache = null;
+    _cmp2IndCache = null;
   }
   const empty = document.getElementById('cmp2-empty');
   if (empty) { empty.style.display = 'block'; empty.textContent = 'Carregando...'; }

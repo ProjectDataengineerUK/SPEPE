@@ -151,6 +151,7 @@ _PUBLIC_API_PATHS = {
     "/api/kpi",
     "/api/mapa/locais",
     "/api/locais/resumo",
+    "/api/comparativo/indicadores",
     "/api/model/status",
     "/api/model/shap",
     "/api/resultados/partido",
@@ -8044,3 +8045,99 @@ async def get_comparativo_partidos(
             "partidos": partidos_final,
         }
     )
+
+
+@app.get("/api/comparativo/indicadores")
+async def get_comparativo_indicadores(
+    uf: str = Query("SP"),
+    ano: int = Query(2022),
+) -> JSONResponse:
+    """Indicadores socioeconômicos por município para overlay no mapa comparativo.
+
+    Mescla IBGE (socioeconômico), Saúde (DataSUS) e Segurança em uma única resposta
+    indexada por nm (nome do município). Sem limit — retorna todos os municípios da UF.
+    """
+    if not (settings.gcp_project_id and os.environ.get("USE_BIGQUERY", "").lower() == "true"):
+        return JSONResponse({"municipios": [], "fonte": "bigquery_indisponivel"})
+    try:
+        result = await _bq_comparativo_indicadores(uf.upper(), ano)
+        return JSONResponse({"municipios": result, "fonte": "bigquery", "uf": uf.upper(), "ano": ano})
+    except Exception as exc:
+        logger.warning("comparativo/indicadores falhou: %s", exc)
+        return JSONResponse({"municipios": [], "erro": str(exc)})
+
+
+async def _bq_comparativo_indicadores(uf: str, ano: int) -> list[dict]:
+    from google.cloud import bigquery
+
+    client = bigquery.Client(project=settings.gcp_project_id)
+    gold = f"{settings.gcp_project_id}.{settings.bigquery_dataset_gold}"
+
+    query = f"""
+        WITH ibge AS (
+            SELECT nm_municipio AS nm,
+                   ROUND(idhm, 3)                  AS idhm,
+                   ROUND(renda_per_capita, 0)       AS renda,
+                   ROUND(taxa_alfabetizacao, 1)     AS alfab,
+                   ROUND(gini, 3)                   AS gini,
+                   ROUND(pct_extrema_pobreza, 1)    AS extrema_pobreza
+            FROM `{gold}.fact_ibge_municipio`
+            WHERE sg_uf = @uf AND ano = @ano
+        ),
+        saude AS (
+            SELECT i.nm_municipio AS nm,
+                   ROUND(s.taxa_mortalidade_infantil_1000, 1) AS mortalidade,
+                   ROUND(COALESCE(s.pct_cobertura_plano_saude,0)*100, 1) AS cobertura,
+                   ROUND(s.idsus_score, 3)                   AS idsus
+            FROM `{gold}.fact_saude_municipio` s
+            LEFT JOIN (SELECT DISTINCT cd_municipio_ibge, nm_municipio FROM `{gold}.fact_ibge_municipio`) i
+              USING (cd_municipio_ibge)
+            WHERE s.sg_uf = @uf AND s.ano = @ano
+        ),
+        seg AS (
+            SELECT i.nm_municipio AS nm,
+                   ROUND(s.ivs_total, 3)             AS ivs,
+                   ROUND(s.taxa_homicidio_100k, 1)   AS homicidio,
+                   ROUND(s.taxa_roubo_100k, 1)       AS roubo
+            FROM `{gold}.fact_seguranca_municipio` s
+            LEFT JOIN (SELECT DISTINCT cd_municipio_ibge, nm_municipio FROM `{gold}.fact_ibge_municipio`) i
+              USING (cd_municipio_ibge)
+            WHERE s.sg_uf = @uf AND s.ano = @ano
+        )
+        SELECT
+            COALESCE(ibge.nm, saude.nm, seg.nm)  AS nm,
+            ibge.idhm, ibge.renda, ibge.alfab, ibge.gini, ibge.extrema_pobreza,
+            saude.mortalidade, saude.cobertura, saude.idsus,
+            seg.ivs, seg.homicidio, seg.roubo
+        FROM ibge
+        FULL OUTER JOIN saude USING (nm)
+        FULL OUTER JOIN seg   USING (nm)
+        WHERE COALESCE(ibge.nm, saude.nm, seg.nm) IS NOT NULL
+        ORDER BY nm
+    """
+    params = [
+        bigquery.ScalarQueryParameter("uf", "STRING", uf),
+        bigquery.ScalarQueryParameter("ano", "INT64", ano),
+    ]
+    rows = await asyncio.to_thread(
+        lambda: list(
+            client.query(query, job_config=bigquery.QueryJobConfig(query_parameters=params)).result()
+        )
+    )
+    return [
+        {
+            "nm": r["nm"],
+            "idhm": r["idhm"],
+            "renda": r["renda"],
+            "alfab": r["alfab"],
+            "gini": r["gini"],
+            "extrema_pobreza": r["extrema_pobreza"],
+            "mortalidade": r["mortalidade"],
+            "cobertura": r["cobertura"],
+            "idsus": r["idsus"],
+            "ivs": r["ivs"],
+            "homicidio": r["homicidio"],
+            "roubo": r["roubo"],
+        }
+        for r in rows
+    ]
