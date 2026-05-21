@@ -157,6 +157,17 @@ table.data tr:hover td{background:var(--bg3)}
 .dig-section{display:none}
 .dig-section.active{display:block}
 
+/* ── PREVISÃO 2026 sub-nav ── */
+#prev-filterbar{display:flex;align-items:center;gap:8px;padding:7px 10px;background:var(--bg2);border-bottom:1px solid var(--br);flex-shrink:0;flex-wrap:wrap}
+#prev-filterbar select,#prev-filterbar input{font-size:.70rem;background:var(--bg3);color:var(--tx);border:1px solid var(--br);border-radius:5px;padding:3px 7px}
+#prev-filterbar input{min-width:140px}
+.prev-subnav{display:flex;gap:2px;padding:5px 10px;background:var(--bg2);border-bottom:1px solid var(--br);flex-shrink:0}
+.prev-stab{font-size:.70rem;font-weight:600;color:var(--tx3);padding:4px 10px;border-radius:5px;cursor:pointer;border:none;background:none;white-space:nowrap}
+.prev-stab:hover{background:var(--bg3);color:var(--tx)}
+.prev-stab.active{background:var(--bg3);color:#fff;border-bottom:2px solid var(--grn2)}
+.prev-subpanel{display:none;flex:1;overflow:hidden;flex-direction:column}
+.prev-subpanel.active{display:flex}
+
 /* ── RANKING tab ── */
 .ranking-layout{display:grid;grid-template-columns:60% 40%;gap:12px;flex:1;min-height:0;overflow:hidden}
 
@@ -237,28 +248,6 @@ table.data tr:hover td{background:var(--bg3)}
   <nav id="topbar">
     <div class="tb-logo"><span>SP</span>EPE</div>
     <div class="tb-sep"></div>
-    <input id="cand-input" type="text" placeholder="Candidato..." list="cand-list" autocomplete="off" oninput="applyFilters();showPreCandSocial(this.value)">
-    <datalist id="cand-list"></datalist>
-    <select class="tb-sel" id="f-cargo" onchange="applyFilters()">
-      <option value="presidente">Presidente</option>
-      <option value="governador" selected>Governador</option>
-      <option value="senador">Senador</option>
-      <option value="dep federal">Dep. Federal</option>
-      <option value="dep estadual">Dep. Estadual</option>
-    </select>
-    <select class="tb-sel" id="f-uf" onchange="applyFilters()">
-      <option value="BR">BR</option>
-      <option value="AC">AC</option><option value="AL">AL</option><option value="AM">AM</option>
-      <option value="AP">AP</option><option value="BA">BA</option><option value="CE">CE</option>
-      <option value="DF">DF</option><option value="ES">ES</option><option value="GO">GO</option>
-      <option value="MA">MA</option><option value="MG">MG</option><option value="MS">MS</option>
-      <option value="MT">MT</option><option value="PA">PA</option><option value="PB">PB</option>
-      <option value="PE">PE</option><option value="PI">PI</option><option value="PR">PR</option>
-      <option value="RJ">RJ</option><option value="RN">RN</option><option value="RO">RO</option>
-      <option value="RR">RR</option><option value="RS">RS</option><option value="SC">SC</option>
-      <option value="SE">SE</option><option value="SP" selected>SP</option><option value="TO">TO</option>
-    </select>
-    <span class="tb-sel" style="cursor:default;user-select:none">2026</span>
     <div class="tb-right">
       <div class="src-dots" title="Auditoria de dados — clique para verificar tabelas" style="cursor:pointer" onclick="openDataAudit()">
         <div class="sdot grn" title="TSE"></div>
@@ -285,11 +274,8 @@ table.data tr:hover td{background:var(--bg3)}
 
   <!-- TAB BAR -->
   <div id="tabbar">
-    <div class="tab active" data-tab="mapa" onclick="switchTab('mapa')">&#128506; Mapa</div>
-    <div class="tab" data-tab="resultados" onclick="switchTab('resultados')">&#128202; Resultados</div>
+    <div class="tab active" data-tab="resultados" onclick="switchTab('resultados')">&#128202; Resultados</div>
     <div class="tab" data-tab="eleitorado" onclick="switchTab('eleitorado')">&#128101; Eleitorado <span class="tab-badge">2026</span></div>
-    <div class="tab" data-tab="digital" onclick="switchTab('digital')">&#128241; Digital <span class="tab-badge">2026</span></div>
-    <div class="tab" data-tab="ranking" onclick="switchTab('ranking')">&#127942; Ranking</div>
     <div class="tab" data-tab="comparativo" onclick="switchTab('comparativo');loadComparativo()">&#9878; Comparativo</div>
     <div class="tab" data-tab="locais" onclick="switchTab('locais')">&#127968; Locais</div>
     <div class="tab" data-tab="previsao" onclick="switchTab('previsao')">&#128302; Previs&#227;o <span class="tab-badge">2026</span></div>
@@ -305,37 +291,8 @@ table.data tr:hover td{background:var(--bg3)}
   <!-- CONTENT -->
   <div id="content">
 
-    <!-- TAB: MAPA -->
-    <div class="tab-panel active" id="tab-mapa">
-      <div id="leaflet-map" style="flex:1;position:relative">
-        <div id="map-overlay-tl">
-          <div class="map-crumb" id="map-breadcrumb"><span onclick="resetMap()">Brasil</span></div>
-          <div class="map-zoom-group">
-            <button class="map-btn active" data-level="uf" onclick="setMapLevel('uf')">&#127757; UF</button>
-            <button class="map-btn" data-level="nacional" onclick="setMapLevel('nacional')">&#127758; Nacional</button>
-            <button class="map-btn" data-level="regiao" onclick="setMapLevel('regiao')">&#128205; Regi&#227;o</button>
-            <button class="map-btn" data-level="municipio" onclick="setMapLevel('municipio')">&#127968; Mun.</button>
-          </div>
-        </div>
-        <div id="map-overlay-tr">
-          <button class="layer-chip active" data-layer="electoral" onclick="swapLayer('electoral')">&#127942; Eleit.</button>
-          <button class="layer-chip" data-layer="economic" onclick="swapLayer('economic')">&#128202; IBGE</button>
-          <button class="layer-chip" data-layer="health" onclick="swapLayer('health')">&#127973; Sa&#250;de</button>
-          <button class="layer-chip" data-layer="security" onclick="swapLayer('security')">&#128737; Seg.</button>
-          <button class="layer-chip" data-layer="poll" onclick="swapLayer('poll')">&#128203; Pesq.</button>
-          <button class="layer-chip" data-layer="pred" onclick="swapLayer('pred')">&#128302; Pred.</button>
-        </div>
-        <div id="map-overlay-bl">
-          <button class="map-btn" id="btn-heat" onclick="toggleHeatmap()">&#127777; Mapa de Calor</button>
-        </div>
-        <div id="map-overlay-br">
-          <div id="map-legend"></div>
-        </div>
-      </div>
-    </div>
-
     <!-- TAB: RESULTADOS -->
-    <div class="tab-panel" id="tab-resultados">
+    <div class="tab-panel active" id="tab-resultados">
       <div class="panel-scroll">
         <div class="kpi-row" id="res-kpis">
           <div class="kpi"><div class="kpi-val" id="res-votos">&mdash;</div><div class="kpi-lbl">Total de votos</div></div>
@@ -366,109 +323,8 @@ table.data tr:hover td{background:var(--bg3)}
     <!-- TAB: ELEITORADO -->
     <div class="tab-panel" id="tab-eleitorado">
       <div class="panel-scroll">
-        <div style="display:flex;align-items:center;gap:8px;margin-bottom:12px">
-          <span style="font-size:.80rem;font-weight:700;color:var(--tx)">Perfil do Eleitorado</span>
-          <span class="tag tag-grn">&#128197; Dados 2026</span>
-        </div>
-        <div class="kpi-row kpi-row-4">
-          <div class="kpi"><div class="kpi-val" id="el-total">&mdash;</div><div class="kpi-lbl">Total eleitores</div></div>
-          <div class="kpi"><div class="kpi-val" id="el-fem">&mdash;</div><div class="kpi-lbl">% mulheres</div></div>
-          <div class="kpi"><div class="kpi-val" id="el-jov">&mdash;</div><div class="kpi-lbl">% jovens 16-24</div></div>
-          <div class="kpi"><div class="kpi-val" id="el-sup">&mdash;</div><div class="kpi-lbl">% ens. superior</div></div>
-        </div>
-        <div class="chart-2x2" style="height:calc(100vh - var(--topbar) - var(--tabbar) - var(--chatbar) - 140px)">
-          <div class="chart-panel"><div class="chart-title">G&#234;nero</div><div class="chart-wrap"><canvas id="chart-genero"></canvas></div></div>
-          <div class="chart-panel"><div class="chart-title">Faixa Et&#225;ria</div><div class="chart-wrap"><canvas id="chart-idade"></canvas></div></div>
-          <div class="chart-panel"><div class="chart-title">Escolaridade</div><div class="chart-wrap"><canvas id="chart-edu"></canvas></div></div>
-          <div class="chart-panel"><div class="chart-title">Evolu&#231;&#227;o 2018 → 2022</div><div class="chart-wrap"><canvas id="chart-evolucao"></canvas></div></div>
-        </div>
-      </div>
-    </div>
-
-    <!-- TAB: DIGITAL -->
-    <div class="tab-panel" id="tab-digital">
-      <div class="panel-scroll">
-        <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px">
-          <span style="font-size:.80rem;font-weight:700;color:var(--tx)">Monitor Digital</span>
-          <span class="tag tag-blu">&#128197; Tempo Real</span>
-        </div>
-        <div class="kpi-row kpi-row-4">
-          <div class="kpi"><div class="kpi-val" id="dig-sent">&mdash;</div><div class="kpi-lbl">Sentimento m&#233;dio</div></div>
-          <div class="kpi"><div class="kpi-val" id="dig-vol">&mdash;</div><div class="kpi-lbl">Men&#231;&#245;es (90d)</div></div>
-          <div class="kpi"><div class="kpi-val" id="dig-top">&mdash;</div><div class="kpi-lbl">Mais mencionado</div></div>
-          <div class="kpi"><div class="kpi-val" id="dig-trend">&mdash;</div><div class="kpi-lbl">Tend&#234;ncia</div></div>
-        </div>
-        <div class="pill-row">
-          <button class="pill active" onclick="switchDig('social',this)">Social</button>
-          <button class="pill" onclick="switchDig('meta',this)">Meta Ads</button>
-          <button class="pill" onclick="switchDig('trends',this)">Google Trends</button>
-          <button class="pill" onclick="switchDig('gdelt',this)">GDELT</button>
-        </div>
-        <div class="dig-section active" id="dig-social">
-          <div class="results-grid" style="height:calc(100vh - var(--topbar) - var(--tabbar) - var(--chatbar) - 200px)">
-            <div class="chart-panel"><div class="chart-title">Sentimento por candidato</div><div class="chart-wrap"><canvas id="chart-sent-cand"></canvas></div></div>
-            <div class="chart-panel"><div class="chart-title">Volume de men&#231;&#245;es semanal</div><div class="chart-wrap"><canvas id="chart-vol-week"></canvas></div></div>
-          </div>
-        </div>
-        <div class="dig-section" id="dig-meta">
-          <div class="chart-panel" style="height:calc(100vh - var(--topbar) - var(--tabbar) - var(--chatbar) - 200px)">
-            <div class="chart-title">Investimento em publicidade (Meta)</div>
-            <div class="chart-wrap"><canvas id="chart-meta-spend"></canvas></div>
-          </div>
-        </div>
-        <div class="dig-section" id="dig-trends">
-          <div class="chart-panel" style="height:calc(100vh - var(--topbar) - var(--tabbar) - var(--chatbar) - 200px)">
-            <div class="chart-title">Interesse de busca (Google Trends)</div>
-            <div class="chart-wrap"><canvas id="chart-trends"></canvas></div>
-          </div>
-        </div>
-        <div class="dig-section" id="dig-gdelt">
-          <div class="shdr">Eventos GDELT Recentes</div>
-          <div id="gdelt-list"><div class="empty">Carregando...</div></div>
-        </div>
-        <div id="dig-no-tokens" style="display:none;background:var(--bg2);border:1px solid var(--br);border-radius:8px;padding:20px;text-align:center;color:var(--tx2);font-size:.75rem">
-          Monitor social em configura&#231;&#227;o &mdash; dados de RSS dispon&#237;veis em breve.
-        </div>
-      </div>
-    </div>
-
-    <!-- TAB: RANKING -->
-    <div class="tab-panel" id="tab-ranking">
-      <div class="panel-scroll">
-        <div class="ranking-layout" style="height:calc(100vh - var(--topbar) - var(--tabbar) - var(--chatbar) - 30px)">
-          <div class="chart-panel">
-            <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;flex-shrink:0">
-              <span class="chart-title" style="margin:0" id="rank-title">Ranking &mdash; Governador 2022</span>
-              <div style="margin-left:auto;display:flex;gap:5px">
-                <button class="pill active" id="rank-t1" onclick="loadRankingTurno(1,this)">1&#186; turno</button>
-                <button class="pill" id="rank-t2" onclick="loadRankingTurno(2,this)">2&#186; turno</button>
-              </div>
-            </div>
-            <div class="table-wrap">
-              <table class="data">
-                <thead><tr>
-                  <th onclick="rankSort('pos')" style="cursor:pointer"># &#8597;</th>
-                  <th onclick="rankSort('nm')" style="cursor:pointer">Candidato &#8597;</th>
-                  <th>Partido</th>
-                  <th onclick="rankSort('uf')" style="cursor:pointer">UF &#8597;</th>
-                  <th onclick="rankSort('votos')" style="cursor:pointer;text-align:right">Votos &#8597;</th>
-                  <th onclick="rankSort('pct')" style="cursor:pointer;text-align:right">% &#8597;</th>
-                  <th>Sit.</th>
-                </tr></thead>
-                <tbody id="rank-tbody"></tbody>
-              </table>
-            </div>
-          </div>
-          <div style="display:flex;flex-direction:column;gap:10px;overflow:hidden">
-            <div class="chart-panel" style="flex:1">
-              <div class="chart-title">Cadeiras por Partido</div>
-              <div class="chart-wrap"><canvas id="chart-partidos"></canvas></div>
-            </div>
-            <div class="chart-panel" style="flex:1" id="rank-regiao-panel">
-              <div class="chart-title">Distribui&#231;&#227;o Regional</div>
-              <div class="chart-wrap"><canvas id="chart-rank-regiao"></canvas></div>
-            </div>
-          </div>
+        <div style="padding:40px;text-align:center;color:var(--tx2);font-size:.8rem">
+          Perfil do eleitorado dispon&#237;vel em <strong>Previs&#227;o 2026 → Perfil Eleitorado</strong>
         </div>
       </div>
     </div>
@@ -631,28 +487,186 @@ table.data tr:hover td{background:var(--bg3)}
 
     <!-- TAB: PREVISAO -->
     <div class="tab-panel" id="tab-previsao">
-      <div class="panel-scroll">
-        <div style="display:flex;align-items:center;gap:8px;margin-bottom:12px">
-          <span style="font-size:.80rem;font-weight:700;color:var(--tx)">Modelo Preditivo</span>
-          <span class="tag tag-org">&#128197; 2026</span>
-          <div class="pill-row" style="margin:0 0 0 auto">
-            <button class="pill" onclick="setScenario('otimista',this)">+ Otimista</button>
-            <button class="pill active" onclick="setScenario('base',this)">Base</button>
-            <button class="pill" onclick="setScenario('pessimista',this)">&minus; Pessimista</button>
+      <!-- Filtros internos (movidos do topbar) -->
+      <div id="prev-filterbar">
+        <span style="font-size:.70rem;font-weight:700;color:var(--tx2);margin-right:2px">Previsão 2026</span>
+        <input id="cand-input" type="text" placeholder="Candidato..." list="cand-list" autocomplete="off" oninput="applyFilters();showPreCandSocial(this.value)">
+        <datalist id="cand-list"></datalist>
+        <select id="f-cargo" onchange="applyFilters()">
+          <option value="presidente">Presidente</option>
+          <option value="governador" selected>Governador</option>
+          <option value="senador">Senador</option>
+          <option value="dep federal">Dep. Federal</option>
+          <option value="dep estadual">Dep. Estadual</option>
+        </select>
+        <select id="f-uf" onchange="applyFilters()">
+          <option value="BR">BR</option>
+          <option value="AC">AC</option><option value="AL">AL</option><option value="AM">AM</option>
+          <option value="AP">AP</option><option value="BA">BA</option><option value="CE">CE</option>
+          <option value="DF">DF</option><option value="ES">ES</option><option value="GO">GO</option>
+          <option value="MA">MA</option><option value="MG">MG</option><option value="MS">MS</option>
+          <option value="MT">MT</option><option value="PA">PA</option><option value="PB">PB</option>
+          <option value="PE">PE</option><option value="PI">PI</option><option value="PR">PR</option>
+          <option value="RJ">RJ</option><option value="RN">RN</option><option value="RO">RO</option>
+          <option value="RR">RR</option><option value="RS">RS</option><option value="SC">SC</option>
+          <option value="SE">SE</option><option value="SP" selected>SP</option><option value="TO">TO</option>
+        </select>
+        <span class="tag tag-org" style="margin-left:auto">&#8987; <span id="countdown-prev"></span></span>
+        <!-- Cenário pills (existentes) -->
+        <div class="pill-row" style="margin:0">
+          <button class="pill" onclick="setScenario('otimista',this)">+ Otimista</button>
+          <button class="pill active" onclick="setScenario('base',this)">Base</button>
+          <button class="pill" onclick="setScenario('pessimista',this)">&minus; Pessimista</button>
+        </div>
+      </div>
+      <!-- Sub-navegação -->
+      <div class="prev-subnav">
+        <button class="prev-stab active" data-psec="modelos" onclick="switchPrevSection('modelos',this)">&#128302; Modelos de Previs&#227;o</button>
+        <button class="prev-stab" data-psec="perfil" onclick="switchPrevSection('perfil',this)">&#128101; Perfil Eleitorado</button>
+        <button class="prev-stab" data-psec="ranking" onclick="switchPrevSection('ranking',this)">&#127942; Ranking</button>
+        <button class="prev-stab" data-psec="digital" onclick="switchPrevSection('digital',this)">&#128241; Digital</button>
+        <button class="prev-stab" data-psec="mapa" onclick="switchPrevSection('mapa',this)">&#128506; Mapa</button>
+      </div>
+      <!-- Sub-painel: Modelos -->
+      <div class="prev-subpanel active" id="psec-modelos">
+        <div class="panel-scroll">
+          <div class="results-grid" style="height:calc(100vh - var(--topbar) - var(--tabbar) - var(--chatbar) - 140px)">
+            <div class="chart-panel">
+              <div class="chart-title">Probabilidade de vit&#243;ria (%)</div>
+              <div id="prev-cands"><div class="empty">Carregando...</div></div>
+            </div>
+            <div class="chart-panel">
+              <div class="chart-title">SHAP &mdash; Fatores explicativos</div>
+              <div id="shap-list"><div class="empty">Carregando...</div></div>
+            </div>
+          </div>
+          <div id="prev-no-data" style="display:none;padding:40px;text-align:center;color:var(--tx2);font-size:.8rem">
+            Modelo Bayesiano em treinamento &mdash; dispon&#237;vel ap&#243;s coleta de dados 2026.
           </div>
         </div>
-        <div class="results-grid" style="height:calc(100vh - var(--topbar) - var(--tabbar) - var(--chatbar) - 100px)">
-          <div class="chart-panel">
-            <div class="chart-title">Probabilidade de vit&#243;ria (%)</div>
-            <div id="prev-cands"><div class="empty">Carregando...</div></div>
+      </div>
+      <!-- Sub-painel: Perfil Eleitorado -->
+      <div class="prev-subpanel" id="psec-perfil">
+        <div class="panel-scroll">
+          <div class="kpi-row kpi-row-4">
+            <div class="kpi"><div class="kpi-val" id="el-total">&mdash;</div><div class="kpi-lbl">Total eleitores</div></div>
+            <div class="kpi"><div class="kpi-val" id="el-fem">&mdash;</div><div class="kpi-lbl">% mulheres</div></div>
+            <div class="kpi"><div class="kpi-val" id="el-jov">&mdash;</div><div class="kpi-lbl">% jovens 16-24</div></div>
+            <div class="kpi"><div class="kpi-val" id="el-sup">&mdash;</div><div class="kpi-lbl">% ens. superior</div></div>
           </div>
-          <div class="chart-panel">
-            <div class="chart-title">SHAP &mdash; Fatores explicativos</div>
-            <div id="shap-list"><div class="empty">Carregando...</div></div>
+          <div class="chart-2x2" style="height:calc(100vh - var(--topbar) - var(--tabbar) - var(--chatbar) - 155px)">
+            <div class="chart-panel"><div class="chart-title">G&#234;nero</div><div class="chart-wrap"><canvas id="chart-genero"></canvas></div></div>
+            <div class="chart-panel"><div class="chart-title">Faixa Et&#225;ria</div><div class="chart-wrap"><canvas id="chart-idade"></canvas></div></div>
+            <div class="chart-panel"><div class="chart-title">Escolaridade</div><div class="chart-wrap"><canvas id="chart-edu"></canvas></div></div>
+            <div class="chart-panel"><div class="chart-title">Evolu&#231;&#227;o 2018 → 2022</div><div class="chart-wrap"><canvas id="chart-evolucao"></canvas></div></div>
           </div>
         </div>
-        <div id="prev-no-data" style="display:none;padding:40px;text-align:center;color:var(--tx2);font-size:.8rem">
-          Modelo Bayesiano em treinamento &mdash; dispon&#237;vel ap&#243;s coleta de dados 2026.
+      </div>
+      <!-- Sub-painel: Ranking -->
+      <div class="prev-subpanel" id="psec-ranking">
+        <div class="panel-scroll">
+          <div class="ranking-layout" style="height:calc(100vh - var(--topbar) - var(--tabbar) - var(--chatbar) - 80px)">
+            <div class="chart-panel">
+              <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;flex-shrink:0">
+                <span class="chart-title" style="margin:0" id="rank-title">Ranking &mdash; Governador 2022</span>
+                <div style="margin-left:auto;display:flex;gap:5px">
+                  <button class="pill active" id="rank-t1" onclick="loadRankingTurno(1,this)">1&#186; turno</button>
+                  <button class="pill" id="rank-t2" onclick="loadRankingTurno(2,this)">2&#186; turno</button>
+                </div>
+              </div>
+              <div class="table-wrap">
+                <table class="data">
+                  <thead><tr>
+                    <th onclick="rankSort('pos')" style="cursor:pointer"># &#8597;</th>
+                    <th onclick="rankSort('nm')" style="cursor:pointer">Candidato &#8597;</th>
+                    <th>Partido</th>
+                    <th onclick="rankSort('uf')" style="cursor:pointer">UF &#8597;</th>
+                    <th onclick="rankSort('votos')" style="cursor:pointer;text-align:right">Votos &#8597;</th>
+                    <th onclick="rankSort('pct')" style="cursor:pointer;text-align:right">% &#8597;</th>
+                    <th>Sit.</th>
+                  </tr></thead>
+                  <tbody id="rank-tbody"></tbody>
+                </table>
+              </div>
+            </div>
+            <div style="display:flex;flex-direction:column;gap:10px;overflow:hidden">
+              <div class="chart-panel" style="flex:1">
+                <div class="chart-title">Cadeiras por Partido</div>
+                <div class="chart-wrap"><canvas id="chart-partidos"></canvas></div>
+              </div>
+              <div class="chart-panel" style="flex:1" id="rank-regiao-panel">
+                <div class="chart-title">Distribui&#231;&#227;o Regional</div>
+                <div class="chart-wrap"><canvas id="chart-rank-regiao"></canvas></div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <!-- Sub-painel: Digital -->
+      <div class="prev-subpanel" id="psec-digital">
+        <div class="panel-scroll">
+          <div class="kpi-row kpi-row-4">
+            <div class="kpi"><div class="kpi-val" id="dig-sent">&mdash;</div><div class="kpi-lbl">Sentimento m&#233;dio</div></div>
+            <div class="kpi"><div class="kpi-val" id="dig-vol">&mdash;</div><div class="kpi-lbl">Men&#231;&#245;es (90d)</div></div>
+            <div class="kpi"><div class="kpi-val" id="dig-top">&mdash;</div><div class="kpi-lbl">Mais mencionado</div></div>
+            <div class="kpi"><div class="kpi-val" id="dig-trend">&mdash;</div><div class="kpi-lbl">Tend&#234;ncia</div></div>
+          </div>
+          <div class="pill-row">
+            <button class="pill active" onclick="switchDig('social',this)">Social</button>
+            <button class="pill" onclick="switchDig('meta',this)">Meta Ads</button>
+            <button class="pill" onclick="switchDig('trends',this)">Google Trends</button>
+            <button class="pill" onclick="switchDig('gdelt',this)">GDELT</button>
+          </div>
+          <div class="dig-section active" id="dig-social">
+            <div class="results-grid" style="height:calc(100vh - var(--topbar) - var(--tabbar) - var(--chatbar) - 215px)">
+              <div class="chart-panel"><div class="chart-title">Sentimento por candidato</div><div class="chart-wrap"><canvas id="chart-sent-cand"></canvas></div></div>
+              <div class="chart-panel"><div class="chart-title">Volume de men&#231;&#245;es semanal</div><div class="chart-wrap"><canvas id="chart-vol-week"></canvas></div></div>
+            </div>
+          </div>
+          <div class="dig-section" id="dig-meta">
+            <div class="chart-panel" style="height:calc(100vh - var(--topbar) - var(--tabbar) - var(--chatbar) - 215px)">
+              <div class="chart-title">Investimento em publicidade (Meta)</div>
+              <div class="chart-wrap"><canvas id="chart-meta-spend"></canvas></div>
+            </div>
+          </div>
+          <div class="dig-section" id="dig-trends">
+            <div class="chart-panel" style="height:calc(100vh - var(--topbar) - var(--tabbar) - var(--chatbar) - 215px)">
+              <div class="chart-title">Interesse de busca (Google Trends)</div>
+              <div class="chart-wrap"><canvas id="chart-trends"></canvas></div>
+            </div>
+          </div>
+          <div class="dig-section" id="dig-gdelt">
+            <div class="shdr">Eventos GDELT Recentes</div>
+            <div id="gdelt-list"><div class="empty">Carregando...</div></div>
+          </div>
+        </div>
+      </div>
+      <!-- Sub-painel: Mapa -->
+      <div class="prev-subpanel" id="psec-mapa">
+        <div id="leaflet-map" style="flex:1;position:relative">
+          <div id="map-overlay-tl">
+            <div class="map-crumb" id="map-breadcrumb"><span onclick="resetMap()">Brasil</span></div>
+            <div class="map-zoom-group">
+              <button class="map-btn active" data-level="uf" onclick="setMapLevel('uf')">&#127757; UF</button>
+              <button class="map-btn" data-level="nacional" onclick="setMapLevel('nacional')">&#127758; Nacional</button>
+              <button class="map-btn" data-level="regiao" onclick="setMapLevel('regiao')">&#128205; Regi&#227;o</button>
+              <button class="map-btn" data-level="municipio" onclick="setMapLevel('municipio')">&#127968; Mun.</button>
+            </div>
+          </div>
+          <div id="map-overlay-tr">
+            <button class="layer-chip active" data-layer="electoral" onclick="swapLayer('electoral')">&#127942; Eleit.</button>
+            <button class="layer-chip" data-layer="economic" onclick="swapLayer('economic')">&#128202; IBGE</button>
+            <button class="layer-chip" data-layer="health" onclick="swapLayer('health')">&#127973; Sa&#250;de</button>
+            <button class="layer-chip" data-layer="security" onclick="swapLayer('security')">&#128737; Seg.</button>
+            <button class="layer-chip" data-layer="poll" onclick="swapLayer('poll')">&#128203; Pesq.</button>
+            <button class="layer-chip" data-layer="pred" onclick="swapLayer('pred')">&#128302; Pred.</button>
+          </div>
+          <div id="map-overlay-bl">
+            <button class="map-btn" id="btn-heat" onclick="toggleHeatmap()">&#127777; Mapa de Calor</button>
+          </div>
+          <div id="map-overlay-br">
+            <div id="map-legend"></div>
+          </div>
         </div>
       </div>
     </div>
@@ -771,7 +785,7 @@ const IBGE_GEO = {
 // ── STATE ──────────────────────────────────────────────────────────────────
 let _uf = 'SP', _cargo = 'governador', _ano = 2026, _candidato = '';
 let _preCand2026 = {};  // {NM_UPPER → candidato obj}
-let _activeTab = 'mapa';
+let _activeTab = 'resultados';
 let _mapLevel = 'uf', _mapCtx = {uf:'SP'}, _activeLayer = 'electoral';
 let _mapData = {}, _geoLayer = null, _heatLayer = null;
 let _charts = {}, _ws = null, _idToken = null;
@@ -909,7 +923,7 @@ function _bootApp(name, initials) {
   _initCountdown();
   loadCandidatoList();
   initChat();
-  setTimeout(initMap, 200);
+  loadTab(_activeTab);
 }
 
 function doLogout() {
@@ -920,8 +934,10 @@ function doLogout() {
 
 function _initCountdown() {
   const el = document.getElementById('countdown-el');
+  const el2 = document.getElementById('countdown-prev');
   const diff = Math.ceil((new Date('2026-10-04') - new Date()) / (1000*60*60*24));
   if (el && diff > 0) el.textContent = `⏱ ${diff}d · 1ºT`;
+  if (el2 && diff > 0) el2.textContent = `${diff}d`;
 }
 
 // ── FILTERS ────────────────────────────────────────────────────────────────
@@ -993,27 +1009,41 @@ function switchTab(tab) {
   _activeTab = tab;
   document.querySelectorAll('.tab').forEach(t => t.classList.toggle('active', t.dataset.tab === tab));
   document.querySelectorAll('.tab-panel').forEach(p => p.classList.toggle('active', p.id === 'tab-'+tab));
-  // Clear banner states not relevant to new tab
-  const bannerMap = {digital:['digital','gdelt'], comparativo:['comparativo'], previsao:['shap']};
+  const bannerMap = {comparativo:['comparativo'], previsao:['shap','digital','gdelt']};
   const keep = new Set(Object.values(bannerMap).flat());
   const active = new Set(bannerMap[tab] || []);
   keep.forEach(k => { if (!active.has(k)) _updateDemoBanner(k, null); });
   loadTab(tab);
-  if (tab === 'mapa') setTimeout(()=>{ if(gMap) gMap.invalidateSize(); }, 50);
 }
 
 function loadTab(tab) {
   const loaders = {
-    mapa:        ()=>{ if(gMap) reloadMap(); else initMap(); },
     resultados:  loadResultados,
     eleitorado:  loadEleitorado,
-    digital:     loadDigital,
-    ranking:     loadRanking,
     comparativo: loadComparativo,
     locais:      loadLocais,
-    previsao:    ()=>loadPrevisao(_scenario),
+    previsao:    loadPrevisaoTab,
   };
   if (loaders[tab]) loaders[tab]();
+}
+
+let _prevSection = 'modelos';
+function switchPrevSection(sec, btn) {
+  _prevSection = sec;
+  document.querySelectorAll('.prev-stab').forEach(b => b.classList.remove('active'));
+  if (btn) btn.classList.add('active');
+  document.querySelectorAll('.prev-subpanel').forEach(p => p.classList.remove('active'));
+  const panel = document.getElementById('psec-' + sec);
+  if (panel) panel.classList.add('active');
+  if (sec === 'mapa') { setTimeout(()=>{ if(gMap) gMap.invalidateSize(); else initMap(); }, 50); }
+  else if (sec === 'modelos') loadPrevisao(_scenario);
+  else if (sec === 'perfil') loadEleitorado();
+  else if (sec === 'ranking') loadRanking();
+  else if (sec === 'digital') loadDigital();
+}
+
+function loadPrevisaoTab() {
+  switchPrevSection(_prevSection, document.querySelector(`.prev-stab[data-psec="${_prevSection}"]`));
 }
 
 // ── MAP ────────────────────────────────────────────────────────────────────
@@ -1483,7 +1513,7 @@ function _renderRankTable() {
 // ── PREVISAO ───────────────────────────────────────────────────────────────
 function setScenario(sc, btn) {
   _scenario = sc;
-  document.querySelectorAll('#tab-previsao .pill').forEach(b => b.classList.remove('active'));
+  document.querySelectorAll('#prev-filterbar .pill').forEach(b => b.classList.remove('active'));
   if (btn) btn.classList.add('active');
   loadPrevisao(sc);
 }
