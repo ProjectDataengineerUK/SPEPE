@@ -7295,8 +7295,9 @@ async def get_comparativo_mapa(
     Retorna lista de municípios com candidato/partido líder em cada ano.
     Chave de join com geojson: nm_municipio (normalizado uppercase).
     """
-    import pandas as pd
     import unicodedata
+
+    import pandas as pd
 
     def _norm(s: str) -> str:
         s = unicodedata.normalize("NFD", s.upper())
@@ -7304,6 +7305,115 @@ async def get_comparativo_mapa(
 
     cd_cargo = _cargo_to_cd(cargo, 6)
 
+    # ── BigQuery path ────────────────────────────────────────────────────────
+    if settings.gcp_project_id and os.environ.get("USE_BIGQUERY", "").lower() == "true":
+        try:
+            from google.cloud import bigquery as _bq
+
+            bq = _bq.Client(project=settings.gcp_project_id)
+            gold = f"{settings.gcp_project_id}.{settings.bigquery_dataset_gold}"
+            bq_query = f"""
+                WITH liders AS (
+                    SELECT
+                        nm_municipio,
+                        ano_eleicao,
+                        COALESCE(nm_urna_candidato, nm_candidato)   AS nm_urna,
+                        nm_candidato,
+                        ANY_VALUE(sg_partido)                        AS sg_partido,
+                        SUM(total_votos)                             AS votos,
+                        SUM(SUM(total_votos)) OVER (
+                            PARTITION BY nm_municipio, ano_eleicao
+                        )                                            AS total_mun,
+                        ROW_NUMBER() OVER (
+                            PARTITION BY nm_municipio, ano_eleicao
+                            ORDER BY SUM(total_votos) DESC
+                        )                                            AS rk
+                    FROM `{gold}.fact_municipio_candidato_eleicao`
+                    WHERE sg_uf   = @uf
+                      AND cd_cargo = @cd_cargo
+                      AND nr_turno = @turno
+                      AND ano_eleicao IN (2018, 2022)
+                    GROUP BY nm_municipio, ano_eleicao, nm_candidato, nm_urna_candidato
+                ),
+                top1 AS (
+                    SELECT * FROM liders WHERE rk = 1
+                ),
+                l22 AS (
+                    SELECT nm_municipio,
+                           nm_urna      AS nm_vencedor_2022,
+                           sg_partido   AS sg_partido_2022,
+                           ROUND(votos / NULLIF(total_mun, 0) * 100, 2) AS pct_2022,
+                           votos        AS votos_2022
+                    FROM top1 WHERE ano_eleicao = 2022
+                ),
+                l18 AS (
+                    SELECT nm_municipio,
+                           nm_urna      AS nm_vencedor_2018,
+                           sg_partido   AS sg_partido_2018,
+                           ROUND(votos / NULLIF(total_mun, 0) * 100, 2) AS pct_2018,
+                           votos        AS votos_2018
+                    FROM top1 WHERE ano_eleicao = 2018
+                )
+                SELECT
+                    COALESCE(l22.nm_municipio, l18.nm_municipio) AS nm_municipio,
+                    l22.nm_vencedor_2022,
+                    l22.sg_partido_2022,
+                    COALESCE(l22.pct_2022, 0.0)                 AS pct_2022,
+                    COALESCE(l22.votos_2022, 0)                 AS votos_2022,
+                    l18.nm_vencedor_2018,
+                    l18.sg_partido_2018,
+                    COALESCE(l18.pct_2018, 0.0)                 AS pct_2018,
+                    COALESCE(l18.votos_2018, 0)                 AS votos_2018,
+                    (l22.nm_vencedor_2022 != l18.nm_vencedor_2018)    AS mudou_lider,
+                    (l22.sg_partido_2022  != l18.sg_partido_2018)     AS mudou_partido
+                FROM l22 FULL OUTER JOIN l18 USING (nm_municipio)
+                ORDER BY COALESCE(l22.votos_2022, l18.votos_2018) DESC
+            """
+            job_cfg = _bq.QueryJobConfig(
+                query_parameters=[
+                    _bq.ScalarQueryParameter("uf", "STRING", uf.upper()),
+                    _bq.ScalarQueryParameter("cd_cargo", "INT64", cd_cargo),
+                    _bq.ScalarQueryParameter("turno", "INT64", turno),
+                ]
+            )
+            rows = await asyncio.to_thread(
+                lambda: list(bq.query(bq_query, job_config=job_cfg).result())
+            )
+            municipios_bq = []
+            for r in rows:
+                municipios_bq.append(
+                    {
+                        "nm_municipio": r.get("nm_municipio") or "",
+                        "nm_mun_norm": _norm(r.get("nm_municipio") or ""),
+                        "nm_vencedor_2022": r.get("nm_vencedor_2022") or "",
+                        "sg_partido_2022": r.get("sg_partido_2022") or "",
+                        "pct_2022": float(r.get("pct_2022") or 0),
+                        "votos_2022": int(r.get("votos_2022") or 0),
+                        "nm_vencedor_2018": r.get("nm_vencedor_2018") or "",
+                        "sg_partido_2018": r.get("sg_partido_2018") or "",
+                        "pct_2018": float(r.get("pct_2018") or 0),
+                        "votos_2018": int(r.get("votos_2018") or 0),
+                        "mudou_lider": bool(r.get("mudou_lider")),
+                        "mudou_partido": bool(r.get("mudou_partido")),
+                    }
+                )
+            return JSONResponse(
+                {
+                    "status": "ok",
+                    "uf": uf.upper(),
+                    "cargo": cargo,
+                    "municipios": municipios_bq,
+                    "total": len(municipios_bq),
+                    "fonte": "bigquery",
+                }
+            )
+        except Exception as exc:
+            logger.warning("BigQuery comparativo/mapa falhou: %s", exc)
+            return JSONResponse(
+                {"status": "erro", "municipios": [], "msg": str(exc), "fonte": "bigquery"}
+            )
+
+    # ── Local parquet fallback ───────────────────────────────────────────────
     frames: list[pd.DataFrame] = []
     for f in sorted(_LOCAL_SILVER_DIR.glob("tse_*.parquet")):
         try:
