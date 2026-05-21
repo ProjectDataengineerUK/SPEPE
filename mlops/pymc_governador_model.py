@@ -318,7 +318,6 @@ def predict_governador(
     """
     try:
         import pymc as pm
-        import arviz as az
     except ImportError:
         raise ImportError("PyMC + ArviZ required")
 
