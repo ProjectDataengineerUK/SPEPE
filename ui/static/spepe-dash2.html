@@ -382,7 +382,6 @@ table.data tr:hover td{background:var(--bg3)}
               style="font-size:.70rem;padding:3px 8px;background:var(--bg3);border:1px solid var(--br);border-radius:5px;color:var(--tx);width:140px;outline:none">
             <button onclick="loadComparativo()" style="padding:3px 12px;font-size:.70rem;background:var(--grn2);color:#fff;border:none;border-radius:5px;cursor:pointer;font-weight:600">Buscar</button>
             <button onclick="cmp2ToggleMapa()" id="cmp2-mapa-btn" style="padding:3px 10px;font-size:.70rem;background:var(--bg3);border:1px solid var(--br);border-radius:5px;cursor:pointer;color:var(--tx2)">&#128506; Mapa</button>
-            <button onclick="cmp2ToggleLocais()" id="cmp2-locais-btn" style="padding:3px 10px;font-size:.70rem;background:var(--bg3);border:1px solid var(--br);border-radius:5px;cursor:pointer;color:var(--tx2)">&#127968; Locais</button>
           </div>
         </div>
 
@@ -437,48 +436,13 @@ table.data tr:hover td{background:var(--bg3)}
             <button id="cmi-homicidio" class="pill" onclick="cmp2IndSelect('homicidio',this)" style="font-size:.61rem;padding:2px 7px">Homic&#237;dios</button>
             <span id="cmp2-ind-loading" style="display:none;font-size:.60rem;color:var(--tx3);margin-left:4px">&#8230;</span>
           </div>
-          <div id="cmp2-leaflet" style="height:340px"></div>
+          <div style="position:relative">
+            <div id="cmp2-leaflet" style="height:340px"></div>
+            <button id="cmp2-loc-back" onclick="_cmp2LocBack()" style="display:none;position:absolute;top:8px;left:8px;z-index:1000;background:rgba(13,17,23,.88);border:1px solid var(--grn);border-radius:6px;padding:4px 10px;font-size:.68rem;color:var(--tx);cursor:pointer">&#8592; Eleitorado</button>
+            <div id="cmp2-loc-crumb" style="display:none;position:absolute;top:8px;left:50%;transform:translateX(-50%);z-index:999;background:rgba(13,17,23,.80);border:1px solid var(--br);border-radius:6px;padding:3px 10px;font-size:.66rem;color:var(--tx2);pointer-events:none;white-space:nowrap"></div>
+            <div id="cmp2-loc-spinner" style="display:none;position:absolute;inset:0;background:rgba(13,17,23,.5);z-index:998;display:none;align-items:center;justify-content:center;font-size:.70rem;color:var(--tx3)">Carregando locais&#8230;</div>
+          </div>
           <div id="cmp2-mapa-tooltip" style="display:none;position:absolute;pointer-events:none;background:var(--bg2);border:1px solid var(--br);border-radius:6px;padding:6px 10px;font-size:.62rem;z-index:9999;max-width:220px"></div>
-        </div>
-
-        <!-- locais de votação -->
-        <div id="cmp2-locais-panel" style="display:none;margin-bottom:10px;border:1px solid var(--br);border-radius:8px;overflow:hidden">
-          <div style="padding:6px 12px;background:var(--bg3);border-bottom:1px solid var(--br);display:flex;align-items:center;gap:8px;flex-wrap:wrap">
-            <span style="font-size:.65rem;font-weight:700;color:var(--tx2)">&#127968; Locais de Vota&#231;&#227;o</span>
-            <span class="tag tag-grn" style="font-size:.60rem">TSE Cadastro</span>
-            <select id="loc-mun-sel" style="font-size:.70rem;background:var(--bg3);color:var(--tx);border:1px solid var(--br);border-radius:5px;padding:2px 6px;max-width:180px" onchange="onLocMunChange()">
-              <option value="">Todos os munic&#237;pios</option>
-            </select>
-            <select id="loc-zona-sel" style="font-size:.70rem;background:var(--bg3);color:var(--tx);border:1px solid var(--br);border-radius:5px;padding:2px 6px" onchange="onLocZonaChange()">
-              <option value="">Todas as zonas</option>
-            </select>
-            <span id="loc-loading" style="display:none;font-size:.70rem;color:var(--tx3)">Carregando&#8230;</span>
-            <div style="display:flex;gap:12px;margin-left:auto">
-              <span class="kpi" style="min-width:0;padding:0 8px"><div class="kpi-val" id="loc-zonas" style="font-size:.80rem">&mdash;</div><div class="kpi-lbl">Zonas</div></span>
-              <span class="kpi" style="min-width:0;padding:0 8px"><div class="kpi-val" id="loc-locais" style="font-size:.80rem">&mdash;</div><div class="kpi-lbl">Locais</div></span>
-              <span class="kpi" style="min-width:0;padding:0 8px"><div class="kpi-val" id="loc-secoes" style="font-size:.80rem">&mdash;</div><div class="kpi-lbl">Se&#231;&#245;es</div></span>
-              <span class="kpi" style="min-width:0;padding:0 8px"><div class="kpi-val" id="loc-coords" style="font-size:.80rem">&mdash;</div><div class="kpi-lbl">c/ coords</div></span>
-            </div>
-          </div>
-          <div style="display:flex;gap:8px;height:340px;padding:8px">
-            <div id="loc-leaflet" style="flex:1.6;border-radius:6px;overflow:hidden;background:#0d1117;min-height:200px"></div>
-            <div style="flex:1;overflow:hidden;display:flex;flex-direction:column;min-width:0">
-              <div id="loc-table-empty" style="display:none;padding:20px;text-align:center;color:var(--tx3);font-size:.75rem">
-                Selecione um munic&#237;pio para ver os locais no mapa.
-              </div>
-              <div style="overflow-y:auto;flex:1">
-                <table class="data">
-                  <thead><tr>
-                    <th onclick="locSort('nr_zona')" style="cursor:pointer">Zona</th>
-                    <th onclick="locSort('nm_municipio')" style="cursor:pointer">Munic&#237;pio</th>
-                    <th onclick="locSort('qt_locais')" style="cursor:pointer;text-align:right">Locais</th>
-                    <th onclick="locSort('qt_secoes')" style="cursor:pointer;text-align:right">Se&#231;&#245;es</th>
-                  </tr></thead>
-                  <tbody id="loc-tbody"></tbody>
-                </table>
-              </div>
-            </div>
-          </div>
         </div>
 
         <!-- tabelas -->
@@ -701,8 +665,11 @@ table.data tr:hover td{background:var(--bg3)}
             <button class="layer-chip" data-layer="poll" onclick="swapLayer('poll')">&#128203; Pesq.</button>
             <button class="layer-chip" data-layer="pred" onclick="swapLayer('pred')">&#128302; Pred.</button>
           </div>
-          <div id="map-overlay-bl">
+          <div id="map-overlay-bl" style="display:flex;flex-direction:column;align-items:flex-start;gap:4px">
             <button class="map-btn" id="btn-heat" onclick="toggleHeatmap()">&#127777; Mapa de Calor</button>
+            <button class="map-btn" id="btn-locais" onclick="_prevLocToggle()">&#127968; Locais de Vota&#231;&#227;o</button>
+            <button id="prev-loc-back" onclick="_prevLocBack()" style="display:none" class="map-btn">&#8592; Voltar</button>
+            <div id="prev-loc-crumb" style="display:none;font-size:.62rem;color:var(--tx2);background:rgba(13,17,23,.85);border:1px solid var(--br);border-radius:4px;padding:2px 8px;pointer-events:none"></div>
           </div>
           <div id="map-overlay-br">
             <div id="map-legend"></div>
@@ -1907,14 +1874,6 @@ function _geoCentroid(feat) {
   return [lat / ring.length, lng / ring.length];
 }
 
-function cmp2ToggleLocais() {
-  const panel = document.getElementById('cmp2-locais-panel');
-  const btn   = document.getElementById('cmp2-locais-btn');
-  const visible = panel && panel.style.display !== 'none';
-  if (panel) panel.style.display = visible ? 'none' : '';
-  if (btn) { btn.style.background = visible ? 'var(--bg3)' : 'var(--grn2)'; btn.style.color = visible ? 'var(--tx2)' : '#fff'; }
-  if (!visible) loadLocais();
-}
 
 function cmp2ToggleMapa() {
   _cmp2MapaVisible = !_cmp2MapaVisible;
@@ -2194,6 +2153,13 @@ function _cmp2AddPolygonLayer(geo, mapaD, munMap, modo) {
           if (tooltip) { tooltip.style.left=(e.originalEvent.clientX+14)+'px'; tooltip.style.top=(e.originalEvent.clientY-10)+'px'; }
         },
         mouseout: () => { _cmp2MapaLayer.resetStyle(layer); if(tooltip) tooltip.style.display='none'; },
+        click: () => {
+          if (tooltip) tooltip.style.display = 'none';
+          const nm = feat.properties.name || feat.properties.description || '';
+          let bounds = null;
+          try { bounds = layer.getBounds(); } catch(_) {}
+          _cmp2LocEnter(nm, bounds);
+        },
       });
     }
   }).addTo(_cmp2MapaMap);

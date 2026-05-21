@@ -10,5 +10,36 @@
       "Bash"
     ]
   },
-  "hooks": {}
+  "hooks": {
+    "SessionStart": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash \"/home/jonatas/Projetos/SPEPE/.claude/hooks/mempalace_setup.sh\" || true"
+          }
+        ]
+      }
+    ],
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "command -v mempalace > /dev/null 2>&1 && bash \"/home/jonatas/Projetos/SPEPE/.claude/hooks/mempalace_save.sh\" || true"
+          }
+        ]
+      }
+    ],
+    "PreCompact": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "command -v mempalace > /dev/null 2>&1 && bash \"/home/jonatas/Projetos/SPEPE/.claude/hooks/mempalace_precompact.sh\" || true"
+          }
+        ]
+      }
+    ]
+  }
 }
