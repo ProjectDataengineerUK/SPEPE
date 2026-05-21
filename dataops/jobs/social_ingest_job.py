@@ -42,6 +42,7 @@ from dataops.clients.social_client import (
     fetch_youtube_videos,
     load_candidate_pages_from_bq,
 )
+from dataops.precandidatos_2026 import get_nomes, get_pages_dict
 from dataops.source_registry import enrich_with_source_meta
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s %(message)s")
@@ -62,6 +63,26 @@ _DEFAULT_CANDIDATOS = [
     "Fernando Haddad",
     "Guilherme Boulos",
 ]
+
+
+def _candidatos_2026(uf: str = "RJ") -> list[str]:
+    """Merge national defaults with UF pre-candidates for 2026 election."""
+    pre = get_nomes(uf)
+    seen = set(_DEFAULT_CANDIDATOS)
+    extras = [nm for nm in pre if nm not in seen]
+    return _DEFAULT_CANDIDATOS + extras
+
+
+def _pages_2026(bq_pages: dict[str, list[str]], uf: str = "RJ") -> dict[str, list[str]]:
+    """Merge BQ pages with pre-candidate social handles as fallback."""
+    pre = get_pages_dict(uf)
+    merged: dict[str, list[str]] = {}
+    for field in ("facebook", "instagram", "youtube", "x"):
+        existing = set(bq_pages.get(field, []))
+        fallback = [h for h in pre.get(field, []) if h not in existing]
+        merged[field] = list(bq_pages.get(field, [])) + fallback
+    return merged
+
 
 _TIMEFRAME_BY_YEAR: dict[int, str] = {
     2018: "2018-01-01 2018-10-31",
@@ -89,7 +110,7 @@ def _write(df: pd.DataFrame, source: str, year: int, filename: str, use_gcs: boo
     logger.info("%s Bronze: %d registros → %s", source.upper(), len(df), filename)
 
 
-def main(candidatos: list[str], dias: int, year: int) -> None:
+def main(candidatos: list[str], dias: int, year: int, uf: str = "RJ") -> None:
     logger.info("Social ingest job: %d candidatos, %d dias, year=%d", len(candidatos), dias, year)
     use_gcs = bool(os.environ.get("GCS_BUCKET"))
     gcp_project = os.environ.get("GCP_PROJECT_ID", "")
@@ -97,15 +118,30 @@ def main(candidatos: list[str], dias: int, year: int) -> None:
 
     Path("data/bronze/social").mkdir(parents=True, exist_ok=True)
 
-    pages: dict[str, list[str]] = {"facebook": [], "instagram": [], "youtube": []}
+    # For 2026 elections augment candidate list with RJ pre-candidates
+    if year == 2026 and not os.environ.get("SOCIAL_CANDIDATOS"):
+        candidatos = _candidatos_2026(uf)
+        logger.info("2026: %d candidatos (default + pré-cand RJ)", len(candidatos))
+
+    bq_pages: dict[str, list[str]] = {"facebook": [], "instagram": [], "youtube": [], "x": []}
     if gcp_project:
-        pages = load_candidate_pages_from_bq(gcp_project)
+        bq_pages = load_candidate_pages_from_bq(gcp_project)
         logger.info(
             "dim_candidato_social_pages: %d FB / %d IG / %d YT",
-            len(pages["facebook"]),
-            len(pages["instagram"]),
-            len(pages["youtube"]),
+            len(bq_pages["facebook"]),
+            len(bq_pages["instagram"]),
+            len(bq_pages["youtube"]),
         )
+
+    # Merge with pre-candidate handles (static fallback when BQ is sparse)
+    pages = _pages_2026(bq_pages, uf) if year == 2026 else bq_pages
+    logger.info(
+        "Pages após merge pré-cand: %d FB / %d IG / %d YT / %d X",
+        len(pages["facebook"]),
+        len(pages["instagram"]),
+        len(pages["youtube"]),
+        len(pages.get("x", [])),
+    )
 
     # ── Twitter/X ─────────────────────────────────────────────────────────────
     if should_run("twitter", filter_set):
@@ -243,16 +279,20 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Social ingest job")
     parser.add_argument(
         "--candidatos",
-        default=os.environ.get("SOCIAL_CANDIDATOS", json.dumps(_DEFAULT_CANDIDATOS)),
+        default=os.environ.get("SOCIAL_CANDIDATOS", ""),
     )
     parser.add_argument("--dias", type=int, default=int(os.environ.get("SOCIAL_DIAS", "7")))
     parser.add_argument("--year", type=int, default=int(os.environ.get("DEFAULT_ANO", "2026")))
+    parser.add_argument("--uf", default=os.environ.get("DEFAULT_UF", "RJ"))
     args = parser.parse_args()
 
-    try:
-        candidatos = json.loads(args.candidatos)
-    except json.JSONDecodeError as exc:
-        logger.error("Erro ao parsear --candidatos JSON: %s", exc)
-        sys.exit(1)
+    if args.candidatos:
+        try:
+            candidatos = json.loads(args.candidatos)
+        except json.JSONDecodeError as exc:
+            logger.error("Erro ao parsear --candidatos JSON: %s", exc)
+            sys.exit(1)
+    else:
+        candidatos = _DEFAULT_CANDIDATOS
 
-    main(candidatos, args.dias, args.year)
+    main(candidatos, args.dias, args.year, uf=args.uf)

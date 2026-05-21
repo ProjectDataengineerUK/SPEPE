@@ -47,6 +47,7 @@ from config.logging_config import setup_logging
 from config.session_state import SessionState
 from config.settings import settings
 from dataops.clients.digital_client import fetch_meta_ads, fetch_trends
+from dataops.precandidatos_2026 import PRE_CANDIDATOS_2026 as _PRE_CANDIDATOS_2026
 from security.output_validators import validate_input_injection
 
 
@@ -153,6 +154,7 @@ _PUBLIC_API_PATHS = {
     "/api/locais/resumo",
     "/api/comparativo/indicadores",
     "/api/precandidatos",
+    "/api/social/engajamento/precandidatos",
     "/api/comparativo/candidatos",
     "/api/comparativo/mapa",
     "/api/comparativo/partidos",
@@ -1105,293 +1107,6 @@ async def get_candidatos(
     )
 
 
-# ── Pré-candidatos 2026 — dados estáticos pesquisados em 21/05/2026 ──────────
-# Fonte: levantamentos públicos (Diário do Rio, Poder360, Agenda do Poder, JOTA)
-
-_PRE_CANDIDATOS_2026: dict[str, dict[str, list[dict]]] = {
-    "RJ": {
-        "governador": [
-            {
-                "nm": "Eduardo Paes",
-                "partido": "PSD",
-                "status": "confirmado",
-                "instagram": "@eduardopaes",
-                "youtube": "@EduardoPaes",
-                "x": "@eduardopaes",
-                "facebook": "eduardopaesoficial",
-                "obs": "Favorito — 50% nas pesquisas. Prefeito do Rio; vice: Jane Reis (MDB).",
-            },
-            {
-                "nm": "Douglas Ruas",
-                "partido": "PL",
-                "status": "confirmado",
-                "instagram": "@douglasruasrj",
-                "obs": "Dep. estadual; articulação Flávio Bolsonaro.",
-            },
-            {
-                "nm": "Anthony Garotinho",
-                "partido": "Republicanos",
-                "status": "confirmado",
-                "instagram": "@anthonygarotinhorj",
-                "tiktok": "@anthonygarotinhorj",
-                "x": "@anthonygarotinhorj",
-                "obs": "Lançou pré-candidatura ao governo (mai/2026). Também testado para Dep. Federal.",
-            },
-            {
-                "nm": "André Marinho",
-                "partido": "Novo",
-                "status": "confirmado",
-                "obs": "Confirmado pelo Novo.",
-            },
-            {
-                "nm": "André Português",
-                "partido": "Republicanos",
-                "status": "confirmado",
-                "obs": "Ex-prefeito de Miguel Pereira.",
-            },
-            {
-                "nm": "William Siri",
-                "partido": "PSOL",
-                "status": "confirmado",
-                "instagram": "@williamsiri",
-                "obs": "Vereador do Rio; lançado pelo PSOL.",
-            },
-            {
-                "nm": "Washington Reis",
-                "partido": "MDB",
-                "status": "citado",
-                "obs": "Pré-candidato; candidatura depende de questão jurídica no STF.",
-            },
-            {
-                "nm": "Fabiano Horta",
-                "partido": "PT",
-                "status": "citado",
-                "instagram": "@fabianohorta",
-                "obs": "Ex-prefeito de Maricá; tendência do PT apoiar Eduardo Paes.",
-            },
-            {
-                "nm": "Rodrigo Neves",
-                "partido": "PDT",
-                "status": "citado",
-                "instagram": "@rodrigonevesniteroi",
-                "obs": "Prefeito de Niterói; articulação estadual.",
-            },
-        ],
-        "dep federal": [
-            {
-                "nm": "Wladimir Garotinho",
-                "partido": "PL",
-                "status": "confirmado",
-                "youtube": "@wladimirgarotinhooficial",
-                "facebook": "wladimirgarotinhoo",
-                "obs": "Ex-prefeito de Campos; base Norte Fluminense; alinhado Flávio Bolsonaro.",
-            },
-            {
-                "nm": "Anthony Garotinho",
-                "partido": "Republicanos",
-                "status": "confirmado",
-                "instagram": "@anthonygarotinhorj",
-                "tiktok": "@anthonygarotinhorj",
-                "x": "@anthonygarotinhorj",
-                "obs": "Ex-governador. Pode migrar para disputa ao governo.",
-            },
-            {
-                "nm": "Juliana Benício",
-                "partido": "Cidadania",
-                "status": "confirmado",
-                "instagram": "@julianabeniciooficial",
-                "youtube": "@Juliana.Benicio",
-                "facebook": "JulianaBenicioOficial",
-                "obs": "Niterói; ligada ao grupo Rodrigo Neves/Cidadania.",
-            },
-            {
-                "nm": "Gracyanne Barbosa",
-                "partido": "Republicanos",
-                "status": "confirmado",
-                "instagram": "@graoficial",
-                "obs": "Influenciadora fitness; alto engajamento digital.",
-            },
-            {
-                "nm": "Felipe Curi",
-                "partido": "PP",
-                "status": "confirmado",
-                "instagram": "@delegadofelipecuri",
-                "obs": "Ex-secretário de Polícia Civil; apoio Flávio Bolsonaro.",
-            },
-            {
-                "nm": "Cristina Mel",
-                "partido": "PSDB",
-                "status": "confirmado",
-                "instagram": "@cristinamel",
-                "obs": "Cantora gospel; pré-candidatura anunciada.",
-            },
-            {
-                "nm": "Zé de Abreu",
-                "partido": "PT",
-                "status": "confirmado",
-                "instagram": "@zehdeabreu",
-                "x": "@zehdeabreu",
-                "obs": "Ator; candidatura apoiada por Quaquá (PT-RJ).",
-            },
-            {
-                "nm": "Elias Jabbour",
-                "partido": "PCdoB",
-                "status": "confirmado",
-                "instagram": "@eliasmkjabbour",
-                "obs": "Economista/professor; site eliasjabbour.com.br.",
-            },
-            {
-                "nm": "José Camilo Zito",
-                "partido": "Cidadania",
-                "status": "confirmado",
-                "obs": "Ex-prefeito de Duque de Caxias; filiou-se ao Cidadania.",
-            },
-            {
-                "nm": "Haroldo Filho",
-                "partido": "Podemos",
-                "status": "confirmado",
-                "instagram": "@haroldofilho",
-                "obs": "Secretário de Valença; pré-candidatura anunciada.",
-            },
-            {
-                "nm": "Dado Dolabella",
-                "partido": "MDB",
-                "status": "confirmado",
-                "instagram": "@dadodolabella",
-                "obs": "Ator; anúncio pelo MDB foi apagado — candidatura instável.",
-            },
-            {
-                "nm": "Altineu Côrtes",
-                "partido": "PL",
-                "status": "citado",
-                "instagram": "@altineucortes",
-                "obs": "Citado como puxador competitivo.",
-            },
-            {
-                "nm": "Áureo Ribeiro",
-                "partido": "Solidariedade",
-                "status": "citado",
-                "instagram": "@aureoribeiro",
-            },
-            {
-                "nm": "Carlos Jordy",
-                "partido": "PL",
-                "status": "citado",
-                "instagram": "@carlosjordy",
-                "x": "@carlosjordy",
-            },
-            {
-                "nm": "Chico Alencar",
-                "partido": "PSOL",
-                "status": "citado",
-                "instagram": "@chicoalencar",
-                "x": "@chicoalencar",
-            },
-            {
-                "nm": "Daniel Soranz",
-                "partido": "PSD",
-                "status": "citado",
-                "instagram": "@danielsoranz",
-                "x": "@danielsoranz",
-            },
-            {
-                "nm": "Dr. Luizinho",
-                "partido": "PP",
-                "status": "citado",
-                "instagram": "@drluizinho",
-                "x": "@drluizinho",
-            },
-            {
-                "nm": "General Pazuello",
-                "partido": "PL",
-                "status": "citado",
-                "instagram": "@genpazuello",
-            },
-            {
-                "nm": "Glauber Braga",
-                "partido": "PSOL",
-                "status": "citado",
-                "instagram": "@glauber_braga",
-                "x": "@glauber_braga",
-            },
-            {
-                "nm": "Gutemberg Reis",
-                "partido": "MDB",
-                "status": "citado",
-                "instagram": "@gutembergreis",
-            },
-            {
-                "nm": "Lindbergh Farias",
-                "partido": "PT",
-                "status": "citado",
-                "instagram": "@lindberghfarias",
-                "x": "@lindberghfarias",
-            },
-            {
-                "nm": "Marcelo Crivella",
-                "partido": "Republicanos",
-                "status": "citado",
-                "x": "@mcrivella",
-            },
-            {
-                "nm": "Marcelo Freixo",
-                "partido": "PT",
-                "status": "citado",
-                "instagram": "@marcelofreixo",
-                "x": "@marcelofreixo",
-            },
-            {
-                "nm": "Otoni de Paula",
-                "partido": "MDB",
-                "status": "citado",
-                "instagram": "@otonidepaula",
-                "x": "@otonidepaula",
-            },
-            {
-                "nm": "Pastor Henrique Vieira",
-                "partido": "PSOL",
-                "status": "citado",
-                "instagram": "@pastorhenriquevieira",
-            },
-            {
-                "nm": "Reimont",
-                "partido": "PT",
-                "status": "citado",
-                "instagram": "@reimont",
-                "x": "@reimont",
-            },
-            {
-                "nm": "Soraya Santos",
-                "partido": "PL",
-                "status": "citado",
-                "instagram": "@sorayasantos",
-            },
-            {
-                "nm": "Talíria Petrone",
-                "partido": "PSOL",
-                "status": "citado",
-                "instagram": "@taliriapetrone",
-                "x": "@taliriapetrone",
-            },
-            {
-                "nm": "Tarcísio Motta",
-                "partido": "PSOL",
-                "status": "citado",
-                "instagram": "@tarcisiomotta",
-                "x": "@tarcisiomotta",
-            },
-            {
-                "nm": "Alessandro Molon",
-                "partido": "PSB",
-                "status": "citado",
-                "instagram": "@alessandromolon",
-                "x": "@alessandromolon",
-            },
-        ],
-    }
-}
-
-
 @app.get("/api/precandidatos")
 async def get_precandidatos(
     uf: str = Query("RJ"),
@@ -1411,6 +1126,106 @@ async def get_precandidatos(
             "candidatos": candidatos,
             "fonte": "levantamento_estatico_mai2026",
             "aviso": "Lista não oficial — convenções partidárias: 20/jul a 05/ago/2026",
+        }
+    )
+
+
+@app.get("/api/social/engajamento/precandidatos")
+async def get_engajamento_precandidatos(
+    uf: str = Query("RJ"),
+    cargo: str = Query(""),
+    plataforma: str = Query(""),
+) -> JSONResponse:
+    """Métricas de perfil (followers, engagement) de pré-candidatos 2026.
+
+    Lê de spepe_gold.dim_precandidato_2026 quando BigQuery disponível;
+    caso contrário retorna dados estáticos sem métricas de followers.
+    """
+    from dataops.precandidatos_2026 import get_candidatos
+
+    cargo_key = cargo.lower().strip()
+    cands_static = (
+        get_candidatos(uf, cargo_key)
+        if cargo_key
+        else [
+            {**c, "cargo": c_key}
+            for c_key, lst in _PRE_CANDIDATOS_2026.get(uf.upper(), {}).items()
+            for c in lst
+        ]
+    )
+
+    if settings.use_bigquery:
+        try:
+            from google.cloud import bigquery
+
+            client = bigquery.Client(project=settings.gcp_project_id)
+            gold = f"{settings.gcp_project_id}.{settings.bigquery_dataset_gold}"
+            cargo_filter = "AND cargo = @cargo" if cargo_key else ""
+            query = f"""
+                SELECT
+                    nm, cargo, partido, status,
+                    x, instagram, youtube, facebook,
+                    x_followers, x_tweets, x_engagement_rate,
+                    ig_followers, ig_posts,
+                    yt_subscribers, yt_videos,
+                    fb_fans,
+                    dt_atualizacao_metricas
+                FROM `{gold}.dim_precandidato_2026`
+                WHERE sg_uf = @uf
+                {cargo_filter}
+                ORDER BY COALESCE(x_followers, ig_followers, yt_subscribers, 0) DESC
+            """
+            job_config = bigquery.QueryJobConfig(
+                query_parameters=[
+                    bigquery.ScalarQueryParameter("uf", "STRING", uf.upper()),
+                    *(
+                        [bigquery.ScalarQueryParameter("cargo", "STRING", cargo_key)]
+                        if cargo_key
+                        else []
+                    ),
+                ]
+            )
+            rows = await asyncio.to_thread(  # type: ignore[misc]
+                lambda q=query, cfg=job_config: list(client.query(q, job_config=cfg).result())
+            )
+            data = [dict(r) for r in rows]
+            return JSONResponse(
+                {
+                    "uf": uf.upper(),
+                    "cargo": cargo,
+                    "total": len(data),
+                    "candidatos": data,
+                    "fonte": "bigquery_dim_precandidato_2026",
+                }
+            )
+        except Exception as exc:
+            logger.warning("BQ engajamento pré-cand falhou: %s", exc)
+
+    # Fallback: static data without live metrics
+    return JSONResponse(
+        {
+            "uf": uf.upper(),
+            "cargo": cargo,
+            "total": len(cands_static),
+            "candidatos": [
+                {
+                    "nm": c.get("nm"),
+                    "cargo": c.get("cargo", cargo_key),
+                    "partido": c.get("partido"),
+                    "status": c.get("status"),
+                    "instagram": c.get("instagram", "").lstrip("@") or None,
+                    "x": c.get("x", "").lstrip("@") or None,
+                    "youtube": c.get("youtube", "").lstrip("@") or None,
+                    "facebook": c.get("facebook", "").lstrip("@") or None,
+                    "x_followers": None,
+                    "ig_followers": None,
+                    "yt_subscribers": None,
+                    "fb_fans": None,
+                }
+                for c in cands_static
+            ],
+            "fonte": "estatico_sem_metricas",
+            "aviso": "Execute profile_metrics_job para popular métricas de followers",
         }
     )
 
