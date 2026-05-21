@@ -285,6 +285,7 @@ table.data tr:hover td{background:var(--bg3)}
     <div class="tab" data-tab="digital" onclick="switchTab('digital')">&#128241; Digital <span class="tab-badge">2026</span></div>
     <div class="tab" data-tab="ranking" onclick="switchTab('ranking')">&#127942; Ranking</div>
     <div class="tab" data-tab="comparativo" onclick="switchTab('comparativo');loadComparativo()">&#9878; Comparativo</div>
+    <div class="tab" data-tab="locais" onclick="switchTab('locais');loadLocais()">&#127968; Locais</div>
     <div class="tab" data-tab="previsao" onclick="switchTab('previsao')">&#128302; Previs&#227;o <span class="tab-badge">2026</span></div>
   </div>
 
@@ -636,6 +637,49 @@ table.data tr:hover td{background:var(--bg3)}
       </div>
     </div>
 
+    <!-- TAB: LOCAIS DE VOTAÇÃO -->
+    <div class="tab-panel" id="tab-locais">
+      <div class="panel-scroll">
+        <div style="display:flex;align-items:center;gap:8px;padding:4px 0 8px;flex-wrap:wrap">
+          <span style="font-size:.80rem;font-weight:700;color:var(--tx)">Locais de Vota&#231;&#227;o</span>
+          <span class="tag tag-grn">&#127968; TSE Cadastro</span>
+          <select id="loc-mun-sel" style="font-size:.70rem;background:var(--bg3);color:var(--tx);border:1px solid var(--br);border-radius:5px;padding:3px 6px;max-width:200px" onchange="onLocMunChange()">
+            <option value="">Todos os munic&#237;pios</option>
+          </select>
+          <select id="loc-zona-sel" style="font-size:.70rem;background:var(--bg3);color:var(--tx);border:1px solid var(--br);border-radius:5px;padding:3px 6px" onchange="onLocZonaChange()">
+            <option value="">Todas as zonas</option>
+          </select>
+          <span id="loc-loading" style="display:none;font-size:.70rem;color:var(--tx3)">Carregando&#8230;</span>
+        </div>
+        <div class="kpi-row kpi-row-4">
+          <div class="kpi"><div class="kpi-val" id="loc-zonas">&mdash;</div><div class="kpi-lbl">Zonas eleitorais</div></div>
+          <div class="kpi"><div class="kpi-val" id="loc-locais">&mdash;</div><div class="kpi-lbl">Locais de vota&#231;&#227;o</div></div>
+          <div class="kpi"><div class="kpi-val" id="loc-secoes">&mdash;</div><div class="kpi-lbl">Se&#231;&#245;es</div></div>
+          <div class="kpi"><div class="kpi-val" id="loc-coords">&mdash;</div><div class="kpi-lbl">Com coordenadas</div></div>
+        </div>
+        <div style="display:flex;gap:8px;height:calc(100vh - var(--topbar) - var(--tabbar) - var(--chatbar) - 158px)">
+          <div id="loc-leaflet" style="flex:1.6;border-radius:8px;overflow:hidden;background:#0d1117;min-height:200px"></div>
+          <div style="flex:1;overflow:hidden;display:flex;flex-direction:column;min-width:0">
+            <div style="font-size:.68rem;font-weight:600;color:var(--tx2);padding:2px 0 6px;letter-spacing:.04em;text-transform:uppercase">Zonas / Locais</div>
+            <div id="loc-table-empty" style="display:none;padding:20px;text-align:center;color:var(--tx3);font-size:.75rem">
+              Selecione um munic&#237;pio para ver os locais de vota&#231;&#227;o no mapa.
+            </div>
+            <div style="overflow-y:auto;flex:1">
+              <table class="data">
+                <thead><tr>
+                  <th onclick="locSort('nr_zona')" style="cursor:pointer">Zona</th>
+                  <th onclick="locSort('nm_municipio')" style="cursor:pointer">Munic&#237;pio</th>
+                  <th onclick="locSort('qt_locais')" style="cursor:pointer;text-align:right">Locais</th>
+                  <th onclick="locSort('qt_secoes')" style="cursor:pointer;text-align:right">Se&#231;&#245;es</th>
+                </tr></thead>
+                <tbody id="loc-tbody"></tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
   </div><!-- /content -->
 
   <!-- CHAT BAR -->
@@ -882,6 +926,7 @@ function loadTab(tab) {
     digital:     loadDigital,
     ranking:     loadRanking,
     comparativo: loadComparativo,
+    locais:      loadLocais,
     previsao:    ()=>loadPrevisao(_scenario),
   };
   if (loaders[tab]) loaders[tab]();
@@ -2202,6 +2247,199 @@ function _cmp2Render() {
         <td style="text-align:right">${r.cands_2022 != null ? r.cands_2022 : '—'}</td>
       </tr>`;
     }).join('');
+  }
+}
+
+// ── LOCAIS DE VOTAÇÃO ────────────────────────────────────────────────────────
+let _locMap = null;
+let _locMarkersLayer = null;
+let _locResumoCache = null;
+let _locUF = null;
+let _locSortCol = 'nr_zona';
+let _locSortAsc = true;
+
+function _zonaHue(nr) {
+  return Math.round((nr * 137.508) % 360);
+}
+function _zonaColor(nr) {
+  return `hsl(${_zonaHue(nr)},72%,62%)`;
+}
+
+async function loadLocais() {
+  const uf = (_uf || 'SP').toUpperCase();
+  if (_locUF !== uf) {
+    _locUF = uf;
+    _locResumoCache = null;
+    if (_locMap) { _locMap.remove(); _locMap = null; _locMarkersLayer = null; }
+    document.getElementById('loc-mun-sel').innerHTML = '<option value="">Todos os municípios</option>';
+    document.getElementById('loc-zona-sel').innerHTML = '<option value="">Todas as zonas</option>';
+  }
+
+  if (!_locMap) {
+    const el = document.getElementById('loc-leaflet');
+    if (!el || el.offsetHeight < 50) { setTimeout(loadLocais, 150); return; }
+    _locMap = L.map(el, {zoomControl: true, scrollWheelZoom: true});
+    L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
+      attribution: '© OpenStreetMap © CARTO', subdomains: 'abcd', maxZoom: 19
+    }).addTo(_locMap);
+    _locMarkersLayer = L.layerGroup().addTo(_locMap);
+  }
+
+  if (_locResumoCache) { _locApplyResumo(_locResumoCache); return; }
+
+  document.getElementById('loc-loading').style.display = '';
+  const d = await api(`/api/locais/resumo?uf=${uf}`);
+  document.getElementById('loc-loading').style.display = 'none';
+
+  if (!d || d.erro || d.fonte === 'bigquery_indisponivel') {
+    document.getElementById('loc-tbody').innerHTML =
+      `<tr><td colspan="4" style="text-align:center;color:var(--tx3);padding:20px">
+        ${d?.fonte === 'bigquery_indisponivel' ? 'BigQuery não configurado — execute o job spepe-tse-locais-ingest no GCP.' : (d?.erro || 'Sem dados')}
+      </td></tr>`;
+    return;
+  }
+  _locResumoCache = d;
+  _locApplyResumo(d);
+}
+
+function _locApplyResumo(d) {
+  const k = d.kpis || {};
+  document.getElementById('loc-zonas').textContent = _fmt(k.qt_zonas);
+  document.getElementById('loc-locais').textContent = _fmt(k.qt_locais);
+  document.getElementById('loc-secoes').textContent = _fmt(k.qt_secoes);
+  document.getElementById('loc-coords').textContent = `${k.pct_com_coords ?? '—'}%`;
+
+  const munSel = document.getElementById('loc-mun-sel');
+  const curMun = munSel.value;
+  munSel.innerHTML = '<option value="">Todos os municípios</option>' +
+    (d.municipios || []).map(m =>
+      `<option value="${m.cd_municipio}">${m.nm_municipio} (${m.qt_zonas} zona${m.qt_zonas !== 1 ? 's' : ''})</option>`
+    ).join('');
+  if (curMun) munSel.value = curMun;
+
+  _locRenderTable(d.zonas || []);
+  _loadLocaisMap();
+}
+
+function _locRenderTable(zonas) {
+  const sorted = [...zonas].sort((a, b) => {
+    const av = a[_locSortCol], bv = b[_locSortCol];
+    if (typeof av === 'number') return _locSortAsc ? av - bv : bv - av;
+    return _locSortAsc ? String(av).localeCompare(String(bv)) : String(bv).localeCompare(String(av));
+  });
+  const cdMun = document.getElementById('loc-mun-sel')?.value || '';
+  const nrZona = document.getElementById('loc-zona-sel')?.value || '';
+  const filtered = sorted.filter(z =>
+    (!cdMun || _locResumoCache?.municipios?.find(m => m.cd_municipio === cdMun)?.nm_municipio === z.nm_municipio) &&
+    (!nrZona || String(z.nr_zona) === nrZona)
+  );
+  document.getElementById('loc-tbody').innerHTML = filtered.slice(0, 300).map(z => {
+    const c = _zonaColor(z.nr_zona);
+    return `<tr style="cursor:pointer" onclick="onLocTableRow(${z.nr_zona})">
+      <td><span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:${c};margin-right:5px;vertical-align:middle"></span>Zona&nbsp;${String(z.nr_zona).padStart(3,'0')}</td>
+      <td style="color:var(--tx2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:130px">${z.nm_municipio}</td>
+      <td style="text-align:right">${z.qt_locais}</td>
+      <td style="text-align:right">${_fmt(z.qt_secoes)}</td>
+    </tr>`;
+  }).join('') || '<tr><td colspan="4" style="text-align:center;color:var(--tx3);padding:16px">Nenhum local encontrado</td></tr>';
+}
+
+function locSort(col) {
+  if (_locSortCol === col) _locSortAsc = !_locSortAsc;
+  else { _locSortCol = col; _locSortAsc = true; }
+  if (_locResumoCache) _locRenderTable(_locResumoCache.zonas || []);
+}
+
+function onLocTableRow(nr_zona) {
+  const sel = document.getElementById('loc-zona-sel');
+  if (sel.value === String(nr_zona)) {
+    sel.value = ''; // toggle off
+  } else {
+    sel.value = String(nr_zona);
+  }
+  _loadLocaisMap();
+  _locRenderTable(_locResumoCache?.zonas || []);
+}
+
+async function onLocMunChange() {
+  const cdMun = document.getElementById('loc-mun-sel').value;
+  const zonaSel = document.getElementById('loc-zona-sel');
+  if (_locResumoCache && cdMun) {
+    const nm = _locResumoCache.municipios?.find(m => m.cd_municipio === cdMun)?.nm_municipio || '';
+    const zonas = [...new Set(
+      (_locResumoCache.zonas || []).filter(z => z.nm_municipio === nm).map(z => z.nr_zona)
+    )].sort((a, b) => a - b);
+    zonaSel.innerHTML = '<option value="">Todas as zonas</option>' +
+      zonas.map(z => `<option value="${z}">Zona ${String(z).padStart(3,'0')}</option>`).join('');
+  } else {
+    zonaSel.innerHTML = '<option value="">Todas as zonas</option>';
+  }
+  _locRenderTable(_locResumoCache?.zonas || []);
+  await _loadLocaisMap();
+}
+
+async function onLocZonaChange() {
+  _locRenderTable(_locResumoCache?.zonas || []);
+  await _loadLocaisMap();
+}
+
+async function _loadLocaisMap() {
+  if (!_locMap) return;
+  const uf = _locUF || 'SP';
+  const cdMun = document.getElementById('loc-mun-sel')?.value || '';
+  const nrZona = document.getElementById('loc-zona-sel')?.value || '';
+
+  if (!cdMun && !nrZona) {
+    document.getElementById('loc-table-empty').style.display = '';
+    if (_locMarkersLayer) _locMarkersLayer.clearLayers();
+    _locMap.setView([-14.235, -51.925], 4);
+    return;
+  }
+  document.getElementById('loc-table-empty').style.display = 'none';
+
+  let url = `/api/mapa/locais?uf=${uf}&only_with_coords=true`;
+  if (cdMun) url += `&cd_municipio=${encodeURIComponent(cdMun)}`;
+  if (nrZona) url += `&nr_zona=${encodeURIComponent(nrZona)}`;
+
+  document.getElementById('loc-loading').style.display = '';
+  const geo = await api(url);
+  document.getElementById('loc-loading').style.display = 'none';
+
+  if (_locMarkersLayer) _locMarkersLayer.clearLayers();
+
+  if (!geo?.features?.length) return;
+
+  const leafletMarkers = [];
+  for (const f of geo.features) {
+    const p = f.properties;
+    const [lng, lat] = f.geometry.coordinates;
+    const color = _zonaColor(p.nr_zona);
+    const r = Math.min(9, Math.max(4, 3 + (p.qt_secoes || 1) * 0.25));
+    const marker = L.circleMarker([lat, lng], {
+      radius: r, color, fillColor: color, fillOpacity: 0.82, weight: 1.5,
+    });
+    marker.bindPopup(`
+      <div style="font-size:.74rem;min-width:190px;max-width:240px">
+        <div style="font-weight:700;margin-bottom:4px;word-break:break-word">${p.nm_local_votacao || 'Local ' + p.nr_local_votacao}</div>
+        <div style="color:#8b949e;margin-bottom:2px">&#128205; ${p.ds_endereco || '&mdash;'}${p.nm_bairro ? ', ' + p.nm_bairro : ''}</div>
+        <div style="display:flex;gap:14px;margin-top:6px">
+          <span style="color:${color}">&#9679;</span>
+          <span>Zona <b>${String(p.nr_zona).padStart(3,'0')}</b></span>
+          <span>&#128203; <b>${p.qt_secoes ?? '&mdash;'}</b> se&#231;ões</span>
+        </div>
+        <div style="color:#484f58;font-size:.64rem;margin-top:5px">CEP ${p.nr_cep || '&mdash;'} &middot; ${p.nm_municipio}</div>
+      </div>
+    `, {maxWidth: 280});
+    _locMarkersLayer.addLayer(marker);
+    leafletMarkers.push(marker);
+  }
+
+  if (leafletMarkers.length) {
+    try {
+      const grp = L.featureGroup(leafletMarkers);
+      _locMap.fitBounds(grp.getBounds(), {padding: [25, 25]});
+    } catch (_) {}
+    setTimeout(() => _locMap.invalidateSize(), 100);
   }
 }
 

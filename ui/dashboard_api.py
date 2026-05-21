@@ -150,6 +150,7 @@ _PUBLIC_API_PATHS = {
     "/api/municipios",
     "/api/kpi",
     "/api/mapa/locais",
+    "/api/locais/resumo",
     "/api/model/status",
     "/api/model/shap",
     "/api/resultados/partido",
@@ -3313,6 +3314,117 @@ async def _bq_locais_votacao(
         for r in rows
         if r["nr_latitude"] is not None and r["nr_longitude"] is not None
     ]
+
+
+@app.get("/api/locais/resumo")
+async def get_locais_resumo(
+    uf: str = Query(..., description="Sigla da UF"),
+    cd_municipio: str | None = Query(None),
+) -> JSONResponse:
+    """Resumo de zonas e locais de votação por UF (KPIs + lista de municípios + zonas)."""
+    if not (settings.gcp_project_id and os.environ.get("USE_BIGQUERY", "").lower() == "true"):
+        return JSONResponse(
+            {"zonas": [], "municipios": [], "kpis": {}, "fonte": "bigquery_indisponivel"}
+        )
+    try:
+        result = await _bq_locais_resumo(uf.upper(), cd_municipio)
+        return JSONResponse(result)
+    except Exception as exc:
+        logger.warning("BQ locais_resumo falhou: %s", exc)
+        return JSONResponse({"zonas": [], "municipios": [], "kpis": {}, "erro": str(exc)})
+
+
+async def _bq_locais_resumo(uf: str, cd_municipio: str | None) -> dict:
+    from google.cloud import bigquery
+
+    client = bigquery.Client(project=settings.gcp_project_id)
+    gold = f"{settings.gcp_project_id}.{settings.bigquery_dataset_gold}"
+
+    base_params: list = [bigquery.ScalarQueryParameter("uf", "STRING", uf)]
+    mun_filter = ""
+    if cd_municipio:
+        mun_filter = "AND cd_municipio = @cd_municipio"
+        base_params.append(bigquery.ScalarQueryParameter("cd_municipio", "INT64", int(cd_municipio)))
+
+    zona_query = f"""
+        SELECT nr_zona, nm_municipio,
+               COUNT(*)                AS qt_locais,
+               SUM(qt_secoes)          AS qt_secoes,
+               COUNTIF(has_coordinates) AS qt_com_coords
+        FROM `{gold}.fact_locais_votacao`
+        WHERE sg_uf = @uf {mun_filter}
+        GROUP BY nr_zona, nm_municipio
+        ORDER BY nr_zona, nm_municipio
+    """
+    mun_query = f"""
+        SELECT CAST(cd_municipio AS STRING) AS cd_municipio,
+               nm_municipio,
+               COUNT(DISTINCT nr_zona)  AS qt_zonas,
+               COUNT(*)                 AS qt_locais,
+               SUM(qt_secoes)           AS qt_secoes
+        FROM `{gold}.fact_locais_votacao`
+        WHERE sg_uf = @uf
+        GROUP BY cd_municipio, nm_municipio
+        ORDER BY nm_municipio
+    """
+
+    zona_rows, mun_rows = await asyncio.gather(
+        asyncio.to_thread(
+            lambda: list(
+                client.query(
+                    zona_query,
+                    job_config=bigquery.QueryJobConfig(query_parameters=base_params),
+                ).result()
+            )
+        ),
+        asyncio.to_thread(
+            lambda: list(
+                client.query(
+                    mun_query,
+                    job_config=bigquery.QueryJobConfig(
+                        query_parameters=[bigquery.ScalarQueryParameter("uf", "STRING", uf)]
+                    ),
+                ).result()
+            )
+        ),
+    )
+
+    zonas = [
+        {
+            "nr_zona": r["nr_zona"],
+            "nm_municipio": r["nm_municipio"],
+            "qt_locais": r["qt_locais"],
+            "qt_secoes": r["qt_secoes"] or 0,
+            "qt_com_coords": r["qt_com_coords"],
+        }
+        for r in zona_rows
+    ]
+    municipios = [
+        {
+            "cd_municipio": r["cd_municipio"],
+            "nm_municipio": r["nm_municipio"],
+            "qt_zonas": r["qt_zonas"],
+            "qt_locais": r["qt_locais"],
+            "qt_secoes": r["qt_secoes"] or 0,
+        }
+        for r in mun_rows
+    ]
+
+    total_zonas = len({z["nr_zona"] for z in zonas})
+    total_locais = sum(z["qt_locais"] for z in zonas)
+    total_secoes = sum(z["qt_secoes"] for z in zonas)
+    total_coords = sum(z["qt_com_coords"] for z in zonas)
+    return {
+        "zonas": zonas,
+        "municipios": municipios,
+        "kpis": {
+            "qt_zonas": total_zonas,
+            "qt_locais": total_locais,
+            "qt_secoes": total_secoes,
+            "pct_com_coords": round(total_coords / max(total_locais, 1) * 100, 1),
+        },
+        "fonte": "bigquery",
+    }
 
 
 async def _bq_mapa_nacional(cargo: str, ano: int, turno: int, candidato: str = "") -> list[dict]:
