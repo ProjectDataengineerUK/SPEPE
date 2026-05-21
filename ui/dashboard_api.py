@@ -3378,7 +3378,9 @@ async def get_mapa_locais(
             {"type": "FeatureCollection", "features": [], "fonte": "bigquery_indisponivel"}
         )
     try:
-        features = await _bq_locais_votacao(uf.upper(), cd_municipio, nm_municipio, nr_zona, only_with_coords)
+        features = await _bq_locais_votacao(
+            uf.upper(), cd_municipio, nm_municipio, nr_zona, only_with_coords
+        )
         return _json_safe_response({"type": "FeatureCollection", "features": features})
     except Exception as exc:
         logger.warning("BQ locais_votacao falhou: %s", exc)
@@ -8578,10 +8580,10 @@ def _local_comparativo_indicadores(uf: str, ano: int) -> list[dict]:
                 analf = float(r.get("taxa_analfabetismo") or 0)
                 alfab_raw = round(100 - (analf * 100 if analf <= 1 else analf), 1) if analf else 0
             ibge_map[nm] = {
-                "idhm":  round(float(r.get("idhm") or 0), 3),
+                "idhm": round(float(r.get("idhm") or 0), 3),
                 "renda": round(float(r.get("renda_per_capita") or 0), 0),
                 "alfab": alfab_raw,
-                "gini":  round(float(r.get("gini") or 0), 3),
+                "gini": round(float(r.get("gini") or 0), 3),
             }
 
     # ── Segurança ────────────────────────────────────────────────────────────
@@ -8594,8 +8596,10 @@ def _local_comparativo_indicadores(uf: str, ano: int) -> list[dict]:
             if not nm:
                 continue
             seg_map[nm] = {
-                "ivs":       round(float(r.get("ivs_total") or r.get("ivs_valor") or 0), 3),
-                "homicidio": round(float(r.get("taxa_homicidio_100k") or r.get("taxa_homicidio") or 0), 1),
+                "ivs": round(float(r.get("ivs_total") or r.get("ivs_valor") or 0), 3),
+                "homicidio": round(
+                    float(r.get("taxa_homicidio_100k") or r.get("taxa_homicidio") or 0), 1
+                ),
             }
 
     # ── Saúde ─────────────────────────────────────────────────────────────────
@@ -8609,27 +8613,36 @@ def _local_comparativo_indicadores(uf: str, ano: int) -> list[dict]:
                 continue
             cob = float(r.get("pct_cobertura_plano_saude") or r.get("cobertura_esf_pct") or 0)
             sau_map[nm] = {
-                "mortalidade": round(float(r.get("taxa_mortalidade_infantil_1000") or r.get("tx_mortalidade_infantil") or 0), 1),
-                "cobertura":   round(cob * 100 if cob <= 1 else cob, 1),
+                "mortalidade": round(
+                    float(
+                        r.get("taxa_mortalidade_infantil_1000")
+                        or r.get("tx_mortalidade_infantil")
+                        or 0
+                    ),
+                    1,
+                ),
+                "cobertura": round(cob * 100 if cob <= 1 else cob, 1),
             }
 
     all_nms = set(ibge_map) | set(seg_map) | set(sau_map)
     result = []
     for nm in sorted(all_nms):
         ibge = ibge_map.get(nm, {})
-        seg  = seg_map.get(nm, {})
-        sau  = sau_map.get(nm, {})
-        result.append({
-            "nm":          nm.title(),
-            "idhm":        ibge.get("idhm"),
-            "renda":       ibge.get("renda"),
-            "alfab":       ibge.get("alfab"),
-            "gini":        ibge.get("gini"),
-            "mortalidade": sau.get("mortalidade"),
-            "cobertura":   sau.get("cobertura"),
-            "ivs":         seg.get("ivs"),
-            "homicidio":   seg.get("homicidio"),
-        })
+        seg = seg_map.get(nm, {})
+        sau = sau_map.get(nm, {})
+        result.append(
+            {
+                "nm": nm.title(),
+                "idhm": ibge.get("idhm"),
+                "renda": ibge.get("renda"),
+                "alfab": ibge.get("alfab"),
+                "gini": ibge.get("gini"),
+                "mortalidade": sau.get("mortalidade"),
+                "cobertura": sau.get("cobertura"),
+                "ivs": seg.get("ivs"),
+                "homicidio": seg.get("homicidio"),
+            }
+        )
     return result
 
 
@@ -8645,7 +8658,9 @@ async def get_comparativo_indicadores(
     """
     if not (settings.gcp_project_id and os.environ.get("USE_BIGQUERY", "").lower() == "true"):
         result = await asyncio.to_thread(_local_comparativo_indicadores, uf.upper(), ano)
-        return JSONResponse({"municipios": result, "fonte": "silver_local", "uf": uf.upper(), "ano": ano})
+        return JSONResponse(
+            {"municipios": result, "fonte": "silver_local", "uf": uf.upper(), "ano": ano}
+        )
     try:
         result = await _bq_comparativo_indicadores(uf.upper(), ano)
         return JSONResponse(
@@ -8654,7 +8669,9 @@ async def get_comparativo_indicadores(
     except Exception as exc:
         logger.warning("comparativo/indicadores falhou: %s", exc)
         result = await asyncio.to_thread(_local_comparativo_indicadores, uf.upper(), ano)
-        return JSONResponse({"municipios": result, "fonte": "silver_fallback", "uf": uf.upper(), "ano": ano})
+        return JSONResponse(
+            {"municipios": result, "fonte": "silver_fallback", "uf": uf.upper(), "ano": ano}
+        )
 
 
 async def _bq_comparativo_indicadores(uf: str, ano: int) -> list[dict]:
