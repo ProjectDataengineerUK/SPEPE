@@ -34,6 +34,7 @@ locals {
     security_ingest      = { schedule = "30 4 * * 1", desc = "Segurança pública — semanal segunda 04:30 BRT" }
     sancoes_ingest       = { schedule = "0 5 * * 1",  desc = "CEIS/CNEP sanções — semanal segunda 05:00 BRT" }
     candidatos_discovery = { schedule = "30 5 * * 1", desc = "Discovery candidatos — semanal segunda 05:30 BRT" }
+    profile_metrics      = { schedule = "0 6 * * 1",  desc = "Profile metrics redes sociais — semanal segunda 06:00 BRT" }
 
     # ── Mensal (dia 1 de cada mês) ────────────────────────────────────────────
     tse_ingest              = { schedule = "0 6 1 * *",  desc = "TSE resultados — mensal dia 1 06:00 BRT" }
