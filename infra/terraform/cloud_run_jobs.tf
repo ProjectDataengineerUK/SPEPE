@@ -34,6 +34,7 @@ locals {
     bluesky_ingest        = { timeout = "1800s", memory = "1Gi",   cpu = "1", args = [] }
     pymc_train            = { timeout = "7200s", memory = "8Gi",   cpu = "4", args = [] }
     pymc_electoral_train  = { timeout = "7200s", memory = "8Gi",   cpu = "4", args = [] }
+    profile_metrics       = { timeout = "3600s", memory = "1Gi",   cpu = "1", args = [] }
   }
 
   # Env vars adicionais por job (além das compartilhadas)
@@ -94,6 +95,10 @@ locals {
     polls_ingest        = { POLLS_YEAR = "2026", POLLS_LOOKBACK_DAYS = "30" }
     gdelt_ingest        = { GDELT_LOOKBACK_DAYS = "30" }
     bluesky_ingest      = { BLUESKY_LOOKBACK_DAYS = "30" }
+    profile_metrics = {
+      UF        = "RJ"
+      PLATFORMS = "x,instagram,youtube,facebook"
+    }
     pymc_train = {
       PYMC_DRAWS         = "1000"
       PYMC_TUNE          = "2000"
@@ -143,6 +148,7 @@ locals {
     bluesky_ingest          = ["python", "-m", "dataops.jobs.bluesky_ingest_job"]
     pymc_train              = ["python", "-m", "mlops.pymc_train"]
     pymc_electoral_train    = ["python", "-m", "mlops.pymc_electoral_train"]
+    profile_metrics         = ["python", "-m", "dataops.jobs.profile_metrics_job"]
   }
 }
 
