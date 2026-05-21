@@ -1185,9 +1185,11 @@ async def get_engajamento_precandidatos(
                     ),
                 ]
             )
-            rows = await asyncio.to_thread(  # type: ignore[misc]
-                lambda q=query, cfg=job_config: list(client.query(q, job_config=cfg).result())
-            )
+
+            def _run_bq_engajamento() -> list:
+                return list(client.query(query, job_config=job_config).result())
+
+            rows = await asyncio.to_thread(_run_bq_engajamento)
             data = [dict(r) for r in rows]
             return JSONResponse(
                 {
