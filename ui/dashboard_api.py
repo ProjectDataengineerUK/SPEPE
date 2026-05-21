@@ -2708,11 +2708,24 @@ async def _bq_perfis(uf: str, ano: int) -> dict:
 
     client = bigquery.Client(project=settings.gcp_project_id)
     gold = f"{settings.gcp_project_id}.{settings.bigquery_dataset_gold}"
-    query = f"""
+    silver = f"{settings.gcp_project_id}.{settings.bigquery_dataset_silver}"
+
+    gold_query = f"""
         SELECT ds_genero, ds_faixa_etaria, ds_grau_escolaridade,
                SUM(qt_eleitores) AS qt_eleitores
         FROM `{gold}.fact_perfil_eleitorado`
         WHERE sg_uf = @uf AND ano = @ano
+        GROUP BY 1, 2, 3
+        ORDER BY 1, 2, 3
+    """
+    silver_query = f"""
+        SELECT
+            COALESCE(ds_genero, 'Não informado')            AS ds_genero,
+            COALESCE(ds_faixa_etaria, 'Não informado')      AS ds_faixa_etaria,
+            COALESCE(ds_grau_escolaridade, 'Não informado') AS ds_grau_escolaridade,
+            SUM(SAFE_CAST(qt_eleitores AS INT64))           AS qt_eleitores
+        FROM `{silver}.perfil_eleitorado`
+        WHERE sg_uf = @uf AND SAFE_CAST(ano AS INT64) = @ano
         GROUP BY 1, 2, 3
         ORDER BY 1, 2, 3
     """
@@ -2722,25 +2735,52 @@ async def _bq_perfis(uf: str, ano: int) -> dict:
             bigquery.ScalarQueryParameter("ano", "INT64", ano),
         ]
     )
-    rows = list(client.query(query, job_config=job_config).result())
+
+    rows = await asyncio.to_thread(
+        lambda: list(client.query(gold_query, job_config=job_config).result())
+    )
+    if not rows:
+        # fallback: Silver direto (Gold pode ainda não ter sido construído)
+        rows = await asyncio.to_thread(
+            lambda: list(client.query(silver_query, job_config=job_config).result())
+        )
+
     genero: dict[str, int] = {}
     faixa: dict[str, int] = {}
     escolaridade: dict[str, int] = {}
     for r in rows:
-        g = r.get("ds_genero", "Não informado") or "Não informado"
-        f = r.get("ds_faixa_etaria", "Não informado") or "Não informado"
-        e = r.get("ds_grau_escolaridade", "Não informado") or "Não informado"
-        qt = r.get("qt_eleitores") or 0
+        g = r.get("ds_genero") or "Não informado"
+        f = r.get("ds_faixa_etaria") or "Não informado"
+        e = r.get("ds_grau_escolaridade") or "Não informado"
+        qt = int(r.get("qt_eleitores") or 0)
         genero[g] = genero.get(g, 0) + qt
         faixa[f] = faixa.get(f, 0) + qt
         escolaridade[e] = escolaridade.get(e, 0) + qt
-    return {
-        "genero": [{"label": k, "qt_eleitores": v} for k, v in genero.items()],
-        "faixa_etaria": sorted(
-            [{"label": k, "qt_eleitores": v} for k, v in faixa.items()],
+
+    def _with_pct(d: dict[str, int]) -> list[dict]:
+        total = sum(d.values()) or 1
+        return sorted(
+            [
+                {
+                    "label": k,
+                    "ds_genero": k,
+                    "ds_faixa": k,
+                    "ds_grau": k,
+                    "qt_eleitores": v,
+                    "pct": round(v / total * 100, 1),
+                }
+                for k, v in d.items()
+            ],
             key=lambda x: x["label"],
-        ),
-        "escolaridade": [{"label": k, "qt_eleitores": v} for k, v in escolaridade.items()],
+        )
+
+    total_eleitores = sum(genero.values())
+    return {
+        "genero": _with_pct(genero),
+        "faixa_etaria": _with_pct(faixa),
+        "escolaridade": _with_pct(escolaridade),
+        "total_eleitores": total_eleitores,
+        "fonte": "bigquery",
     }
 
 
