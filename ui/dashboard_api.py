@@ -8561,7 +8561,8 @@ def _local_comparativo_indicadores(uf: str, ano: int) -> list[dict]:
             df = df[df["ano"] == ano]
         return df
 
-    norm = lambda s: (s or "").strip().upper()
+    def norm(s: str | None) -> str:
+        return (s or "").strip().upper()
 
     # ── IBGE ────────────────────────────────────────────────────────────────
     ibge_map: dict[str, dict] = {}
