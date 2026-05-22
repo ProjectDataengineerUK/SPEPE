@@ -493,7 +493,7 @@ table.data tr:hover td{background:var(--bg3)}
     <div class="tab-panel" id="tab-previsao">
       <!-- Filtros internos (movidos do topbar) -->
       <div id="prev-filterbar">
-        <span style="font-size:.70rem;font-weight:700;color:var(--tx2);margin-right:2px">Previsão 2026</span>
+        <span style="font-size:.70rem;font-weight:700;color:var(--tx2);margin-right:2px" id="prev-ano-label">Previsão 2026</span>
         <input id="cand-input" type="text" placeholder="Candidato..." list="cand-list" autocomplete="off" oninput="applyFilters();showPreCandSocial(this.value)">
         <datalist id="cand-list"></datalist>
         <select id="f-cargo" onchange="applyFilters()">
@@ -514,6 +514,11 @@ table.data tr:hover td{background:var(--bg3)}
           <option value="RJ">RJ</option><option value="RN">RN</option><option value="RO">RO</option>
           <option value="RR">RR</option><option value="RS">RS</option><option value="SC">SC</option>
           <option value="SE">SE</option><option value="SP" selected>SP</option><option value="TO">TO</option>
+        </select>
+        <select id="f-ano" onchange="_onAnoChange()" title="Ano de referência">
+          <option value="2026" selected>2026</option>
+          <option value="2022">2022</option>
+          <option value="2018">2018</option>
         </select>
         <span class="tag tag-org" style="margin-left:auto">&#8987; <span id="countdown-prev"></span></span>
         <!-- Cenário pills (existentes) -->
@@ -909,13 +914,21 @@ function _initCountdown() {
 function applyFilters() {
   _cargo     = document.getElementById('f-cargo').value;
   _uf        = document.getElementById('f-uf').value;
-  _ano       = 2026;
+  _ano       = parseInt(document.getElementById('f-ano')?.value || '2026', 10);
   _candidato = document.getElementById('cand-input').value.trim();
   _mapCtx    = {uf: _uf === 'BR' ? null : _uf};
   _mapLevel  = 'uf';
+  const lbl = document.getElementById('prev-ano-label');
+  if (lbl) lbl.textContent = _ano >= 2026 ? 'Previsão 2026' : `Histórico ${_ano}`;
   loadCandidatoList();
   loadTab(_activeTab);
   if (_activeTab === 'mapa') reloadMap();
+}
+
+function _onAnoChange() {
+  const inp = document.getElementById('cand-input');
+  if (inp) inp.value = '';
+  applyFilters();
 }
 
 async function loadCandidatoList() {
