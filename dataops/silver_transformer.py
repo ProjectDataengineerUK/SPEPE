@@ -2467,9 +2467,11 @@ def transform_ibge_to_silver(uf: str, year: int, use_bigquery: bool = False) -> 
         return {"status": "skipped", "reason": "no_bronze_municipios"}
 
     # ── SIDRA indicators (tall → wide) ──────────────────────────────────────
-    sidra_files_local = list((LOCAL_BRONZE_DIR / "ibge" / str(year) / uf_upper).glob(
-        f"indicadores_{uf_upper}_{year}.parquet"
-    ))
+    sidra_files_local = list(
+        (LOCAL_BRONZE_DIR / "ibge" / str(year) / uf_upper).glob(
+            f"indicadores_{uf_upper}_{year}.parquet"
+        )
+    )
     df_sidra_tall: pd.DataFrame | None = None
     if sidra_files_local:
         df_sidra_tall = pd.read_parquet(sidra_files_local[0])
@@ -2480,12 +2482,9 @@ def transform_ibge_to_silver(uf: str, year: int, use_bigquery: bool = False) -> 
     if df_sidra_tall is not None and not df_sidra_tall.empty:
         # Pivot tall (cd_municipio_ibge, indicador, valor) → wide
         if {"cd_municipio_ibge", "indicador", "valor"}.issubset(df_sidra_tall.columns):
-            df_sidra_wide = (
-                df_sidra_tall.pivot_table(
-                    index="cd_municipio_ibge", columns="indicador", values="valor", aggfunc="last"
-                )
-                .reset_index()
-            )
+            df_sidra_wide = df_sidra_tall.pivot_table(
+                index="cd_municipio_ibge", columns="indicador", values="valor", aggfunc="last"
+            ).reset_index()
             df_sidra_wide.columns.name = None
         else:
             df_sidra_wide = df_sidra_tall  # already wide if schema differs
@@ -2507,8 +2506,7 @@ def transform_ibge_to_silver(uf: str, year: int, use_bigquery: bool = False) -> 
 
     if not df_atlas.empty and "cd_municipio_ibge" in df_atlas.columns:
         atlas_cols = ["cd_municipio_ibge"] + [
-            c for c in df_atlas.columns
-            if c not in df.columns and c != "cd_municipio_ibge"
+            c for c in df_atlas.columns if c not in df.columns and c != "cd_municipio_ibge"
         ]
         df = df.merge(df_atlas[atlas_cols], on="cd_municipio_ibge", how="left")
 
