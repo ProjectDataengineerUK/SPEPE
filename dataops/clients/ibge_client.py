@@ -63,7 +63,7 @@ _IPEADATA_ADH_SERIES: dict[str, str] = {
     "idhm": "ADH_IDHM",
     "renda_per_capita": "ADH_RDPC",
     "gini": "ADH_GINI",
-    "pct_extrema_pobreza": "ADH_POBRE",
+    "pct_extrema_pobreza": "ADH_PIND",
 }
 
 
