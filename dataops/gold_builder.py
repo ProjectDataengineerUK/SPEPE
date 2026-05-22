@@ -279,7 +279,7 @@ def _build_gold_via_bigquery_sql() -> dict:
             SELECT
                 SAFE_CAST(cd_municipio_ibge AS INT64)              AS cd_municipio_ibge,
                 ANY_VALUE(sg_uf)                                    AS sg_uf,
-                ANY_VALUE(nm_municipio)                             AS nm_municipio,
+                MAX(nm_municipio)                                   AS nm_municipio,
                 SAFE_CAST(ANY_VALUE(ano) AS INT64)                  AS ano,
                 ANY_VALUE(populacao)                                AS populacao_total,
                 ANY_VALUE(taxa_alfabetizacao)                       AS taxa_alfabetizacao,
@@ -297,7 +297,7 @@ def _build_gold_via_bigquery_sql() -> dict:
                 ANY_VALUE(gini)                                     AS gini,
                 ANY_VALUE(pct_extrema_pobreza)                      AS pct_extrema_pobreza,
                 CURRENT_TIMESTAMP()                                 AS ingested_at
-            FROM `{silver}`.ibge_municipio_*
+            FROM `{silver}.ibge_municipio_*`
             WHERE cd_municipio_ibge IS NOT NULL
             GROUP BY cd_municipio_ibge
         """,
