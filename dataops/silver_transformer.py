@@ -2435,6 +2435,7 @@ def _dataframe_to_bq_schema(df: pd.DataFrame) -> list:
         else:
             bq_type = _type_map.get(dtype_str, "STRING")
         fields.append(bigquery.SchemaField(col, bq_type, mode="NULLABLE"))
+    return fields
 
 
 def _load_bronze_parquet_gcs(prefix: str) -> pd.DataFrame:
