@@ -277,27 +277,28 @@ def _build_gold_via_bigquery_sql() -> dict:
         "fact_ibge_municipio": f"""
             CREATE OR REPLACE TABLE `{gold}.fact_ibge_municipio` AS
             SELECT
-                SAFE_CAST(cd_municipio_ibge AS INT64)            AS cd_municipio_ibge,
-                ANY_VALUE(sg_uf)                                  AS sg_uf,
-                ANY_VALUE(
-                    COALESCE(nm_municipio_x, nm_municipio_y)
-                )                                                 AS nm_municipio,
-                SAFE_CAST(ANY_VALUE(ano_eleicao) AS INT64)        AS ano,
-                CAST(NULL AS FLOAT64)                             AS populacao_total,
-                CAST(NULL AS FLOAT64)                             AS taxa_alfabetizacao,
-                CAST(NULL AS FLOAT64)                             AS taxa_analfabetismo,
-                CAST(NULL AS FLOAT64)                             AS renda_per_capita,
-                CAST(NULL AS FLOAT64)                             AS pct_urbano,
-                CAST(NULL AS FLOAT64)                             AS pct_0_14,
-                CAST(NULL AS FLOAT64)                             AS pct_60_mais,
-                CAST(NULL AS FLOAT64)                             AS pct_catolico,
-                CAST(NULL AS FLOAT64)                             AS idhm,
-                CAST(NULL AS FLOAT64)                             AS gini,
-                CAST(NULL AS FLOAT64)                             AS pct_extrema_pobreza,
-                CURRENT_TIMESTAMP()                               AS ingested_at
-            FROM {silver_wc}
-            WHERE REGEXP_CONTAINS(LOWER(_TABLE_SUFFIX), r'^[a-z]{{2}}_20\d\d$')
-              AND cd_municipio_ibge IS NOT NULL
+                SAFE_CAST(cd_municipio_ibge AS INT64)              AS cd_municipio_ibge,
+                ANY_VALUE(sg_uf)                                    AS sg_uf,
+                ANY_VALUE(nm_municipio)                             AS nm_municipio,
+                SAFE_CAST(ANY_VALUE(ano) AS INT64)                  AS ano,
+                ANY_VALUE(populacao)                                AS populacao_total,
+                ANY_VALUE(taxa_alfabetizacao)                       AS taxa_alfabetizacao,
+                ANY_VALUE(COALESCE(
+                    pct_analfabetos,
+                    IF(taxa_alfabetizacao IS NOT NULL,
+                       ROUND(100.0 - taxa_alfabetizacao, 4), NULL)
+                ))                                                  AS taxa_analfabetismo,
+                ANY_VALUE(renda_per_capita)                         AS renda_per_capita,
+                ANY_VALUE(pct_urbano)                               AS pct_urbano,
+                ANY_VALUE(pct_0_14)                                 AS pct_0_14,
+                ANY_VALUE(pct_60_mais)                              AS pct_60_mais,
+                ANY_VALUE(pct_catolico)                             AS pct_catolico,
+                ANY_VALUE(idhm)                                     AS idhm,
+                ANY_VALUE(gini)                                     AS gini,
+                ANY_VALUE(pct_extrema_pobreza)                      AS pct_extrema_pobreza,
+                CURRENT_TIMESTAMP()                                 AS ingested_at
+            FROM `{silver}`.ibge_municipio_*
+            WHERE cd_municipio_ibge IS NOT NULL
             GROUP BY cd_municipio_ibge
         """,
         "dim_territorio": f"""

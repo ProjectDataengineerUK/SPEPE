@@ -9,7 +9,11 @@ from pathlib import Path
 import pandas as pd
 
 from dataops.bronze_writer import write_bronze
-from dataops.clients.ibge_client import fetch_sidra_indicators, load_municipios
+from dataops.clients.ibge_client import (
+    fetch_ipeadata_atlas_municipios,
+    fetch_sidra_indicators,
+    load_municipios,
+)
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s %(message)s")
 logger = logging.getLogger("spepe.jobs.ibge_sync")
@@ -92,6 +96,30 @@ def main(uf: str, year: int | None = None) -> None:
             use_gcs=bool(os.environ.get("GCS_BUCKET")),
         )
         logger.info("Municípios Bronze: %s (%d rows)", out_path, len(df_mun))
+
+    # IPEADATA Atlas (IDHM, Renda per capita, Gini, Extrema Pobreza) — Censo 2010
+    # Fetch once per job run (all municipalities in Brazil). Only UF=ALL triggers the fetch
+    # to avoid redundant downloads; the single parquet covers all UFs.
+    if uf.upper() == "ALL" or not _atlas_already_fetched(year, bool(os.environ.get("GCS_BUCKET"))):
+        df_atlas = fetch_ipeadata_atlas_municipios()
+        if not df_atlas.empty:
+            out_path = write_bronze(
+                df=df_atlas,
+                source="ibge",
+                year=year,
+                uf="BR",
+                filename="atlas_municipios_BR.parquet",
+                use_gcs=bool(os.environ.get("GCS_BUCKET")),
+            )
+            logger.info("IPEADATA Atlas Bronze: %s (%d rows)", out_path, len(df_atlas))
+
+
+def _atlas_already_fetched(year: int, use_gcs: bool) -> bool:
+    """Return True if atlas_municipios_BR.parquet already exists locally."""
+    if use_gcs:
+        return False  # always re-fetch in GCS mode (Bronze is immutable)
+    local = Path("data/bronze/ibge") / str(year) / "BR" / "atlas_municipios_BR.parquet"
+    return local.exists()
 
 
 if __name__ == "__main__":

@@ -22,6 +22,7 @@ def main(uf: str, years: list[int] | None = None, include_social: bool = True) -
         transform_economia_to_silver,
         transform_emendas_to_silver,
         transform_endividamento_to_silver,
+        transform_ibge_to_silver,
         transform_locais_votacao_to_silver,
         transform_pesquisas_to_silver,
         transform_presidente_to_silver,
@@ -61,6 +62,15 @@ def main(uf: str, years: list[int] | None = None, include_social: bool = True) -
             logger.info(
                 "Silver TSE OK %s/%d: %d rows, DQ=%.1f%%", uf, year, result.get("rows", 0), dq_score
             )
+
+    # ── IBGE indicadores municipais (SIDRA + Atlas IPEADATA) ───────────────
+    for year in target_years:
+        logger.info("Silver IBGE indicadores: %s/%d", uf, year)
+        r = transform_ibge_to_silver(uf, year, use_bigquery=use_bq)
+        if r.get("status") == "ok":
+            logger.info("IBGE Silver OK %s/%d: %d rows", uf, year, r.get("rows", 0))
+        else:
+            logger.warning("IBGE Silver %s/%d: %s", uf, year, r.get("message"))
 
     # ── Presidente TSE (nacional — BR, multi-ano, expandido para municípios) ──
     _pres_years_env = os.environ.get("PRESIDENTE_YEARS", "2018,2022")

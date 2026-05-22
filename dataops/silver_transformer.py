@@ -2435,4 +2435,120 @@ def _dataframe_to_bq_schema(df: pd.DataFrame) -> list:
         else:
             bq_type = _type_map.get(dtype_str, "STRING")
         fields.append(bigquery.SchemaField(col, bq_type, mode="NULLABLE"))
-    return fields
+
+
+def _load_bronze_parquet_gcs(prefix: str) -> pd.DataFrame:
+    """Read all parquets under a GCS prefix. Returns empty DataFrame if GCS unavailable."""
+    if not GCS_BUCKET:
+        return pd.DataFrame()
+    try:
+        return _read_gcs_parquet_glob(GCS_BUCKET, prefix)
+    except Exception as exc:
+        logger.warning("GCS read %s falhou: %s", prefix, exc)
+        return pd.DataFrame()
+
+
+def transform_ibge_to_silver(uf: str, year: int, use_bigquery: bool = False) -> dict:
+    """Bronze IBGE → Silver ibge_municipio_{uf}_{year}.
+
+    Merges:
+      - Bronze municipios_{UF}.parquet  (IBGE codes + municipality names)
+      - Bronze indicadores_{UF}_{year}.parquet  (SIDRA tall: taxa_alfabetizacao, populacao, …)
+      - Bronze atlas_municipios_BR.parquet  (IPEADATA ADH: idhm, gini, renda_per_capita, …)
+    Outputs wide Silver table with one row per municipality.
+    """
+    LOCAL_SILVER_DIR.mkdir(parents=True, exist_ok=True)
+    uf_upper = uf.upper()
+
+    # ── municipios (IBGE codes + names) ─────────────────────────────────────
+    df_mun = _load_bronze_ibge(uf_upper)  # reads municipios_{UF}.parquet
+    if df_mun.empty:
+        logger.warning("transform_ibge_to_silver: sem Bronze municipios para UF=%s", uf_upper)
+        return {"status": "skipped", "reason": "no_bronze_municipios"}
+
+    # ── SIDRA indicators (tall → wide) ──────────────────────────────────────
+    sidra_files_local = list((LOCAL_BRONZE_DIR / "ibge" / str(year) / uf_upper).glob(
+        f"indicadores_{uf_upper}_{year}.parquet"
+    ))
+    df_sidra_tall: pd.DataFrame | None = None
+    if sidra_files_local:
+        df_sidra_tall = pd.read_parquet(sidra_files_local[0])
+    elif GCS_BUCKET:
+        df_sidra_tall = _load_bronze_parquet_gcs(f"raw/ibge/{year}/{uf_upper}/indicadores_")
+
+    df_sidra_wide = pd.DataFrame()
+    if df_sidra_tall is not None and not df_sidra_tall.empty:
+        # Pivot tall (cd_municipio_ibge, indicador, valor) → wide
+        if {"cd_municipio_ibge", "indicador", "valor"}.issubset(df_sidra_tall.columns):
+            df_sidra_wide = (
+                df_sidra_tall.pivot_table(
+                    index="cd_municipio_ibge", columns="indicador", values="valor", aggfunc="last"
+                )
+                .reset_index()
+            )
+            df_sidra_wide.columns.name = None
+        else:
+            df_sidra_wide = df_sidra_tall  # already wide if schema differs
+
+    # ── Atlas IPEADATA (idhm, gini, renda_per_capita) ───────────────────────
+    atlas_local = LOCAL_BRONZE_DIR / "ibge" / str(year) / "BR" / "atlas_municipios_BR.parquet"
+    df_atlas = pd.DataFrame()
+    if atlas_local.exists():
+        df_atlas = pd.read_parquet(atlas_local)
+    elif GCS_BUCKET:
+        df_atlas = _load_bronze_parquet_gcs(f"raw/ibge/{year}/BR/atlas_municipios_BR")
+
+    # ── Merge ────────────────────────────────────────────────────────────────
+    df = df_mun[["cd_municipio_ibge", "nm_municipio", "sg_uf"]].copy()
+    df["ano"] = year
+
+    if not df_sidra_wide.empty and "cd_municipio_ibge" in df_sidra_wide.columns:
+        df = df.merge(df_sidra_wide, on="cd_municipio_ibge", how="left")
+
+    if not df_atlas.empty and "cd_municipio_ibge" in df_atlas.columns:
+        atlas_cols = ["cd_municipio_ibge"] + [
+            c for c in df_atlas.columns
+            if c not in df.columns and c != "cd_municipio_ibge"
+        ]
+        df = df.merge(df_atlas[atlas_cols], on="cd_municipio_ibge", how="left")
+
+    df["ingested_at"] = pd.Timestamp.utcnow()
+    df["cd_municipio_ibge"] = pd.to_numeric(df["cd_municipio_ibge"], errors="coerce").astype(
+        "Int64"
+    )
+
+    rows = len(df)
+    filename = f"ibge_municipio_{uf_upper}_{year}.parquet"
+    local_path = LOCAL_SILVER_DIR / filename
+    df.to_parquet(local_path, index=False, compression="zstd")
+    logger.info("Silver IBGE %s: %d rows → %s", uf_upper, rows, local_path)
+
+    if use_bigquery and GCS_BUCKET:
+        try:
+            from google.cloud import bigquery, storage
+
+            project = os.environ.get("GCP_PROJECT_ID", "")
+            silver_dataset = os.environ.get("BIGQUERY_DATASET_SILVER", "spepe_silver")
+            table_id = f"{project}.{silver_dataset}.ibge_municipio_{uf_upper.lower()}_{year}"
+            bucket_obj = storage.Client().bucket(GCS_BUCKET)
+            staging_blob = f"tmp/silver/ibge_municipio_{uf_upper.lower()}_{year}.parquet"
+            buf = io.BytesIO()
+            df.to_parquet(buf, index=False, compression="zstd")
+            buf.seek(0)
+            bucket_obj.blob(staging_blob).upload_from_file(buf)
+            bq_client = bigquery.Client(project=project)
+            bq_client.load_table_from_uri(
+                f"gs://{GCS_BUCKET}/{staging_blob}",
+                table_id,
+                job_config=bigquery.LoadJobConfig(
+                    write_disposition="WRITE_TRUNCATE",
+                    source_format=bigquery.SourceFormat.PARQUET,
+                    autodetect=True,
+                ),
+            ).result()
+            bucket_obj.blob(staging_blob).delete()
+            logger.info("Silver IBGE BQ: %s (%d rows)", table_id, rows)
+        except Exception as exc:
+            logger.warning("Silver IBGE BQ write falhou: %s", exc)
+
+    return {"status": "ok", "path": str(local_path), "rows": rows}

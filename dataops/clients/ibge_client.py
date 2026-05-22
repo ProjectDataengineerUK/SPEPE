@@ -53,6 +53,19 @@ _IPEADATA_SERIES = {
     "gini_renda": "PNAD_GINI",
 }
 
+# ADH = Atlas do Desenvolvimento Humano (PNUD/IPEA) — município — Censo 2010
+_IPEADATA_ADH_MUN_URL = (
+    "http://www.ipeadata.gov.br/api/odata4/ValoresSerie"
+    "(SERCODIGO='{serie}')?$top=6000&$filter=NIVNOME%20eq%20'Munic%C3%ADpios'"
+)
+
+_IPEADATA_ADH_SERIES: dict[str, str] = {
+    "idhm": "ADH_IDHM",
+    "renda_per_capita": "ADH_RDPC",
+    "gini": "ADH_GINI",
+    "pct_extrema_pobreza": "ADH_POBRE",
+}
+
 
 @retry(stop=stop_after_attempt(3), wait=wait_exponential(min=2, max=20))
 def _get(url: str, **kwargs: Any) -> Any:
@@ -242,3 +255,61 @@ def fetch_sidra_indicators(
 
     logger.info("SIDRA retornou %d linhas para UF=%s", len(rows), uf)
     return rows
+
+
+def fetch_ipeadata_atlas_municipios() -> pd.DataFrame:
+    """Fetch municipality-level IDHM, Renda per capita, Gini, and extreme poverty from IPEADATA.
+
+    Source: Atlas do Desenvolvimento Humano — Censo 2010 (last available at municipality level).
+    Returns wide DataFrame indexed by cd_municipio_ibge (7-digit IBGE code).
+    """
+    frames: dict[str, dict[int, float]] = {}
+
+    for field, serie in _IPEADATA_ADH_SERIES.items():
+        url = _IPEADATA_ADH_MUN_URL.format(serie=serie)
+        try:
+            data = _get(url)
+        except Exception as exc:
+            logger.warning("IPEADATA ADH %s (%s) falhou: %s", field, serie, exc)
+            continue
+
+        values: dict[int, float] = {}
+        # Keep only the latest year per municipality
+        latest: dict[int, tuple[str, float]] = {}
+        for item in data.get("value", []):
+            ter = str(item.get("TERCODIGO", "")).strip()
+            val = item.get("VALVALOR")
+            date = str(item.get("VALDATA", ""))
+            if not ter or val is None:
+                continue
+            try:
+                cod = int(ter)
+                fval = float(val)
+            except (TypeError, ValueError):
+                continue
+            if cod not in latest or date > latest[cod][0]:
+                latest[cod] = (date, fval)
+
+        for cod, (_, fval) in latest.items():
+            values[cod] = fval
+
+        frames[field] = values
+        logger.info("IPEADATA ADH %s: %d municípios", field, len(values))
+
+    if not frames:
+        return pd.DataFrame()
+
+    # Build wide DataFrame: one row per municipality
+    all_codes = set().union(*frames.values())
+    rows = []
+    for cod in sorted(all_codes):
+        rows.append(
+            {
+                "cd_municipio_ibge": cod,
+                **{field: frames[field].get(cod) for field in _IPEADATA_ADH_SERIES},
+            }
+        )
+
+    df = pd.DataFrame(rows)
+    logger.info("IPEADATA Atlas: %d municípios com indicadores ADH", len(df))
+    return df
