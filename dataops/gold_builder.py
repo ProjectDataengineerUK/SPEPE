@@ -288,12 +288,8 @@ def _build_gold_via_bigquery_sql() -> dict:
                     IF(taxa_alfabetizacao IS NOT NULL,
                        ROUND(100.0 - taxa_alfabetizacao, 4), NULL)
                 ))                                                  AS taxa_analfabetismo,
-                ANY_VALUE(renda_per_capita)                         AS renda_per_capita,
-                ANY_VALUE(pct_urbano)                               AS pct_urbano,
-                ANY_VALUE(pct_0_14)                                 AS pct_0_14,
-                ANY_VALUE(pct_60_mais)                              AS pct_60_mais,
-                ANY_VALUE(pct_catolico)                             AS pct_catolico,
                 ANY_VALUE(idhm)                                     AS idhm,
+                ANY_VALUE(renda_per_capita)                         AS renda_per_capita,
                 ANY_VALUE(gini)                                     AS gini,
                 ANY_VALUE(pct_extrema_pobreza)                      AS pct_extrema_pobreza,
                 CURRENT_TIMESTAMP()                                 AS ingested_at
