@@ -75,7 +75,11 @@ def main(
                 all_ok = False
             else:
                 logger.info(
-                    "Silver TSE OK %s/%d: %d rows, DQ=%.1f%%", uf, year, result.get("rows", 0), dq_score
+                    "Silver TSE OK %s/%d: %d rows, DQ=%.1f%%",
+                    uf,
+                    year,
+                    result.get("rows", 0),
+                    dq_score,
                 )
 
     # ── IBGE indicadores municipais (SIDRA + Atlas IPEADATA) ───────────────
@@ -106,7 +110,9 @@ def main(
 
     # ── Pesquisas eleitorais (nacional — BR, multi-ano) ─────────────────────
     if _run("pesquisas"):
-        _py_env = os.environ.get("PESQUISA_YEARS", os.environ.get("PESQUISA_YEAR", "2018,2022,2026"))
+        _py_env = os.environ.get(
+            "PESQUISA_YEARS", os.environ.get("PESQUISA_YEAR", "2018,2022,2026")
+        )
         pesquisa_years = [int(y.strip()) for y in _py_env.split(",") if y.strip()]
         for pesquisa_year in pesquisa_years:
             logger.info("Silver pesquisas: ano=%d", pesquisa_year)
@@ -246,7 +252,9 @@ def main(
             logger.info("Silver TSE perfil: %s/%d", uf, perfil_year)
             r = transform_tse_perfil_to_silver(uf, perfil_year, use_bigquery=use_bq)
             if r.get("status") == "ok":
-                logger.info("TSE Perfil Silver OK %s/%d: %d rows", uf, perfil_year, r.get("rows", 0))
+                logger.info(
+                    "TSE Perfil Silver OK %s/%d: %d rows", uf, perfil_year, r.get("rows", 0)
+                )
             else:
                 logger.warning(
                     "TSE Perfil Silver %s/%d: %s (CDN TSE pode estar em manutenção)",
