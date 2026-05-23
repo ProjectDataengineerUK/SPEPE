@@ -497,7 +497,7 @@ def _build_gold_via_bigquery_sql() -> dict:
                 SAFE_CAST(p.margem_erro AS FLOAT64)                          AS margem_erro,
                 SAFE_CAST(p.n_entrevistados AS INT64)                        AS n_entrevistados,
                 COALESCE(i.uf, p.uf, 'BR')                                   AS uf,
-                SAFE_CAST(COALESCE(i.cd_cargo, p.cd_cargo, '1') AS INT64)   AS cd_cargo,
+                SAFE_CAST(COALESCE(CAST(i.cd_cargo AS STRING), CAST(p.cd_cargo AS STRING), '1') AS INT64) AS cd_cargo,
                 COALESCE(i.tipo_pesquisa, p.tipo_pesquisa, 'corrente')      AS tipo_pesquisa,
                 i.candidato_normalizado,
                 i.record_confidence_score,
@@ -506,7 +506,7 @@ def _build_gold_via_bigquery_sql() -> dict:
                 CURRENT_TIMESTAMP()                                          AS updated_at
             FROM `{silver}.fact_pesquisa` p
             LEFT JOIN `{silver}.fact_pesquisa_intencao` i
-              ON p.poll_id = i.poll_id
+              ON CAST(p.poll_id AS STRING) = CAST(i.poll_id AS STRING)
               AND COALESCE(p.uf, 'BR') = COALESCE(i.uf, 'BR')
               AND COALESCE(CAST(p.cd_cargo AS STRING), '1') = COALESCE(CAST(i.cd_cargo AS STRING), '1')
             WHERE i.candidato IS NOT NULL
@@ -676,7 +676,7 @@ def _build_gold_via_bigquery_sql() -> dict:
                 SAFE_CAST(endividamento_familias_pct AS FLOAT64)     AS endividamento_familias_pct,
                 SAFE_CAST(comprometimento_renda_pct AS FLOAT64)      AS comprometimento_renda_pct,
                 SAFE_CAST(inadimplencia_pf_pct AS FLOAT64)           AS inadimplencia_pf_pct,
-                SAFE_CAST(inadimplencia_pf_credito AS FLOAT64)       AS inadimplencia_pf_credito,
+                CAST(NULL AS FLOAT64)                                 AS inadimplencia_pf_credito,
                 COALESCE(granularidade, 'Nacional')                  AS granularidade,
                 fontes,
                 CURRENT_TIMESTAMP()                                  AS ingested_at

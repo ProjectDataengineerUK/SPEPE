@@ -493,21 +493,30 @@ _VIEWS: dict[str, str] = {
     """,
     # ── Volume e sentimento por tema × UF × semana ───────────────────────
     "vw_social_temas_uf": f"""
+        WITH grouped AS (
+            SELECT
+                sg_uf,
+                DATE_TRUNC(data_referencia, WEEK)                           AS semana,
+                tema,
+                COUNT(*)                                                    AS volume_mencoes,
+                AVG(sentimento_score)                                       AS sentimento_medio
+            FROM `{_PROJECT}.{_SILVER}.social_mencoes_br`,
+            UNNEST(temas) AS tema
+            WHERE temas IS NOT NULL
+            GROUP BY 1, 2, 3
+        )
         SELECT
             sg_uf,
-            DATE_TRUNC(data_referencia, WEEK)                               AS semana,
+            semana,
             tema,
-            COUNT(*)                                                        AS volume_mencoes,
-            AVG(sentimento_score)                                           AS sentimento_medio,
+            volume_mencoes,
+            sentimento_medio,
             ROUND(
-                COUNT(*) / SUM(COUNT(*)) OVER (
-                    PARTITION BY sg_uf, DATE_TRUNC(data_referencia, WEEK)
-                ), 4
+                volume_mencoes / NULLIF(SUM(volume_mencoes) OVER (
+                    PARTITION BY sg_uf, semana
+                ), 0), 4
             )                                                               AS share_tema
-        FROM `{_PROJECT}.{_SILVER}.social_mencoes_br`,
-        UNNEST(temas) AS tema
-        WHERE temas IS NOT NULL
-        GROUP BY 1, 2, 3
+        FROM grouped
     """,
     # ── Engajamento por plataforma × UF × dia ────────────────────────────
     "vw_social_plataforma_uf": f"""
