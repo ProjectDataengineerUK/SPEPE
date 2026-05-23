@@ -141,6 +141,12 @@ jobs:
               --region "${{ env.GCP_REGION }}" \
               --project "${{ vars.GCP_PROJECT_ID }}" 2>&1 || echo "Warning: could not update ${JOB}"
           done
+          gcloud run jobs update spepe-tse-locais-ingest \
+            --image="${IMAGE}" \
+            --command="python" \
+            --args="-m,dataops.jobs.tse_locais_ingest_job,--uf,ALL" \
+            --region "${{ env.GCP_REGION }}" \
+            --project "${{ vars.GCP_PROJECT_ID }}" 2>&1 || echo "Warning: could not update spepe-tse-locais-ingest"
           gcloud run jobs update spepe-pymc-train \
             --image="${IMAGE}" \
             --command="python" \
@@ -263,6 +269,24 @@ jobs:
                 --project spepe-prod 2>&1 || echo "Warning: could not create ${PYMC_JOB}"
             fi
           done
+          if gcloud run jobs describe "spepe-tse-locais-ingest" --region "${REGION}" --project spepe-prod &>/dev/null; then
+            gcloud run jobs update "spepe-tse-locais-ingest" \
+              --image="${IMAGE}" \
+              --command="python" \
+              --args="-m,dataops.jobs.tse_locais_ingest_job,--uf,ALL" \
+              --region "${REGION}" \
+              --project spepe-prod 2>&1 || echo "Warning: could not update spepe-tse-locais-ingest"
+          else
+            gcloud run jobs create "spepe-tse-locais-ingest" \
+              --image="${IMAGE}" \
+              --command="python" \
+              --args="-m,dataops.jobs.tse_locais_ingest_job,--uf,ALL" \
+              --region "${REGION}" \
+              --service-account "${SA}" \
+              --memory "4Gi" --cpu "2" --task-timeout "7200" \
+              --set-env-vars "GCP_PROJECT_ID=spepe-prod,USE_BIGQUERY=true,GCS_BUCKET=spepe-prod-data,BIGQUERY_DATASET_SILVER=spepe_silver,BIGQUERY_DATASET_GOLD=spepe_gold" \
+              --project spepe-prod 2>&1 || echo "Warning: could not create spepe-tse-locais-ingest"
+          fi
 
       - name: Smoke test — prod health check
         run: |
