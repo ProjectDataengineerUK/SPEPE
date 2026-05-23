@@ -155,7 +155,9 @@ def _build_gold_via_bigquery_sql() -> dict:
                 SAFE_CAST(SUM({_s}qt_votos) AS INT64)                AS total_votos,
                 ROUND(
                     SUM({_s}qt_votos) / NULLIF(SUM(SUM({_s}qt_votos)) OVER (
-                        PARTITION BY {_s}sg_uf, {_s}cd_municipio, {_s}cd_cargo,
+                        PARTITION BY {_s}sg_uf,
+                                     SAFE_CAST({_s}cd_municipio AS INT64),
+                                     SAFE_CAST({_s}cd_cargo AS INT64),
                                      SAFE_CAST({_s}ano_eleicao AS INT64)
                     ), 0) * 100, 2
                 ) AS pct_votos_municipio,
