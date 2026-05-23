@@ -138,30 +138,34 @@ def _build_gold_via_bigquery_sql() -> dict:
 
     sqls = {
         "fact_municipio_eleicao": f"""
-            CREATE OR REPLACE TABLE `{gold}.fact_municipio_eleicao` AS
+            CREATE OR REPLACE TABLE `{gold}.fact_municipio_eleicao`
+            PARTITION BY RANGE_BUCKET(ano_eleicao, GENERATE_ARRAY(2010, 2034, 4))
+            CLUSTER BY sg_uf, cd_municipio, ano_eleicao
+            AS
             SELECT
                 {_s}sg_uf,
-                SAFE_CAST({_s}cd_municipio AS INT64)        AS cd_municipio,
+                SAFE_CAST({_s}cd_municipio AS INT64)                AS cd_municipio,
                 {_nm_mun_sel},
-                SAFE_CAST({_s}cd_municipio_ibge AS INT64)   AS cd_municipio_ibge,
+                SAFE_CAST({_s}cd_municipio_ibge AS INT64)           AS cd_municipio_ibge,
                 {_s}nm_candidato,
                 {_partido_cols}
-                SAFE_CAST({_s}cd_cargo AS INT64)             AS cd_cargo,
+                SAFE_CAST({_s}cd_cargo AS INT64)                     AS cd_cargo,
                 {_s}ds_cargo,
-                SAFE_CAST({_s}ano_eleicao AS INT64)          AS ano_eleicao,
-                SAFE_CAST(SUM({_s}qt_votos) AS INT64)        AS total_votos,
+                SAFE_CAST({_s}ano_eleicao AS INT64)                  AS ano_eleicao,
+                SAFE_CAST(SUM({_s}qt_votos) AS INT64)                AS total_votos,
                 ROUND(
                     SUM({_s}qt_votos) / NULLIF(SUM(SUM({_s}qt_votos)) OVER (
-                        PARTITION BY {_s}sg_uf, {_s}cd_municipio, {_s}cd_cargo, {_s}ano_eleicao
+                        PARTITION BY {_s}sg_uf, {_s}cd_municipio, {_s}cd_cargo,
+                                     SAFE_CAST({_s}ano_eleicao AS INT64)
                     ), 0) * 100, 2
                 ) AS pct_votos_municipio,
-                CURRENT_TIMESTAMP()                          AS ingested_at
+                CURRENT_TIMESTAMP()                                  AS ingested_at
             FROM {_from_tse_s}
             {_partido_join}
             WHERE _TABLE_SUFFIX NOT LIKE 'br_%'
             GROUP BY {_s}sg_uf, {_s}cd_municipio, {_nm_mun_grp}, {_s}cd_municipio_ibge,
                      {_s}nm_candidato, {_partido_grp}
-                     {_s}cd_cargo, {_s}ds_cargo, {_s}ano_eleicao
+                     {_s}cd_cargo, {_s}ds_cargo, SAFE_CAST({_s}ano_eleicao AS INT64)
         """,
         "fact_secao_eleicao": f"""
             CREATE OR REPLACE TABLE `{gold}.fact_secao_eleicao` AS
@@ -502,7 +506,7 @@ def _build_gold_via_bigquery_sql() -> dict:
             LEFT JOIN `{silver}.fact_pesquisa_intencao` i
               ON p.poll_id = i.poll_id
               AND COALESCE(p.uf, 'BR') = COALESCE(i.uf, 'BR')
-              AND COALESCE(p.cd_cargo, '1') = COALESCE(i.cd_cargo, '1')
+              AND COALESCE(CAST(p.cd_cargo AS STRING), '1') = COALESCE(CAST(i.cd_cargo AS STRING), '1')
             WHERE i.candidato IS NOT NULL
               AND SAFE_CAST(i.intencao_pct AS FLOAT64) IS NOT NULL
         """,

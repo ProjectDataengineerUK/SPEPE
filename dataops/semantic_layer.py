@@ -23,10 +23,9 @@ _VIEWS: dict[str, str] = {
             DATE(created_at)                                                AS data,
             COUNT(*)                                                        AS total_mencoes,
             COALESCE(SUM(like_count), 0)                                    AS total_likes,
-            COALESCE(SUM(retweet_count), 0)                                 AS total_retweets,
-            COALESCE(SUM(reply_count), 0)                                   AS total_replies,
-            COALESCE(SUM(like_count), 0) + COALESCE(SUM(retweet_count), 0)
-                + COALESCE(SUM(reply_count), 0)                             AS total_engajamento
+            CAST(0 AS INT64)                                                AS total_retweets,
+            COALESCE(SUM(comment_count), 0)                                 AS total_replies,
+            COALESCE(SUM(like_count), 0) + COALESCE(SUM(comment_count), 0) AS total_engajamento
         FROM `{_PROJECT}.{_SILVER}.social_mencoes_br`
         GROUP BY fonte, sg_uf, DATE(created_at)
     """,
@@ -71,8 +70,7 @@ _VIEWS: dict[str, str] = {
             i.idhm,
             i.renda_per_capita,
             i.gini,
-            i.pct_extrema_pobreza,
-            i.pct_urbano
+            i.pct_extrema_pobreza
         FROM `{_PROJECT}.{_GOLD}.fact_municipio_candidato_eleicao` e
         LEFT JOIN `{_PROJECT}.{_GOLD}.fact_ibge_municipio` i
             ON e.cd_municipio_ibge = i.cd_municipio_ibge
@@ -120,8 +118,7 @@ _VIEWS: dict[str, str] = {
                 DATE_TRUNC(DATE(created_at), WEEK(MONDAY))                     AS semana,
                 COUNT(*)                                                        AS total_mencoes,
                 COALESCE(SUM(like_count), 0)
-                    + COALESCE(SUM(retweet_count), 0)
-                    + COALESCE(SUM(reply_count), 0)                            AS total_engajamento
+                    + COALESCE(SUM(comment_count), 0)                          AS total_engajamento
             FROM `{_PROJECT}.{_SILVER}.social_mencoes_br`
             GROUP BY sg_uf, DATE_TRUNC(DATE(created_at), WEEK(MONDAY))
         )
@@ -162,12 +159,10 @@ _VIEWS: dict[str, str] = {
                 DATE_TRUNC(DATE(created_at), WEEK(MONDAY))                     AS semana,
                 COUNT(*)                                                        AS volume_mencoes,
                 COALESCE(SUM(like_count), 0)
-                    + COALESCE(SUM(retweet_count), 0)
-                    + COALESCE(SUM(reply_count), 0)                            AS engajamento_total,
+                    + COALESCE(SUM(comment_count), 0)                          AS engajamento_total,
                 ROUND(
                     (COALESCE(SUM(like_count), 0)
-                        + COALESCE(SUM(retweet_count), 0)
-                        + COALESCE(SUM(reply_count), 0))
+                        + COALESCE(SUM(comment_count), 0))
                     / NULLIF(COUNT(*), 0), 1
                 )                                                               AS engajamento_por_mencao
             FROM `{_PROJECT}.{_SILVER}.social_mencoes_br`
@@ -428,7 +423,6 @@ _VIEWS: dict[str, str] = {
             i.gini,
             i.pct_extrema_pobreza,
             i.taxa_analfabetismo,
-            i.pct_urbano,
             CAST(i.populacao_total AS INT64)                AS populacao_total,
 
             -- Segurança pública
@@ -492,8 +486,7 @@ _VIEWS: dict[str, str] = {
             STDDEV(sentimento_score)                                        AS sentimento_score_stddev,
             AVG(confianca_nlp)                                              AS confianca_nlp_media,
             COUNT(*)                                                        AS total_mencoes,
-            SUM(like_count + COALESCE(retweet_count, 0)
-                + COALESCE(comment_count, 0))                               AS engajamento_total
+            SUM(like_count + COALESCE(comment_count, 0))                    AS engajamento_total
         FROM `{_PROJECT}.{_SILVER}.social_mencoes_br`
         WHERE confianca_nlp >= 0.70 OR confianca_nlp IS NULL
         GROUP BY 1, 2, 3
@@ -524,8 +517,7 @@ _VIEWS: dict[str, str] = {
             data_referencia,
             COUNT(*)                                                        AS total_posts,
             SUM(like_count)                                                 AS total_likes,
-            SUM(COALESCE(retweet_count, 0)
-                + COALESCE(comment_count, 0))                               AS total_interacoes,
+            SUM(COALESCE(comment_count, 0))                                 AS total_interacoes,
             AVG(sentimento_score)                                           AS sentimento_medio,
             COUNTIF(suspeito_coordenado = TRUE)                             AS posts_suspeitos
         FROM `{_PROJECT}.{_SILVER}.social_mencoes_br`

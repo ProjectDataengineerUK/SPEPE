@@ -13,7 +13,6 @@ def compute_incumbencia_sql(
     silver_dataset: str,
     gold_dataset: str,
 ) -> str:
-    silver = f"`{project_id}.{silver_dataset}`"
     return f"""
 CREATE OR REPLACE TABLE `{project_id}.spepe_mlops.dim_incumbencia` AS
 WITH cands AS (
@@ -30,7 +29,7 @@ WITH cands AS (
               AND UPPER(ds_situacao) NOT LIKE '%NÃO%'
               AND UPPER(ds_situacao) NOT LIKE '%NAO%'
              THEN TRUE ELSE FALSE END AS foi_eleito
-    FROM {silver}.tse_candidaturas_*
+    FROM `{project_id}.{silver_dataset}.tse_candidaturas_*`
     WHERE sq_candidato IS NOT NULL
       AND nm_candidato IS NOT NULL
 ),
