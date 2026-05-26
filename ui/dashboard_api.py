@@ -123,6 +123,7 @@ async def serve_static(filename: str) -> FileResponse:
 logger = logging.getLogger("spepe.dashboard_api")
 
 _LOCAL_SILVER_DIR = Path(os.environ.get("DATA_DIR", "data")) / "silver"
+_LOCAL_BRONZE_DIR = Path(os.environ.get("DATA_DIR", "data")) / "bronze"
 
 # ── Dashboard auth middleware (Google ID token) ───────────────────────────
 
@@ -3373,10 +3374,25 @@ async def get_mapa_locais(
     only_with_coords: bool = Query(True),
 ) -> Response:
     """GeoJSON FeatureCollection com pontos de locais de votação da UF."""
-    if not (settings.gcp_project_id and os.environ.get("USE_BIGQUERY", "").lower() == "true"):
-        return _json_safe_response(
-            {"type": "FeatureCollection", "features": [], "fonte": "bigquery_indisponivel"}
+    use_bq = settings.gcp_project_id and os.environ.get("USE_BIGQUERY", "").lower() == "true"
+
+    if not use_bq:
+        features = await asyncio.to_thread(
+            _bronze_locais_votacao,
+            uf.upper(),
+            cd_municipio,
+            nm_municipio,
+            nr_zona,
+            only_with_coords,
         )
+        if features is None:
+            return _json_safe_response(
+                {"type": "FeatureCollection", "features": [], "fonte": "bigquery_indisponivel"}
+            )
+        return _json_safe_response(
+            {"type": "FeatureCollection", "features": features, "fonte": "local"}
+        )
+
     try:
         features = await _bq_locais_votacao(
             uf.upper(), cd_municipio, nm_municipio, nr_zona, only_with_coords
@@ -3385,6 +3401,86 @@ async def get_mapa_locais(
     except Exception as exc:
         logger.warning("BQ locais_votacao falhou: %s", exc)
         return _json_safe_response({"type": "FeatureCollection", "features": [], "erro": str(exc)})
+
+
+def _bronze_locais_votacao(
+    uf: str,
+    cd_municipio: str | None,
+    nm_municipio: str | None,
+    nr_zona: str | None,
+    only_with_coords: bool,
+) -> list[dict] | None:
+    """Lê Bronze local (tse_locais) e retorna features GeoJSON. None se sem dados."""
+    import pandas as pd
+
+    pattern = _LOCAL_BRONZE_DIR / "tse_locais" / "*" / uf / "*.parquet"
+    files = sorted(_LOCAL_BRONZE_DIR.glob(f"tse_locais/*/{uf}/*.parquet"))
+    if not files:
+        return None
+
+    frames = []
+    for f in files:
+        try:
+            frames.append(pd.read_parquet(f))
+        except Exception:
+            continue
+    if not frames:
+        return None
+
+    df = pd.concat(frames, ignore_index=True)
+    df.columns = [c.lower() for c in df.columns]
+
+    needed = {"nr_latitude", "nr_longitude", "nr_zona", "nr_local_votacao", "nm_municipio"}
+    if not needed.issubset(df.columns):
+        return None
+
+    if cd_municipio:
+        df = df[df["cd_municipio"].astype(str) == str(cd_municipio)]
+    if nm_municipio:
+        norm = nm_municipio.upper()
+        df = df[df["nm_municipio"].str.upper() == norm]
+    if nr_zona:
+        df = df[df["nr_zona"].astype(str) == str(nr_zona)]
+    if only_with_coords:
+        df = df[df["nr_latitude"].notna() & df["nr_longitude"].notna()]
+
+    # deduplica por local (preserva uma linha por local de votação)
+    dedup_cols = [
+        c for c in ("sg_uf", "cd_municipio", "nr_zona", "nr_local_votacao") if c in df.columns
+    ]
+    if dedup_cols:
+        df = df.drop_duplicates(subset=dedup_cols)
+
+    features = []
+    for _, row in df.iterrows():
+        lat = row.get("nr_latitude")
+        lng = row.get("nr_longitude")
+        if lat is None or lng is None:
+            continue
+        try:
+            lat, lng = float(lat), float(lng)
+        except (ValueError, TypeError):
+            continue
+        qt_secoes = row.get("qt_aptos")  # Bronze usa qt_aptos; Gold usa qt_secoes
+        features.append(
+            {
+                "type": "Feature",
+                "geometry": {"type": "Point", "coordinates": [lng, lat]},
+                "properties": {
+                    "sg_uf": row.get("sg_uf", uf),
+                    "cd_municipio": row.get("cd_municipio"),
+                    "nm_municipio": row.get("nm_municipio", ""),
+                    "nr_zona": row.get("nr_zona"),
+                    "nr_local_votacao": row.get("nr_local_votacao"),
+                    "nm_local_votacao": row.get("nm_local_votacao", ""),
+                    "ds_endereco": row.get("ds_endereco", ""),
+                    "nm_bairro": row.get("nm_bairro", ""),
+                    "nr_cep": row.get("nr_cep", ""),
+                    "qt_secoes": qt_secoes,
+                },
+            }
+        )
+    return features
 
 
 async def _bq_locais_votacao(
@@ -3462,16 +3558,110 @@ async def get_locais_resumo(
     cd_municipio: str | None = Query(None),
 ) -> JSONResponse:
     """Resumo de zonas e locais de votação por UF (KPIs + lista de municípios + zonas)."""
-    if not (settings.gcp_project_id and os.environ.get("USE_BIGQUERY", "").lower() == "true"):
-        return JSONResponse(
-            {"zonas": [], "municipios": [], "kpis": {}, "fonte": "bigquery_indisponivel"}
-        )
+    use_bq = settings.gcp_project_id and os.environ.get("USE_BIGQUERY", "").lower() == "true"
+
+    if not use_bq:
+        result = await asyncio.to_thread(_bronze_locais_resumo, uf.upper(), cd_municipio)
+        if result is None:
+            return JSONResponse(
+                {"zonas": [], "municipios": [], "kpis": {}, "fonte": "bigquery_indisponivel"}
+            )
+        return JSONResponse({**result, "fonte": "local"})
+
     try:
         result = await _bq_locais_resumo(uf.upper(), cd_municipio)
         return JSONResponse(result)
     except Exception as exc:
         logger.warning("BQ locais_resumo falhou: %s", exc)
         return JSONResponse({"zonas": [], "municipios": [], "kpis": {}, "erro": str(exc)})
+
+
+def _bronze_locais_resumo(uf: str, cd_municipio: str | None) -> dict | None:
+    """KPIs + zonas + municípios a partir do Bronze local. None se sem dados."""
+    import pandas as pd
+
+    files = sorted(_LOCAL_BRONZE_DIR.glob(f"tse_locais/*/{uf}/*.parquet"))
+    if not files:
+        return None
+
+    frames = []
+    for f in files:
+        try:
+            frames.append(pd.read_parquet(f))
+        except Exception:
+            continue
+    if not frames:
+        return None
+
+    df = pd.concat(frames, ignore_index=True)
+    df.columns = [c.lower() for c in df.columns]
+
+    if "nm_municipio" not in df.columns or "nr_zona" not in df.columns:
+        return None
+
+    if cd_municipio and "cd_municipio" in df.columns:
+        df = df[df["cd_municipio"].astype(str) == str(cd_municipio)]
+
+    has_coords = (
+        df["nr_latitude"].notna() & df["nr_longitude"].notna()
+        if "nr_latitude" in df.columns
+        else pd.Series(False, index=df.index)
+    )
+    qt_locais_total = (
+        df["nr_local_votacao"].nunique() if "nr_local_votacao" in df.columns else len(df)
+    )
+    qt_zonas_total = df["nr_zona"].nunique()
+    qt_secoes_total = df["nr_secao"].nunique() if "nr_secao" in df.columns else 0
+    qt_coords = int(has_coords.sum())
+    pct_coords = round(qt_coords / max(qt_locais_total, 1) * 100, 1)
+
+    # por município
+    mun_grp = df.groupby("nm_municipio").agg(qt_zonas=("nr_zona", "nunique")).reset_index()
+    if "cd_municipio" in df.columns:
+        cd_map = (
+            df.drop_duplicates("nm_municipio").set_index("nm_municipio")["cd_municipio"].to_dict()
+        )
+    else:
+        cd_map = {}
+    municipios = [
+        {
+            "nm_municipio": r["nm_municipio"],
+            "cd_municipio": cd_map.get(r["nm_municipio"]),
+            "qt_zonas": int(r["qt_zonas"]),
+        }
+        for _, r in mun_grp.iterrows()
+    ]
+
+    # por zona
+    zona_cols = ["nr_zona", "nm_municipio"]
+    agg: dict = {
+        "qt_locais": ("nr_local_votacao", "nunique")
+        if "nr_local_votacao" in df.columns
+        else ("nr_zona", "count")
+    }
+    if "nr_secao" in df.columns:
+        agg["qt_secoes"] = ("nr_secao", "nunique")
+    zona_grp = df.groupby(zona_cols).agg(**{k: v for k, v in agg.items()}).reset_index()
+    zonas = [
+        {
+            "nr_zona": int(r["nr_zona"]),
+            "nm_municipio": r["nm_municipio"],
+            "qt_locais": int(r.get("qt_locais", 0)),
+            "qt_secoes": int(r.get("qt_secoes", 0)),
+        }
+        for _, r in zona_grp.iterrows()
+    ]
+
+    return {
+        "kpis": {
+            "qt_zonas": qt_zonas_total,
+            "qt_locais": qt_locais_total,
+            "qt_secoes": qt_secoes_total,
+            "pct_com_coords": pct_coords,
+        },
+        "municipios": municipios,
+        "zonas": zonas,
+    }
 
 
 async def _bq_locais_resumo(uf: str, cd_municipio: str | None) -> dict:
