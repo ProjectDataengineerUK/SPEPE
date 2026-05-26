@@ -8305,18 +8305,18 @@ async def get_comparativo_mapa_candidato(
             grp = grp.merge(tot, on=["nm_municipio", "ano_eleicao"], how="left")
             grp["pct"] = (grp["total_votos"] / grp["total_mun"].replace(0, 1) * 100).round(2)
 
-            municipios: dict[str, dict] = {}
+            municipios_loc: dict[str, dict] = {}
             for _, row in grp.iterrows():
                 nm = row["nm_municipio"]
                 ano = int(row["ano_eleicao"])
                 sfx = str(ano)
                 slot = "c1" if row["nm_candidato"] == candidato else "c2"
-                if nm not in municipios:
-                    municipios[nm] = {"nm_municipio": nm}
-                municipios[nm][f"votos_{slot}_{sfx}"] = int(row["total_votos"])
-                municipios[nm][f"pct_{slot}_{sfx}"] = float(row["pct"])
+                if nm not in municipios_loc:
+                    municipios_loc[nm] = {"nm_municipio": nm}
+                municipios_loc[nm][f"votos_{slot}_{sfx}"] = int(row["total_votos"])
+                municipios_loc[nm][f"pct_{slot}_{sfx}"] = float(row["pct"])
 
-            for m in municipios.values():
+            for m in municipios_loc.values():
                 for sfx in ("2022", "2018"):
                     v1 = m.get(f"votos_c1_{sfx}", 0)
                     v2 = m.get(f"votos_c2_{sfx}", 0)
@@ -8329,7 +8329,7 @@ async def get_comparativo_mapa_candidato(
                     "modo": "comparacao",
                     "candidato1": candidato,
                     "candidato2": candidato2,
-                    "municipios": list(municipios.values()),
+                    "municipios": list(municipios_loc.values()),
                     "fonte": "local",
                 }
             )
@@ -8346,12 +8346,12 @@ async def get_comparativo_mapa_candidato(
         grp = grp.merge(tot, on=["nm_municipio", "ano_eleicao"], how="left")
         grp["pct"] = (grp["total_votos"] / grp["total_mun"].replace(0, 1) * 100).round(2)
 
-        municipios_d: dict[str, dict] = {}
+        municipios_loc_d: dict[str, dict] = {}
         for _, row in grp.iterrows():
             nm = row["nm_municipio"]
             ano = int(row["ano_eleicao"])
-            if nm not in municipios_d:
-                municipios_d[nm] = {
+            if nm not in municipios_loc_d:
+                municipios_loc_d[nm] = {
                     "nm_municipio": nm,
                     "votos_2018": 0,
                     "pct_2018": 0.0,
@@ -8359,13 +8359,13 @@ async def get_comparativo_mapa_candidato(
                     "pct_2022": 0.0,
                 }
             if ano == 2018:
-                municipios_d[nm]["votos_2018"] = int(row["total_votos"])
-                municipios_d[nm]["pct_2018"] = float(row["pct"])
+                municipios_loc_d[nm]["votos_2018"] = int(row["total_votos"])
+                municipios_loc_d[nm]["pct_2018"] = float(row["pct"])
             elif ano == 2022:
-                municipios_d[nm]["votos_2022"] = int(row["total_votos"])
-                municipios_d[nm]["pct_2022"] = float(row["pct"])
+                municipios_loc_d[nm]["votos_2022"] = int(row["total_votos"])
+                municipios_loc_d[nm]["pct_2022"] = float(row["pct"])
 
-        result_list = list(municipios_d.values())
+        result_list = list(municipios_loc_d.values())
         max_pct = max((m["pct_2022"] or m["pct_2018"] for m in result_list), default=1.0)
         return JSONResponse(
             {
