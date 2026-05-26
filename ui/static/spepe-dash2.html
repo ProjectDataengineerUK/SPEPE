@@ -530,18 +530,21 @@ table.data tr:hover td{background:var(--bg3)}
       </div>
       <!-- Sub-navegação -->
       <div class="prev-subnav">
-        <button class="prev-stab active" data-psec="modelos" onclick="switchPrevSection('modelos',this)">&#128302; Modelos de Previs&#227;o</button>
-        <button class="prev-stab" data-psec="perfil" onclick="switchPrevSection('perfil',this)">&#128101; Perfil Eleitorado</button>
+        <button class="prev-stab active" data-psec="modelos" onclick="switchPrevSection('modelos',this)">&#128302; Modelo</button>
+        <button class="prev-stab" data-psec="pesquisas" onclick="switchPrevSection('pesquisas',this)">&#128203; Pesquisas</button>
+        <button class="prev-stab" data-psec="social" onclick="switchPrevSection('social',this)">&#128241; Social</button>
+        <button class="prev-stab" data-psec="perfil" onclick="switchPrevSection('perfil',this)">&#128101; Perfil</button>
         <button class="prev-stab" data-psec="ranking" onclick="switchPrevSection('ranking',this)">&#127942; Ranking</button>
-        <button class="prev-stab" data-psec="digital" onclick="switchPrevSection('digital',this)">&#128241; Digital</button>
+        <button class="prev-stab" data-psec="digital" onclick="switchPrevSection('digital',this)">&#128200; Digital</button>
         <button class="prev-stab" data-psec="mapa" onclick="switchPrevSection('mapa',this)">&#128506; Mapa</button>
       </div>
       <!-- Sub-painel: Modelos -->
       <div class="prev-subpanel active" id="psec-modelos">
         <div class="panel-scroll">
-          <div class="results-grid" style="height:calc(100vh - var(--topbar) - var(--tabbar) - var(--chatbar) - 140px)">
+          <div id="prev-model-label" style="display:none;padding:4px 12px;font-size:.65rem;color:var(--tx3);background:rgba(34,197,94,.08);border-bottom:1px solid var(--br)"></div>
+          <div class="results-grid" style="height:calc(100vh - var(--topbar) - var(--tabbar) - var(--chatbar) - 145px)">
             <div class="chart-panel">
-              <div class="chart-title">Probabilidade de vit&#243;ria (%)</div>
+              <div class="chart-title" id="prev-cands-title">Probabilidade de vit&#243;ria (%)</div>
               <div id="prev-cands"><div class="empty">Carregando...</div></div>
             </div>
             <div class="chart-panel">
@@ -551,6 +554,72 @@ table.data tr:hover td{background:var(--bg3)}
           </div>
           <div id="prev-no-data" style="display:none;padding:40px;text-align:center;color:var(--tx2);font-size:.8rem">
             Modelo Bayesiano em treinamento &mdash; dispon&#237;vel ap&#243;s coleta de dados 2026.
+          </div>
+        </div>
+      </div>
+      <!-- Sub-painel: Pesquisas -->
+      <div class="prev-subpanel" id="psec-pesquisas">
+        <div class="panel-scroll">
+          <div class="kpi-row kpi-row-4" id="pesq-kpi-row">
+            <div class="kpi"><div class="kpi-val" id="pesq-lider">—</div><div class="kpi-lbl">Líder nas pesquisas</div></div>
+            <div class="kpi"><div class="kpi-val" id="pesq-pct">—</div><div class="kpi-lbl">Intenção líder (%)</div></div>
+            <div class="kpi"><div class="kpi-val" id="pesq-institutos">—</div><div class="kpi-lbl">Institutos</div></div>
+            <div class="kpi"><div class="kpi-val" id="pesq-ultima">—</div><div class="kpi-lbl">Última pesquisa</div></div>
+          </div>
+          <div class="results-grid" style="height:calc(100vh - var(--topbar) - var(--tabbar) - var(--chatbar) - 165px)">
+            <div class="chart-panel" style="flex:2">
+              <div style="display:flex;align-items:center;gap:8px;flex-shrink:0;margin-bottom:6px">
+                <span class="chart-title" style="margin:0">Inten&#231;&#227;o de Voto &mdash; Evolu&#231;&#227;o</span>
+                <div style="margin-left:auto;display:flex;gap:4px">
+                  <button class="pill active" id="pesq-p90" onclick="setPesqJanela(90,this)">90d</button>
+                  <button class="pill" id="pesq-p180" onclick="setPesqJanela(180,this)">180d</button>
+                  <button class="pill" id="pesq-p365" onclick="setPesqJanela(365,this)">1 ano</button>
+                </div>
+              </div>
+              <div class="chart-wrap"><canvas id="chart-pesq-evolucao"></canvas></div>
+            </div>
+            <div class="chart-panel" style="flex:1">
+              <div class="chart-title">&#250;ltima rodada (inten&#231;&#227;o %)</div>
+              <div id="pesq-ultima-rodada"><div class="empty">Carregando...</div></div>
+            </div>
+          </div>
+          <div id="pesq-house-wrap" style="padding:8px 12px">
+            <div class="shdr" style="margin-bottom:6px">House effects por instituto</div>
+            <div id="pesq-house-list" style="display:flex;flex-wrap:wrap;gap:6px"></div>
+          </div>
+          <div id="pesq-no-data" style="display:none;padding:40px;text-align:center;color:var(--tx2);font-size:.8rem">
+            Pesquisas n&#227;o dispon&#237;veis &mdash; execute <code>spepe-polls-ingest</code> para ingerir dados.
+          </div>
+        </div>
+      </div>
+      <!-- Sub-painel: Social (monitoramento de redes) -->
+      <div class="prev-subpanel" id="psec-social">
+        <div class="panel-scroll">
+          <div class="kpi-row kpi-row-4">
+            <div class="kpi"><div class="kpi-val" id="soc-score">—</div><div class="kpi-lbl">Sentimento médio</div></div>
+            <div class="kpi"><div class="kpi-val" id="soc-vol">—</div><div class="kpi-lbl">Menções (90d)</div></div>
+            <div class="kpi"><div class="kpi-val" id="soc-lider">—</div><div class="kpi-lbl">+ mencionado</div></div>
+            <div class="kpi"><div class="kpi-val" id="soc-trend">—</div><div class="kpi-lbl">Tendência</div></div>
+          </div>
+          <div class="results-grid" style="height:calc(100vh - var(--topbar) - var(--tabbar) - var(--chatbar) - 215px)">
+            <div class="chart-panel">
+              <div class="chart-title">Sentimento por candidato</div>
+              <div class="chart-wrap"><canvas id="chart-soc-sent"></canvas></div>
+            </div>
+            <div class="chart-panel">
+              <div class="chart-title">Volume de men&#231;&#245;es semanal</div>
+              <div class="chart-wrap"><canvas id="chart-soc-vol"></canvas></div>
+            </div>
+          </div>
+          <div class="results-grid" style="height:calc(100vh - var(--topbar) - var(--tabbar) - var(--chatbar) - 215px);margin-top:10px">
+            <div class="chart-panel">
+              <div class="chart-title">Temas em alta</div>
+              <div id="soc-temas-list" style="overflow-y:auto;flex:1"></div>
+            </div>
+            <div class="chart-panel">
+              <div class="chart-title">Eventos GDELT recentes</div>
+              <div id="soc-gdelt-list" style="overflow-y:auto;flex:1"><div class="empty">Carregando...</div></div>
+            </div>
           </div>
         </div>
       </div>
@@ -1013,10 +1082,12 @@ function switchPrevSection(sec, btn) {
   const panel = document.getElementById('psec-' + sec);
   if (panel) panel.classList.add('active');
   if (sec === 'mapa') { setTimeout(()=>{ if(gMap) gMap.invalidateSize(); else initMap(); }, 50); }
-  else if (sec === 'modelos') loadPrevisao(_scenario);
-  else if (sec === 'perfil') loadEleitorado();
-  else if (sec === 'ranking') loadRanking();
-  else if (sec === 'digital') loadDigital();
+  else if (sec === 'modelos')   loadPrevisao(_scenario);
+  else if (sec === 'pesquisas') loadPesquisas();
+  else if (sec === 'social')    loadSocialMonitor();
+  else if (sec === 'perfil')    loadEleitorado();
+  else if (sec === 'ranking')   loadRanking();
+  else if (sec === 'digital')   loadDigital();
 }
 
 function loadPrevisaoTab() {
@@ -1334,7 +1405,8 @@ async function loadDigital() {
   ]);
   const noTokens = sentD?.status === 'sem_tokens';
   const isFallbackDig = sentD?.status === 'fallback';
-  document.getElementById('dig-no-tokens').style.display = noTokens ? 'block' : 'none';
+  const digNoTok = document.getElementById('dig-no-tokens');
+  if (digNoTok) digNoTok.style.display = noTokens ? 'block' : 'none';
   _updateDemoBanner('digital', isFallbackDig ? 'Monitor social: dados de exemplo — conecte Twitter/YouTube' : null);
 
   const score = sentD?.score ?? sentD?.sentimento_score ?? null;
@@ -1497,38 +1569,57 @@ function setScenario(sc, btn) {
 }
 
 async function loadPrevisao(scenario='base') {
-  const noData = document.getElementById('prev-no-data');
+  const noData    = document.getElementById('prev-no-data');
+  const lbl       = document.getElementById('prev-model-label');
+  const titleEl   = document.getElementById('prev-cands-title');
+  const prevEl    = document.getElementById('prev-cands');
+  const shapEl    = document.getElementById('shap-list');
+
+  if (prevEl) prevEl.innerHTML = '<div class="empty">Carregando...</div>';
+  if (shapEl) shapEl.innerHTML = '<div class="empty">Carregando...</div>';
+
   const d = await api(`/api/previsao?uf=${_uf}&cargo=${encodeURIComponent(_cargo)}&ano=2026`);
-  const _cands = d?.candidatos || d?.data || [];
-  if (!d || !_cands.length) {
-    if (noData) noData.style.display = 'block';
-    document.getElementById('prev-cands').innerHTML = '';
-    document.getElementById('shap-list').innerHTML = '';
+  const modelCands = d?.candidatos || d?.data || [];
+
+  if (!modelCands.length) {
+    // Fallback: use polls as a proxy for probability
+    const pd = await api(`/api/pesquisas?cargo=${encodeURIComponent(_cargo)}&sg_uf=${_uf}&ano=2026`);
+    const series = pd?.series || [];
+    if (!series.length) {
+      if (noData) noData.style.display = 'block';
+      if (lbl) lbl.style.display = 'none';
+      if (prevEl) prevEl.innerHTML = '';
+      if (shapEl) shapEl.innerHTML = '';
+      return;
+    }
+    // Build pseudo-probability from latest poll point per candidato
+    const latest = series.map(s => {
+      const pts = s.pontos || [];
+      const last = pts.reduce((a,b) => (a.data||'') >= (b.data||'') ? a : b, pts[0]||{});
+      return { nm: s.candidato, prob_vitoria: (last.ajustada||last.intencao||0)/100, data: last.data||'' };
+    }).filter(c => c.prob_vitoria > 0)
+      .sort((a,b) => b.prob_vitoria - a.prob_vitoria);
+
+    if (noData) noData.style.display = 'none';
+    if (lbl) { lbl.textContent = '📊 Fonte: pesquisas eleitorais — modelo Bayesiano ainda não treinado'; lbl.style.display = 'block'; }
+    if (titleEl) titleEl.textContent = 'Intenção de Voto — Última Pesquisa (%)';
+    _renderCandBars(prevEl, latest, scenario);
+    if (shapEl) shapEl.innerHTML = '<div class="empty">SHAP disponível após treino do modelo</div>';
     return;
   }
+
   if (noData) noData.style.display = 'none';
-  const scMult = {otimista:1.15, base:1, pessimista:0.85}[scenario] || 1;
-  const cands = _cands;
-  const prevEl = document.getElementById('prev-cands');
-  if (prevEl) {
-    prevEl.innerHTML = cands.slice(0,8).map(c => {
-      const p = Math.min(100, Math.round((c.prob_vitoria||c.pct||0)*100*scMult));
-      const col = p>50?'#22c55e':p>30?'var(--org)':'var(--red)';
-      return `<div class="prob-wrap">
-        <div class="prob-lbl"><span>${_esc(c.nm||'—')}</span><span style="color:${col};font-weight:700">${p}%</span></div>
-        <div class="prob-track"><div class="prob-fill" style="width:${p}%;background:${col}"></div></div>
-      </div>`;
-    }).join('') || '<div class="empty">Sem candidatos no modelo</div>';
-  }
+  if (lbl) lbl.style.display = 'none';
+  if (titleEl) titleEl.textContent = 'Probabilidade de vitória (%)';
+  _renderCandBars(prevEl, modelCands, scenario);
 
   const shap = await api(`/api/model/shap?uf=${_uf}&cargo=${encodeURIComponent(_cargo)}`);
   const shapItems = shap?.features || shap || [];
-  const shapEl = document.getElementById('shap-list');
   if (shapEl) {
     const isFallback = shap?.status === 'fallback';
     _updateDemoBanner('shap', isFallback ? 'SHAP: valores estimados (modelo não treinado ainda)' : null);
     const maxS = Math.max(...shapItems.map(s=>Math.abs(s.shap||0)), 0.001);
-    shapEl.innerHTML = (shapItems.slice(0,8).map(s => {
+    shapEl.innerHTML = shapItems.slice(0,8).map(s => {
       const v = s.shap||0;
       const pct = Math.abs(v/maxS*100).toFixed(0);
       const col = v>0?'#22c55e':'var(--red)';
@@ -1537,7 +1628,172 @@ async function loadPrevisao(scenario='base') {
         <div class="shap-bar-wrap"><div class="shap-bar-fill" style="width:${pct}%;background:${col}"></div></div>
         <div class="shap-val" style="color:${col}">${v>0?'+':''}${v.toFixed(3)}</div>
       </div>`;
-    }).join('') || '<div class="empty">SHAP não disponível</div>');
+    }).join('') || '<div class="empty">SHAP não disponível</div>';
+  }
+}
+
+function _renderCandBars(el, cands, scenario) {
+  if (!el) return;
+  const scMult = {otimista:1.15, base:1, pessimista:0.85}[scenario] || 1;
+  el.innerHTML = cands.slice(0,8).map(c => {
+    const raw = c.prob_vitoria ?? c.pct ?? 0;
+    const p = Math.min(100, Math.round(raw * 100 * scMult));
+    const col = p>50?'#22c55e':p>30?'var(--org)':'var(--red)';
+    return `<div class="prob-wrap">
+      <div class="prob-lbl"><span>${_esc(c.nm||c.candidato||'—')}</span><span style="color:${col};font-weight:700">${p}%</span></div>
+      <div class="prob-track"><div class="prob-fill" style="width:${p}%;background:${col}"></div></div>
+    </div>`;
+  }).join('') || '<div class="empty">Sem candidatos</div>';
+}
+
+// ── PESQUISAS ──────────────────────────────────────────────────────────────
+let _pesqJanela = 90;
+const _PESQ_COLORS = ['#3b82f6','#22c55e','#f59e0b','#ef4444','#a78bfa','#ec4899','#14b8a6','#f97316'];
+
+function setPesqJanela(dias, btn) {
+  _pesqJanela = dias;
+  document.querySelectorAll('#psec-pesquisas .pill').forEach(b => b.classList.remove('active'));
+  if (btn) btn.classList.add('active');
+  loadPesquisas();
+}
+
+async function loadPesquisas() {
+  const noData = document.getElementById('pesq-no-data');
+  const pd = await api(`/api/pesquisas?cargo=${encodeURIComponent(_cargo)}&sg_uf=${_uf}&ano=2026`);
+  const series = pd?.series || [];
+
+  if (!series.length) {
+    if (noData) noData.style.display = 'block';
+    document.getElementById('pesq-ultima-rodada').innerHTML = '';
+    return;
+  }
+  if (noData) noData.style.display = 'none';
+
+  // KPIs
+  const latest = series.map(s => {
+    const pts = s.pontos || [];
+    const last = pts.reduce((a,b) => (a.data||'') >= (b.data||'') ? a : b, pts[0]||{});
+    return { nm: s.candidato, intencao: last.ajustada||last.intencao||0, data: last.data||'' };
+  }).filter(c => c.intencao > 0).sort((a,b) => b.intencao - a.intencao);
+
+  const lider = latest[0];
+  _set('pesq-lider', lider ? (lider.nm||'—').split(' ')[0] : '—');
+  _set('pesq-pct', lider ? lider.intencao.toFixed(1) + '%' : '—');
+  const allInsts = new Set((pd.house_effects||[]).map(h=>h.instituto).filter(Boolean));
+  _set('pesq-institutos', allInsts.size || '—');
+  _set('pesq-ultima', lider?.data?.slice(0,7) || '—');
+
+  // Evolução multi-linha
+  const cutDate = new Date(); cutDate.setDate(cutDate.getDate() - _pesqJanela);
+  const cutStr = cutDate.toISOString().slice(0,7);
+  const allDates = [...new Set(series.flatMap(s=>(s.pontos||[]).map(p=>p.data||'').filter(d=>d>=cutStr)))].sort();
+
+  const datasets = series.slice(0,8).map((s,i) => {
+    const byDate = Object.fromEntries((s.pontos||[]).filter(p=>p.data>=cutStr).map(p=>[p.data, p.ajustada||p.intencao||0]));
+    return {
+      label: s.candidato,
+      data: allDates.map(d => byDate[d] ?? null),
+      borderColor: _PESQ_COLORS[i % _PESQ_COLORS.length],
+      backgroundColor: _PESQ_COLORS[i % _PESQ_COLORS.length] + '22',
+      tension: 0.3, spanGaps: true, pointRadius: 3, fill: false,
+    };
+  });
+
+  const evoCanvas = document.getElementById('chart-pesq-evolucao');
+  if (evoCanvas) {
+    if (evoCanvas._chartInst) evoCanvas._chartInst.destroy();
+    evoCanvas._chartInst = new Chart(evoCanvas.getContext('2d'), {
+      type: 'line',
+      data: { labels: allDates, datasets },
+      options: {
+        responsive: true, maintainAspectRatio: false,
+        plugins: { legend: { labels: { color: '#8d96a0', font: { size: 10 } } } },
+        scales: {
+          x: { ticks: { color:'#8d96a0', maxRotation:45, font:{size:9} }, grid:{color:'rgba(255,255,255,.04)'} },
+          y: { ticks: { color:'#8d96a0', callback: v => v+'%' }, grid:{color:'rgba(255,255,255,.06)'} }
+        }
+      }
+    });
+  }
+
+  // Última rodada (barras horizontais)
+  const rodadaEl = document.getElementById('pesq-ultima-rodada');
+  if (rodadaEl) {
+    rodadaEl.innerHTML = latest.slice(0,8).map((c,i) => {
+      const col = _PESQ_COLORS[series.findIndex(s=>s.candidato===c.nm) % _PESQ_COLORS.length] || '#3b82f6';
+      return `<div class="prob-wrap">
+        <div class="prob-lbl"><span>${_esc((c.nm||'—').split(' ')[0])}</span><span style="color:${col};font-weight:700">${c.intencao.toFixed(1)}%</span></div>
+        <div class="prob-track"><div class="prob-fill" style="width:${Math.min(100,c.intencao)}%;background:${col}"></div></div>
+      </div>`;
+    }).join('') || '<div class="empty">Sem dados</div>';
+  }
+
+  // House effects
+  const houseEl = document.getElementById('pesq-house-list');
+  const houseWrap = document.getElementById('pesq-house-wrap');
+  if (houseEl && pd.house_effects?.length) {
+    if (houseWrap) houseWrap.style.display = 'block';
+    houseEl.innerHTML = pd.house_effects.map(h => {
+      const v = h.house_effect||0;
+      const col = v>0?'#22c55e':v<0?'var(--red)':'var(--tx3)';
+      return `<span class="tag" style="color:${col};border-color:${col}33">${_esc(h.instituto||'?')} <b>${v>0?'+':''}${v.toFixed(2)}%</b></span>`;
+    }).join('');
+  } else if (houseWrap) {
+    houseWrap.style.display = 'none';
+  }
+}
+
+// ── SOCIAL MONITOR ─────────────────────────────────────────────────────────
+async function loadSocialMonitor() {
+  const [sentD, gdeltD, temasD] = await Promise.all([
+    api(`/api/social/sentimento?uf=${_uf}`),
+    api(`/api/gdelt_eventos?uf=${_uf}`),
+    api(`/api/social/temas?uf=${_uf}`),
+  ]);
+
+  const score = sentD?.score ?? sentD?.sentimento_score ?? null;
+  _set('soc-score', score != null ? score.toFixed(2) : '—');
+  _set('soc-vol',   sentD?.volume != null ? _fmt(sentD.volume) : '—');
+  const topC = (sentD?.candidatos||[])[0];
+  _set('soc-lider', topC ? (topC.nm||'—').split(' ')[0] : '—');
+  _set('soc-trend', sentD?.tendencia || '—');
+
+  const cands = sentD?.candidatos || [];
+  if (cands.length) {
+    mkChart('chart-soc-sent','bar',
+      cands.slice(0,8).map(c=>(c.nm||'?').split(' ')[0]),
+      cands.slice(0,8).map(c=>c.score||c.sentimento||0),
+      {colors: cands.slice(0,8).map(c=>(c.score||0)>=0?'#22c55e':'#ef4444')}
+    );
+  }
+
+  const volSeries = sentD?.series || [];
+  if (volSeries.length) {
+    mkChart('chart-soc-vol','line',
+      volSeries.map(s=>s.dt||s.data||''),
+      volSeries.map(s=>s.volume||s.val||0),
+      {colors:'#7c3aed'}
+    );
+  }
+
+  const temasEl = document.getElementById('soc-temas-list');
+  const temas = temasD?.temas || temasD?.data || [];
+  if (temasEl) {
+    temasEl.innerHTML = temas.slice(0,12).map(t =>
+      `<div class="kv-row"><span class="kv-lbl" style="flex:1">${_esc(t.tema||t.label||'—')}</span>
+       <span class="kv-val tag tag-grn">${_fmt(t.volume||t.count||0)}</span></div>`
+    ).join('') || '<div class="empty">Sem temas</div>';
+  }
+
+  const gdeltEl = document.getElementById('soc-gdelt-list');
+  const gdeltItems = gdeltD?.eventos || gdeltD?.data || [];
+  if (gdeltEl) {
+    gdeltEl.innerHTML = gdeltItems.slice(0,10).map(e =>
+      `<div class="kv-row">
+        <span class="kv-lbl" style="flex:1">${_esc(e.titulo||e.title||e.tema||'—')}</span>
+        <span class="kv-val" style="font-size:.68rem;color:var(--tx3)">${_esc(e.dt||e.data||'')}</span>
+      </div>`
+    ).join('') || '<div class="empty">Sem eventos GDELT</div>';
   }
 }
 
