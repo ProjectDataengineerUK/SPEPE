@@ -8265,7 +8265,15 @@ async def get_comparativo_mapa_candidato(
             if votos_col:
                 df = df.rename(columns={votos_col: "total_votos"})
 
-        needed = {"sg_uf", "cd_cargo", "nr_turno", "nm_candidato", "nm_municipio", "total_votos", "ano_eleicao"}
+        needed = {
+            "sg_uf",
+            "cd_cargo",
+            "nr_turno",
+            "nm_candidato",
+            "nm_municipio",
+            "total_votos",
+            "ano_eleicao",
+        }
         if not needed.issubset(df.columns):
             return JSONResponse({"status": "sem_dados", "municipios": [], "fonte": "local"})
 
@@ -8280,12 +8288,20 @@ async def get_comparativo_mapa_candidato(
         df["total_votos"] = pd.to_numeric(df["total_votos"], errors="coerce").fillna(0)
 
         # total de votos por município × ano (denominador)
-        tot = df.groupby(["nm_municipio", "ano_eleicao"])["total_votos"].sum().reset_index(name="total_mun")
+        tot = (
+            df.groupby(["nm_municipio", "ano_eleicao"])["total_votos"]
+            .sum()
+            .reset_index(name="total_mun")
+        )
 
         if candidato2:
             # modo comparação: candidato1 vs candidato2
             df_c = df[df["nm_candidato"].isin([candidato, candidato2])].copy()
-            grp = df_c.groupby(["nm_municipio", "nm_candidato", "ano_eleicao"])["total_votos"].sum().reset_index()
+            grp = (
+                df_c.groupby(["nm_municipio", "nm_candidato", "ano_eleicao"])["total_votos"]
+                .sum()
+                .reset_index()
+            )
             grp = grp.merge(tot, on=["nm_municipio", "ano_eleicao"], how="left")
             grp["pct"] = (grp["total_votos"] / grp["total_mun"].replace(0, 1) * 100).round(2)
 
@@ -8307,11 +8323,16 @@ async def get_comparativo_mapa_candidato(
                     if v1 or v2:
                         m[f"lider_{sfx}"] = "c1" if v1 > v2 else ("c2" if v2 > v1 else "empate")
 
-            return JSONResponse({
-                "status": "ok", "modo": "comparacao",
-                "candidato1": candidato, "candidato2": candidato2,
-                "municipios": list(municipios.values()), "fonte": "local",
-            })
+            return JSONResponse(
+                {
+                    "status": "ok",
+                    "modo": "comparacao",
+                    "candidato1": candidato,
+                    "candidato2": candidato2,
+                    "municipios": list(municipios.values()),
+                    "fonte": "local",
+                }
+            )
 
         # modo candidato único
         df_c = df[df["nm_candidato"] == candidato].copy()
@@ -8330,7 +8351,13 @@ async def get_comparativo_mapa_candidato(
             nm = row["nm_municipio"]
             ano = int(row["ano_eleicao"])
             if nm not in municipios_d:
-                municipios_d[nm] = {"nm_municipio": nm, "votos_2018": 0, "pct_2018": 0.0, "votos_2022": 0, "pct_2022": 0.0}
+                municipios_d[nm] = {
+                    "nm_municipio": nm,
+                    "votos_2018": 0,
+                    "pct_2018": 0.0,
+                    "votos_2022": 0,
+                    "pct_2022": 0.0,
+                }
             if ano == 2018:
                 municipios_d[nm]["votos_2018"] = int(row["total_votos"])
                 municipios_d[nm]["pct_2018"] = float(row["pct"])
@@ -8340,11 +8367,17 @@ async def get_comparativo_mapa_candidato(
 
         result_list = list(municipios_d.values())
         max_pct = max((m["pct_2022"] or m["pct_2018"] for m in result_list), default=1.0)
-        return JSONResponse({
-            "status": "ok", "modo": "candidato", "candidato": candidato,
-            "municipios": result_list, "max_pct": max_pct,
-            "total_municipios": len(result_list), "fonte": "local",
-        })
+        return JSONResponse(
+            {
+                "status": "ok",
+                "modo": "candidato",
+                "candidato": candidato,
+                "municipios": result_list,
+                "max_pct": max_pct,
+                "total_municipios": len(result_list),
+                "fonte": "local",
+            }
+        )
 
     from google.cloud import bigquery as _bq
 
