@@ -2865,7 +2865,10 @@ async function _cmp2LocEnter(nmMunicipio, bounds) {
   _drawLocaisMarkers(_cmp2MapaMap, _cmp2LocLayer, geo?.features || []);
 
   if (!geo?.features?.length) {
-    if (crumb) crumb.textContent = `📍 ${nmMunicipio} — sem coords cadastradas`;
+    const msg = geo?.fonte === 'bigquery_indisponivel'
+      ? `📍 ${nmMunicipio} — requer GCP (spepe-tse-locais-ingest)`
+      : `📍 ${nmMunicipio} — sem coords cadastradas`;
+    if (crumb) crumb.textContent = msg;
   }
 }
 

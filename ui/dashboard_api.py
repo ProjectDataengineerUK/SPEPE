@@ -8233,10 +8233,118 @@ async def get_comparativo_mapa_candidato(
     Votos de um ou dois candidatos por município (choropleth dinâmico).
     Retorna pct relativo ao total de votos válidos no município/ano.
     """
+    import unicodedata
+
+    import pandas as pd
+
+    def _norm_cand(s: str) -> str:
+        s = unicodedata.normalize("NFD", s.upper())
+        return "".join(c for c in s if unicodedata.category(c) != "Mn")
+
     cd_cargo = _cargo_to_cd(cargo, 6)
 
-    if not (settings.gcp_project_id and os.environ.get("USE_BIGQUERY", "").lower() == "true"):
-        return JSONResponse({"status": "bigquery_disabled", "municipios": []})
+    use_bq = settings.gcp_project_id and os.environ.get("USE_BIGQUERY", "").lower() == "true"
+
+    if not use_bq:
+        # ── Silver local fallback ────────────────────────────────────────────
+        frames: list[pd.DataFrame] = []
+        for f in sorted(_LOCAL_SILVER_DIR.glob("tse_*.parquet")):
+            try:
+                frames.append(pd.read_parquet(f))
+            except Exception:
+                continue
+        if not frames:
+            return JSONResponse({"status": "sem_dados", "municipios": [], "fonte": "local"})
+
+        df = pd.concat(frames, ignore_index=True)
+        df.columns = [c.lower() for c in df.columns]
+        col_map = {"qt_votos_nominais": "total_votos"}
+        df = df.rename(columns={k: v for k, v in col_map.items() if k in df.columns})
+        if "total_votos" not in df.columns:
+            votos_col = next((c for c in df.columns if "voto" in c), None)
+            if votos_col:
+                df = df.rename(columns={votos_col: "total_votos"})
+
+        needed = {"sg_uf", "cd_cargo", "nr_turno", "nm_candidato", "nm_municipio", "total_votos", "ano_eleicao"}
+        if not needed.issubset(df.columns):
+            return JSONResponse({"status": "sem_dados", "municipios": [], "fonte": "local"})
+
+        df = df[
+            (df["sg_uf"].str.upper() == uf.upper())
+            & (df["cd_cargo"].astype(str) == str(cd_cargo))
+            & (df["nr_turno"].astype(str) == str(turno))
+            & (df["ano_eleicao"].isin([2018, 2022]))
+            & df["nm_candidato"].notna()
+            & (~df["nm_candidato"].str.upper().str.strip().isin(_INVALIDOS_NOMES))
+        ].copy()
+        df["total_votos"] = pd.to_numeric(df["total_votos"], errors="coerce").fillna(0)
+
+        # total de votos por município × ano (denominador)
+        tot = df.groupby(["nm_municipio", "ano_eleicao"])["total_votos"].sum().reset_index(name="total_mun")
+
+        if candidato2:
+            # modo comparação: candidato1 vs candidato2
+            df_c = df[df["nm_candidato"].isin([candidato, candidato2])].copy()
+            grp = df_c.groupby(["nm_municipio", "nm_candidato", "ano_eleicao"])["total_votos"].sum().reset_index()
+            grp = grp.merge(tot, on=["nm_municipio", "ano_eleicao"], how="left")
+            grp["pct"] = (grp["total_votos"] / grp["total_mun"].replace(0, 1) * 100).round(2)
+
+            municipios: dict[str, dict] = {}
+            for _, row in grp.iterrows():
+                nm = row["nm_municipio"]
+                ano = int(row["ano_eleicao"])
+                sfx = str(ano)
+                slot = "c1" if row["nm_candidato"] == candidato else "c2"
+                if nm not in municipios:
+                    municipios[nm] = {"nm_municipio": nm}
+                municipios[nm][f"votos_{slot}_{sfx}"] = int(row["total_votos"])
+                municipios[nm][f"pct_{slot}_{sfx}"] = float(row["pct"])
+
+            for m in municipios.values():
+                for sfx in ("2022", "2018"):
+                    v1 = m.get(f"votos_c1_{sfx}", 0)
+                    v2 = m.get(f"votos_c2_{sfx}", 0)
+                    if v1 or v2:
+                        m[f"lider_{sfx}"] = "c1" if v1 > v2 else ("c2" if v2 > v1 else "empate")
+
+            return JSONResponse({
+                "status": "ok", "modo": "comparacao",
+                "candidato1": candidato, "candidato2": candidato2,
+                "municipios": list(municipios.values()), "fonte": "local",
+            })
+
+        # modo candidato único
+        df_c = df[df["nm_candidato"] == candidato].copy()
+        if df_c.empty:
+            # tolerante: busca por normalização
+            norm_cand = _norm_cand(candidato)
+            df["_nm_norm"] = df["nm_candidato"].apply(_norm_cand)
+            df_c = df[df["_nm_norm"] == norm_cand].copy()
+
+        grp = df_c.groupby(["nm_municipio", "ano_eleicao"])["total_votos"].sum().reset_index()
+        grp = grp.merge(tot, on=["nm_municipio", "ano_eleicao"], how="left")
+        grp["pct"] = (grp["total_votos"] / grp["total_mun"].replace(0, 1) * 100).round(2)
+
+        municipios_d: dict[str, dict] = {}
+        for _, row in grp.iterrows():
+            nm = row["nm_municipio"]
+            ano = int(row["ano_eleicao"])
+            if nm not in municipios_d:
+                municipios_d[nm] = {"nm_municipio": nm, "votos_2018": 0, "pct_2018": 0.0, "votos_2022": 0, "pct_2022": 0.0}
+            if ano == 2018:
+                municipios_d[nm]["votos_2018"] = int(row["total_votos"])
+                municipios_d[nm]["pct_2018"] = float(row["pct"])
+            elif ano == 2022:
+                municipios_d[nm]["votos_2022"] = int(row["total_votos"])
+                municipios_d[nm]["pct_2022"] = float(row["pct"])
+
+        result_list = list(municipios_d.values())
+        max_pct = max((m["pct_2022"] or m["pct_2018"] for m in result_list), default=1.0)
+        return JSONResponse({
+            "status": "ok", "modo": "candidato", "candidato": candidato,
+            "municipios": result_list, "max_pct": max_pct,
+            "total_municipios": len(result_list), "fonte": "local",
+        })
 
     from google.cloud import bigquery as _bq
 
