@@ -2865,9 +2865,14 @@ async function _cmp2LocEnter(nmMunicipio, bounds) {
   _drawLocaisMarkers(_cmp2MapaMap, _cmp2LocLayer, geo?.features || []);
 
   if (!geo?.features?.length) {
-    const msg = geo?.fonte === 'bigquery_indisponivel'
-      ? `📍 ${nmMunicipio} — requer GCP (spepe-tse-locais-ingest)`
-      : `📍 ${nmMunicipio} — sem coords cadastradas`;
+    const f = geo?.fonte;
+    const msg = f === 'bigquery_indisponivel' || f === 'tabela_nao_encontrada' || f === 'pipeline_nao_executado'
+      ? `📍 ${nmMunicipio} — execute spepe-tse-locais-ingest no GCP`
+      : f === 'sem_coordenadas'
+        ? `📍 ${nmMunicipio} — ${geo.qt_total} locais sem coordenadas no TSE`
+        : f === 'bigquery_erro'
+          ? `📍 ${nmMunicipio} — erro BQ: ${geo?.erro?.slice(0, 60)}`
+          : `📍 ${nmMunicipio} — sem coords cadastradas`;
     if (crumb) crumb.textContent = msg;
   }
 }
@@ -2927,7 +2932,13 @@ async function _prevLocLoad() {
   _drawLocaisMarkers(gMap, _prevLocLayer, geo?.features || []);
 
   if (!geo?.features?.length && crumb) {
-    crumb.textContent = (nmMun ? `📍 ${nmMun}` : `📍 ${uf}`) + ' — sem coords';
+    const f = geo?.fonte;
+    const label = nmMun ? `📍 ${nmMun}` : `📍 ${uf}`;
+    crumb.textContent = (f === 'tabela_nao_encontrada' || f === 'pipeline_nao_executado')
+      ? `${label} — execute spepe-tse-locais-ingest`
+      : f === 'sem_coordenadas'
+        ? `${label} — sem coords (${geo.qt_total} locais)`
+        : `${label} — sem coords`;
   }
 }
 

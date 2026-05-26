@@ -3397,10 +3397,32 @@ async def get_mapa_locais(
         features = await _bq_locais_votacao(
             uf.upper(), cd_municipio, nm_municipio, nr_zona, only_with_coords
         )
-        return _json_safe_response({"type": "FeatureCollection", "features": features})
+        if not features and only_with_coords:
+            # Diagnostic: check if table has any rows at all for this UF
+            qt_total = await _bq_locais_count(uf.upper(), cd_municipio, nm_municipio)
+            fonte = "sem_coordenadas" if qt_total > 0 else "pipeline_nao_executado"
+            return _json_safe_response(
+                {
+                    "type": "FeatureCollection",
+                    "features": [],
+                    "fonte": fonte,
+                    "qt_total": qt_total,
+                }
+            )
+        return _json_safe_response(
+            {"type": "FeatureCollection", "features": features, "fonte": "bigquery"}
+        )
     except Exception as exc:
-        logger.warning("BQ locais_votacao falhou: %s", exc)
-        return _json_safe_response({"type": "FeatureCollection", "features": [], "erro": str(exc)})
+        err_str = str(exc)
+        logger.warning("BQ locais_votacao falhou: %s", err_str)
+        fonte = (
+            "tabela_nao_encontrada"
+            if "Not found" in err_str or "not found" in err_str.lower()
+            else "bigquery_erro"
+        )
+        return _json_safe_response(
+            {"type": "FeatureCollection", "features": [], "fonte": fonte, "erro": err_str}
+        )
 
 
 def _bronze_locais_votacao(
@@ -3413,7 +3435,6 @@ def _bronze_locais_votacao(
     """Lê Bronze local (tse_locais) e retorna features GeoJSON. None se sem dados."""
     import pandas as pd
 
-    pattern = _LOCAL_BRONZE_DIR / "tse_locais" / "*" / uf / "*.parquet"
     files = sorted(_LOCAL_BRONZE_DIR.glob(f"tse_locais/*/{uf}/*.parquet"))
     if not files:
         return None
@@ -3550,6 +3571,36 @@ async def _bq_locais_votacao(
         for r in rows
         if r["nr_latitude"] is not None and r["nr_longitude"] is not None
     ]
+
+
+async def _bq_locais_count(uf: str, cd_municipio: str | None, nm_municipio: str | None) -> int:
+    """Returns total row count in fact_locais_votacao for this UF (ignoring coords filter)."""
+    try:
+        from google.cloud import bigquery
+
+        client = bigquery.Client(project=settings.gcp_project_id)
+        gold = f"{settings.gcp_project_id}.{settings.bigquery_dataset_gold}"
+        filters = ["sg_uf = @uf"]
+        params: list = [bigquery.ScalarQueryParameter("uf", "STRING", uf)]
+        if cd_municipio:
+            filters.append("cd_municipio = @cd_municipio")
+            params.append(bigquery.ScalarQueryParameter("cd_municipio", "INT64", int(cd_municipio)))
+        if nm_municipio:
+            filters.append("UPPER(nm_municipio) = UPPER(@nm_municipio)")
+            params.append(bigquery.ScalarQueryParameter("nm_municipio", "STRING", nm_municipio))
+        query = (
+            f"SELECT COUNT(*) AS n FROM `{gold}.fact_locais_votacao` WHERE {' AND '.join(filters)}"
+        )
+        rows = await asyncio.to_thread(
+            lambda: list(
+                client.query(
+                    query, job_config=bigquery.QueryJobConfig(query_parameters=params)
+                ).result()
+            )
+        )
+        return int(rows[0]["n"]) if rows else 0
+    except Exception:
+        return 0
 
 
 @app.get("/api/locais/resumo")

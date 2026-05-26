@@ -18,9 +18,12 @@ logger = logging.getLogger("spepe.clients.tse")
 _CDN = "https://cdn.tse.jus.br/estatistica/sead/odsele/votacao_secao/votacao_secao_{year}_{uf}.zip"
 _CDN_BR = "https://cdn.tse.jus.br/estatistica/sead/odsele/votacao_secao/votacao_secao_{year}_BR.zip"
 _CDN_LOCAIS = (
-    "https://cdn.tse.jus.br/estatistica/sead/odsele/eleitorado_locais_votacao/"
-    "eleitorado_locais_votacao_{uf}_ATUAL.zip"
+    "https://cdn.tse.jus.br/estatistica/sead/odsele/perfil_eleitorado/"
+    "eleitorado_local_votacao_ATUAL.zip"
 )
+# TSE consolidou os 27 arquivos por UF em um único arquivo nacional (2026+).
+# Cache no nível do módulo: baixa uma vez por processo quando --uf ALL.
+_LOCAIS_NATIONAL_ZIP: list[str] = []
 
 _COL_MAP_LOCAIS: dict[str, str] = {
     "SG_UF": "sg_uf",
@@ -248,77 +251,83 @@ def download_br_presidente(year: int) -> str:
 
 
 @retry(stop=stop_after_attempt(3), wait=wait_exponential(min=2, max=30))
-def download_eleitorado_locais(uf: str) -> str:
-    """Download locais de votação TSE (cadastro ATUAL) para uma UF.
+def _download_locais_zip_nacional() -> str:
+    """Baixa o ZIP nacional de locais de votação TSE. Retorna o caminho do tmp zip."""
+    logger.info("Baixando locais votação nacional: %s", _CDN_LOCAIS)
+    tmp_fd, tmp_zip = tempfile.mkstemp(suffix=".zip")
+    with requests.get(_CDN_LOCAIS, timeout=600, stream=True) as resp:
+        resp.raise_for_status()
+        with os.fdopen(tmp_fd, "wb") as fout:
+            for http_chunk in resp.iter_content(chunk_size=8 * 1024 * 1024):
+                fout.write(http_chunk)
+    logger.info("ZIP locais nacional: %.1f MB", os.path.getsize(tmp_zip) / 1e6)
+    return tmp_zip
 
-    O arquivo CDN não é versionado por ano — é o cadastro vigente ("ATUAL").
+
+def download_eleitorado_locais(uf: str) -> str:
+    """Filtra locais de votação TSE para uma UF do arquivo nacional ATUAL.
+
+    O TSE passou a publicar um único arquivo nacional em 2026 (path:
+    perfil_eleitorado/eleitorado_local_votacao_ATUAL.zip). O ZIP é baixado
+    uma vez por processo e reutilizado para todas as UFs.
     Retorna caminho de parquet temporário; caller responsável por apagar após uso.
     """
-    url = _CDN_LOCAIS.format(uf=uf.upper())
-    logger.info("Baixando locais votação: %s", url)
+    if not _LOCAIS_NATIONAL_ZIP:
+        _LOCAIS_NATIONAL_ZIP.append(_download_locais_zip_nacional())
+    zip_path = _LOCAIS_NATIONAL_ZIP[0]
 
-    tmp_fd, tmp_zip = tempfile.mkstemp(suffix=".zip")
-    tmp_parquet = tmp_zip.replace(".zip", ".parquet")
-    try:
-        with requests.get(url, timeout=300, stream=True) as resp:
-            resp.raise_for_status()
-            with os.fdopen(tmp_fd, "wb") as fout:
-                for http_chunk in resp.iter_content(chunk_size=8 * 1024 * 1024):
-                    fout.write(http_chunk)
-        logger.info("ZIP locais baixado: %.1f MB", os.path.getsize(tmp_zip) / 1e6)
+    uf_upper = uf.upper()
+    tmp_parquet = tempfile.mktemp(suffix=f"_locais_{uf_upper}.parquet")
+    keep_cols = set(_COL_MAP_LOCAIS.keys())
+    writer: pq.ParquetWriter | None = None
+    total_rows = 0
 
-        writer: pq.ParquetWriter | None = None
-        total_rows = 0
-        keep_cols = set(_COL_MAP_LOCAIS.keys())
+    with zipfile.ZipFile(zip_path) as zf:
+        csv_files = [n for n in zf.namelist() if n.lower().endswith(".csv")]
+        if not csv_files:
+            raise ValueError(f"ZIP locais nacional vazio: {zf.namelist()}")
 
-        with zipfile.ZipFile(tmp_zip) as zf:
-            csv_files = [n for n in zf.namelist() if n.lower().endswith(".csv")]
-            if not csv_files:
-                raise ValueError(f"ZIP locais vazio para {uf}: {zf.namelist()}")
-
-            for name in csv_files:
-                with zf.open(name) as f:
-                    for chunk in pd.read_csv(
-                        f, sep=";", encoding="latin-1", dtype=str, chunksize=200_000
+        for name in csv_files:
+            with zf.open(name) as f:
+                for chunk in pd.read_csv(
+                    f, sep=";", encoding="latin-1", dtype=str, chunksize=200_000
+                ):
+                    if "SG_UF" in chunk.columns:
+                        chunk = chunk[chunk["SG_UF"].str.strip().str.upper() == uf_upper]
+                    if chunk.empty:
+                        continue
+                    present = [c for c in chunk.columns if c in keep_cols]
+                    chunk = chunk[present].rename(columns={c: _COL_MAP_LOCAIS[c] for c in present})
+                    for col in ("nr_latitude", "nr_longitude"):
+                        if col in chunk.columns:
+                            chunk[col] = pd.to_numeric(
+                                chunk[col].str.replace(",", ".", regex=False),
+                                errors="coerce",
+                            )
+                    for col in (
+                        "cd_municipio",
+                        "nr_zona",
+                        "nr_secao",
+                        "nr_local_votacao",
+                        "qt_aptos",
                     ):
-                        present = [c for c in chunk.columns if c in keep_cols]
-                        chunk = chunk[present].rename(
-                            columns={c: _COL_MAP_LOCAIS[c] for c in present}
-                        )
-                        for col in ("nr_latitude", "nr_longitude"):
-                            if col in chunk.columns:
-                                chunk[col] = pd.to_numeric(
-                                    chunk[col].str.replace(",", ".", regex=False),
-                                    errors="coerce",
-                                )
-                        for col in (
-                            "cd_municipio",
-                            "nr_zona",
-                            "nr_secao",
-                            "nr_local_votacao",
-                            "qt_aptos",
-                        ):
-                            if col in chunk.columns:
-                                chunk[col] = pd.to_numeric(chunk[col], errors="coerce")
-                        if "sg_uf" in chunk.columns:
-                            chunk["sg_uf"] = chunk["sg_uf"].str.strip().str.upper()
-                        if "nm_municipio" in chunk.columns:
-                            chunk["nm_municipio"] = chunk["nm_municipio"].str.strip().str.title()
-                        table = pa.Table.from_pandas(chunk, preserve_index=False)
-                        if writer is None:
-                            writer = pq.ParquetWriter(tmp_parquet, table.schema, compression="zstd")
-                        writer.write_table(table)
-                        total_rows += len(chunk)
-                        del chunk, table
+                        if col in chunk.columns:
+                            chunk[col] = pd.to_numeric(chunk[col], errors="coerce")
+                    if "sg_uf" in chunk.columns:
+                        chunk["sg_uf"] = chunk["sg_uf"].str.strip().str.upper()
+                    if "nm_municipio" in chunk.columns:
+                        chunk["nm_municipio"] = chunk["nm_municipio"].str.strip().str.title()
+                    table = pa.Table.from_pandas(chunk, preserve_index=False)
+                    if writer is None:
+                        writer = pq.ParquetWriter(tmp_parquet, table.schema, compression="zstd")
+                    writer.write_table(table)
+                    total_rows += len(chunk)
+                    del chunk, table
 
-        if writer:
-            writer.close()
-        if total_rows == 0:
-            raise ValueError(f"Nenhuma linha lida de locais de votação {uf}")
+    if writer:
+        writer.close()
+    if total_rows == 0:
+        raise ValueError(f"Nenhuma linha para UF={uf_upper} no arquivo nacional")
 
-        logger.info("Locais votação %s: %d linhas → %s", uf, total_rows, tmp_parquet)
-        return tmp_parquet
-
-    finally:
-        if os.path.exists(tmp_zip):
-            os.unlink(tmp_zip)
+    logger.info("Locais votação %s: %d linhas → %s", uf_upper, total_rows, tmp_parquet)
+    return tmp_parquet
