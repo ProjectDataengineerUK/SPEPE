@@ -550,7 +550,9 @@ def enrich_sentiment_vertex(
     was_list = isinstance(df, list)
     frame: pd.DataFrame = pd.DataFrame(df) if was_list else df  # type: ignore[arg-type]
 
-    texts = frame[text_field].fillna("").tolist() if text_field in frame.columns else [""] * len(frame)
+    texts = (
+        frame[text_field].fillna("").tolist() if text_field in frame.columns else [""] * len(frame)
+    )
 
     if not project:
         frame = frame.copy()
