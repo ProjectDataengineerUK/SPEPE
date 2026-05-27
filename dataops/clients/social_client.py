@@ -548,26 +548,25 @@ def enrich_sentiment_vertex(
         project = os.environ.get("GCP_PROJECT_ID", "")
 
     was_list = isinstance(df, list)
-    if was_list:
-        df = pd.DataFrame(df)
+    frame: pd.DataFrame = pd.DataFrame(df) if was_list else df  # type: ignore[arg-type]
 
-    texts = df[text_field].fillna("").tolist() if text_field in df.columns else [""] * len(df)
+    texts = frame[text_field].fillna("").tolist() if text_field in frame.columns else [""] * len(frame)
 
     if not project:
-        df = df.copy()
-        df["sentiment"] = [_simple_sentiment(t) for t in texts]
-        df["sentimento_score"] = 0.0
-        df["confianca_nlp"] = None
-        return df.to_dict("records") if was_list else df
+        frame = frame.copy()
+        frame["sentiment"] = [_simple_sentiment(t) for t in texts]
+        frame["sentimento_score"] = 0.0
+        frame["confianca_nlp"] = None
+        return frame.to_dict("records") if was_list else frame
 
     labels, scores, confidences = _call_vertex_nlp(texts, project)
 
-    df = df.copy()
-    df["sentiment"] = labels
-    df["sentimento_score"] = scores
-    df["confianca_nlp"] = confidences
+    frame = frame.copy()
+    frame["sentiment"] = labels
+    frame["sentimento_score"] = scores
+    frame["confianca_nlp"] = confidences
 
-    return df.to_dict("records") if was_list else df
+    return frame.to_dict("records") if was_list else frame
 
 
 # ── BigQuery helpers ─────────────────────────────────────────────────────────
