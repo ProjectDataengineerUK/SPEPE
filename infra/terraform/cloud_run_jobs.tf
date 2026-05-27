@@ -54,15 +54,9 @@ locals {
       PESQUISAS_ENRICH_PDF = "false"
     }
     social_ingest = {
-      SOCIAL_CANDIDATOS = jsonencode([
-        "Lula", "Lula da Silva",
-        "Tarcísio de Freitas", "Tarcísio Freitas",
-        "Bolsonaro", "Jair Bolsonaro",
-        "Simone Tebet", "Ciro Gomes",
-        "Alckmin", "Geraldo Alckmin",
-        "Rodrigo Pacheco",
-        "Fernando Haddad", "Guilherme Boulos",
-      ])
+      # SOCIAL_CANDIDATOS omitido → Python usa _candidatos_2026("RJ"):
+      # nacional (Lula, Tarcísio, Bolsonaro...) + pré-candidatos RJ 2026
+      # (governador, senador, dep. federal) via dataops/precandidatos_2026.py
       SOCIAL_DIAS = "7"
       SOCIAL_YEAR = "2026"
     }

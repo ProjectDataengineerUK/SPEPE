@@ -530,12 +530,13 @@ def _call_vertex_nlp(
 
 
 def enrich_sentiment_vertex(
-    df: pd.DataFrame,
+    df: pd.DataFrame | list,
     text_field: str = "text",
     project: str = "",
-) -> pd.DataFrame:
-    """Enrich a DataFrame with Vertex AI NLP sentiment columns.
+) -> pd.DataFrame | list:
+    """Enrich records with Vertex AI NLP sentiment columns.
 
+    Accepts either a DataFrame or a list of dicts; returns the same type.
     Adds/replaces:
       - sentiment       (str)   positivo | negativo | neutro
       - sentimento_score (float) -1.0 to +1.0
@@ -546,15 +547,18 @@ def enrich_sentiment_vertex(
     if not project:
         project = os.environ.get("GCP_PROJECT_ID", "")
 
+    was_list = isinstance(df, list)
+    if was_list:
+        df = pd.DataFrame(df)
+
     texts = df[text_field].fillna("").tolist() if text_field in df.columns else [""] * len(df)
 
     if not project:
-        # No GCP context — use rule-based labels and neutral float defaults
         df = df.copy()
         df["sentiment"] = [_simple_sentiment(t) for t in texts]
         df["sentimento_score"] = 0.0
         df["confianca_nlp"] = None
-        return df
+        return df.to_dict("records") if was_list else df
 
     labels, scores, confidences = _call_vertex_nlp(texts, project)
 
@@ -563,7 +567,7 @@ def enrich_sentiment_vertex(
     df["sentimento_score"] = scores
     df["confianca_nlp"] = confidences
 
-    return df
+    return df.to_dict("records") if was_list else df
 
 
 # ── BigQuery helpers ─────────────────────────────────────────────────────────
